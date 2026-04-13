@@ -140,4 +140,5 @@ npx playwright test
 ### Root Files
 - `CHANGELOG.md` - Project changelog (Keep a Changelog format)
 - `CODE_OF_CONDUCT.md` - Contributor Covenant code of conduct
+- `CONTRIBUTORS.md` - Project contributors list
 - `LICENSE` - MIT license
