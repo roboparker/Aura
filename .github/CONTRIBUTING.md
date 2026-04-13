@@ -18,6 +18,41 @@ Then, if it appears that it's a real bug, you may report it using Github by foll
 
 > _NOTE:_ Don’t hesitate to give as much information as you can (OS, PHP version extensions...)
 
+## Branching
+
+Create a branch from `main` using the appropriate prefix:
+
+| Prefix      | Purpose                               | Example                   |
+|-------------|---------------------------------------|---------------------------|
+| `feature/`  | New functionality                     | `feature/add-user-entity` |
+| `fix/`      | Bug fixes                             | `fix/login-validation`    |
+| `chore/`    | Maintenance, deps, config             | `chore/upgrade-deps`      |
+| `docs/`     | Documentation changes                 | `docs/update-api-guide`   |
+| `refactor/` | Code restructuring (no behavior change) | `refactor/extract-service` |
+
+Use lowercase `kebab-case` for branch names.
+
+## Commit Messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). Format:
+
+```
+<type>(<optional scope>): <description>
+```
+
+**Types:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `style`
+
+**Scopes:** `api`, `pwa`, `e2e`, `infra`
+
+**Examples:**
+```
+feat(api): add Book entity with CRUD endpoints
+fix(pwa): correct login form validation
+docs: update contributing guidelines
+```
+
+See `docs/branching-and-releases.md` for the full strategy.
+
 ## Pull Requests
 
 ### Writing a Pull Request
