@@ -42,60 +42,17 @@ All branches are short-lived and created from `main`. Use the following prefixes
 ## Pull Request Workflow
 
 1. **Create a branch** from `main`
-2. **Make commits** following [Conventional Commits](#conventional-commits)
+2. **Make commits** with clear, descriptive messages
 3. **Open a PR** against `main`
 4. **CI checks must pass** (tests, linting, E2E)
 5. **Squash and merge** into `main`
 6. **Delete the branch**
 
 ### PR Requirements
-- Descriptive title following conventional commit format
+- Descriptive title
 - Fill in the PR template (bug fix, new feature, tests pass, etc.)
 - All CI checks green
 - Squash commits into a single commit on merge
-
-## Conventional Commits
-
-Commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
-
-```
-<type>(<optional scope>): <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-### Types
-
-| Type       | When to use                                  |
-|------------|----------------------------------------------|
-| `feat`     | A new feature                                |
-| `fix`      | A bug fix                                    |
-| `chore`    | Maintenance (deps, config, tooling)          |
-| `docs`     | Documentation only                           |
-| `refactor` | Code change that neither fixes nor adds      |
-| `test`     | Adding or updating tests                     |
-| `ci`       | CI/CD configuration changes                  |
-| `style`    | Formatting, whitespace (no logic change)     |
-
-### Scopes
-
-Optional scopes narrow the change area:
-- `api` — Backend PHP/Symfony changes
-- `pwa` — Frontend Next.js changes
-- `e2e` — End-to-end test changes
-- `infra` — Docker, Helm, CI changes
-
-### Examples
-
-```
-feat(api): add Book entity with CRUD endpoints
-fix(pwa): correct login form validation
-chore: upgrade api-platform to 4.2.0
-docs: add branching strategy documentation
-ci: add Playwright to CI pipeline
-```
 
 ## Releases
 
@@ -165,7 +122,7 @@ gitDiagram
 | Default branch      | `main` (always deployable)        |
 | Branch lifetime     | Short-lived (hours to days)       |
 | Merge strategy      | Squash and merge                  |
-| Commit format       | Conventional Commits              |
+| Commit messages     | Clear and descriptive             |
 | Versioning          | Date-based build numbers `YYYY.MM.DD.N` |
 | Release mechanism   | Git tags + GitHub releases        |
 | CI triggers         | Push to `main`, all PRs           |

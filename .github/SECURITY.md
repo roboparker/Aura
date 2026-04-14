@@ -13,12 +13,6 @@ Instead, please report vulnerabilities via [GitHub's private vulnerability repor
 - Potential impact
 - Suggested fix (if any)
 
-### Response Timeline
-
-- **Acknowledgment**: Within 48 hours
-- **Initial assessment**: Within 1 week
-- **Fix or mitigation**: As soon as reasonably possible depending on severity
-
 ## Supported Versions
 
 Only the latest release on `main` is actively supported with security updates.

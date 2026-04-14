@@ -100,7 +100,6 @@ npx playwright test
 ### Git & Branching
 - `main` is the only long-lived branch — always deployable
 - Create short-lived branches: `feature/`, `fix/`, `chore/`, `docs/`, `refactor/`
-- Use [Conventional Commits](https://www.conventionalcommits.org/) (e.g., `feat(api): add Book entity`)
 - Squash and merge PRs
 - See `docs/branching-and-releases.md` for the full strategy
 
