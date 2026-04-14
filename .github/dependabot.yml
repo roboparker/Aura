@@ -12,6 +12,8 @@ updates:
       interval: daily
     labels:
       - dependencies
+    assignees:
+      - roboparker
     open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /pwa
@@ -19,4 +21,6 @@ updates:
       interval: daily
     labels:
       - dependencies
+    assignees:
+      - roboparker
     open-pull-requests-limit: 5
