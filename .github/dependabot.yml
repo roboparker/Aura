@@ -12,11 +12,11 @@ updates:
       interval: daily
     labels:
       - dependencies
-    open-pull-requests-limit: 0 # open Pull Requests for security updates only
+    open-pull-requests-limit: 5
   - package-ecosystem: npm
     directory: /pwa
     schedule:
       interval: daily
     labels:
       - dependencies
-    open-pull-requests-limit: 0 # open Pull Requests for security updates only
+    open-pull-requests-limit: 5
