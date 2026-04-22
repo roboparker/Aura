@@ -1,6 +1,23 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "../contexts/AuthContext";
 import { ENTRYPOINT } from "../config/entrypoint";
 
@@ -11,12 +28,91 @@ interface Todo {
   description: string | null;
   createdOn: string;
   completedOn: string | null;
+  position: number;
 }
 
-interface HydraCollection {
-  "hydra:member": Todo[];
-  "hydra:totalItems"?: number;
+interface TodoCollection {
+  // API Platform 4 emits JSON-LD 1.1 (`member`); older versions use `hydra:member`.
+  member?: Todo[];
+  "hydra:member"?: Todo[];
 }
+
+interface SortableTodoItemProps {
+  todo: Todo;
+  onToggle: (todo: Todo) => void;
+  onDelete: (todo: Todo) => void;
+}
+
+const SortableTodoItem = ({ todo, onToggle, onDelete }: SortableTodoItemProps) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: todo["@id"],
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className="bg-white rounded-lg shadow-card p-4 flex items-start gap-3"
+      data-testid="todo-item"
+    >
+      <button
+        type="button"
+        aria-label={`Drag to reorder "${todo.title}"`}
+        className="mt-0.5 px-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none bg-transparent border-0"
+        {...attributes}
+        {...listeners}
+      >
+        {/* Six-dot grip icon */}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <circle cx="5" cy="3" r="1.5" />
+          <circle cx="11" cy="3" r="1.5" />
+          <circle cx="5" cy="8" r="1.5" />
+          <circle cx="11" cy="8" r="1.5" />
+          <circle cx="5" cy="13" r="1.5" />
+          <circle cx="11" cy="13" r="1.5" />
+        </svg>
+      </button>
+      <input
+        type="checkbox"
+        checked={!!todo.completedOn}
+        onChange={() => onToggle(todo)}
+        aria-label={`Mark "${todo.title}" as ${todo.completedOn ? "incomplete" : "complete"}`}
+        className="mt-1 h-4 w-4 text-cyan-700 border-gray-300 rounded focus:ring-cyan-500"
+      />
+      <div className="flex-1">
+        <p
+          className={`font-medium ${
+            todo.completedOn ? "line-through text-gray-400" : "text-black"
+          }`}
+        >
+          {todo.title}
+        </p>
+        {todo.description && (
+          <p
+            className={`text-sm mt-1 ${
+              todo.completedOn ? "line-through text-gray-400" : "text-gray-600"
+            }`}
+          >
+            {todo.description}
+          </p>
+        )}
+      </div>
+      <button
+        onClick={() => onDelete(todo)}
+        aria-label={`Delete "${todo.title}"`}
+        className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
+      >
+        Delete
+      </button>
+    </li>
+  );
+};
 
 const Todos = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -28,6 +124,13 @@ const Todos = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const sensors = useSensors(
+    // Require an 8px drag before activating so a quick click on the grip
+    // doesn't get misinterpreted as a reorder attempt.
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -45,8 +148,8 @@ const Todos = () => {
       if (!res.ok) {
         throw new Error("Failed to load todos.");
       }
-      const data: HydraCollection = await res.json();
-      setTodos(data["hydra:member"] ?? []);
+      const data: TodoCollection = await res.json();
+      setTodos(data.member ?? data["hydra:member"] ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load todos.");
     } finally {
@@ -79,7 +182,7 @@ const Todos = () => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
-          data["hydra:description"] || data.detail || "Failed to create todo.",
+          data.description || data.detail || data["hydra:description"] || "Failed to create todo.",
         );
       }
       setTitle("");
@@ -125,6 +228,36 @@ const Todos = () => {
       await loadTodos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete todo.");
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = todos.findIndex((t) => t["@id"] === active.id);
+    const newIndex = todos.findIndex((t) => t["@id"] === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const previous = todos;
+    const reordered = arrayMove(todos, oldIndex, newIndex);
+    // Apply optimistically — snappy UX, rolled back below if the server rejects.
+    setTodos(reordered);
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}/todos/reorder`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order: reordered.map((t) => t["@id"]) }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to save new order.");
+      }
+    } catch (err) {
+      setTodos(previous);
+      setError(err instanceof Error ? err.message : "Failed to save new order.");
     }
   };
 
@@ -200,48 +333,27 @@ const Todos = () => {
               No todos yet. Add one above to get started.
             </p>
           ) : (
-            <ul className="space-y-2" data-testid="todo-list">
-              {todos.map((todo) => (
-                <li
-                  key={todo["@id"]}
-                  className="bg-white rounded-lg shadow-card p-4 flex items-start gap-3"
-                  data-testid="todo-item"
-                >
-                  <input
-                    type="checkbox"
-                    checked={!!todo.completedOn}
-                    onChange={() => handleToggle(todo)}
-                    aria-label={`Mark "${todo.title}" as ${todo.completedOn ? "incomplete" : "complete"}`}
-                    className="mt-1 h-4 w-4 text-cyan-700 border-gray-300 rounded focus:ring-cyan-500"
-                  />
-                  <div className="flex-1">
-                    <p
-                      className={`font-medium ${
-                        todo.completedOn ? "line-through text-gray-400" : "text-black"
-                      }`}
-                    >
-                      {todo.title}
-                    </p>
-                    {todo.description && (
-                      <p
-                        className={`text-sm mt-1 ${
-                          todo.completedOn ? "line-through text-gray-400" : "text-gray-600"
-                        }`}
-                      >
-                        {todo.description}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => handleDelete(todo)}
-                    aria-label={`Delete "${todo.title}"`}
-                    className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={todos.map((t) => t["@id"])}
+                strategy={verticalListSortingStrategy}
+              >
+                <ul className="space-y-2" data-testid="todo-list">
+                  {todos.map((todo) => (
+                    <SortableTodoItem
+                      key={todo["@id"]}
+                      todo={todo}
+                      onToggle={handleToggle}
+                      onDelete={handleDelete}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           )}
         </div>
       </div>

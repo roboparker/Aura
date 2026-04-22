@@ -231,6 +231,168 @@ class TodoTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testNewTodoIsPlacedAtTheTop(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $existing = $this->createTodo($alice, 'First');
+        $existing->setPosition(5);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos', [
+            'json' => ['title' => 'Newer'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $newer = $this->reloadTodoByTitle('Newer');
+        // Position is one slot above the existing minimum so the fresh todo
+        // renders at the top without having to shift every row.
+        $this->assertSame(4, $newer->getPosition());
+    }
+
+    public function testReorderPersistsNewPositions(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->createTodo($alice, 'A');
+        $b = $this->createTodo($alice, 'B');
+        $c = $this->createTodo($alice, 'C');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => [
+                'order' => [
+                    '/todos/' . $c->getId(),
+                    '/todos/' . $a->getId(),
+                    '/todos/' . $b->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Todo::class);
+        $this->assertSame(0, $repo->findOneBy(['title' => 'C'])->getPosition());
+        $this->assertSame(1, $repo->findOneBy(['title' => 'A'])->getPosition());
+        $this->assertSame(2, $repo->findOneBy(['title' => 'B'])->getPosition());
+    }
+
+    public function testReorderReflectsInCollectionOrder(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->createTodo($alice, 'A');
+        $b = $this->createTodo($alice, 'B');
+        $c = $this->createTodo($alice, 'C');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => [
+                'order' => [
+                    '/todos/' . $b->getId(),
+                    '/todos/' . $c->getId(),
+                    '/todos/' . $a->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(204);
+
+        $client->request('GET', '/todos');
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse()->toArray();
+        $titles = array_map(fn ($t) => $t['title'], $response['member']);
+        $this->assertSame(['B', 'C', 'A'], $titles);
+    }
+
+    public function testReorderRejectsUnauthenticated(): void
+    {
+        static::createClient()->request('POST', '/todos/reorder', [
+            'json' => ['order' => []],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testReorderRejectsOtherUsersTodo(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $aliceTodo = $this->createTodo($alice, 'Alice only');
+        $bobsTodo = $this->createTodo($bob, 'Bob owns this');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => [
+                'order' => [
+                    '/todos/' . $aliceTodo->getId(),
+                    '/todos/' . $bobsTodo->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        // 404 rather than 403 to avoid leaking existence, matching the
+        // item-lookup behavior of the owner query extension.
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testReorderRejectsIncompleteOrder(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->createTodo($alice, 'A');
+        $this->createTodo($alice, 'B');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => ['order' => ['/todos/' . $a->getId()]],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testReorderRejectsDuplicateIri(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->createTodo($alice, 'A');
+        $this->createTodo($alice, 'B');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => [
+                'order' => [
+                    '/todos/' . $a->getId(),
+                    '/todos/' . $a->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testReorderRejectsMalformedBody(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/todos/reorder', [
+            'json' => ['unexpected' => 'shape'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+    }
+
     /**
      * @param string[] $roles
      */

@@ -92,4 +92,53 @@ test.describe("Todos", () => {
     await page.locator('nav >> text=Todos').click();
     await expect(page).toHaveURL(/\/todos/);
   });
+
+  test("user can reorder todos via keyboard drag", async ({ page }) => {
+    // dnd-kit's KeyboardSensor is deterministic across browsers, unlike
+    // pointer-based drag which is flaky with dnd-kit's distance constraint.
+    // Space picks up the grip, ArrowDown moves it, Space drops.
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/todos`);
+
+    // New todos go to the top, so creating in order A, B, C produces list C, B, A.
+    // Keep suffixes unique in case the browser uses a cached network response.
+    const suffix = Date.now();
+    const titles = [`A-${suffix}`, `B-${suffix}`, `C-${suffix}`];
+    for (const t of titles) {
+      await page.fill("#title", t);
+      await page.click('button[type="submit"]');
+      await expect(
+        page.locator('[data-testid="todo-item"]', { hasText: t }),
+      ).toBeVisible();
+    }
+
+    // Verify initial order (newest first): C, B, A
+    const listItems = page.locator('[data-testid="todo-item"] p.font-medium').first();
+    await expect(listItems).toHaveText(titles[2]);
+
+    // Grab the grip on the top item (C) and move it down twice to position 3
+    const topGrip = page
+      .locator('[data-testid="todo-item"]')
+      .first()
+      .getByRole("button", { name: /Drag to reorder/ });
+    await topGrip.focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Space");
+
+    // Now the order should be B, A, C — verify via the top item
+    await expect(
+      page.locator('[data-testid="todo-item"]').first().locator("p.font-medium"),
+    ).toHaveText(titles[1]);
+
+    // Reloading should preserve the server-persisted order
+    await page.reload();
+    await expect(
+      page.locator('[data-testid="todo-item"]').first().locator("p.font-medium"),
+    ).toHaveText(titles[1]);
+    await expect(
+      page.locator('[data-testid="todo-item"]').last().locator("p.font-medium"),
+    ).toHaveText(titles[2]);
+  });
 });

@@ -35,11 +35,12 @@ use Symfony\Component\Validator\Constraints as Assert;
     ],
     normalizationContext: ['groups' => ['todo:read']],
     denormalizationContext: ['groups' => ['todo:write']],
-    order: ['createdOn' => 'DESC'],
+    order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
 #[ORM\Entity(repositoryClass: TodoRepository::class)]
 #[ORM\Table(name: 'todo')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_todo_owner')]
+#[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_todo_owner_position')]
 class Todo
 {
     #[ORM\Id]
@@ -70,6 +71,16 @@ class Todo
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['todo:read', 'todo:write'])]
     private ?\DateTimeImmutable $completedOn = null;
+
+    /**
+     * Per-owner sort key. Lower positions render first. Set server-side:
+     * assigned by the persist processor on create, rewritten in bulk by the
+     * reorder endpoint. Negative values are allowed so new todos can be
+     * inserted at the top without having to shift existing rows.
+     */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[Groups(['todo:read'])]
+    private int $position = 0;
 
     public function __construct()
     {
@@ -133,5 +144,16 @@ class Todo
     public function isCompleted(): bool
     {
         return null !== $this->completedOn;
+    }
+
+    public function getPosition(): int
+    {
+        return $this->position;
+    }
+
+    public function setPosition(int $position): static
+    {
+        $this->position = $position;
+        return $this;
     }
 }
