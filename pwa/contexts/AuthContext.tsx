@@ -14,6 +14,9 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (token: string, newPassword: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -82,6 +85,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const res = await fetch(`${ENTRYPOINT}/auth/change-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to change password.");
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    const res = await fetch(`${ENTRYPOINT}/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ email }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Failed to request password reset.");
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    const res = await fetch(`${ENTRYPOINT}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ token, newPassword }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Failed to reset password.");
+    }
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     fetch(`${ENTRYPOINT}/auth/logout`, {
@@ -99,6 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        changePassword,
+        requestPasswordReset,
+        resetPassword,
         error,
         clearError,
       }}

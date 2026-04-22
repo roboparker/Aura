@@ -26,6 +26,9 @@ security:
     access_control:
         - { path: ^/users$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/auth/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/auth/forgot-password$, roles: PUBLIC_ACCESS }
+        - { path: ^/auth/reset-password$, roles: PUBLIC_ACCESS }
+        - { path: ^/auth/change-password$, roles: ROLE_USER }
         - { path: ^/api/me$, roles: ROLE_USER }
         - { path: ^/docs, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: PUBLIC_ACCESS }

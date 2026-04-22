@@ -27,6 +27,7 @@ const SignIn = () => {
   const { login } = useAuth();
   const router = useRouter();
   const registered = router.query.registered === "true";
+  const reset = router.query.reset === "true";
 
   return (
     <>
@@ -42,6 +43,15 @@ const SignIn = () => {
           {registered && (
             <div className="bg-green-50 text-green-700 p-3 rounded text-sm mb-4">
               Account created successfully. Please sign in.
+            </div>
+          )}
+
+          {reset && (
+            <div
+              className="bg-green-50 text-green-700 p-3 rounded text-sm mb-4"
+              data-testid="password-reset-success"
+            >
+              Password reset successfully. Please sign in with your new password.
             </div>
           )}
 
@@ -104,6 +114,15 @@ const SignIn = () => {
                 >
                   {isSubmitting ? "Signing In..." : "Sign In"}
                 </button>
+
+                <p className="text-center text-sm">
+                  <Link
+                    href="/forgot-password"
+                    className="text-cyan-700 font-medium"
+                  >
+                    Forgot password?
+                  </Link>
+                </p>
 
                 <p className="text-center text-sm text-gray-600">
                   Don&apos;t have an account?{" "}

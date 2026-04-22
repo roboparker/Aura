@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import ChangePasswordForm from "../components/account/ChangePasswordForm";
 
 const Account = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -54,6 +55,8 @@ const Account = () => {
               </div>
             </div>
           </div>
+
+          <ChangePasswordForm />
 
           <button
             onClick={() => {

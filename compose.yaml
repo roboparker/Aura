@@ -15,6 +15,8 @@ services:
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
+      MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
@@ -45,8 +47,18 @@ services:
       test: curl -f http://localhost:3000 || exit 1
       timeout: 5s
       retries: 5
-      start_period: 60s  
-  
+      start_period: 60s
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+
   ###> doctrine/doctrine-bundle ###
   database:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
