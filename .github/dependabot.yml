@@ -13,6 +13,12 @@ updates:
     labels:
       - dependencies
     open-pull-requests-limit: 5
+    ignore:
+      # Symfony components are pinned to 7.2.* in composer.json — bumping a
+      # single component to a new major (e.g. dotenv 8.0) desyncs the stack.
+      # Major Symfony upgrades must be done together as a coordinated PR.
+      - dependency-name: "symfony/*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /pwa
     schedule:
