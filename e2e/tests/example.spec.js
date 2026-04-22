@@ -9,7 +9,12 @@ test('homepage', async ({ page }) => {
 test('swagger', async ({ page }) => {
   await page.goto('https://localhost/docs');
   await expect(page).toHaveTitle('Hello API Platform - API Platform');
-  await expect(page.locator('.operation-tag-content > span')).toHaveCount(5);
+  // Assert the resources we expose are listed rather than a hardcoded count —
+  // Swagger-UI groups operations per resource plus per serialization context,
+  // so the total span count shifts every time a resource or group is added.
+  await expect(page.getByRole('heading', { name: 'Task', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tag', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'User', exact: true })).toBeVisible();
 });
 
 test('admin', async ({ page, browserName }) => {
