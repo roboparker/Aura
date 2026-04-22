@@ -7,8 +7,8 @@ framework:
     # See https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#headers
     trusted_headers: [ 'x-forwarded-for', 'x-forwarded-proto' ]
 
-    # Note that the session will be started ONLY if you read or write from it.
-    #session: true
+    # Session is needed for json_login authentication
+    session: true
 
     #esi: true
     #fragments: true
@@ -16,5 +16,5 @@ framework:
 when@test:
     framework:
         test: true
-        #session:
-        #    storage_factory_id: session.storage.factory.mock_file
+        session:
+            storage_factory_id: session.storage.factory.mock_file

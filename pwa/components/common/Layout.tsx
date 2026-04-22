@@ -5,6 +5,8 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import { AuthProvider } from "../../contexts/AuthContext";
+import Navbar from "./Navbar";
 
 const Layout = ({
   children,
@@ -17,7 +19,12 @@ const Layout = ({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+      <HydrationBoundary state={dehydratedState}>
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
+      </HydrationBoundary>
     </QueryClientProvider>
   );
 };
