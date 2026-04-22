@@ -31,8 +31,12 @@
 	encode zstd br gzip
 
 	mercure {
-		# Transport to use (default to Bolt)
-		transport_url {$MERCURE_TRANSPORT_URL:bolt:///data/mercure.db}
+		# Transport to use (default to Bolt). The Mercure Caddy module that
+		# ships with mercure-bundle 0.4 replaced the old
+		# `transport_url bolt:///path/to/db` scalar with a subdirective block.
+		transport bolt {
+			path /data/mercure.db
+		}
 		# Publisher JWT key
 		publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
 		# Subscriber JWT key
