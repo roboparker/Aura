@@ -20,7 +20,7 @@
         "symfony/expression-language": "7.2.*",
         "symfony/flex": "^2.2",
         "symfony/framework-bundle": "7.2.*",
-        "symfony/mailer": "7.2.*",
+        "symfony/mailer": "7.4.*",
         "symfony/mercure-bundle": "^0.4.2",
         "symfony/monolog-bundle": "^4.0",
         "symfony/property-access": "7.2.*",
