@@ -298,21 +298,28 @@ const Tasks = () => {
   };
 
   const handleToggle = async (task: Task) => {
+    // Optimistic toggle: flip the checkbox immediately so the UI feels
+    // responsive and so controlled-input assertions in tests see the new
+    // state without waiting for the server round-trip.
+    const previous = tasks;
+    const nextCompletedOn = task.completedOn ? null : new Date().toISOString();
+    setTasks(
+      tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t)),
+    );
     setError(null);
+
     try {
       const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
-          completedOn: task.completedOn ? null : new Date().toISOString(),
-        }),
+        body: JSON.stringify({ completedOn: nextCompletedOn }),
       });
       if (!res.ok) {
         throw new Error("Failed to update task.");
       }
-      await loadData();
     } catch (err) {
+      setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update task.");
     }
   };

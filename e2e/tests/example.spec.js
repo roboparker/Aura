@@ -18,6 +18,13 @@ test('swagger', async ({ page }) => {
 });
 
 test('admin', async ({ page, browserName }) => {
+  // /admin is now gated behind ROLE_ADMIN — sign in as the admin fixture first.
+  await page.goto('https://localhost/signin');
+  await page.fill('#email', 'admin@aura.test');
+  await page.fill('#password', 'admin123');
+  await page.click('button[type="submit"]');
+  await expect(page).toHaveURL(/\/account/);
+
   await page.goto('https://localhost/admin');
   await page.getByLabel('Create').click();
   await page.getByLabel('Name').fill('foo' + browserName);

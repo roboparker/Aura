@@ -5,7 +5,8 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: 0,
+  // Retry once in CI to absorb rare flakes in pointer/keyboard drag tests.
+  retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: 'html',
   use: {

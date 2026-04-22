@@ -41,10 +41,13 @@ test.describe("Tags", () => {
     await expect(item).toBeVisible();
     await expect(item.locator("text=High priority")).toBeVisible();
 
-    // Edit — title update
+    // Edit — title update. Once the edit form opens, the li's text content is
+    // replaced by form inputs (whose `value` isn't matched by `hasText`), so
+    // re-scope to the sole tag-item on the page instead of filtering by title.
     await item.getByRole("button", { name: /Edit/i }).click();
-    await item.getByLabel("Title").fill(`${title}-edited`);
-    await item.getByRole("button", { name: /Save/i }).click();
+    const editingItem = page.locator('[data-testid="tag-item"]').first();
+    await editingItem.getByLabel("Title").fill(`${title}-edited`);
+    await editingItem.getByRole("button", { name: /Save/i }).click();
     await expect(
       page.locator('[data-testid="tag-item"]', { hasText: `${title}-edited` }),
     ).toBeVisible();
