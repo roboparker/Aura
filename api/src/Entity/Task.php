@@ -8,8 +8,8 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Repository\TodoRepository;
-use App\State\TodoOwnerProcessor;
+use App\Repository\TaskRepository;
+use App\State\TaskOwnerProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            processor: TodoOwnerProcessor::class,
+            processor: TaskOwnerProcessor::class,
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
@@ -33,53 +33,53 @@ use Symfony\Component\Validator\Constraints as Assert;
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
         ),
     ],
-    normalizationContext: ['groups' => ['todo:read']],
-    denormalizationContext: ['groups' => ['todo:write']],
+    normalizationContext: ['groups' => ['task:read']],
+    denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
-#[ORM\Entity(repositoryClass: TodoRepository::class)]
-#[ORM\Table(name: 'todo')]
-#[ORM\Index(columns: ['owner_id'], name: 'idx_todo_owner')]
-#[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_todo_owner_position')]
-class Todo
+#[ORM\Entity(repositoryClass: TaskRepository::class)]
+#[ORM\Table(name: 'task')]
+#[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
+#[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
+class Task
 {
     #[ORM\Id]
     #[ORM\Column(type: 'integer')]
     #[ORM\GeneratedValue(strategy: 'SEQUENCE')]
-    #[Groups(['todo:read'])]
+    #[Groups(['task:read'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['todo:read'])]
+    #[Groups(['task:read'])]
     private ?User $owner = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
-    #[Groups(['todo:read', 'todo:write'])]
+    #[Groups(['task:read', 'task:write'])]
     private string $title = '';
 
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(['todo:read', 'todo:write'])]
+    #[Groups(['task:read', 'task:write'])]
     private ?string $description = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['todo:read'])]
+    #[Groups(['task:read'])]
     private \DateTimeImmutable $createdOn;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['todo:read', 'todo:write'])]
+    #[Groups(['task:read', 'task:write'])]
     private ?\DateTimeImmutable $completedOn = null;
 
     /**
      * Per-owner sort key. Lower positions render first. Set server-side:
      * assigned by the persist processor on create, rewritten in bulk by the
-     * reorder endpoint. Negative values are allowed so new todos can be
+     * reorder endpoint. Negative values are allowed so new tasks can be
      * inserted at the top without having to shift existing rows.
      */
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    #[Groups(['todo:read'])]
+    #[Groups(['task:read'])]
     private int $position = 0;
 
     public function __construct()

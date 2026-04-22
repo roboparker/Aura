@@ -21,7 +21,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "../contexts/AuthContext";
 import { ENTRYPOINT } from "../config/entrypoint";
 
-interface Todo {
+interface Task {
   "@id": string;
   id: number;
   title: string;
@@ -31,21 +31,21 @@ interface Todo {
   position: number;
 }
 
-interface TodoCollection {
+interface TaskCollection {
   // API Platform 4 emits JSON-LD 1.1 (`member`); older versions use `hydra:member`.
-  member?: Todo[];
-  "hydra:member"?: Todo[];
+  member?: Task[];
+  "hydra:member"?: Task[];
 }
 
-interface SortableTodoItemProps {
-  todo: Todo;
-  onToggle: (todo: Todo) => void;
-  onDelete: (todo: Todo) => void;
+interface SortableTaskItemProps {
+  task: Task;
+  onToggle: (task: Task) => void;
+  onDelete: (task: Task) => void;
 }
 
-const SortableTodoItem = ({ todo, onToggle, onDelete }: SortableTodoItemProps) => {
+const SortableTaskItem = ({ task, onToggle, onDelete }: SortableTaskItemProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: todo["@id"],
+    id: task["@id"],
   });
 
   const style = {
@@ -59,11 +59,11 @@ const SortableTodoItem = ({ todo, onToggle, onDelete }: SortableTodoItemProps) =
       ref={setNodeRef}
       style={style}
       className="bg-white rounded-lg shadow-card p-4 flex items-start gap-3"
-      data-testid="todo-item"
+      data-testid="task-item"
     >
       <button
         type="button"
-        aria-label={`Drag to reorder "${todo.title}"`}
+        aria-label={`Drag to reorder "${task.title}"`}
         className="mt-0.5 px-1 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing touch-none bg-transparent border-0"
         {...attributes}
         {...listeners}
@@ -80,32 +80,32 @@ const SortableTodoItem = ({ todo, onToggle, onDelete }: SortableTodoItemProps) =
       </button>
       <input
         type="checkbox"
-        checked={!!todo.completedOn}
-        onChange={() => onToggle(todo)}
-        aria-label={`Mark "${todo.title}" as ${todo.completedOn ? "incomplete" : "complete"}`}
+        checked={!!task.completedOn}
+        onChange={() => onToggle(task)}
+        aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
         className="mt-1 h-4 w-4 text-cyan-700 border-gray-300 rounded focus:ring-cyan-500"
       />
       <div className="flex-1">
         <p
           className={`font-medium ${
-            todo.completedOn ? "line-through text-gray-400" : "text-black"
+            task.completedOn ? "line-through text-gray-400" : "text-black"
           }`}
         >
-          {todo.title}
+          {task.title}
         </p>
-        {todo.description && (
+        {task.description && (
           <p
             className={`text-sm mt-1 ${
-              todo.completedOn ? "line-through text-gray-400" : "text-gray-600"
+              task.completedOn ? "line-through text-gray-400" : "text-gray-600"
             }`}
           >
-            {todo.description}
+            {task.description}
           </p>
         )}
       </div>
       <button
-        onClick={() => onDelete(todo)}
-        aria-label={`Delete "${todo.title}"`}
+        onClick={() => onDelete(task)}
+        aria-label={`Delete "${task.title}"`}
         className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
       >
         Delete
@@ -114,11 +114,11 @@ const SortableTodoItem = ({ todo, onToggle, onDelete }: SortableTodoItemProps) =
   );
 };
 
-const Todos = () => {
+const Tasks = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [todos, setTodos] = useState<Todo[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -138,20 +138,20 @@ const Todos = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadTodos = useCallback(async () => {
+  const loadTasks = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/todos`, {
+      const res = await fetch(`${ENTRYPOINT}/tasks`, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
       if (!res.ok) {
-        throw new Error("Failed to load todos.");
+        throw new Error("Failed to load tasks.");
       }
-      const data: TodoCollection = await res.json();
-      setTodos(data.member ?? data["hydra:member"] ?? []);
+      const data: TaskCollection = await res.json();
+      setTasks(data.member ?? data["hydra:member"] ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load todos.");
+      setError(err instanceof Error ? err.message : "Failed to load tasks.");
     } finally {
       setIsLoading(false);
     }
@@ -159,9 +159,9 @@ const Todos = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadTodos();
+      loadTasks();
     }
-  }, [isAuthenticated, loadTodos]);
+  }, [isAuthenticated, loadTasks]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -170,7 +170,7 @@ const Todos = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/todos`, {
+      const res = await fetch(`${ENTRYPOINT}/tasks`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
@@ -182,52 +182,52 @@ const Todos = () => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create todo.",
+          data.description || data.detail || data["hydra:description"] || "Failed to create task.",
         );
       }
       setTitle("");
       setDescription("");
-      await loadTodos();
+      await loadTasks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create todo.");
+      setError(err instanceof Error ? err.message : "Failed to create task.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleToggle = async (todo: Todo) => {
+  const handleToggle = async (task: Task) => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${todo["@id"]}`, {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
         body: JSON.stringify({
-          completedOn: todo.completedOn ? null : new Date().toISOString(),
+          completedOn: task.completedOn ? null : new Date().toISOString(),
         }),
       });
       if (!res.ok) {
-        throw new Error("Failed to update todo.");
+        throw new Error("Failed to update task.");
       }
-      await loadTodos();
+      await loadTasks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update todo.");
+      setError(err instanceof Error ? err.message : "Failed to update task.");
     }
   };
 
-  const handleDelete = async (todo: Todo) => {
+  const handleDelete = async (task: Task) => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${todo["@id"]}`, {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!res.ok) {
-        throw new Error("Failed to delete todo.");
+        throw new Error("Failed to delete task.");
       }
-      await loadTodos();
+      await loadTasks();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete todo.");
+      setError(err instanceof Error ? err.message : "Failed to delete task.");
     }
   };
 
@@ -235,18 +235,18 @@ const Todos = () => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = todos.findIndex((t) => t["@id"] === active.id);
-    const newIndex = todos.findIndex((t) => t["@id"] === over.id);
+    const oldIndex = tasks.findIndex((t) => t["@id"] === active.id);
+    const newIndex = tasks.findIndex((t) => t["@id"] === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const previous = todos;
-    const reordered = arrayMove(todos, oldIndex, newIndex);
+    const previous = tasks;
+    const reordered = arrayMove(tasks, oldIndex, newIndex);
     // Apply optimistically — snappy UX, rolled back below if the server rejects.
-    setTodos(reordered);
+    setTasks(reordered);
     setError(null);
 
     try {
-      const res = await fetch(`${ENTRYPOINT}/todos/reorder`, {
+      const res = await fetch(`${ENTRYPOINT}/tasks/reorder`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -256,7 +256,7 @@ const Todos = () => {
         throw new Error("Failed to save new order.");
       }
     } catch (err) {
-      setTodos(previous);
+      setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to save new order.");
     }
   };
@@ -272,11 +272,11 @@ const Todos = () => {
   return (
     <>
       <Head>
-        <title>Todos - Aura</title>
+        <title>Tasks - Aura</title>
       </Head>
       <div className="min-h-screen bg-gray-50 px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-black mb-6">Todos</h1>
+          <h1 className="text-2xl font-bold text-black mb-6">Tasks</h1>
 
           <form
             onSubmit={handleCreate}
@@ -313,7 +313,7 @@ const Todos = () => {
               disabled={isSubmitting || !title.trim()}
               className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Adding..." : "Add Todo"}
+              {isSubmitting ? "Adding..." : "Add Task"}
             </button>
           </form>
 
@@ -327,10 +327,10 @@ const Todos = () => {
           )}
 
           {isLoading ? (
-            <p className="text-gray-500">Loading todos...</p>
-          ) : todos.length === 0 ? (
+            <p className="text-gray-500">Loading tasks...</p>
+          ) : tasks.length === 0 ? (
             <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-              No todos yet. Add one above to get started.
+              No tasks yet. Add one above to get started.
             </p>
           ) : (
             <DndContext
@@ -339,14 +339,14 @@ const Todos = () => {
               onDragEnd={handleDragEnd}
             >
               <SortableContext
-                items={todos.map((t) => t["@id"])}
+                items={tasks.map((t) => t["@id"])}
                 strategy={verticalListSortingStrategy}
               >
-                <ul className="space-y-2" data-testid="todo-list">
-                  {todos.map((todo) => (
-                    <SortableTodoItem
-                      key={todo["@id"]}
-                      todo={todo}
+                <ul className="space-y-2" data-testid="task-list">
+                  {tasks.map((task) => (
+                    <SortableTaskItem
+                      key={task["@id"]}
+                      task={task}
                       onToggle={handleToggle}
                       onDelete={handleDelete}
                     />
@@ -361,4 +361,4 @@ const Todos = () => {
   );
 };
 
-export default Todos;
+export default Tasks;

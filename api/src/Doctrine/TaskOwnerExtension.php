@@ -6,17 +6,17 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use App\Entity\Todo;
+use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Todo queries so non-admin users only see their own todos.
+ * Filters Task queries so non-admin users only see their own tasks.
  * Applies to both collection and item queries as a defense-in-depth against
  * leaks; operation-level `security` already covers item access.
  */
-final class TodoOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
+final class TaskOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
     public function __construct(private Security $security)
     {
@@ -45,7 +45,7 @@ final class TodoOwnerExtension implements QueryCollectionExtensionInterface, Que
 
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
-        if (Todo::class !== $resourceClass) {
+        if (Task::class !== $resourceClass) {
             return;
         }
 

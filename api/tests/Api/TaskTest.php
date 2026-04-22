@@ -3,12 +3,12 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Todo;
+use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class TodoTest extends ApiTestCase
+class TaskTest extends ApiTestCase
 {
     private EntityManagerInterface $entityManager;
 
@@ -19,33 +19,33 @@ class TodoTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Todo')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testListTodosUnauthenticated(): void
+    public function testListTasksUnauthenticated(): void
     {
-        static::createClient()->request('GET', '/todos');
+        static::createClient()->request('GET', '/tasks');
         $this->assertResponseStatusCodeSame(401);
     }
 
-    public function testCreateTodoUnauthenticated(): void
+    public function testCreateTaskUnauthenticated(): void
     {
-        static::createClient()->request('POST', '/todos', [
+        static::createClient()->request('POST', '/tasks', [
             'json' => ['title' => 'Buy milk'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(401);
     }
 
-    public function testCreateTodoAuthenticated(): void
+    public function testCreateTaskAuthenticated(): void
     {
         $user = $this->createUser('alice@example.com');
 
         $client = static::createClient();
         $client->loginUser($user);
 
-        $client->request('POST', '/todos', [
+        $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Buy milk',
                 'description' => 'From the store',
@@ -55,20 +55,20 @@ class TodoTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $this->assertJsonContains([
-            '@type' => 'Todo',
+            '@type' => 'Task',
             'title' => 'Buy milk',
             'description' => 'From the store',
         ]);
 
         // Owner was set server-side regardless of any supplied value; completedOn
         // is omitted from the JSON-LD response when null, so verify via the entity.
-        $todo = $this->reloadTodoByTitle('Buy milk');
-        $this->assertSame($user->getId(), $todo->getOwner()?->getId());
-        $this->assertNotNull($todo->getCreatedOn());
-        $this->assertNull($todo->getCompletedOn());
+        $task = $this->reloadTaskByTitle('Buy milk');
+        $this->assertSame($user->getId(), $task->getOwner()?->getId());
+        $this->assertNotNull($task->getCreatedOn());
+        $this->assertNull($task->getCompletedOn());
     }
 
-    public function testCreateTodoIgnoresClientSuppliedOwner(): void
+    public function testCreateTaskIgnoresClientSuppliedOwner(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
@@ -76,9 +76,9 @@ class TodoTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $client->request('POST', '/todos', [
+        $client->request('POST', '/tasks', [
             'json' => [
-                'title' => 'Sneaky todo',
+                'title' => 'Sneaky task',
                 'owner' => '/users/' . $bob->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -86,18 +86,18 @@ class TodoTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
 
-        $todo = $this->reloadTodoByTitle('Sneaky todo');
-        $this->assertSame($alice->getId(), $todo->getOwner()?->getId(), 'Owner must be overwritten by the processor.');
+        $task = $this->reloadTaskByTitle('Sneaky task');
+        $this->assertSame($alice->getId(), $task->getOwner()?->getId(), 'Owner must be overwritten by the processor.');
     }
 
-    public function testCreateTodoRequiresTitle(): void
+    public function testCreateTaskRequiresTitle(): void
     {
         $user = $this->createUser('alice@example.com');
 
         $client = static::createClient();
         $client->loginUser($user);
 
-        $client->request('POST', '/todos', [
+        $client->request('POST', '/tasks', [
             'json' => ['title' => ''],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -105,149 +105,149 @@ class TodoTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testListTodosOnlyShowsOwnTodos(): void
+    public function testListTasksOnlyShowsOwnTasks(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
 
-        $this->createTodo($alice, 'Alice task 1');
-        $this->createTodo($alice, 'Alice task 2');
-        $this->createTodo($bob, 'Bob task');
+        $this->createTask($alice, 'Alice task 1');
+        $this->createTask($alice, 'Alice task 2');
+        $this->createTask($bob, 'Bob task');
 
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $client->request('GET', '/todos');
+        $client->request('GET', '/tasks');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 2]);
     }
 
-    public function testAdminSeesAllTodos(): void
+    public function testAdminSeesAllTasks(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
 
-        $this->createTodo($alice, 'A1');
-        $this->createTodo($bob, 'B1');
-        $this->createTodo($bob, 'B2');
+        $this->createTask($alice, 'A1');
+        $this->createTask($bob, 'B1');
+        $this->createTask($bob, 'B2');
 
         $client = static::createClient();
         $client->loginUser($admin);
-        $client->request('GET', '/todos');
+        $client->request('GET', '/tasks');
 
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 3]);
     }
 
-    public function testGetOwnTodo(): void
+    public function testGetOwnTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $todo = $this->createTodo($alice, 'My task');
+        $task = $this->createTask($alice, 'My task');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/todos/' . $todo->getId());
+        $client->request('GET', '/tasks/' . $task->getId());
 
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['title' => 'My task']);
     }
 
-    public function testGetOtherUsersTodoReturns404(): void
+    public function testGetOtherUsersTaskReturns404(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $bobsTodo = $this->createTodo($bob, 'Bob private');
+        $bobsTask = $this->createTask($bob, 'Bob private');
 
         $client = static::createClient();
         $client->loginUser($alice);
         // Collection extension filters by owner, so an item lookup returns 404
         // rather than leaking its existence with 403.
-        $client->request('GET', '/todos/' . $bobsTodo->getId());
+        $client->request('GET', '/tasks/' . $bobsTask->getId());
 
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testCompleteTodo(): void
+    public function testCompleteTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $todo = $this->createTodo($alice, 'Task to complete');
-        $this->assertNull($todo->getCompletedOn());
+        $task = $this->createTask($alice, 'Task to complete');
+        $this->assertNull($task->getCompletedOn());
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/todos/' . $todo->getId(), [
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
             'json' => ['completedOn' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM)],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
-        $reloaded = $this->reloadTodoByTitle('Task to complete');
+        $reloaded = $this->reloadTaskByTitle('Task to complete');
         $this->assertNotNull($reloaded->getCompletedOn());
         $this->assertTrue($reloaded->isCompleted());
     }
 
-    public function testUncompleteTodo(): void
+    public function testUncompleteTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $todo = $this->createTodo($alice, 'Was done');
-        $todo->setCompletedOn(new \DateTimeImmutable());
+        $task = $this->createTask($alice, 'Was done');
+        $task->setCompletedOn(new \DateTimeImmutable());
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/todos/' . $todo->getId(), [
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
             'json' => ['completedOn' => null],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
-        $reloaded = $this->reloadTodoByTitle('Was done');
+        $reloaded = $this->reloadTaskByTitle('Was done');
         $this->assertNull($reloaded->getCompletedOn());
     }
 
-    public function testDeleteOwnTodo(): void
+    public function testDeleteOwnTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $todo = $this->createTodo($alice, 'Delete me');
+        $task = $this->createTask($alice, 'Delete me');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/todos/' . $todo->getId());
+        $client->request('DELETE', '/tasks/' . $task->getId());
 
         $this->assertResponseStatusCodeSame(204);
     }
 
-    public function testCannotDeleteOtherUsersTodo(): void
+    public function testCannotDeleteOtherUsersTask(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $bobsTodo = $this->createTodo($bob, 'Bob owns this');
+        $bobsTask = $this->createTask($bob, 'Bob owns this');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/todos/' . $bobsTodo->getId());
+        $client->request('DELETE', '/tasks/' . $bobsTask->getId());
 
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testNewTodoIsPlacedAtTheTop(): void
+    public function testNewTaskIsPlacedAtTheTop(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $existing = $this->createTodo($alice, 'First');
+        $existing = $this->createTask($alice, 'First');
         $existing->setPosition(5);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos', [
+        $client->request('POST', '/tasks', [
             'json' => ['title' => 'Newer'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
 
         $this->assertResponseStatusCodeSame(201);
-        $newer = $this->reloadTodoByTitle('Newer');
-        // Position is one slot above the existing minimum so the fresh todo
+        $newer = $this->reloadTaskByTitle('Newer');
+        // Position is one slot above the existing minimum so the fresh task
         // renders at the top without having to shift every row.
         $this->assertSame(4, $newer->getPosition());
     }
@@ -255,18 +255,18 @@ class TodoTest extends ApiTestCase
     public function testReorderPersistsNewPositions(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $a = $this->createTodo($alice, 'A');
-        $b = $this->createTodo($alice, 'B');
-        $c = $this->createTodo($alice, 'C');
+        $a = $this->createTask($alice, 'A');
+        $b = $this->createTask($alice, 'B');
+        $c = $this->createTask($alice, 'C');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
+        $client->request('POST', '/tasks/reorder', [
             'json' => [
                 'order' => [
-                    '/todos/' . $c->getId(),
-                    '/todos/' . $a->getId(),
-                    '/todos/' . $b->getId(),
+                    '/tasks/' . $c->getId(),
+                    '/tasks/' . $a->getId(),
+                    '/tasks/' . $b->getId(),
                 ],
             ],
             'headers' => ['Content-Type' => 'application/json'],
@@ -275,7 +275,7 @@ class TodoTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(204);
 
         $this->entityManager->clear();
-        $repo = $this->entityManager->getRepository(Todo::class);
+        $repo = $this->entityManager->getRepository(Task::class);
         $this->assertSame(0, $repo->findOneBy(['title' => 'C'])->getPosition());
         $this->assertSame(1, $repo->findOneBy(['title' => 'A'])->getPosition());
         $this->assertSame(2, $repo->findOneBy(['title' => 'B'])->getPosition());
@@ -284,25 +284,25 @@ class TodoTest extends ApiTestCase
     public function testReorderReflectsInCollectionOrder(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $a = $this->createTodo($alice, 'A');
-        $b = $this->createTodo($alice, 'B');
-        $c = $this->createTodo($alice, 'C');
+        $a = $this->createTask($alice, 'A');
+        $b = $this->createTask($alice, 'B');
+        $c = $this->createTask($alice, 'C');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
+        $client->request('POST', '/tasks/reorder', [
             'json' => [
                 'order' => [
-                    '/todos/' . $b->getId(),
-                    '/todos/' . $c->getId(),
-                    '/todos/' . $a->getId(),
+                    '/tasks/' . $b->getId(),
+                    '/tasks/' . $c->getId(),
+                    '/tasks/' . $a->getId(),
                 ],
             ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(204);
 
-        $client->request('GET', '/todos');
+        $client->request('GET', '/tasks');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse()->toArray();
         $titles = array_map(fn ($t) => $t['title'], $response['member']);
@@ -311,27 +311,27 @@ class TodoTest extends ApiTestCase
 
     public function testReorderRejectsUnauthenticated(): void
     {
-        static::createClient()->request('POST', '/todos/reorder', [
+        static::createClient()->request('POST', '/tasks/reorder', [
             'json' => ['order' => []],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(401);
     }
 
-    public function testReorderRejectsOtherUsersTodo(): void
+    public function testReorderRejectsOtherUsersTask(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $aliceTodo = $this->createTodo($alice, 'Alice only');
-        $bobsTodo = $this->createTodo($bob, 'Bob owns this');
+        $aliceTask = $this->createTask($alice, 'Alice only');
+        $bobsTask = $this->createTask($bob, 'Bob owns this');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
+        $client->request('POST', '/tasks/reorder', [
             'json' => [
                 'order' => [
-                    '/todos/' . $aliceTodo->getId(),
-                    '/todos/' . $bobsTodo->getId(),
+                    '/tasks/' . $aliceTask->getId(),
+                    '/tasks/' . $bobsTask->getId(),
                 ],
             ],
             'headers' => ['Content-Type' => 'application/json'],
@@ -345,13 +345,13 @@ class TodoTest extends ApiTestCase
     public function testReorderRejectsIncompleteOrder(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $a = $this->createTodo($alice, 'A');
-        $this->createTodo($alice, 'B');
+        $a = $this->createTask($alice, 'A');
+        $this->createTask($alice, 'B');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
-            'json' => ['order' => ['/todos/' . $a->getId()]],
+        $client->request('POST', '/tasks/reorder', [
+            'json' => ['order' => ['/tasks/' . $a->getId()]],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
 
@@ -361,16 +361,16 @@ class TodoTest extends ApiTestCase
     public function testReorderRejectsDuplicateIri(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $a = $this->createTodo($alice, 'A');
-        $this->createTodo($alice, 'B');
+        $a = $this->createTask($alice, 'A');
+        $this->createTask($alice, 'B');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
+        $client->request('POST', '/tasks/reorder', [
             'json' => [
                 'order' => [
-                    '/todos/' . $a->getId(),
-                    '/todos/' . $a->getId(),
+                    '/tasks/' . $a->getId(),
+                    '/tasks/' . $a->getId(),
                 ],
             ],
             'headers' => ['Content-Type' => 'application/json'],
@@ -385,7 +385,7 @@ class TodoTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/todos/reorder', [
+        $client->request('POST', '/tasks/reorder', [
             'json' => ['unexpected' => 'shape'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -413,23 +413,23 @@ class TodoTest extends ApiTestCase
         return $user;
     }
 
-    private function createTodo(User $owner, string $title): Todo
+    private function createTask(User $owner, string $title): Task
     {
-        $todo = new Todo();
-        $todo->setOwner($owner);
-        $todo->setTitle($title);
+        $task = new Task();
+        $task->setOwner($owner);
+        $task->setTitle($title);
 
-        $this->entityManager->persist($todo);
+        $this->entityManager->persist($task);
         $this->entityManager->flush();
 
-        return $todo;
+        return $task;
     }
 
-    private function reloadTodoByTitle(string $title): Todo
+    private function reloadTaskByTitle(string $title): Task
     {
         $this->entityManager->clear();
-        $todo = $this->entityManager->getRepository(Todo::class)->findOneBy(['title' => $title]);
-        self::assertNotNull($todo, sprintf('Expected to find Todo with title "%s".', $title));
-        return $todo;
+        $task = $this->entityManager->getRepository(Task::class)->findOneBy(['title' => $title]);
+        self::assertNotNull($task, sprintf('Expected to find Task with title "%s".', $title));
+        return $task;
     }
 }
