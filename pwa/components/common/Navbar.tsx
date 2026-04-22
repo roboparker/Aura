@@ -20,6 +20,9 @@ const Navbar = () => {
                   Admin
                 </Link>
               )}
+              <Link href="/todos" className="text-cyan-200 hover:text-white no-underline text-sm">
+                Todos
+              </Link>
               <Link href="/account" className="text-cyan-200 hover:text-white no-underline text-sm">
                 My Account
               </Link>
