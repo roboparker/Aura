@@ -23,14 +23,14 @@ import { ENTRYPOINT } from "../config/entrypoint";
 
 interface Tag {
   "@id": string;
-  id: number;
+  id: string;
   title: string;
   color: string;
 }
 
 interface Task {
   "@id": string;
-  id: number;
+  id: string;
   title: string;
   description: string | null;
   createdOn: string;

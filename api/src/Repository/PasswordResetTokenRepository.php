@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\PasswordResetToken;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -24,15 +25,15 @@ class PasswordResetTokenRepository extends ServiceEntityRepository
     /**
      * Invalidates all outstanding tokens for a user.
      */
-    public function invalidateAllForUser(int $userId): void
+    public function invalidateAllForUser(User $user): void
     {
         $this->createQueryBuilder('t')
             ->update()
             ->set('t.usedAt', ':now')
-            ->where('t.user = :userId')
+            ->where('t.user = :user')
             ->andWhere('t.usedAt IS NULL')
             ->setParameter('now', new \DateTimeImmutable())
-            ->setParameter('userId', $userId)
+            ->setParameter('user', $user)
             ->getQuery()
             ->execute();
     }

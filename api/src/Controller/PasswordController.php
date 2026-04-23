@@ -87,7 +87,7 @@ class PasswordController extends AbstractController
         }
 
         // Invalidate prior outstanding tokens, then issue a fresh one
-        $this->tokenRepository->invalidateAllForUser($user->getId());
+        $this->tokenRepository->invalidateAllForUser($user);
 
         $plainToken = bin2hex(random_bytes(32));
         $tokenHash = hash('sha256', $plainToken);
