@@ -1,3 +1,5 @@
+import "@blocknote/core/fonts/inter.css"
+import "@blocknote/mantine/style.css"
 import "../styles/globals.css"
 import Layout from "../components/common/Layout"
 import type { AppProps } from "next/app"
