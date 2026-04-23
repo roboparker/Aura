@@ -27,13 +27,13 @@ use Symfony\Component\Validator\Constraints as Assert;
             processor: TaskOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
     ],
     normalizationContext: ['groups' => ['task:read']],
@@ -44,6 +44,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
+#[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
 class Task
 {
     #[ORM\Id]
@@ -57,6 +58,16 @@ class Task
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['task:read'])]
     private ?User $owner = null;
+
+    /**
+     * Optional project the task belongs to. When set, every project member
+     * can read and edit the task alongside its owner. Personal tasks leave
+     * this null.
+     */
+    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['task:read', 'task:write'])]
+    private ?Project $project = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -120,6 +131,17 @@ class Task
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+        return $this;
+    }
+
+    public function getProject(): ?Project
+    {
+        return $this->project;
+    }
+
+    public function setProject(?Project $project): static
+    {
+        $this->project = $project;
         return $this;
     }
 
