@@ -6,18 +6,17 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use App\Entity\Task;
+use App\Entity\Tag;
 use App\Entity\User;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Task queries so non-admin users only see tasks they can act on:
- * tasks they own directly, plus any task attached to a project they belong
- * to. Applies to both collection and item queries as defense-in-depth
- * against leaks; operation-level `security` already covers item access.
+ * Filters Tag queries so non-admin users only see their own tags. Mirrors
+ * TaskOwnerExtension; applied at both collection and item level to keep
+ * cross-user tag lookups (including as task.tags members) returning 404.
  */
-final class TaskOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
+final class TagOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
     public function __construct(private Security $security)
     {
@@ -46,7 +45,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
 
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
-        if (Task::class !== $resourceClass) {
+        if (Tag::class !== $resourceClass) {
             return;
         }
 
@@ -60,13 +59,8 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
-        // A LEFT JOIN on project.members keeps owner-only (project=null) rows
-        // visible while also surfacing tasks from projects the user belongs
-        // to. The task is visible when either side matches.
         $queryBuilder
-            ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
-            ->leftJoin('tp_access.members', 'tp_member', 'WITH', 'tp_member = :currentUser')
-            ->andWhere(sprintf('%s.owner = :currentUser OR tp_member IS NOT NULL', $rootAlias))
+            ->andWhere(sprintf('%s.owner = :currentUser', $rootAlias))
             ->setParameter('currentUser', $user);
     }
 }

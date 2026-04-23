@@ -10,6 +10,12 @@ framework:
     # Session is needed for json_login authentication
     session: true
 
+    # UUIDv7 is time-ordered, which keeps B-tree index locality good.
+    # Configured globally so `doctrine.uuid_generator` emits v7.
+    uid:
+        default_uuid_version: 7
+        time_based_uuid_version: 7
+
     #esi: true
     #fragments: true
 

@@ -21,37 +21,69 @@ import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "../contexts/AuthContext";
 import { ENTRYPOINT } from "../config/entrypoint";
 
+interface Tag {
+  "@id": string;
+  id: string;
+  title: string;
+  color: string;
+}
+
 interface Task {
   "@id": string;
-  id: number;
+  id: string;
   title: string;
   description: string | null;
   createdOn: string;
   completedOn: string | null;
   position: number;
+  tags: Tag[];
 }
 
-interface TaskCollection {
+interface Collection<T> {
   // API Platform 4 emits JSON-LD 1.1 (`member`); older versions use `hydra:member`.
-  member?: Task[];
-  "hydra:member"?: Task[];
+  member?: T[];
+  "hydra:member"?: T[];
 }
 
 interface SortableTaskItemProps {
   task: Task;
+  allTags: Tag[];
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onTagsChange: (task: Task, nextTagIris: string[]) => Promise<void>;
 }
 
-const SortableTaskItem = ({ task, onToggle, onDelete }: SortableTaskItemProps) => {
+const SortableTaskItem = ({
+  task,
+  allTags,
+  onToggle,
+  onDelete,
+  onTagsChange,
+}: SortableTaskItemProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
   });
+
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+  };
+
+  const attachedIris = new Set(task.tags.map((t) => t["@id"]));
+  const availableTags = allTags.filter((t) => !attachedIris.has(t["@id"]));
+
+  const handleRemoveTag = async (tag: Tag) => {
+    const next = task.tags.filter((t) => t["@id"] !== tag["@id"]).map((t) => t["@id"]);
+    await onTagsChange(task, next);
+  };
+
+  const handleAddTag = async (tag: Tag) => {
+    const next = [...task.tags.map((t) => t["@id"]), tag["@id"]];
+    setIsPickerOpen(false);
+    await onTagsChange(task, next);
   };
 
   return (
@@ -85,7 +117,7 @@ const SortableTaskItem = ({ task, onToggle, onDelete }: SortableTaskItemProps) =
         aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
         className="mt-1 h-4 w-4 text-cyan-700 border-gray-300 rounded focus:ring-cyan-500"
       />
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <p
           className={`font-medium ${
             task.completedOn ? "line-through text-gray-400" : "text-black"
@@ -102,6 +134,62 @@ const SortableTaskItem = ({ task, onToggle, onDelete }: SortableTaskItemProps) =
             {task.description}
           </p>
         )}
+        <div className="mt-2 flex flex-wrap items-center gap-1" data-testid="task-tags">
+          {task.tags.map((tag) => (
+            <span
+              key={tag["@id"]}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-white"
+              style={{ backgroundColor: tag.color }}
+              data-testid="task-tag"
+            >
+              {tag.title}
+              <button
+                type="button"
+                onClick={() => handleRemoveTag(tag)}
+                aria-label={`Remove tag "${tag.title}" from "${task.title}"`}
+                className="ml-0.5 text-white/80 hover:text-white bg-transparent border-0 cursor-pointer leading-none"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {availableTags.length > 0 && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen((v) => !v)}
+                aria-label={`Add tag to "${task.title}"`}
+                aria-expanded={isPickerOpen}
+                className="text-xs text-cyan-700 hover:text-cyan-900 bg-transparent border border-dashed border-gray-300 rounded px-2 py-0.5 cursor-pointer"
+              >
+                + Tag
+              </button>
+              {isPickerOpen && (
+                <div
+                  className="absolute left-0 mt-1 z-10 bg-white border border-gray-200 rounded-md shadow-lg py-1 min-w-[150px] max-h-60 overflow-y-auto"
+                  role="menu"
+                >
+                  {availableTags.map((tag) => (
+                    <button
+                      key={tag["@id"]}
+                      type="button"
+                      onClick={() => handleAddTag(tag)}
+                      role="menuitem"
+                      className="w-full text-left px-3 py-1 hover:bg-gray-100 flex items-center gap-2 bg-transparent border-0 cursor-pointer"
+                    >
+                      <span
+                        className="inline-block h-3 w-3 rounded"
+                        style={{ backgroundColor: tag.color }}
+                        aria-hidden="true"
+                      />
+                      <span className="text-sm text-gray-700">{tag.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       <button
         onClick={() => onDelete(task)}
@@ -119,6 +207,7 @@ const Tasks = () => {
   const router = useRouter();
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [allTags, setAllTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
@@ -138,18 +227,31 @@ const Tasks = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadTasks = useCallback(async () => {
+  const loadData = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/tasks`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
-      if (!res.ok) {
+      // Load tasks and tags in parallel — the task list embeds its current
+      // tag badges, the full tag list populates the "+ Tag" picker.
+      const [tasksRes, tagsRes] = await Promise.all([
+        fetch(`${ENTRYPOINT}/tasks`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+        fetch(`${ENTRYPOINT}/tags`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+      ]);
+      if (!tasksRes.ok) {
         throw new Error("Failed to load tasks.");
       }
-      const data: TaskCollection = await res.json();
-      setTasks(data.member ?? data["hydra:member"] ?? []);
+      if (!tagsRes.ok) {
+        throw new Error("Failed to load tags.");
+      }
+      const tasksData: Collection<Task> = await tasksRes.json();
+      const tagsData: Collection<Tag> = await tagsRes.json();
+      setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
+      setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load tasks.");
     } finally {
@@ -159,9 +261,9 @@ const Tasks = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadTasks();
+      loadData();
     }
-  }, [isAuthenticated, loadTasks]);
+  }, [isAuthenticated, loadData]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -187,7 +289,7 @@ const Tasks = () => {
       }
       setTitle("");
       setDescription("");
-      await loadTasks();
+      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
     } finally {
@@ -196,21 +298,28 @@ const Tasks = () => {
   };
 
   const handleToggle = async (task: Task) => {
+    // Optimistic toggle: flip the checkbox immediately so the UI feels
+    // responsive and so controlled-input assertions in tests see the new
+    // state without waiting for the server round-trip.
+    const previous = tasks;
+    const nextCompletedOn = task.completedOn ? null : new Date().toISOString();
+    setTasks(
+      tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t)),
+    );
     setError(null);
+
     try {
       const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
-          completedOn: task.completedOn ? null : new Date().toISOString(),
-        }),
+        body: JSON.stringify({ completedOn: nextCompletedOn }),
       });
       if (!res.ok) {
         throw new Error("Failed to update task.");
       }
-      await loadTasks();
     } catch (err) {
+      setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update task.");
     }
   };
@@ -225,9 +334,34 @@ const Tasks = () => {
       if (!res.ok) {
         throw new Error("Failed to delete task.");
       }
-      await loadTasks();
+      await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete task.");
+    }
+  };
+
+  const handleTagsChange = async (task: Task, nextTagIris: string[]) => {
+    // Optimistic update so badges appear instantly. Roll back on server reject.
+    const previous = tasks;
+    const nextTags = nextTagIris
+      .map((iri) => allTags.find((t) => t["@id"] === iri))
+      .filter((t): t is Tag => Boolean(t));
+    setTasks(tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, tags: nextTags } : t)));
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ tags: nextTagIris }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to update tags.");
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update tags.");
     }
   };
 
@@ -347,8 +481,10 @@ const Tasks = () => {
                     <SortableTaskItem
                       key={task["@id"]}
                       task={task}
+                      allTags={allTags}
                       onToggle={handleToggle}
                       onDelete={handleDelete}
+                      onTagsChange={handleTagsChange}
                     />
                   ))}
                 </ul>

@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { ENTRYPOINT } from "../config/entrypoint";
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   roles: string[];
 }

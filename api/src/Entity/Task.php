@@ -10,8 +10,11 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ApiResource(
@@ -24,13 +27,13 @@ use Symfony\Component\Validator\Constraints as Assert;
             processor: TaskOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
         ),
     ],
     normalizationContext: ['groups' => ['task:read']],
@@ -41,18 +44,30 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
+#[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
 class Task
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'integer')]
-    #[ORM\GeneratedValue(strategy: 'SEQUENCE')]
+    #[ORM\Column(type: 'uuid', unique: true)]
+    #[ORM\GeneratedValue(strategy: 'CUSTOM')]
+    #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
     #[Groups(['task:read'])]
-    private ?int $id = null;
+    private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['task:read'])]
     private ?User $owner = null;
+
+    /**
+     * Optional project the task belongs to. When set, every project member
+     * can read and edit the task alongside its owner. Personal tasks leave
+     * this null.
+     */
+    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['task:read', 'task:write'])]
+    private ?Project $project = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -82,12 +97,28 @@ class Task
     #[Groups(['task:read'])]
     private int $position = 0;
 
+    /**
+     * Owning side of the Task↔Tag many-to-many. Membership is edited via
+     * PATCH /tasks/{id} with a `tags` array of Tag IRIs. Tags are scoped to
+     * the task's owner; cross-user IRIs are rejected by TagOwnerExtension
+     * during deserialization.
+     *
+     * @var Collection<int, Tag>
+     */
+    #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'tasks')]
+    #[ORM\JoinTable(name: 'task_tag')]
+    #[ORM\JoinColumn(name: 'task_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'tag_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['task:read', 'task:write'])]
+    private Collection $tags;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
+        $this->tags = new ArrayCollection();
     }
 
-    public function getId(): ?int
+    public function getId(): ?Uuid
     {
         return $this->id;
     }
@@ -100,6 +131,17 @@ class Task
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+        return $this;
+    }
+
+    public function getProject(): ?Project
+    {
+        return $this->project;
+    }
+
+    public function setProject(?Project $project): static
+    {
+        $this->project = $project;
         return $this;
     }
 
@@ -154,6 +196,28 @@ class Task
     public function setPosition(int $position): static
     {
         $this->position = $position;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Tag>
+     */
+    public function getTags(): Collection
+    {
+        return $this->tags;
+    }
+
+    public function addTag(Tag $tag): static
+    {
+        if (!$this->tags->contains($tag)) {
+            $this->tags->add($tag);
+        }
+        return $this;
+    }
+
+    public function removeTag(Tag $tag): static
+    {
+        $this->tags->removeElement($tag);
         return $this;
     }
 }
