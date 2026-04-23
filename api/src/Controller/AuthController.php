@@ -20,7 +20,7 @@ class AuthController extends AbstractController
         }
 
         return $this->json([
-            'id' => $user->getId(),
+            'id' => (string) $user->getId(),
             'email' => $user->getEmail(),
             'roles' => $user->getRoles(),
         ]);
@@ -34,7 +34,7 @@ class AuthController extends AbstractController
         }
 
         return $this->json([
-            'id' => $user->getId(),
+            'id' => (string) $user->getId(),
             'email' => $user->getEmail(),
             'roles' => $user->getRoles(),
         ]);

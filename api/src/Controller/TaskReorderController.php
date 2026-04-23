@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Bulk reorder the authenticated user's tasks. Accepts an ordered list of
@@ -40,15 +41,15 @@ final class TaskReorderController extends AbstractController
     {
         $payload = json_decode($request->getContent(), true);
         if (!is_array($payload) || !isset($payload['order']) || !is_array($payload['order'])) {
-            return $this->json(['error' => 'Expected body: {"order": ["/tasks/1", ...]}.'], 400);
+            return $this->json(['error' => 'Expected body: {"order": ["/tasks/{uuid}", ...]}.'], 400);
         }
 
         $ids = [];
         foreach ($payload['order'] as $iri) {
-            if (!is_string($iri) || !preg_match('#^/tasks/(\d+)$#', $iri, $match)) {
+            if (!is_string($iri) || !preg_match('#^/tasks/([0-9a-fA-F-]{36})$#', $iri, $match) || !Uuid::isValid($match[1])) {
                 return $this->json(['error' => sprintf('Invalid Task IRI: %s', is_string($iri) ? $iri : gettype($iri))], 400);
             }
-            $id = (int) $match[1];
+            $id = Uuid::fromString($match[1])->toRfc4122();
             if (isset($ids[$id])) {
                 return $this->json(['error' => sprintf('Duplicate Task IRI: %s', $iri)], 400);
             }
@@ -59,7 +60,7 @@ final class TaskReorderController extends AbstractController
         $owned = $this->tasks->findBy(['owner' => $user]);
         $ownedById = [];
         foreach ($owned as $task) {
-            $ownedById[$task->getId()] = $task;
+            $ownedById[(string) $task->getId()] = $task;
         }
 
         // Ownership check runs first so cross-user or non-existent IRIs return
@@ -67,7 +68,7 @@ final class TaskReorderController extends AbstractController
         // This mirrors TaskOwnerExtension's item-lookup behavior.
         foreach ($requestedIds as $id) {
             if (!isset($ownedById[$id])) {
-                return $this->json(['error' => sprintf('Task %d not found.', $id)], 404);
+                return $this->json(['error' => sprintf('Task %s not found.', $id)], 404);
             }
         }
 
