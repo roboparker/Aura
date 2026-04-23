@@ -28,10 +28,10 @@ final class Version20260422130000 extends AbstractMigration
         $this->addSql('ALTER TABLE project ADD CONSTRAINT FK_2FB3D0EE7E3C61F9 FOREIGN KEY (owner_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
 
         $this->addSql('CREATE TABLE project_member (project_id UUID NOT NULL, user_id UUID NOT NULL, PRIMARY KEY (project_id, user_id))');
-        $this->addSql('CREATE INDEX IDX_FDCFBC3B166D1F9C ON project_member (project_id)');
-        $this->addSql('CREATE INDEX IDX_FDCFBC3BA76ED395 ON project_member (user_id)');
-        $this->addSql('ALTER TABLE project_member ADD CONSTRAINT FK_FDCFBC3B166D1F9C FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE NOT DEFERRABLE');
-        $this->addSql('ALTER TABLE project_member ADD CONSTRAINT FK_FDCFBC3BA76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
+        $this->addSql('CREATE INDEX IDX_67401132166D1F9C ON project_member (project_id)');
+        $this->addSql('CREATE INDEX IDX_67401132A76ED395 ON project_member (user_id)');
+        $this->addSql('ALTER TABLE project_member ADD CONSTRAINT FK_67401132166D1F9C FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE NOT DEFERRABLE');
+        $this->addSql('ALTER TABLE project_member ADD CONSTRAINT FK_67401132A76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
 
         $this->addSql('ALTER TABLE task ADD project_id UUID DEFAULT NULL');
         $this->addSql('ALTER TABLE task ADD CONSTRAINT FK_527EDB25166D1F9C FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE SET NULL NOT DEFERRABLE');
@@ -44,8 +44,8 @@ final class Version20260422130000 extends AbstractMigration
         $this->addSql('DROP INDEX idx_task_project');
         $this->addSql('ALTER TABLE task DROP project_id');
 
-        $this->addSql('ALTER TABLE project_member DROP CONSTRAINT FK_FDCFBC3BA76ED395');
-        $this->addSql('ALTER TABLE project_member DROP CONSTRAINT FK_FDCFBC3B166D1F9C');
+        $this->addSql('ALTER TABLE project_member DROP CONSTRAINT FK_67401132A76ED395');
+        $this->addSql('ALTER TABLE project_member DROP CONSTRAINT FK_67401132166D1F9C');
         $this->addSql('DROP TABLE project_member');
 
         $this->addSql('ALTER TABLE project DROP CONSTRAINT FK_2FB3D0EE7E3C61F9');
