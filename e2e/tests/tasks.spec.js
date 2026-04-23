@@ -116,15 +116,20 @@ test.describe("Tasks", () => {
     const listItems = page.locator('[data-testid="task-item"] p.font-medium').first();
     await expect(listItems).toHaveText(titles[2]);
 
-    // Grab the grip on the top item (C) and move it down twice to position 3
+    // Grab the grip on the top item (C) and move it down twice to position 3.
+    // Use locator.press() to focus+press atomically (more reliable in CI than
+    // focus() + keyboard.press), and wait briefly between keys so dnd-kit's
+    // drag state has time to update between Space/Arrow events.
     const topGrip = page
       .locator('[data-testid="task-item"]')
       .first()
       .getByRole("button", { name: /Drag to reorder/ });
-    await topGrip.focus();
-    await page.keyboard.press("Space");
+    await topGrip.press("Space");
+    await page.waitForTimeout(100);
     await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(100);
     await page.keyboard.press("ArrowDown");
+    await page.waitForTimeout(100);
     await page.keyboard.press("Space");
 
     // Now the order should be B, A, C — verify via the top item

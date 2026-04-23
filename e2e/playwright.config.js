@@ -5,8 +5,12 @@ module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  retries: 0,
-  workers: 1,
+  // Retry once in CI to absorb rare flakes in pointer/keyboard drag tests.
+  retries: process.env.CI ? 1 : 0,
+  // Parallelise in CI — each test creates its own user with a unique email, so
+  // workers don't contend on data. Keep a single worker locally to make
+  // interactive debugging predictable.
+  workers: process.env.CI ? 4 : 1,
   reporter: 'html',
   use: {
     ignoreHTTPSErrors: true,

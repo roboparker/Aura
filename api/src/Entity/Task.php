@@ -10,6 +10,8 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -82,9 +84,25 @@ class Task
     #[Groups(['task:read'])]
     private int $position = 0;
 
+    /**
+     * Owning side of the Task↔Tag many-to-many. Membership is edited via
+     * PATCH /tasks/{id} with a `tags` array of Tag IRIs. Tags are scoped to
+     * the task's owner; cross-user IRIs are rejected by TagOwnerExtension
+     * during deserialization.
+     *
+     * @var Collection<int, Tag>
+     */
+    #[ORM\ManyToMany(targetEntity: Tag::class, inversedBy: 'tasks')]
+    #[ORM\JoinTable(name: 'task_tag')]
+    #[ORM\JoinColumn(name: 'task_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'tag_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['task:read', 'task:write'])]
+    private Collection $tags;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
+        $this->tags = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -154,6 +172,28 @@ class Task
     public function setPosition(int $position): static
     {
         $this->position = $position;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Tag>
+     */
+    public function getTags(): Collection
+    {
+        return $this->tags;
+    }
+
+    public function addTag(Tag $tag): static
+    {
+        if (!$this->tags->contains($tag)) {
+            $this->tags->add($tag);
+        }
+        return $this;
+    }
+
+    public function removeTag(Tag $tag): static
+    {
+        $this->tags->removeElement($tag);
         return $this;
     }
 }
