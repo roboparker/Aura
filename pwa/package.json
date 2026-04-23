@@ -20,7 +20,7 @@
     "formik": "^2.4.9",
     "isomorphic-unfetch": "^4.0.2",
     "next": "^15.5.15",
-    "postcss": "^8.5.3",
+    "postcss": "^8.5.10",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tailwindcss": "^4.1.7"
