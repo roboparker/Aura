@@ -60,6 +60,14 @@ docker compose up -d
 ```
 The API is served at `https://localhost` (FrankenPHP handles both API and PWA proxying).
 
+### Parallel Worktree Stacks
+To run multiple worktrees concurrently without port/container collisions, generate a per-worktree `.env` first:
+```bash
+scripts/worktree-env.sh           # writes ./.env with a unique project name and port block
+docker compose up -d
+```
+Linked worktrees get ports in the 20000+ range; the main checkout keeps default ports. See `docs/deployment.md` for details.
+
 ### API Development
 ```bash
 cd api
