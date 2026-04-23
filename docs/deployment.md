@@ -23,13 +23,42 @@ Key variables (set in `.env` or `compose.override.yaml`):
 
 | Variable                       | Default                  | Description              |
 |--------------------------------|--------------------------|--------------------------|
+| `COMPOSE_PROJECT_NAME`         | (directory name)         | Isolates containers/volumes per stack |
 | `SERVER_NAME`                  | `localhost`              | Server hostname          |
 | `POSTGRES_USER`                | `app`                    | Database user            |
 | `POSTGRES_PASSWORD`            | `!ChangeMe!`             | Database password        |
 | `POSTGRES_DB`                  | `app`                    | Database name            |
+| `POSTGRES_PORT`                | `5432`                   | Host port for PostgreSQL (dev override) |
 | `CADDY_MERCURE_JWT_SECRET`     | `!ChangeThisMercure...`  | Mercure JWT secret       |
 | `HTTPS_PORT`                   | `443`                    | HTTPS port               |
 | `HTTP_PORT`                    | `80`                     | HTTP port                |
+| `HTTP3_PORT`                   | `443`                    | HTTP/3 (UDP) port        |
+| `MAILPIT_SMTP_PORT`            | `1025`                   | Mailpit SMTP port        |
+| `MAILPIT_WEB_PORT`             | `8025`                   | Mailpit web UI port      |
+
+### Parallel Worktree Stacks
+
+Each git worktree can run its own isolated Docker stack so you can work on
+multiple branches in parallel without port or container-name conflicts.
+`scripts/worktree-env.sh` generates a per-worktree `.env` with a unique
+`COMPOSE_PROJECT_NAME` and a non-conflicting port block derived from a hash
+of the worktree path.
+
+```bash
+# From inside any worktree (including the main checkout):
+scripts/worktree-env.sh          # writes ./.env (refuses to overwrite)
+scripts/worktree-env.sh --print  # preview without writing
+scripts/worktree-env.sh --force  # overwrite an existing .env
+
+docker compose up -d             # picks up .env automatically
+```
+
+The main checkout keeps the default ports (443/80/5432/...). Linked worktrees
+get ports in the 20000+ range (e.g. HTTPS on `20409`, Mailpit UI on `27409`,
+PostgreSQL on `25409`). Access the app at the `APP_FRONTEND_URL` printed by
+the script.
+
+`.env` is gitignored, so each worktree's values stay local.
 
 ## Production (Docker Compose)
 
