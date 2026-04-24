@@ -38,6 +38,7 @@ Aura/
 - **State**: @tanstack/react-query
 - **Forms**: Formik
 - **Admin**: @api-platform/admin
+- **Rich text**: BlockNote (WYSIWYG markdown editor) + react-markdown / remark-gfm (read-only rendering). Shared editor lives in `pwa/components/editor/`.
 - **Package manager**: pnpm
 
 ### E2E Tests
@@ -104,6 +105,10 @@ npx playwright test
 - Components in `pwa/components/`
 - Pages follow Next.js file-based routing in `pwa/pages/`
 - Use Tailwind CSS for styling
+- Long-form description fields use `MarkdownEditor` for input and `MarkdownView` for rendering (both from `pwa/components/editor/`). Content is stored as markdown in the API's `TEXT` columns.
+
+### E2E Tests
+- Shared helpers (auth + markdown editor) live in `e2e/tests/helpers.js` — prefer them over duplicating `registerAndSignIn` per spec.
 
 ### Git & Branching
 - `main` is the only long-lived branch — always deployable

@@ -6,32 +6,37 @@ import { ENTRYPOINT } from "../config/entrypoint";
 import MarkdownEditor from "../components/editor/MarkdownEditor";
 import MarkdownView from "../components/editor/MarkdownView";
 
-interface Tag {
+interface Member {
+  "@id": string;
+  id: string;
+  email: string;
+}
+
+interface Project {
   "@id": string;
   id: string;
   title: string;
   description: string | null;
-  color: string;
+  createdOn: string;
+  owner: Member;
+  members: Member[];
 }
 
-interface TagCollection {
-  member?: Tag[];
-  "hydra:member"?: Tag[];
+interface ProjectCollection {
+  member?: Project[];
+  "hydra:member"?: Project[];
 }
 
-const DEFAULT_COLOR = "#6b7280";
-
-const Tags = () => {
+const Projects = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [tags, setTags] = useState<Tag[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [color, setColor] = useState(DEFAULT_COLOR);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Bumped after a successful create so the MarkdownEditor remounts empty.
   const [editorResetKey, setEditorResetKey] = useState(0);
@@ -39,7 +44,6 @@ const Tags = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editColor, setEditColor] = useState(DEFAULT_COLOR);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -47,20 +51,20 @@ const Tags = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadTags = useCallback(async () => {
+  const loadProjects = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/tags`, {
+      const res = await fetch(`${ENTRYPOINT}/projects`, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
       if (!res.ok) {
-        throw new Error("Failed to load tags.");
+        throw new Error("Failed to load projects.");
       }
-      const data: TagCollection = await res.json();
-      setTags(data.member ?? data["hydra:member"] ?? []);
+      const data: ProjectCollection = await res.json();
+      setProjects(data.member ?? data["hydra:member"] ?? []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tags.");
+      setError(err instanceof Error ? err.message : "Failed to load projects.");
     } finally {
       setIsLoading(false);
     }
@@ -68,9 +72,9 @@ const Tags = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      loadTags();
+      loadProjects();
     }
-  }, [isAuthenticated, loadTags]);
+  }, [isAuthenticated, loadProjects]);
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -79,91 +83,93 @@ const Tags = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/tags`, {
+      const res = await fetch(`${ENTRYPOINT}/projects`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
-          color,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create tag.",
+          data.description || data.detail || data["hydra:description"] || "Failed to create project.",
         );
       }
       setTitle("");
       setDescription("");
-      setColor(DEFAULT_COLOR);
       setEditorResetKey((k) => k + 1);
-      await loadTags();
+      await loadProjects();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create tag.");
+      setError(err instanceof Error ? err.message : "Failed to create project.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const startEdit = (tag: Tag) => {
-    setEditingId(tag["@id"]);
-    setEditTitle(tag.title);
-    setEditDescription(tag.description ?? "");
-    setEditColor(tag.color);
+  const startEdit = (project: Project) => {
+    setEditingId(project["@id"]);
+    setEditTitle(project.title);
+    setEditDescription(project.description ?? "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
   };
 
-  const handleUpdate = async (event: FormEvent<HTMLFormElement>, tag: Tag) => {
+  const handleUpdate = async (event: FormEvent<HTMLFormElement>, project: Project) => {
     event.preventDefault();
     if (!editTitle.trim()) return;
 
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${tag["@id"]}`, {
+      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim() || null,
-          color: editColor,
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to update tag.",
+          data.description || data.detail || data["hydra:description"] || "Failed to update project.",
         );
       }
       setEditingId(null);
-      await loadTags();
+      await loadProjects();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update tag.");
+      setError(err instanceof Error ? err.message : "Failed to update project.");
     }
   };
 
-  const handleDelete = async (tag: Tag) => {
-    if (!window.confirm(`Delete tag "${tag.title}"? It will be removed from any tasks using it.`)) {
+  const handleDelete = async (project: Project) => {
+    // Deleting a project deletes it for every member, and its tasks revert to
+    // personal (project_id SET NULL). Make sure the user is aware.
+    if (
+      !window.confirm(
+        `Delete project "${project.title}"? This removes it for all members; project tasks become personal tasks of their owners.`,
+      )
+    ) {
       return;
     }
 
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${tag["@id"]}`, {
+      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
         method: "DELETE",
         credentials: "include",
       });
       if (!res.ok) {
-        throw new Error("Failed to delete tag.");
+        throw new Error("Failed to delete project.");
       }
-      await loadTags();
+      await loadProjects();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete tag.");
+      setError(err instanceof Error ? err.message : "Failed to delete project.");
     }
   };
 
@@ -178,11 +184,11 @@ const Tags = () => {
   return (
     <>
       <Head>
-        <title>Tags - Aura</title>
+        <title>Projects - Aura</title>
       </Head>
       <div className="min-h-screen bg-gray-50 px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-black mb-6">Tags</h1>
+          <h1 className="text-2xl font-bold text-black mb-6">Projects</h1>
 
           <form
             onSubmit={handleCreate}
@@ -198,7 +204,7 @@ const Tags = () => {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                maxLength={100}
+                maxLength={255}
                 className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
               />
             </div>
@@ -214,27 +220,12 @@ const Tags = () => {
                 onChange={setDescription}
               />
             </div>
-            <div>
-              <label htmlFor="color" className="block text-sm font-medium text-gray-700">
-                Color
-              </label>
-              <div className="mt-1 flex items-center gap-3">
-                <input
-                  id="color"
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-16 border border-gray-300 rounded-md cursor-pointer"
-                />
-                <span className="text-sm font-mono text-gray-600">{color}</span>
-              </div>
-            </div>
             <button
               type="submit"
               disabled={isSubmitting || !title.trim()}
               className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? "Adding..." : "Add Tag"}
+              {isSubmitting ? "Adding..." : "Add Project"}
             </button>
           </form>
 
@@ -248,27 +239,27 @@ const Tags = () => {
           )}
 
           {isLoading ? (
-            <p className="text-gray-500">Loading tags...</p>
-          ) : tags.length === 0 ? (
+            <p className="text-gray-500">Loading projects...</p>
+          ) : projects.length === 0 ? (
             <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-              No tags yet. Create one above to start organizing your tasks.
+              No projects yet. Create one above to start collaborating.
             </p>
           ) : (
-            <ul className="space-y-2" data-testid="tag-list">
-              {tags.map((tag) => (
+            <ul className="space-y-2" data-testid="project-list">
+              {projects.map((project) => (
                 <li
-                  key={tag["@id"]}
+                  key={project["@id"]}
                   className="bg-white rounded-lg shadow-card p-4"
-                  data-testid="tag-item"
+                  data-testid="project-item"
                 >
-                  {editingId === tag["@id"] ? (
-                    <form onSubmit={(e) => handleUpdate(e, tag)} className="space-y-3">
+                  {editingId === project["@id"] ? (
+                    <form onSubmit={(e) => handleUpdate(e, project)} className="space-y-3">
                       <input
                         type="text"
                         value={editTitle}
                         onChange={(e) => setEditTitle(e.target.value)}
                         required
-                        maxLength={100}
+                        maxLength={255}
                         aria-label="Title"
                         className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                       />
@@ -277,16 +268,6 @@ const Tags = () => {
                         value={editDescription}
                         onChange={setEditDescription}
                       />
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={editColor}
-                          onChange={(e) => setEditColor(e.target.value)}
-                          aria-label="Color"
-                          className="h-10 w-16 border border-gray-300 rounded-md cursor-pointer"
-                        />
-                        <span className="text-sm font-mono text-gray-600">{editColor}</span>
-                      </div>
                       <div className="flex gap-2">
                         <button
                           type="submit"
@@ -304,29 +285,45 @@ const Tags = () => {
                       </div>
                     </form>
                   ) : (
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold text-white"
-                        style={{ backgroundColor: tag.color }}
-                      >
-                        {tag.title}
-                      </span>
-                      <div className="flex-1">
-                        {tag.description && <MarkdownView source={tag.description} />}
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <h2 className="font-semibold text-black">{project.title}</h2>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <button
+                            onClick={() => startEdit(project)}
+                            className="text-cyan-700 hover:text-cyan-900 text-sm font-medium bg-transparent border-0 cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(project)}
+                            aria-label={`Delete "${project.title}"`}
+                            className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => startEdit(tag)}
-                        className="text-cyan-700 hover:text-cyan-900 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(tag)}
-                        aria-label={`Delete "${tag.title}"`}
-                        className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                      >
-                        Delete
-                      </button>
+                      {project.description && (
+                        <MarkdownView source={project.description} className="mt-1" />
+                      )}
+                      {project.members.length > 0 && (
+                        <div
+                          className="mt-2 flex flex-wrap items-center gap-1"
+                          data-testid="project-members"
+                        >
+                          <span className="text-xs text-gray-500">Members:</span>
+                          {project.members.map((member) => (
+                            <span
+                              key={member["@id"]}
+                              className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
+                              data-testid="project-member"
+                            >
+                              {member.email}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </li>
@@ -339,4 +336,4 @@ const Tags = () => {
   );
 };
 
-export default Tags;
+export default Projects;

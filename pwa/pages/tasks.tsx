@@ -20,6 +20,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "../contexts/AuthContext";
 import { ENTRYPOINT } from "../config/entrypoint";
+import MarkdownEditor from "../components/editor/MarkdownEditor";
+import MarkdownView from "../components/editor/MarkdownView";
 
 interface Tag {
   "@id": string;
@@ -126,13 +128,10 @@ const SortableTaskItem = ({
           {task.title}
         </p>
         {task.description && (
-          <p
-            className={`text-sm mt-1 ${
-              task.completedOn ? "line-through text-gray-400" : "text-gray-600"
-            }`}
-          >
-            {task.description}
-          </p>
+          <MarkdownView
+            source={task.description}
+            className={`mt-1 ${task.completedOn ? "line-through text-gray-400" : ""}`}
+          />
         )}
         <div className="mt-2 flex flex-wrap items-center gap-1" data-testid="task-tags">
           {task.tags.map((tag) => (
@@ -213,6 +212,9 @@ const Tasks = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Bumped after a successful create so the MarkdownEditor remounts with
+  // an empty value — its initialContent is only read once at creation.
+  const [editorResetKey, setEditorResetKey] = useState(0);
 
   const sensors = useSensors(
     // Require an 8px drag before activating so a quick click on the grip
@@ -289,6 +291,7 @@ const Tasks = () => {
       }
       setTitle("");
       setDescription("");
+      setEditorResetKey((k) => k + 1);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
@@ -431,15 +434,15 @@ const Tasks = () => {
               />
             </div>
             <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                 Description <span className="text-gray-400">(optional)</span>
               </label>
-              <textarea
+              <MarkdownEditor
+                key={editorResetKey}
                 id="description"
+                ariaLabel="Description"
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                onChange={setDescription}
               />
             </div>
             <button

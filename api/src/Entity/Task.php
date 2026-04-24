@@ -76,6 +76,7 @@ class Task
     private string $title = '';
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Assert\Length(max: 100000, maxMessage: 'Description cannot be longer than {{ limit }} characters.')]
     #[Groups(['task:read', 'task:write'])]
     private ?string $description = null;
 

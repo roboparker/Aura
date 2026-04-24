@@ -1,23 +1,8 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
+const { BASE_URL, uniqueEmail: shared, registerAndSignIn, fillDescription } = require("./helpers");
 
-const BASE_URL = "https://localhost";
-
-const uniqueEmail = () => `tasks-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-
-async function registerAndSignIn(page, email, password = "password123") {
-  const res = await page.request.post(`${BASE_URL}/users`, {
-    headers: { "Content-Type": "application/ld+json" },
-    data: { email, plainPassword: password },
-  });
-  expect(res.ok()).toBeTruthy();
-
-  await page.goto(`${BASE_URL}/signin`);
-  await page.fill("#email", email);
-  await page.fill("#password", password);
-  await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/account/);
-}
+const uniqueEmail = () => shared("tasks");
 
 test.describe("Tasks", () => {
   test("unauthenticated visitors are redirected to sign in", async ({ page }) => {
@@ -35,7 +20,7 @@ test.describe("Tasks", () => {
     // Create
     const title = `Buy groceries ${Date.now()}`;
     await page.fill("#title", title);
-    await page.fill("#description", "Milk, eggs, bread");
+    await fillDescription(page, undefined, "Milk, eggs, bread");
     await page.click('button[type="submit"]');
 
     const item = page.locator('[data-testid="task-item"]', { hasText: title });
