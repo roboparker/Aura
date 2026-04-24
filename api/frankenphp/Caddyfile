@@ -57,6 +57,12 @@
 	header ?Permissions-Policy "browsing-topics=()"
 
 	route {
+		# Serve user-uploaded media (avatars, attachments) directly from disk
+		handle_path /media/* {
+			root * /app/var/media
+			file_server
+		}
+
 		# Matches requests for HTML documents, for static files and for Next.js files,
 		# except for known API paths and paths with extensions handled by API Platform
 		@pwa expression `(

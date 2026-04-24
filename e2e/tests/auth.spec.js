@@ -13,6 +13,8 @@ test.describe("Authentication", () => {
     await page.goto(`${BASE_URL}/signup`);
     await expect(page).toHaveTitle("Sign Up - Aura");
 
+    await page.fill("#givenName", "E2e");
+    await page.fill("#familyName", "User");
     await page.fill("#email", email);
     await page.fill("#password", "password123");
     await page.fill("#confirmPassword", "password123");
@@ -48,7 +50,7 @@ test.describe("Authentication", () => {
     const email = uniqueEmail();
     const res = await page.request.post(`${BASE_URL}/users`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { email, plainPassword: "password123" },
+      data: { email, plainPassword: "password123", givenName: "E2e", familyName: "User" },
     });
     expect(res.ok()).toBeTruthy();
 

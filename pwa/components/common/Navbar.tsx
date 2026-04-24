@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { useAuth } from "../../contexts/AuthContext";
+import UserAvatar from "../user/UserAvatar";
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
@@ -13,7 +14,7 @@ const Navbar = () => {
         </Link>
 
         <div className="flex items-center gap-4">
-          {isAuthenticated ? (
+          {isAuthenticated && user ? (
             <>
               {isAdmin && (
                 <Link href="/admin" className="text-cyan-200 hover:text-white no-underline text-sm">
@@ -29,15 +30,15 @@ const Navbar = () => {
               <Link href="/tags" className="text-cyan-200 hover:text-white no-underline text-sm">
                 Tags
               </Link>
-              <Link href="/account" className="text-cyan-200 hover:text-white no-underline text-sm">
-                My Account
-              </Link>
               <button
                 onClick={logout}
                 className="text-cyan-200 hover:text-white text-sm bg-transparent border-0 cursor-pointer"
               >
                 Sign Out
               </button>
+              <Link href="/account" aria-label="My Account" className="inline-flex">
+                <UserAvatar user={user} size="sm" />
+              </Link>
             </>
           ) : (
             <>

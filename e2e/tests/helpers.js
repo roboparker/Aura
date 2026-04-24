@@ -6,10 +6,11 @@ const BASE_URL = "https://localhost";
 const uniqueEmail = (prefix = "e2e") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
-async function registerAndSignIn(page, email, password = "password123") {
+async function registerAndSignIn(page, email, password = "password123", options = {}) {
+  const { givenName = "E2e", familyName = "User" } = options;
   const res = await page.request.post(`${BASE_URL}/users`, {
     headers: { "Content-Type": "application/ld+json" },
-    data: { email, plainPassword: password },
+    data: { email, plainPassword: password, givenName, familyName },
   });
   expect(res.ok()).toBeTruthy();
 

@@ -20,6 +20,7 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+      - media_data:/app/var/media
     ports:
       # HTTP
       - target: 80
@@ -85,6 +86,7 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  media_data:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###
