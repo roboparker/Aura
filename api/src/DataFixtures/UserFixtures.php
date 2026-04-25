@@ -10,6 +10,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class UserFixtures extends Fixture
 {
+    public const ADMIN_REFERENCE = 'user-admin';
+    public const USER_REFERENCE = 'user-uma';
+
     public function __construct(
         private UserPasswordHasherInterface $passwordHasher,
         private AvatarColorService $colorService,
@@ -37,5 +40,8 @@ class UserFixtures extends Fixture
         $manager->persist($user);
 
         $manager->flush();
+
+        $this->addReference(self::ADMIN_REFERENCE, $admin);
+        $this->addReference(self::USER_REFERENCE, $user);
     }
 }
