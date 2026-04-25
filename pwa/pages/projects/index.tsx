@@ -1,10 +1,11 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { ENTRYPOINT } from "../config/entrypoint";
-import MarkdownEditor from "../components/editor/MarkdownEditor";
-import MarkdownView from "../components/editor/MarkdownView";
+import { useAuth } from "../../contexts/AuthContext";
+import { ENTRYPOINT } from "../../config/entrypoint";
+import MarkdownEditor from "../../components/editor/MarkdownEditor";
+import MarkdownView from "../../components/editor/MarkdownView";
 
 interface Member {
   "@id": string;
@@ -287,7 +288,14 @@ const Projects = () => {
                   ) : (
                     <div>
                       <div className="flex items-start justify-between gap-3">
-                        <h2 className="font-semibold text-black">{project.title}</h2>
+                        <h2 className="font-semibold text-black">
+                          <Link
+                            href={`/projects/${project.id}`}
+                            className="text-cyan-700 hover:text-cyan-900 no-underline"
+                          >
+                            {project.title}
+                          </Link>
+                        </h2>
                         <div className="flex items-center gap-3 shrink-0">
                           <button
                             onClick={() => startEdit(project)}

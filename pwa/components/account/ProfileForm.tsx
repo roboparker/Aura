@@ -2,11 +2,13 @@ import { useState } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import { ENTRYPOINT } from "../../config/entrypoint";
 import { useAuth } from "../../contexts/AuthContext";
+import { AVATAR_PALETTE } from "../../lib/avatarPalette";
 
 interface Values {
   givenName: string;
   familyName: string;
   nickname: string;
+  personalizedColor: string;
 }
 
 const validate = (values: Values) => {
@@ -16,6 +18,9 @@ const validate = (values: Values) => {
   if (values.givenName.length > 100) errors.givenName = "Too long (max 100).";
   if (values.familyName.length > 100) errors.familyName = "Too long (max 100).";
   if (values.nickname.length > 100) errors.nickname = "Too long (max 100).";
+  if (!AVATAR_PALETTE.includes(values.personalizedColor)) {
+    errors.personalizedColor = "Pick a color from the palette.";
+  }
   return errors;
 };
 
@@ -42,6 +47,7 @@ const ProfileForm = () => {
           givenName: user.givenName,
           familyName: user.familyName,
           nickname: user.nickname ?? "",
+          personalizedColor: user.personalizedColor,
         }}
         validate={validate}
         enableReinitialize
@@ -56,6 +62,7 @@ const ProfileForm = () => {
                 givenName: values.givenName.trim(),
                 familyName: values.familyName.trim(),
                 nickname: values.nickname.trim() || null,
+                personalizedColor: values.personalizedColor,
               }),
             });
             if (!res.ok) {
@@ -71,7 +78,7 @@ const ProfileForm = () => {
           }
         }}
       >
-        {({ isSubmitting, status }) => (
+        {({ isSubmitting, status, values, setFieldValue }) => (
           <Form className="space-y-3" noValidate>
             {status && (
               <div className="bg-red-50 text-red-500 p-3 rounded text-sm">{status}</div>
@@ -121,6 +128,44 @@ const ProfileForm = () => {
               />
               <ErrorMessage name="nickname" component="p" className="mt-1 text-sm text-red-500" />
             </div>
+
+            <fieldset>
+              <legend className="block text-sm font-medium text-gray-700 mb-1">
+                Avatar color{" "}
+                <span className="text-gray-400 font-normal">(used when you have no picture)</span>
+              </legend>
+              <div
+                role="radiogroup"
+                aria-label="Avatar color"
+                className="flex flex-wrap gap-2"
+                data-testid="avatar-color-palette"
+              >
+                {AVATAR_PALETTE.map((color) => {
+                  const isSelected = values.personalizedColor === color;
+                  return (
+                    <button
+                      key={color}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      aria-label={color}
+                      onClick={() => setFieldValue("personalizedColor", color)}
+                      className={`h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 ${
+                        isSelected
+                          ? "ring-2 ring-offset-2 ring-cyan-700 scale-110"
+                          : "hover:scale-105"
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  );
+                })}
+              </div>
+              <ErrorMessage
+                name="personalizedColor"
+                component="p"
+                className="mt-1 text-sm text-red-500"
+              />
+            </fieldset>
 
             <button
               type="submit"

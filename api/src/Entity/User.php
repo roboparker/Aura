@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Service\AvatarColorService;
 use App\State\UserPasswordHasherProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
@@ -76,10 +77,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /**
      * Hex color (e.g., "#1e6091") used behind the initials fallback when the
-     * user has no avatar. Picked at registration; not user-editable.
+     * user has no avatar. Initialized to a random palette entry at
+     * registration; the user can swap it for any other palette entry on
+     * /account, but never to a free-form value (to keep contrast safe).
      */
     #[ORM\Column(length: 7)]
-    #[Groups(['user:read', 'project:read'])]
+    #[Assert\Choice(
+        choices: AvatarColorService::PALETTE,
+        message: 'Pick a color from the available palette.',
+    )]
+    #[Groups(['user:read', 'user:write', 'project:read'])]
     private string $personalizedColor = '#1e6091';
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
