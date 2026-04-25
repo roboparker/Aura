@@ -270,6 +270,9 @@ class PasswordTest extends ApiTestCase
         $user = new User();
         $user->setEmail($email);
         $user->setRoles(['ROLE_USER']);
+        $user->setGivenName('Test');
+        $user->setFamilyName('User');
+        $user->setPersonalizedColor('#0369a1');
         $user->setPassword($hasher->hashPassword($user, $plainPassword));
 
         $this->entityManager->persist($user);

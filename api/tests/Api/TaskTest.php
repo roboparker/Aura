@@ -405,6 +405,9 @@ class TaskTest extends ApiTestCase
         $user = new User();
         $user->setEmail($email);
         $user->setRoles($roles);
+        $user->setGivenName('Test');
+        $user->setFamilyName('User');
+        $user->setPersonalizedColor('#0369a1');
         $user->setPassword($hasher->hashPassword($user, 'password123'));
 
         $this->entityManager->persist($user);

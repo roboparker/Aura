@@ -1296,7 +1296,10 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     inflector?: scalar|Param|null, // Specify an inflector to use. // Default: "api_platform.metadata.inflector"
  *     validator?: array{
  *         serialize_payload_fields?: mixed, // Set to null to serialize all payload fields when a validation error is thrown, or set the fields you want to include explicitly. // Default: []
- *         query_parameter_validation?: bool|Param, // Default: true
+ *         query_parameter_validation?: bool|Param, // Deprecated: Will be removed in API Platform 5.0. // Default: true
+ *     },
+ *     jsonapi?: array{
+ *         use_iri_as_id?: bool|Param, // Set to false to use entity identifiers instead of IRIs as the "id" field in JSON:API responses. // Default: true
  *     },
  *     eager_loading?: bool|array{
  *         enabled?: bool|Param, // Default: true
@@ -1306,12 +1309,15 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     },
  *     handle_symfony_errors?: bool|Param, // Allows to handle symfony exceptions. // Default: false
  *     enable_swagger?: bool|Param, // Enable the Swagger documentation and export. // Default: true
+ *     enable_json_streamer?: bool|Param, // Enable json streamer. // Default: false
  *     enable_swagger_ui?: bool|Param, // Enable Swagger UI // Default: true
  *     enable_re_doc?: bool|Param, // Enable ReDoc // Default: true
+ *     enable_scalar?: bool|Param, // Enable Scalar API Reference // Default: true
  *     enable_entrypoint?: bool|Param, // Enable the entrypoint // Default: true
  *     enable_docs?: bool|Param, // Enable the docs // Default: true
  *     enable_profiler?: bool|Param, // Enable the data collector and the WebProfilerBundle integration. // Default: true
- *     enable_link_security?: bool|Param, // Enable security for Links (sub resources) // Default: false
+ *     enable_phpdoc_parser?: bool|Param, // Enable resource metadata collector using PHPStan PhpDocParser. // Default: true
+ *     enable_link_security?: bool|Param, // Deprecated: This option is always enabled and will be removed in API Platform 5.0. // Enable security for Links (sub resources). // Default: true
  *     collection?: array{
  *         exists_parameter_name?: scalar|Param|null, // The name of the query parameter to filter on nullable field values. // Default: "exists"
  *         order?: scalar|Param|null, // The default order of results. // Default: "ASC"
@@ -1326,6 +1332,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         },
  *     },
  *     mapping?: array{
+ *         imports?: list<scalar|Param|null>,
  *         paths?: list<scalar|Param|null>,
  *     },
  *     resource_class_directories?: list<scalar|Param|null>,
@@ -1360,7 +1367,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             enabled?: bool|Param, // Default: true
  *         },
  *         max_query_depth?: int|Param, // Default: 20
- *         graphql_playground?: array<mixed>,
+ *         graphql_playground?: bool|array{ // Deprecated: The "graphql_playground" configuration is deprecated and will be ignored.
+ *             enabled?: bool|Param, // Default: false
+ *         },
  *         max_query_complexity?: int|Param, // Default: 500
  *         nesting_separator?: scalar|Param|null, // The separator to use to filter nested fields. // Default: "_"
  *         collection?: array{
@@ -1392,7 +1401,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             max_header_length?: int|Param, // Max header length supported by the cache server. // Default: 7500
  *             request_options?: mixed, // To pass options to the client charged with the request. // Default: []
  *             purger?: scalar|Param|null, // Specify a purger to use (available values: "api_platform.http_cache.purger.varnish.ban", "api_platform.http_cache.purger.varnish.xkey", "api_platform.http_cache.purger.souin"). // Default: "api_platform.http_cache.purger.varnish"
- *             xkey?: array{ // Deprecated: The "xkey" configuration is deprecated, use your own purger to customize surrogate keys or the appropriate paramters.
+ *             xkey?: array{ // Deprecated: The "xkey" configuration is deprecated, use your own purger to customize surrogate keys or the appropriate parameters.
  *                 glue?: scalar|Param|null, // xkey glue between keys // Default: " "
  *             },
  *         },
@@ -1408,6 +1417,9 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     elasticsearch?: bool|array{
  *         enabled?: bool|Param, // Default: false
  *         hosts?: list<scalar|Param|null>,
+ *         ssl_ca_bundle?: scalar|Param|null, // Path to the SSL CA bundle file for Elasticsearch SSL verification. // Default: null
+ *         ssl_verification?: bool|Param, // Enable or disable SSL verification for Elasticsearch connections. // Default: true
+ *         client?: "elasticsearch"|"opensearch"|Param, // The search engine client to use: "elasticsearch" or "opensearch". // Default: "elasticsearch"
  *     },
  *     openapi?: array{
  *         contact?: array{
@@ -1423,12 +1435,21 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         license?: array{
  *             name?: scalar|Param|null, // The license name used for the API. // Default: null
  *             url?: scalar|Param|null, // URL to the license used for the API. MUST be in the format of a URL. // Default: null
+ *             identifier?: scalar|Param|null, // An SPDX license expression for the API. The identifier field is mutually exclusive of the url field. // Default: null
  *         },
  *         swagger_ui_extra_configuration?: mixed, // To pass extra configuration to Swagger UI, like docExpansion or filter. // Default: []
+ *         scalar_extra_configuration?: mixed, // To pass extra configuration to Scalar API Reference, like theme or darkMode. // Default: []
  *         overrideResponses?: bool|Param, // Whether API Platform adds automatic responses to the OpenAPI documentation. // Default: true
+ *         error_resource_class?: scalar|Param|null, // The class used to represent errors in the OpenAPI documentation. // Default: null
+ *         validation_error_resource_class?: scalar|Param|null, // The class used to represent validation errors in the OpenAPI documentation. // Default: null
  *     },
  *     maker?: bool|array{
  *         enabled?: bool|Param, // Default: true
+ *         namespace_prefix?: scalar|Param|null, // Add a prefix to all maker generated classes. e.g set it to "Api" to set the maker namespace to "App\Api\" (if the maker.root_namespace config is App). e.g. App\Api\State\MyStateProcessor // Default: ""
+ *     },
+ *     mcp?: bool|array{
+ *         enabled?: bool|Param, // Default: true
+ *         format?: scalar|Param|null, // The serialization format used for MCP tool input/output. Must be a format registered in api_platform.formats (e.g. "jsonld", "json", "jsonapi"). // Default: "jsonld"
  *     },
  *     exception_to_status?: array<string, int|Param>,
  *     formats?: array<string, array{ // Default: {"jsonld":{"mime_types":["application/ld+json"]}}
@@ -1513,10 +1534,37 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         rules?: mixed,
  *         policy?: mixed,
  *         middleware?: mixed,
- *         parameters?: mixed,
+ *         parameters?: array<string, array{ // Default: []
+ *             key?: mixed,
+ *             schema?: mixed,
+ *             open_api?: mixed,
+ *             provider?: mixed,
+ *             filter?: mixed,
+ *             property?: mixed,
+ *             description?: mixed,
+ *             properties?: mixed,
+ *             required?: mixed,
+ *             priority?: mixed,
+ *             hydra?: mixed,
+ *             constraints?: mixed,
+ *             security?: mixed,
+ *             security_message?: mixed,
+ *             extra_properties?: mixed,
+ *             filter_context?: mixed,
+ *             native_type?: mixed,
+ *             cast_to_array?: mixed,
+ *             cast_to_native_type?: mixed,
+ *             cast_fn?: mixed,
+ *             default?: mixed,
+ *             filter_class?: mixed,
+ *             ...<string, mixed>
+ *         }>,
  *         strict_query_parameter_validation?: mixed,
  *         hide_hydra_operation?: mixed,
+ *         json_stream?: mixed,
  *         extra_properties?: mixed,
+ *         map?: mixed,
+ *         mcp?: mixed,
  *         route_name?: mixed,
  *         errors?: mixed,
  *         read?: mixed,
@@ -1524,6 +1572,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         validate?: mixed,
  *         write?: mixed,
  *         serialize?: mixed,
+ *         content_negotiation?: mixed,
  *         priority?: mixed,
  *         name?: mixed,
  *         allow_create?: mixed,
@@ -1745,6 +1794,138 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     dump_destination?: scalar|Param|null, // A stream URL where dumps should be written to. // Default: null
  *     theme?: "dark"|"light"|Param, // Changes the color of the dump() output when rendered directly on the templating. "dark" (default) or "light". // Default: "dark"
  * }
+ * @psalm-type FlysystemConfig = array{
+ *     storages?: array<string, array{ // Default: []
+ *         adapter?: scalar|Param|null, // DEPRECATED: Use the new config format instead (e.g. "local:" instead of "adapter: local")
+ *         options?: list<mixed>,
+ *         asyncaws?: array{
+ *             client?: scalar|Param|null, // The AsyncAws S3 client service name
+ *             bucket?: scalar|Param|null, // The name of the AWS S3 bucket
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all object keys // Default: ""
+ *         },
+ *         aws?: array{
+ *             client?: scalar|Param|null, // The AWS S3 client service name
+ *             bucket?: scalar|Param|null, // The name of the AWS S3 bucket
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all object keys // Default: ""
+ *             options?: list<mixed>,
+ *             streamReads?: bool|Param, // Whether to use streaming for file reads // Default: true
+ *         },
+ *         azure?: array{
+ *             client?: scalar|Param|null, // The Azure Blob Storage client service name
+ *             container?: scalar|Param|null, // The name of the Azure Blob Storage container
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all blob names // Default: ""
+ *         },
+ *         ftp?: array{
+ *             host?: scalar|Param|null, // FTP host
+ *             username?: scalar|Param|null, // FTP username
+ *             password?: scalar|Param|null, // FTP password
+ *             port?: int|Param, // FTP port number // Default: 21
+ *             root?: scalar|Param|null, // FTP root directory // Default: ""
+ *             passive?: bool|Param, // Use passive mode // Default: true
+ *             ssl?: bool|Param, // Use SSL/TLS encryption // Default: false
+ *             timeout?: int|Param, // Connection timeout in seconds // Default: 90
+ *             ignore_passive_address?: scalar|Param|null, // Ignore passive address // Default: null
+ *             utf8?: bool|Param, // Enable UTF8 mode // Default: false
+ *             transfer_mode?: scalar|Param|null, // Transfer mode (FTP_ASCII or FTP_BINARY constante on ftp extension) // Default: null
+ *             system_type?: null|"windows"|"unix"|Param, // FTP system type // Default: null
+ *             timestamps_on_unix_listings_enabled?: bool|Param, // Enable timestamps on Unix listings // Default: false
+ *             recurse_manually?: bool|Param, // Recurse directories manually // Default: true
+ *             use_raw_list_options?: bool|Param|null, // Use raw list options // Default: null
+ *             connectivityChecker?: scalar|Param|null, // Connectivity checker service name // Default: null
+ *             permissions?: array{ // Unix permissions configuration for files and directories
+ *                 file?: array{ // File permissions
+ *                     public?: int|Param, // Public file permissions // Default: 420
+ *                     private?: int|Param, // Private file permissions // Default: 384
+ *                 },
+ *                 dir?: array{ // Directory permissions
+ *                     public?: int|Param, // Public directory permissions // Default: 493
+ *                     private?: int|Param, // Private directory permissions // Default: 448
+ *                 },
+ *             },
+ *         },
+ *         gcloud?: array{
+ *             client?: scalar|Param|null, // The Google Cloud Storage client service name
+ *             bucket?: scalar|Param|null, // The name of the Google Cloud Storage bucket
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all object keys // Default: ""
+ *             visibility_handler?: scalar|Param|null, // Optional visibility handler service name // Default: null
+ *             streamReads?: bool|Param, // Whether to use streaming for file reads // Default: false
+ *         },
+ *         gridfs?: array{
+ *             bucket?: scalar|Param|null, // GridFS bucket service name (if using an existing bucket service) // Default: null
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all file names // Default: ""
+ *             database?: scalar|Param|null, // MongoDB database name // Default: null
+ *             doctrine_connection?: scalar|Param|null, // Doctrine MongoDB connection name (mutually exclusive with mongodb_uri)
+ *             mongodb_uri?: scalar|Param|null, // MongoDB connection URI (mutually exclusive with doctrine_connection)
+ *             mongodb_uri_options?: list<mixed>,
+ *             mongodb_driver_options?: list<mixed>,
+ *         },
+ *         lazy?: array{ // Lazy adapter for runtime storage selection
+ *             source?: scalar|Param|null, // The service name of the storage to use at runtime
+ *         },
+ *         local?: array{
+ *             directory?: scalar|Param|null, // Directory path for local storage
+ *             lock?: int|Param, // Lock flags for file operations // Default: 0
+ *             skip_links?: bool|Param, // Whether to skip symbolic links // Default: false
+ *             lazy_root_creation?: bool|Param, // Whether to create the root directory lazily // Default: false
+ *             permissions?: array{ // Unix permissions configuration for files and directories
+ *                 file?: array{ // File permissions
+ *                     public?: int|Param, // Public file permissions // Default: 420
+ *                     private?: int|Param, // Private file permissions // Default: 384
+ *                 },
+ *                 dir?: array{ // Directory permissions
+ *                     public?: int|Param, // Public directory permissions // Default: 493
+ *                     private?: int|Param, // Private directory permissions // Default: 448
+ *                 },
+ *             },
+ *         },
+ *         memory?: array<mixed>,
+ *         sftp?: array{
+ *             host?: scalar|Param|null, // SFTP host
+ *             username?: scalar|Param|null, // SFTP username
+ *             password?: scalar|Param|null, // SFTP password (optional if using private key) // Default: null
+ *             privateKey?: scalar|Param|null, // Path to private key file or private key content // Default: null
+ *             passphrase?: scalar|Param|null, // Private key passphrase // Default: null
+ *             port?: int|Param, // SFTP port number // Default: 22
+ *             timeout?: int|Param, // Connection timeout in seconds // Default: 90
+ *             hostFingerprint?: scalar|Param|null, // Host fingerprint for verification // Default: null
+ *             connectivityChecker?: scalar|Param|null, // Connectivity checker service name // Default: null
+ *             preferredAlgorithms?: list<mixed>,
+ *             root?: scalar|Param|null, // SFTP root directory // Default: ""
+ *             permissions?: array{ // Unix permissions configuration for files and directories
+ *                 file?: array{ // File permissions
+ *                     public?: int|Param, // Public file permissions // Default: 420
+ *                     private?: int|Param, // Private file permissions // Default: 384
+ *                 },
+ *                 dir?: array{ // Directory permissions
+ *                     public?: int|Param, // Public directory permissions // Default: 493
+ *                     private?: int|Param, // Private directory permissions // Default: 448
+ *                 },
+ *             },
+ *         },
+ *         webdav?: array{
+ *             client?: scalar|Param|null, // The WebDAV client service name
+ *             prefix?: scalar|Param|null, // Optional path prefix to prepend to all paths // Default: ""
+ *             visibility_handling?: "throw"|"ignore"|Param, // How to handle visibility operations // Default: "throw"
+ *             manual_copy?: bool|Param, // Whether to handle copy operations manually // Default: false
+ *             manual_move?: bool|Param, // Whether to handle move operations manually // Default: false
+ *         },
+ *         bunnycdn?: array{
+ *             client?: scalar|Param|null, // The BunnyCDN client service name
+ *             pull_zone?: scalar|Param|null, // The BunnyCDN pull zone name // Default: ""
+ *         },
+ *         service?: scalar|Param|null, // Reference to a custom adapter service (alternative to registered adapter types)
+ *         visibility?: scalar|Param|null, // Default visibility for files // Default: null
+ *         directory_visibility?: scalar|Param|null, // Default visibility for directories // Default: null
+ *         retain_visibility?: scalar|Param|null, // Keeps the original file visibility (public/private) when copying or moving. // Default: null
+ *         case_sensitive?: bool|Param, // Deprecated: The "case_sensitive" option is deprecated and will be removed in 4.0. // Default: true
+ *         disable_asserts?: bool|Param, // Deprecated: The "disable_asserts" option is deprecated and will be removed in 4.0. // Default: false
+ *         public_url?: list<scalar|Param|null>,
+ *         path_normalizer?: scalar|Param|null, // Path normalizer service name (should implement League\Flysystem\PathNormalizer) // Default: null
+ *         public_url_generator?: scalar|Param|null, // For adapter that do not provide public URLs or override adapter capabilities and public_url option, a public URL generator service name can be configured in the main Filesystem configuration (should implement League\Flysystem\PublicUrlGenerator) // Default: null
+ *         temporary_url_generator?: scalar|Param|null, // For adapter that do not provide public URLs or override adapter capabilities, a temporary URL generator service name can be configured in the main Filesystem configuration (should implement League\Flysystem\TemporaryUrlGenerator) // Default: null
+ *         read_only?: bool|Param, // Converts a file system to read-only // Default: false
+ *     }>,
+ * }
  * @psalm-type ConfigType = array{
  *     imports?: ImportsConfig,
  *     parameters?: ParametersConfig,
@@ -1758,6 +1939,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *     nelmio_cors?: NelmioCorsConfig,
  *     doctrine_migrations?: DoctrineMigrationsConfig,
  *     monolog?: MonologConfig,
+ *     flysystem?: FlysystemConfig,
  *     "when@dev"?: array{
  *         imports?: ImportsConfig,
  *         parameters?: ParametersConfig,
@@ -1774,6 +1956,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         monolog?: MonologConfig,
  *         debug?: DebugConfig,
+ *         flysystem?: FlysystemConfig,
  *     },
  *     "when@prod"?: array{
  *         imports?: ImportsConfig,
@@ -1788,6 +1971,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         nelmio_cors?: NelmioCorsConfig,
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         monolog?: MonologConfig,
+ *         flysystem?: FlysystemConfig,
  *     },
  *     "when@test"?: array{
  *         imports?: ImportsConfig,
@@ -1804,6 +1988,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *         doctrine_migrations?: DoctrineMigrationsConfig,
  *         monolog?: MonologConfig,
  *         debug?: DebugConfig,
+ *         flysystem?: FlysystemConfig,
  *     },
  *     ...<string, ExtensionType|array{ // extra keys must follow the when@%env% pattern or match an extension alias
  *         imports?: ImportsConfig,

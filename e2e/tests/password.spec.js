@@ -12,7 +12,7 @@ const uniqueEmail = () => `pw-test-${Date.now()}-${Math.floor(Math.random() * 10
 async function registerUser(request, email, password) {
   const res = await request.post(`${BASE_URL}/users`, {
     headers: { "Content-Type": "application/ld+json" },
-    data: { email, plainPassword: password },
+    data: { email, plainPassword: password, givenName: "E2e", familyName: "User" },
   });
   expect(res.ok()).toBeTruthy();
 }

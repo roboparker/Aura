@@ -19,11 +19,7 @@ class AuthController extends AbstractController
             ], 401);
         }
 
-        return $this->json([
-            'id' => (string) $user->getId(),
-            'email' => $user->getEmail(),
-            'roles' => $user->getRoles(),
-        ]);
+        return $this->json(self::serializeUser($user));
     }
 
     #[Route('/api/me', name: 'api_me', methods: ['GET'])]
@@ -33,10 +29,23 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
 
-        return $this->json([
+        return $this->json(self::serializeUser($user));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function serializeUser(User $user): array
+    {
+        return [
             'id' => (string) $user->getId(),
             'email' => $user->getEmail(),
             'roles' => $user->getRoles(),
-        ]);
+            'givenName' => $user->getGivenName(),
+            'familyName' => $user->getFamilyName(),
+            'nickname' => $user->getNickname(),
+            'personalizedColor' => $user->getPersonalizedColor(),
+            'avatarUrls' => $user->getAvatarUrls(),
+        ];
     }
 }

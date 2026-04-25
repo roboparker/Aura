@@ -1,10 +1,22 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { ENTRYPOINT } from "../config/entrypoint";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   roles: string[];
+  givenName: string;
+  familyName: string;
+  nickname: string | null;
+  personalizedColor: string;
+  avatarUrls: { thumb?: string; profile?: string } | null;
+}
+
+export interface RegisterInput {
+  email: string;
+  password: string;
+  givenName: string;
+  familyName: string;
 }
 
 interface AuthContextType {
@@ -12,11 +24,12 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
+  refreshUser: () => Promise<void>;
   error: string | null;
   clearError: () => void;
 }
@@ -68,13 +81,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data);
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
+  const register = useCallback(async (input: RegisterInput) => {
     setError(null);
     const res = await fetch(`${ENTRYPOINT}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/ld+json" },
       credentials: "include",
-      body: JSON.stringify({ email, plainPassword: password }),
+      body: JSON.stringify({
+        email: input.email,
+        plainPassword: input.password,
+        givenName: input.givenName,
+        familyName: input.familyName,
+      }),
     });
 
     if (!res.ok) {
@@ -146,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         changePassword,
         requestPasswordReset,
         resetPassword,
+        refreshUser: fetchMe,
         error,
         clearError,
       }}

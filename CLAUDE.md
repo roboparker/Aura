@@ -29,6 +29,9 @@ Aura/
 - **Server**: FrankenPHP
 - **Real-time**: Mercure (WebSocket-like push)
 - **Testing**: PHPUnit
+- **File storage**: league/flysystem-bundle (local adapter in dev, swap to S3 later via `api/config/packages/flysystem.yaml`). User-uploaded media lives under `/app/var/media/` in the container, served by Caddy at `/media/*`.
+- **Image processing**: intervention/image (GD driver). See `api/src/Service/ImageUploadService.php`.
+- **Media model**: `MediaObject` entity is the shared upload target for any domain entity that needs files (today: `User.avatar`; later: task attachments, project covers). Uploads go through `POST /media-objects` (multipart), then entities link them via IRI.
 - **Key packages**: doctrine/orm, nelmio/cors-bundle, symfony/security-bundle, symfony/serializer
 
 ### PWA (Frontend)
@@ -39,6 +42,7 @@ Aura/
 - **Forms**: Formik
 - **Admin**: @api-platform/admin
 - **Rich text**: BlockNote (WYSIWYG markdown editor) + react-markdown / remark-gfm (read-only rendering). Shared editor lives in `pwa/components/editor/`.
+- **Avatars**: Reusable `UserAvatar` in `pwa/components/user/`. Renders the uploaded image when present, otherwise white initials on the user's `personalizedColor` (contrast-safe palette picked at registration).
 - **Package manager**: pnpm
 
 ### E2E Tests

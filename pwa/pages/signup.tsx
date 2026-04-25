@@ -5,6 +5,8 @@ import { Formik, Form, Field, ErrorMessage } from "formik";
 import { useAuth } from "../contexts/AuthContext";
 
 interface SignUpValues {
+  givenName: string;
+  familyName: string;
   email: string;
   password: string;
   confirmPassword: string;
@@ -12,6 +14,18 @@ interface SignUpValues {
 
 const validate = (values: SignUpValues) => {
   const errors: Partial<SignUpValues> = {};
+
+  if (!values.givenName.trim()) {
+    errors.givenName = "Given name is required.";
+  } else if (values.givenName.length > 100) {
+    errors.givenName = "Given name must be 100 characters or fewer.";
+  }
+
+  if (!values.familyName.trim()) {
+    errors.familyName = "Family name is required.";
+  } else if (values.familyName.length > 100) {
+    errors.familyName = "Family name must be 100 characters or fewer.";
+  }
 
   if (!values.email) {
     errors.email = "Email is required.";
@@ -50,11 +64,22 @@ const SignUp = () => {
           </h1>
 
           <Formik<SignUpValues>
-            initialValues={{ email: "", password: "", confirmPassword: "" }}
+            initialValues={{
+              givenName: "",
+              familyName: "",
+              email: "",
+              password: "",
+              confirmPassword: "",
+            }}
             validate={validate}
             onSubmit={async (values, { setSubmitting, setStatus }) => {
               try {
-                await register(values.email, values.password);
+                await register({
+                  email: values.email,
+                  password: values.password,
+                  givenName: values.givenName.trim(),
+                  familyName: values.familyName.trim(),
+                });
                 router.push("/signin?registered=true");
               } catch (err) {
                 setStatus(
@@ -72,6 +97,35 @@ const SignUp = () => {
                     {status}
                   </div>
                 )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Given name
+                    </label>
+                    <Field
+                      id="givenName"
+                      name="givenName"
+                      type="text"
+                      autoComplete="given-name"
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                    />
+                    <ErrorMessage name="givenName" component="p" className="mt-1 text-sm text-red-500" />
+                  </div>
+                  <div>
+                    <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Family name
+                    </label>
+                    <Field
+                      id="familyName"
+                      name="familyName"
+                      type="text"
+                      autoComplete="family-name"
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                    />
+                    <ErrorMessage name="familyName" component="p" className="mt-1 text-sm text-red-500" />
+                  </div>
+                </div>
 
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">

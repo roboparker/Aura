@@ -1,0 +1,6 @@
+flysystem:
+    storages:
+        media.storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/media'

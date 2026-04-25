@@ -30,6 +30,8 @@ security:
         - { path: ^/auth/reset-password$, roles: PUBLIC_ACCESS }
         - { path: ^/auth/change-password$, roles: ROLE_USER }
         - { path: ^/api/me$, roles: ROLE_USER }
+        - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
+        - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/docs, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: PUBLIC_ACCESS }
 

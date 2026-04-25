@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -40,6 +42,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
+#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact'])]
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]

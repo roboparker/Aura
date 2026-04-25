@@ -2,6 +2,8 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import AvatarSection from "../components/account/AvatarSection";
+import ProfileForm from "../components/account/ProfileForm";
 import ChangePasswordForm from "../components/account/ChangePasswordForm";
 
 const Account = () => {
@@ -35,7 +37,11 @@ const Account = () => {
         <div className="max-w-md mx-auto bg-white rounded-lg shadow-card p-8">
           <h1 className="text-2xl font-bold text-black mb-6">My Account</h1>
 
-          <div className="space-y-4">
+          <AvatarSection />
+
+          <ProfileForm />
+
+          <div className="mt-6 space-y-4">
             <div>
               <p className="text-sm font-medium text-gray-500">Email</p>
               <p className="text-black">{user.email}</p>
