@@ -50,6 +50,7 @@ use Symfony\Component\Uid\Uuid;
 )]
 #[ORM\Entity]
 #[ORM\Table(name: 'media_object')]
+#[ORM\Index(columns: ['owner_id'], name: 'idx_media_object_owner')]
 class MediaObject
 {
     public const KIND_AVATAR = 'avatar';

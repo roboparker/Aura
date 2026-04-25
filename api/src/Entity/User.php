@@ -29,6 +29,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 #[ORM\Entity]
 #[ORM\Table(name: '`user`')]
+#[ORM\Index(columns: ['avatar_id'], name: 'idx_user_avatar')]
 #[UniqueEntity('email', message: 'This email is already registered.')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
