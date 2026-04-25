@@ -87,7 +87,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         message: 'Pick a color from the available palette.',
     )]
     #[Groups(['user:read', 'user:write', 'project:read'])]
-    private string $personalizedColor = '#1e6091';
+    private string $personalizedColor = AvatarColorService::PALETTE[0];
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]

@@ -6,7 +6,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\OpenApi\Model;
-use App\Controller\CreateMediaObjectAction;
+use App\State\MediaObjectUploadProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -24,7 +24,7 @@ use Symfony\Component\Uid\Uuid;
         ),
         new Post(
             uriTemplate: '/media-objects',
-            controller: CreateMediaObjectAction::class,
+            processor: MediaObjectUploadProcessor::class,
             openapi: new Model\Operation(
                 requestBody: new Model\RequestBody(
                     content: new \ArrayObject([
