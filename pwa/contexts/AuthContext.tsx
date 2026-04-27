@@ -17,6 +17,7 @@ export interface RegisterInput {
   password: string;
   givenName: string;
   familyName: string;
+  inviteToken?: string;
 }
 
 interface AuthContextType {
@@ -92,6 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         plainPassword: input.password,
         givenName: input.givenName,
         familyName: input.familyName,
+        ...(input.inviteToken ? { inviteToken: input.inviteToken } : {}),
       }),
     });
 

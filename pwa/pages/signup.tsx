@@ -1,8 +1,10 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import { useAuth } from "../contexts/AuthContext";
+import { ENTRYPOINT } from "../config/entrypoint";
 
 interface SignUpValues {
   givenName: string;
@@ -10,6 +12,12 @@ interface SignUpValues {
   email: string;
   password: string;
   confirmPassword: string;
+}
+
+interface InviteContext {
+  email: string;
+  groups: { id: string; title: string; invitedBy: string }[];
+  expiresAt: string;
 }
 
 const validate = (values: SignUpValues) => {
@@ -52,22 +60,112 @@ const SignUp = () => {
   const { register } = useAuth();
   const router = useRouter();
 
+  const inviteToken =
+    typeof router.query.invite === "string" ? router.query.invite : null;
+
+  const [invite, setInvite] = useState<InviteContext | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (!inviteToken) {
+      setInvite(null);
+      setInviteError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setInviteLoading(true);
+    setInviteError(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/invites/${encodeURIComponent(inviteToken)}`,
+        );
+        if (!res.ok) {
+          if (!cancelled) {
+            setInvite(null);
+            setInviteError(
+              "This invitation link is invalid or has expired. You can still sign up below.",
+            );
+          }
+          return;
+        }
+        const data: InviteContext = await res.json();
+        if (!cancelled) setInvite(data);
+      } catch {
+        if (!cancelled) {
+          setInvite(null);
+          setInviteError(
+            "Couldn't verify your invitation. You can still sign up below.",
+          );
+        }
+      } finally {
+        if (!cancelled) setInviteLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router.isReady, inviteToken]);
+
   return (
     <>
       <Head>
         <title>Sign Up - Aura</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
         <div className="w-full max-w-md bg-white rounded-lg shadow-card p-8">
           <h1 className="text-2xl font-bold text-center text-black mb-6">
             Create an Account
           </h1>
 
+          {inviteLoading && (
+            <p className="text-sm text-gray-500 mb-4 text-center">
+              Checking your invitation…
+            </p>
+          )}
+
+          {inviteError && (
+            <div
+              role="alert"
+              className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded"
+            >
+              {inviteError}
+            </div>
+          )}
+
+          {invite && (
+            <div
+              className="mb-4 bg-cyan-50 border border-cyan-200 text-cyan-800 text-sm px-3 py-2 rounded"
+              data-testid="invite-context"
+            >
+              <p className="font-semibold">You&apos;ve been invited to join:</p>
+              <ul className="list-disc list-inside mt-1">
+                {invite.groups.map((group) => (
+                  <li key={group.id}>
+                    <span className="font-medium">{group.title}</span>{" "}
+                    <span className="text-cyan-700/80">
+                      (invited by {group.invitedBy})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs">
+                Sign up with <strong>{invite.email}</strong> and we&apos;ll add you
+                automatically.
+              </p>
+            </div>
+          )}
+
           <Formik<SignUpValues>
+            enableReinitialize
             initialValues={{
               givenName: "",
               familyName: "",
-              email: "",
+              email: invite?.email ?? "",
               password: "",
               confirmPassword: "",
             }}
@@ -79,6 +177,7 @@ const SignUp = () => {
                   password: values.password,
                   givenName: values.givenName.trim(),
                   familyName: values.familyName.trim(),
+                  inviteToken: invite ? (inviteToken ?? undefined) : undefined,
                 });
                 router.push("/signin?registered=true");
               } catch (err) {
@@ -135,9 +234,17 @@ const SignUp = () => {
                     id="email"
                     name="email"
                     type="email"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                    readOnly={!!invite}
+                    className={`w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 ${
+                      invite ? "bg-gray-100 text-gray-600" : ""
+                    }`}
                     placeholder="you@example.com"
                   />
+                  {invite && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Locked to the email your invitation was sent to.
+                    </p>
+                  )}
                   <ErrorMessage name="email" component="p" className="mt-1 text-sm text-red-500" />
                 </div>
 
