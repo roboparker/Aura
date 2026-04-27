@@ -1,15 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@plugin "@tailwindcss/forms";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
     --radius: 0.5rem;
 
-    /* Canonical shadcn neutral baseColor (light). Brand cyan stays in raw
-       utilities (`bg-cyan-700`, `text-cyan-700`) for navbar / links so the
-       brand identity is preserved without overriding shadcn tokens. */
+    /* Canonical shadcn neutral baseColor (light). */
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 3.9%);
 
@@ -96,53 +93,32 @@
     --radius-xl: calc(var(--radius) + 4px);
 }
 
-@theme {
-    --font-display: "Poppins", "system-ui";
-    --shadow-card: 0px 0px 20px 0px rgba(0, 0, 0, 0.15);
-    --transition-duration: 300ms;
-    --min-height-24: 96px;
-    --color-cyan-500: #46b6bf;
-    --color-cyan-700: #0f929a;
-    --color-cyan-200: #bceff3;
-    --color-red-500: #ee4322;
-    --color-black: #1d1e1c;
-    --color-white: #ffffff;
-    --color-transparent: transparent;
-    --container-padding: 2rem;
-    --container-center: center;
-}
-
 @layer base {
-    * {
-        font-family: Poppins;
-    }
-
     body {
         @apply bg-background text-foreground;
     }
-
-    a {
-        @apply no-underline text-cyan-700 dark:text-cyan-400;
-    }
 }
 
+/* The API Platform welcome splash at `/` references these — pure brand
+   chrome, kept out of the shadcn token system. */
 @layer utilities {
     .bg-spider-cover {
-        @apply bg-cyan-700 bg-center bg-no-repeat;
+        background-color: #0f929a;
         background-image: url("../public/api-platform/web.svg");
+        background-position: center;
+        background-repeat: no-repeat;
         background-size: 110%;
     }
     .ribbon {
         position: absolute;
         top: 0;
         right: 0;
-        transform: translate(13.397459%, -100%) rotate(30deg); /* translateX: 100%*(1-cos(angleRotation) */
+        transform: translate(13.397459%, -100%) rotate(30deg);
         transform-origin: bottom left;
-  }
+    }
 }
 
-/* Stand-in for tailwindcss-typography so rendered markdown stays legible.
-   Uses shadcn tokens so dark mode flips automatically. */
+/* Rendered markdown — token-based so it flips with the theme. */
 .markdown-view {
     @apply text-sm text-foreground/80 leading-relaxed break-words;
 }
@@ -154,7 +130,7 @@
 .markdown-view ul { @apply list-disc pl-5 my-1; }
 .markdown-view ol { @apply list-decimal pl-5 my-1; }
 .markdown-view li { @apply my-0.5; }
-.markdown-view a { @apply text-cyan-700 dark:text-cyan-400 underline; }
+.markdown-view a { @apply text-primary underline; }
 .markdown-view strong { @apply font-semibold; }
 .markdown-view em { @apply italic; }
 .markdown-view blockquote { @apply border-l-4 border-border pl-3 my-2 text-muted-foreground; }
@@ -167,8 +143,7 @@
 .markdown-view th { @apply bg-muted font-semibold text-left; }
 .markdown-view input[type="checkbox"] { @apply mr-1 align-middle; }
 
-/* BlockNote paints its own background; drop its default min-height so our
-   container owns the sizing. */
+/* BlockNote owns its own background; just round the outer container. */
 .bn-container {
     @apply rounded-md;
 }

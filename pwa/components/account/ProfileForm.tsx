@@ -41,7 +41,7 @@ const ProfileForm = () => {
       <h2 className="text-lg font-semibold mb-3">Profile</h2>
 
       {nameIncomplete && (
-        <Alert variant="warning" className="mb-3">
+        <Alert className="mb-3">
           <AlertDescription>
             Please complete your name so others can recognize you.
           </AlertDescription>
@@ -92,7 +92,7 @@ const ProfileForm = () => {
               </Alert>
             )}
             {saved && !status && (
-              <Alert variant="success">
+              <Alert>
                 <AlertDescription>Profile saved.</AlertDescription>
               </Alert>
             )}
@@ -140,7 +140,7 @@ const ProfileForm = () => {
                       className={cn(
                         "h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring",
                         isSelected
-                          ? "ring-2 ring-offset-2 ring-cyan-700 scale-110"
+                          ? "ring-2 ring-offset-2 ring-ring scale-110"
                           : "hover:scale-105",
                       )}
                       style={{ backgroundColor: color }}

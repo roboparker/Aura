@@ -24,8 +24,8 @@ const Admin: NextPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -40,10 +40,10 @@ const Admin: NextPage = () => {
         <Head>
           <title>Access Denied - Aura</title>
         </Head>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-black mb-2">Access Denied</h1>
-            <p className="text-gray-600">You need administrator privileges to view this page.</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+            <p className="text-muted-foreground">You need administrator privileges to view this page.</p>
           </div>
         </div>
       </>

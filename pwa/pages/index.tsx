@@ -8,10 +8,6 @@ import logo from "../public/api-platform/logo_api-platform.svg";
 import mercurePicture from "../public/api-platform/mercure.svg";
 import logoTilleuls from "../public/api-platform/logo_tilleuls.svg";
 import apiPicture from "../public/api-platform/api.svg";
-import "@fontsource/poppins";
-import "@fontsource/poppins/600.css";
-import "@fontsource/poppins/700.css";
-
 const Welcome = () => (
   <div className="w-full overflow-x-hidden">
     <Head>

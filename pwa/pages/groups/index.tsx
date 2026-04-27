@@ -287,13 +287,13 @@ const Groups = () => {
                     >
                       {pendingInvites.map((email) => (
                         <li key={email} data-testid="pending-invite">
-                          <Badge variant="muted" className="gap-1">
+                          <Badge variant="secondary" className="gap-1">
                             <span>{email}</span>
                             <button
                               type="button"
                               onClick={() => removeInvite(email)}
                               aria-label={`Remove ${email} from invites`}
-                              className="ml-0.5 text-gray-500 hover:text-destructive bg-transparent border-0 cursor-pointer"
+                              className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -342,7 +342,7 @@ const Groups = () => {
                           <h2 className="font-semibold">
                             <Link
                               href={`/groups/${group.id}`}
-                              className="text-cyan-700 hover:text-cyan-900 no-underline"
+                              className="text-primary hover:underline no-underline"
                             >
                               {group.title}
                             </Link>
@@ -371,7 +371,7 @@ const Groups = () => {
                             {group.members.map((member) => (
                               <Badge
                                 key={member["@id"]}
-                                variant="muted"
+                                variant="secondary"
                                 data-testid="group-member"
                               >
                                 {member.email}

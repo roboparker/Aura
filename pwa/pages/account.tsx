@@ -56,7 +56,7 @@ const Account = () => {
                 <p className="text-sm font-medium text-muted-foreground">Roles</p>
                 <div className="flex gap-2 mt-1">
                   {user.roles.map((role) => (
-                    <Badge key={role} variant="accent">
+                    <Badge key={role} variant="secondary">
                       {role}
                     </Badge>
                   ))}

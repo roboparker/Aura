@@ -40,11 +40,11 @@ const ForgotPassword = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {submitted ? (
-              <Alert variant="success" data-testid="forgot-password-success">
+              <Alert data-testid="forgot-password-success">
                 <AlertDescription>
                   <p>If an account exists for that email, a reset link has been sent.</p>
                   <p className="mt-2">
-                    <Link href="/signin" className="text-cyan-700 font-medium">
+                    <Link href="/signin" className="text-primary font-medium">
                       Back to Sign In
                     </Link>
                   </p>
@@ -93,7 +93,7 @@ const ForgotPassword = () => {
                     </Button>
 
                     <p className="text-center text-sm text-muted-foreground">
-                      <Link href="/signin" className="text-cyan-700 font-medium">
+                      <Link href="/signin" className="text-primary font-medium">
                         Back to Sign In
                       </Link>
                     </p>

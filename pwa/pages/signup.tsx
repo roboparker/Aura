@@ -133,20 +133,20 @@ const SignUp = () => {
             )}
 
             {inviteError && (
-              <Alert variant="warning">
+              <Alert>
                 <AlertDescription>{inviteError}</AlertDescription>
               </Alert>
             )}
 
             {invite && (
-              <Alert variant="info" data-testid="invite-context">
+              <Alert data-testid="invite-context">
                 <AlertDescription>
                   <p className="font-semibold">You&apos;ve been invited to join:</p>
                   <ul className="list-disc list-inside mt-1">
                     {invite.groups.map((group) => (
                       <li key={group.id}>
                         <span className="font-medium">{group.title}</span>{" "}
-                        <span className="text-cyan-700/80">
+                        <span className="text-primary/80">
                           (invited by {group.invitedBy})
                         </span>
                       </li>
@@ -244,7 +244,7 @@ const SignUp = () => {
 
                   <p className="text-center text-sm text-muted-foreground">
                     Already have an account?{" "}
-                    <Link href="/signin" className="text-cyan-700 font-medium">
+                    <Link href="/signin" className="text-primary font-medium">
                       Sign In
                     </Link>
                   </p>

@@ -19,9 +19,9 @@ const Navbar = () => {
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
   return (
-    <nav className="bg-cyan-700 text-white">
+    <nav className="border-b bg-background">
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-white font-bold text-lg no-underline">
+        <Link href="/" className="font-bold text-lg no-underline text-foreground">
           Aura
         </Link>
 
@@ -34,8 +34,7 @@ const Navbar = () => {
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "text-cyan-200 hover:bg-cyan-800 hover:text-white",
-                    router.pathname.startsWith("/admin") && "text-white",
+                    router.pathname.startsWith("/admin") && "bg-accent text-accent-foreground",
                   )}
                 >
                   <Link href="/admin">Admin</Link>
@@ -49,43 +48,30 @@ const Navbar = () => {
                     asChild
                     variant="ghost"
                     size="sm"
-                    className={cn(
-                      "text-cyan-200 hover:bg-cyan-800 hover:text-white",
-                      active && "text-white",
-                    )}
+                    className={cn(active && "bg-accent text-accent-foreground")}
                   >
                     <Link href={link.href}>{link.label}</Link>
                   </Button>
                 );
               })}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={logout}
-                className="text-cyan-200 hover:bg-cyan-800 hover:text-white"
-              >
+              <Button variant="ghost" size="sm" onClick={logout}>
                 Sign Out
               </Button>
               <ThemeToggle />
               <Link
                 href="/account"
                 aria-label="My Account"
-                className="ml-2 inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-cyan-700"
+                className="ml-2 inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <UserAvatar user={user} size="sm" />
               </Link>
             </>
           ) : (
             <>
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="text-cyan-200 hover:bg-cyan-800 hover:text-white"
-              >
+              <Button asChild variant="ghost" size="sm">
                 <Link href="/signin">Sign In</Link>
               </Button>
-              <Button asChild variant="secondary" size="sm" className="bg-white text-cyan-700 hover:bg-cyan-100">
+              <Button asChild size="sm">
                 <Link href="/signup">Sign Up</Link>
               </Button>
               <ThemeToggle />

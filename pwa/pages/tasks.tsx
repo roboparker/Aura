@@ -116,7 +116,7 @@ const SortableTaskItem = ({
             checked={!!task.completedOn}
             onChange={() => onToggle(task)}
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-700"
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
           />
           <div className="flex-1 min-w-0">
             <p
@@ -158,7 +158,7 @@ const SortableTaskItem = ({
                     <button
                       type="button"
                       aria-label={`Add tag to "${task.title}"`}
-                      className="text-xs text-cyan-700 hover:text-cyan-900 bg-transparent border border-dashed border-input rounded px-2 py-0.5 cursor-pointer inline-flex items-center gap-1"
+                      className="text-xs text-primary hover:underline bg-transparent border border-dashed border-input rounded px-2 py-0.5 cursor-pointer inline-flex items-center gap-1"
                     >
                       <Plus className="h-3 w-3" />
                       Tag

@@ -288,7 +288,7 @@ const Projects = () => {
                             <h2 className="font-semibold">
                               <Link
                                 href={`/projects/${project.id}`}
-                                className="text-cyan-700 hover:text-cyan-900 no-underline"
+                                className="text-primary hover:underline no-underline"
                               >
                                 {project.title}
                               </Link>
@@ -324,7 +324,7 @@ const Projects = () => {
                               {project.members.map((member) => (
                                 <Badge
                                   key={member["@id"]}
-                                  variant="muted"
+                                  variant="secondary"
                                   data-testid="project-member"
                                 >
                                   {member.email}

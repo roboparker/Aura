@@ -70,7 +70,7 @@ const ChangePasswordForm = () => {
             )}
 
             {successMessage && (
-              <Alert variant="success" data-testid="change-password-success">
+              <Alert data-testid="change-password-success">
                 <AlertDescription>{successMessage}</AlertDescription>
               </Alert>
             )}

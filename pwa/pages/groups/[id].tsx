@@ -334,7 +334,7 @@ const GroupDetail = () => {
             <p className="text-muted-foreground mb-4">
               It may have been deleted, or you may not be a member.
             </p>
-            <Link href="/groups" className="text-cyan-700 font-medium">
+            <Link href="/groups" className="text-primary font-medium">
               Back to groups
             </Link>
           </CardContent>
@@ -352,7 +352,7 @@ const GroupDetail = () => {
         <div className="max-w-2xl mx-auto">
           <Link
             href="/groups"
-            className="inline-block text-sm text-cyan-700 hover:text-cyan-900 mb-3 no-underline"
+            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
           >
             ← All groups
           </Link>
@@ -441,14 +441,14 @@ const GroupDetail = () => {
                     <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
                       {group.members.map((member) => (
                         <li key={member["@id"]} data-testid="member-pill">
-                          <Badge variant="muted" className="gap-1">
+                          <Badge variant="secondary" className="gap-1">
                             <span>{member.email}</span>
                             {isOwner && member.id !== group.owner.id && (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveMember(member)}
                                 aria-label={`Remove ${member.email}`}
-                                className="ml-0.5 text-gray-500 hover:text-destructive bg-transparent border-0 cursor-pointer"
+                                className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -489,7 +489,6 @@ const GroupDetail = () => {
                         )}
                         {memberInfo && (
                           <Alert
-                            variant="info"
                             className="mt-2"
                             role="status"
                             data-testid="member-info"
@@ -507,16 +506,13 @@ const GroupDetail = () => {
                       <ul className="flex flex-wrap items-center gap-1">
                         {pendingInvites.map((invite) => (
                           <li key={invite.id} data-testid="pending-invite-pill">
-                            <Badge
-                              className="gap-1 bg-amber-100 text-amber-800 border-transparent"
-                              variant="outline"
-                            >
+                            <Badge variant="secondary" className="gap-1">
                               <span>{invite.email}</span>
                               <button
                                 type="button"
                                 onClick={() => handleRevokeInvite(invite)}
                                 aria-label={`Revoke invite to ${invite.email}`}
-                                className="ml-0.5 text-amber-700 hover:text-destructive bg-transparent border-0 cursor-pointer"
+                                className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -547,7 +543,6 @@ const GroupDetail = () => {
                         />
                         <Button
                           type="submit"
-                          variant="warning"
                           size="sm"
                           disabled={isTransferring || !transferEmail.trim()}
                         >

@@ -60,7 +60,7 @@ const ResetPassword = () => {
                 <AlertDescription>
                   <p>This reset link is missing or invalid.</p>
                   <p className="mt-2">
-                    <Link href="/forgot-password" className="text-cyan-700 font-medium">
+                    <Link href="/forgot-password" className="text-primary font-medium">
                       Request a new reset link
                     </Link>
                   </p>

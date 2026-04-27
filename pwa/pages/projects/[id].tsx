@@ -257,7 +257,7 @@ const ProjectDetail = () => {
             <p className="text-muted-foreground mb-4">
               It may have been deleted, or you may not be a member.
             </p>
-            <Link href="/projects" className="text-cyan-700 font-medium">
+            <Link href="/projects" className="text-primary font-medium">
               Back to projects
             </Link>
           </CardContent>
@@ -278,7 +278,7 @@ const ProjectDetail = () => {
         <div className="max-w-2xl mx-auto">
           <Link
             href="/projects"
-            className="inline-block text-sm text-cyan-700 hover:text-cyan-900 mb-3 no-underline"
+            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
           >
             ← All projects
           </Link>
@@ -299,13 +299,13 @@ const ProjectDetail = () => {
                     <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
                       {project.members.map((member) => (
                         <li key={member["@id"]} data-testid="member-pill">
-                          <Badge variant="muted" className="gap-1">
+                          <Badge variant="secondary" className="gap-1">
                             <span>{member.email}</span>
                             <button
                               type="button"
                               onClick={() => handleRemoveMember(member)}
                               aria-label={`Remove ${member.email}`}
-                              className="ml-0.5 text-gray-500 hover:text-destructive bg-transparent border-0 cursor-pointer"
+                              className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -415,7 +415,7 @@ const ProjectDetail = () => {
                             checked={!!task.completedOn}
                             onChange={() => toggleComplete(task)}
                             aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-700"
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
                           />
                           <div className="min-w-0 flex-1">
                             <div

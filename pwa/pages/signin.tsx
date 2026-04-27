@@ -45,7 +45,7 @@ const SignIn = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             {registered && (
-              <Alert variant="success">
+              <Alert>
                 <AlertDescription>
                   Account created successfully. Please sign in.
                 </AlertDescription>
@@ -53,7 +53,7 @@ const SignIn = () => {
             )}
 
             {reset && (
-              <Alert variant="success" data-testid="password-reset-success">
+              <Alert data-testid="password-reset-success">
                 <AlertDescription>
                   Password reset successfully. Please sign in with your new password.
                 </AlertDescription>
@@ -103,14 +103,14 @@ const SignIn = () => {
                   </Button>
 
                   <p className="text-center text-sm">
-                    <Link href="/forgot-password" className="text-cyan-700 font-medium">
+                    <Link href="/forgot-password" className="text-primary font-medium">
                       Forgot password?
                     </Link>
                   </p>
 
                   <p className="text-center text-sm text-muted-foreground">
                     Don&apos;t have an account?{" "}
-                    <Link href="/signup" className="text-cyan-700 font-medium">
+                    <Link href="/signup" className="text-primary font-medium">
                       Sign Up
                     </Link>
                   </p>
