@@ -14,6 +14,6 @@ This app uses [shadcn/ui](https://ui.shadcn.com/) with Tailwind CSS v4. The prim
 npx shadcn@latest add <component>
 ```
 
-`components.json` maps the `@/*` import alias to the `pwa/` root. Design tokens (CSS variables) live in `styles/globals.css` — the brand cyan is wired up as `--primary`. The `cn()` helper in `lib/utils.ts` merges Tailwind classes safely.
+`components.json` maps the `@/*` import alias to the `pwa/` root. Design tokens (CSS variables) live in `styles/globals.css` and currently use the canonical shadcn neutral baseColor — the brand cyan is intentionally **not** wired into `--primary` so the shadcn defaults show through; brand cyan stays in raw `text-cyan-700` / `bg-cyan-700` utilities on the navbar and link elements. The `cn()` helper in `lib/utils.ts` merges Tailwind classes safely.
 
 Formik forms use the `FormikField` helper in `components/ui/formik-field.tsx`, which wraps shadcn's `Input` + `Label` + `ErrorMessage` so individual pages stay terse.

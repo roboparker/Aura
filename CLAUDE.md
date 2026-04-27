@@ -113,7 +113,7 @@ npx playwright test
 - Components in `pwa/components/`; shadcn primitives live in `pwa/components/ui/` and should be the default for buttons, inputs, labels, alerts, cards, dropdowns, etc. Reach for raw Tailwind only when no primitive fits.
 - Pages follow Next.js file-based routing in `pwa/pages/`.
 - Imports prefer the `@/*` alias (`@/components/...`, `@/contexts/...`, `@/lib/...`) over deep relative paths.
-- Use Tailwind CSS for styling. Reference design tokens via the shadcn variables (`bg-background`, `text-muted-foreground`, `border-input`, `text-destructive`, etc.) where possible; the brand `cyan-700` is wired up as `--primary`.
+- Use Tailwind CSS for styling. Reference design tokens via the shadcn variables (`bg-background`, `text-muted-foreground`, `border-input`, `text-destructive`, etc.) where possible. shadcn tokens use the canonical neutral baseColor (no brand override yet); brand cyan still lives in raw utilities (`bg-cyan-700`, `text-cyan-700`) on the navbar and link elements.
 - Forms backed by Formik should use `FormikField` from `pwa/components/ui/formik-field.tsx` rather than hand-rolled `<Field>` + `<label>` + `<ErrorMessage>` blocks.
 - Long-form description fields use `MarkdownEditor` for input and `MarkdownView` for rendering (both from `pwa/components/editor/`). Content is stored as markdown in the API's `TEXT` columns.
 
