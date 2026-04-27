@@ -28,7 +28,7 @@ const MarkdownEditorInner = ({ value, onChange, id, ariaLabel }: MarkdownEditorP
     <div
       id={id}
       aria-label={ariaLabel}
-      className="block w-full border border-gray-300 rounded-md bg-white focus-within:ring-2 focus-within:ring-cyan-500 min-h-24 py-1"
+      className="block w-full border border-input rounded-md bg-background focus-within:ring-2 focus-within:ring-ring min-h-24 py-1"
     >
       <BlockNoteView
         editor={editor}

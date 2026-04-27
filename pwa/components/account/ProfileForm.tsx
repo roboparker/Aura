@@ -1,8 +1,12 @@
 import { useState } from "react";
-import { Formik, Form, Field, ErrorMessage } from "formik";
-import { ENTRYPOINT } from "../../config/entrypoint";
-import { useAuth } from "../../contexts/AuthContext";
-import { AVATAR_PALETTE } from "../../lib/avatarPalette";
+import { Formik, Form, ErrorMessage } from "formik";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import { useAuth } from "@/contexts/AuthContext";
+import { AVATAR_PALETTE } from "@/lib/avatarPalette";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { FormikField } from "@/components/ui/formik-field";
+import { cn } from "@/lib/utils";
 
 interface Values {
   givenName: string;
@@ -34,12 +38,14 @@ const ProfileForm = () => {
 
   return (
     <div className="mt-6">
-      <h2 className="text-lg font-semibold text-black mb-3">Profile</h2>
+      <h2 className="text-lg font-semibold mb-3">Profile</h2>
 
       {nameIncomplete && (
-        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-sm p-3 rounded mb-3">
-          Please complete your name so others can recognize you.
-        </div>
+        <Alert className="mb-3">
+          <AlertDescription>
+            Please complete your name so others can recognize you.
+          </AlertDescription>
+        </Alert>
       )}
 
       <Formik<Values>
@@ -79,60 +85,41 @@ const ProfileForm = () => {
         }}
       >
         {({ isSubmitting, status, values, setFieldValue }) => (
-          <Form className="space-y-3" noValidate>
+          <Form className="space-y-4" noValidate>
             {status && (
-              <div className="bg-red-50 text-red-500 p-3 rounded text-sm">{status}</div>
+              <Alert variant="destructive">
+                <AlertDescription>{status}</AlertDescription>
+              </Alert>
             )}
             {saved && !status && (
-              <div className="bg-green-50 text-green-700 p-3 rounded text-sm">Profile saved.</div>
+              <Alert>
+                <AlertDescription>Profile saved.</AlertDescription>
+              </Alert>
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Given name
-                </label>
-                <Field
-                  id="givenName"
-                  name="givenName"
-                  type="text"
-                  autoComplete="given-name"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-                />
-                <ErrorMessage name="givenName" component="p" className="mt-1 text-sm text-red-500" />
-              </div>
-              <div>
-                <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Family name
-                </label>
-                <Field
-                  id="familyName"
-                  name="familyName"
-                  type="text"
-                  autoComplete="family-name"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-                />
-                <ErrorMessage name="familyName" component="p" className="mt-1 text-sm text-red-500" />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
-                Nickname (optional)
-              </label>
-              <Field
-                id="nickname"
-                name="nickname"
+              <FormikField
+                name="givenName"
                 type="text"
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                autoComplete="given-name"
+                label="Given name"
               />
-              <ErrorMessage name="nickname" component="p" className="mt-1 text-sm text-red-500" />
+              <FormikField
+                name="familyName"
+                type="text"
+                autoComplete="family-name"
+                label="Family name"
+              />
             </div>
 
-            <fieldset>
-              <legend className="block text-sm font-medium text-gray-700 mb-1">
+            <FormikField name="nickname" type="text" label="Nickname (optional)" />
+
+            <fieldset className="space-y-1.5">
+              <legend className="text-sm font-medium leading-none">
                 Avatar color{" "}
-                <span className="text-gray-400 font-normal">(used when you have no picture)</span>
+                <span className="text-muted-foreground font-normal">
+                  (used when you have no picture)
+                </span>
               </legend>
               <div
                 role="radiogroup"
@@ -150,11 +137,12 @@ const ProfileForm = () => {
                       aria-checked={isSelected}
                       aria-label={color}
                       onClick={() => setFieldValue("personalizedColor", color)}
-                      className={`h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 ${
+                      className={cn(
+                        "h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring",
                         isSelected
-                          ? "ring-2 ring-offset-2 ring-cyan-700 scale-110"
-                          : "hover:scale-105"
-                      }`}
+                          ? "ring-2 ring-offset-2 ring-ring scale-110"
+                          : "hover:scale-105",
+                      )}
                       style={{ backgroundColor: color }}
                     />
                   );
@@ -163,17 +151,13 @@ const ProfileForm = () => {
               <ErrorMessage
                 name="personalizedColor"
                 component="p"
-                className="mt-1 text-sm text-red-500"
+                className="text-sm text-destructive"
               />
             </fieldset>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving..." : "Save Profile"}
-            </button>
+            </Button>
           </Form>
         )}
       </Formik>

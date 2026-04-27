@@ -2,10 +2,17 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { ENTRYPOINT } from "../../config/entrypoint";
-import MarkdownEditor from "../../components/editor/MarkdownEditor";
-import MarkdownView from "../../components/editor/MarkdownView";
+import { X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import MarkdownView from "@/components/editor/MarkdownView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 interface Member {
   "@id": string;
@@ -312,24 +319,26 @@ const GroupDetail = () => {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-card p-6">
-          <h1 className="text-xl font-bold text-black mb-2">Group not found</h1>
-          <p className="text-gray-600 mb-4">
-            It may have been deleted, or you may not be a member.
-          </p>
-          <Link href="/groups" className="text-cyan-700 font-medium">
-            Back to groups
-          </Link>
-        </div>
+      <div className="min-h-screen bg-muted px-4 py-12">
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="pt-6">
+            <h1 className="text-xl font-bold mb-2">Group not found</h1>
+            <p className="text-muted-foreground mb-4">
+              It may have been deleted, or you may not be a member.
+            </p>
+            <Link href="/groups" className="text-primary font-medium">
+              Back to groups
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -339,221 +348,221 @@ const GroupDetail = () => {
       <Head>
         <title>{group ? `${group.title} - Aura` : "Group - Aura"}</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
           <Link
             href="/groups"
-            className="inline-block text-sm text-cyan-700 hover:text-cyan-900 mb-3 no-underline"
+            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
           >
             ← All groups
           </Link>
 
           {isLoading || !group ? (
-            <p className="text-gray-500">Loading group...</p>
+            <p className="text-muted-foreground">Loading group...</p>
           ) : (
             <>
-              <div className="bg-white rounded-lg shadow-card p-6 mb-6">
-                {isEditing && isOwner ? (
-                  <form onSubmit={handleSaveEdit} className="space-y-3" data-testid="edit-group-form">
-                    <input
-                      type="text"
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      required
-                      maxLength={255}
-                      aria-label="Title"
-                      className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                    <MarkdownEditor
-                      ariaLabel="Description"
-                      value={editDescription}
-                      onChange={setEditDescription}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="bg-cyan-700 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-cyan-800"
-                      >
-                        Save
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsEditing(false);
-                          setEditTitle(group.title);
-                          setEditDescription(group.description ?? "");
-                        }}
-                        className="bg-gray-200 text-gray-700 py-1 px-3 rounded-md text-sm hover:bg-gray-300"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="flex items-start justify-between gap-3">
-                      <h1 className="text-2xl font-bold text-black mb-2">{group.title}</h1>
-                      {isOwner && (
-                        <div className="flex items-center gap-3 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setIsEditing(true)}
-                            className="text-cyan-700 hover:text-cyan-900 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleDelete}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {group.description && (
-                      <MarkdownView source={group.description} className="mb-3" />
-                    )}
-                  </>
-                )}
-
-                <p className="mt-3 text-xs text-gray-500">
-                  Owner: <span data-testid="group-owner">{group.owner.email}</span>
-                </p>
-
-                <div className="mt-3">
-                  <p className="text-xs text-gray-500 mb-1">Members</p>
-                  <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
-                    {group.members.map((member) => (
-                      <li
-                        key={member["@id"]}
-                        className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
-                        data-testid="member-pill"
-                      >
-                        <span>{member.email}</span>
-                        {isOwner && member.id !== group.owner.id && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMember(member)}
-                            aria-label={`Remove ${member.email}`}
-                            className="ml-1 text-gray-500 hover:text-red-600 leading-none bg-transparent border-0 cursor-pointer text-base"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {isOwner && (
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  {isEditing && isOwner ? (
+                    <form
+                      onSubmit={handleSaveEdit}
+                      className="space-y-3"
+                      data-testid="edit-group-form"
+                    >
+                      <Input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        required
+                        maxLength={255}
+                        aria-label="Title"
+                      />
+                      <MarkdownEditor
+                        ariaLabel="Description"
+                        value={editDescription}
+                        onChange={setEditDescription}
+                      />
+                      <div className="flex gap-2">
+                        <Button type="submit" size="sm">
+                          Save
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setIsEditing(false);
+                            setEditTitle(group.title);
+                            setEditDescription(group.description ?? "");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
                     <>
-                      <form
-                        onSubmit={handleAddMember}
-                        className="mt-2 flex items-center gap-2"
-                        data-testid="add-member-form"
-                      >
-                        <input
-                          type="email"
-                          value={newMemberEmail}
-                          onChange={(e) => setNewMemberEmail(e.target.value)}
-                          placeholder="member@example.com"
-                          aria-label="New member email"
-                          required
-                          className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        />
-                        <button
-                          type="submit"
-                          disabled={isAddingMember || !newMemberEmail.trim()}
-                          className="bg-cyan-700 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isAddingMember ? "Adding..." : "Add"}
-                        </button>
-                      </form>
-                      {memberError && (
-                        <p role="alert" className="mt-2 text-sm text-red-600">
-                          {memberError}
-                        </p>
-                      )}
-                      {memberInfo && (
-                        <p
-                          role="status"
-                          className="mt-2 text-sm text-cyan-800 bg-cyan-50 border border-cyan-200 px-2 py-1 rounded"
-                          data-testid="member-info"
-                        >
-                          {memberInfo}
-                        </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <h1 className="text-2xl font-bold mb-2">{group.title}</h1>
+                        {isOwner && (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setIsEditing(true)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleDelete}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Delete
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {group.description && (
+                        <MarkdownView source={group.description} className="mb-3" />
                       )}
                     </>
                   )}
-                </div>
 
-                {isOwner && pendingInvites.length > 0 && (
-                  <div className="mt-4" data-testid="pending-invites-section">
-                    <p className="text-xs text-gray-500 mb-1">Pending invites</p>
-                    <ul className="flex flex-wrap items-center gap-1">
-                      {pendingInvites.map((invite) => (
-                        <li
-                          key={invite.id}
-                          className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded"
-                          data-testid="pending-invite-pill"
-                        >
-                          <span>{invite.email}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRevokeInvite(invite)}
-                            aria-label={`Revoke invite to ${invite.email}`}
-                            className="ml-1 text-amber-700 hover:text-red-600 leading-none bg-transparent border-0 cursor-pointer text-base"
-                          >
-                            ×
-                          </button>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    Owner: <span data-testid="group-owner">{group.owner.email}</span>
+                  </p>
+
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-1">Members</p>
+                    <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
+                      {group.members.map((member) => (
+                        <li key={member["@id"]} data-testid="member-pill">
+                          <Badge variant="secondary" className="gap-1">
+                            <span>{member.email}</span>
+                            {isOwner && member.id !== group.owner.id && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMember(member)}
+                                aria-label={`Remove ${member.email}`}
+                                className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            )}
+                          </Badge>
                         </li>
                       ))}
                     </ul>
-                  </div>
-                )}
 
-                {isOwner && group.members.length > 1 && (
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500 mb-1">Transfer ownership</p>
-                    <form
-                      onSubmit={handleTransferOwnership}
-                      className="flex items-center gap-2"
-                      data-testid="transfer-ownership-form"
-                    >
-                      <input
-                        type="email"
-                        value={transferEmail}
-                        onChange={(e) => setTransferEmail(e.target.value)}
-                        placeholder="member@example.com"
-                        aria-label="New owner email"
-                        required
-                        className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      />
-                      <button
-                        type="submit"
-                        disabled={isTransferring || !transferEmail.trim()}
-                        className="bg-amber-600 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isTransferring ? "Transferring..." : "Transfer"}
-                      </button>
-                    </form>
-                    {transferError && (
-                      <p role="alert" className="mt-2 text-sm text-red-600">
-                        {transferError}
-                      </p>
+                    {isOwner && (
+                      <>
+                        <form
+                          onSubmit={handleAddMember}
+                          className="mt-2 flex items-center gap-2"
+                          data-testid="add-member-form"
+                        >
+                          <Input
+                            type="email"
+                            value={newMemberEmail}
+                            onChange={(e) => setNewMemberEmail(e.target.value)}
+                            placeholder="member@example.com"
+                            aria-label="New member email"
+                            required
+                            className="flex-1"
+                          />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            disabled={isAddingMember || !newMemberEmail.trim()}
+                          >
+                            {isAddingMember ? "Adding..." : "Add"}
+                          </Button>
+                        </form>
+                        {memberError && (
+                          <p role="alert" className="mt-2 text-sm text-destructive">
+                            {memberError}
+                          </p>
+                        )}
+                        {memberInfo && (
+                          <Alert
+                            className="mt-2"
+                            role="status"
+                            data-testid="member-info"
+                          >
+                            <AlertDescription>{memberInfo}</AlertDescription>
+                          </Alert>
+                        )}
+                      </>
                     )}
                   </div>
-                )}
-              </div>
+
+                  {isOwner && pendingInvites.length > 0 && (
+                    <div className="mt-4" data-testid="pending-invites-section">
+                      <p className="text-xs text-muted-foreground mb-1">Pending invites</p>
+                      <ul className="flex flex-wrap items-center gap-1">
+                        {pendingInvites.map((invite) => (
+                          <li key={invite.id} data-testid="pending-invite-pill">
+                            <Badge variant="secondary" className="gap-1">
+                              <span>{invite.email}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRevokeInvite(invite)}
+                                aria-label={`Revoke invite to ${invite.email}`}
+                                className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {isOwner && group.members.length > 1 && (
+                    <div className="mt-6">
+                      <Separator className="mb-4" />
+                      <p className="text-xs text-muted-foreground mb-1">Transfer ownership</p>
+                      <form
+                        onSubmit={handleTransferOwnership}
+                        className="flex items-center gap-2"
+                        data-testid="transfer-ownership-form"
+                      >
+                        <Input
+                          type="email"
+                          value={transferEmail}
+                          onChange={(e) => setTransferEmail(e.target.value)}
+                          placeholder="member@example.com"
+                          aria-label="New owner email"
+                          required
+                          className="flex-1"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={isTransferring || !transferEmail.trim()}
+                        >
+                          {isTransferring ? "Transferring..." : "Transfer"}
+                        </Button>
+                      </form>
+                      {transferError && (
+                        <p role="alert" className="mt-2 text-sm text-destructive">
+                          {transferError}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               {error && (
-                <div
-                  role="alert"
-                  className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded"
-                >
-                  {error}
-                </div>
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
             </>
           )}

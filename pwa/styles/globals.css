@@ -1,34 +1,126 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/forms";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --radius: 0.5rem;
+
+    /* Canonical shadcn neutral baseColor (light). */
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 3.9%);
+
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(0 0% 3.9%);
+
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(0 0% 3.9%);
+
+    --primary: hsl(0 0% 9%);
+    --primary-foreground: hsl(0 0% 98%);
+
+    --secondary: hsl(0 0% 96.1%);
+    --secondary-foreground: hsl(0 0% 9%);
+
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+
+    --accent: hsl(0 0% 96.1%);
+    --accent-foreground: hsl(0 0% 9%);
+
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(0 0% 98%);
+
+    --border: hsl(0 0% 89.8%);
+    --input: hsl(0 0% 89.8%);
+    --ring: hsl(0 0% 3.9%);
+}
+
+.dark {
+    /* Canonical shadcn neutral baseColor (dark). */
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+
+    --card: hsl(0 0% 3.9%);
+    --card-foreground: hsl(0 0% 98%);
+
+    --popover: hsl(0 0% 3.9%);
+    --popover-foreground: hsl(0 0% 98%);
+
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+
+    --secondary: hsl(0 0% 14.9%);
+    --secondary-foreground: hsl(0 0% 98%);
+
+    --muted: hsl(0 0% 14.9%);
+    --muted-foreground: hsl(0 0% 63.9%);
+
+    --accent: hsl(0 0% 14.9%);
+    --accent-foreground: hsl(0 0% 98%);
+
+    --destructive: hsl(0 62.8% 30.6%);
+    --destructive-foreground: hsl(0 0% 98%);
+
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: hsl(0 0% 83.1%);
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
 
 @layer base {
-    * {
-        font-family: Poppins;
-    }
-
-    a {
-        @apply no-underline text-cyan-700;
+    body {
+        @apply bg-background text-foreground;
     }
 }
 
+/* The API Platform welcome splash at `/` references these — pure brand
+   chrome, kept out of the shadcn token system. */
 @layer utilities {
     .bg-spider-cover {
-        @apply bg-cyan-700 bg-center bg-no-repeat;
+        background-color: #0f929a;
         background-image: url("../public/api-platform/web.svg");
+        background-position: center;
+        background-repeat: no-repeat;
         background-size: 110%;
     }
     .ribbon {
         position: absolute;
         top: 0;
         right: 0;
-        transform: translate(13.397459%, -100%) rotate(30deg); /* translateX: 100%*(1-cos(angleRotation) */
+        transform: translate(13.397459%, -100%) rotate(30deg);
         transform-origin: bottom left;
-  }
+    }
 }
 
-/* Stand-in for tailwindcss-typography so rendered markdown stays legible. */
+/* Rendered markdown — token-based so it flips with the theme. */
 .markdown-view {
-    @apply text-sm text-gray-700 leading-relaxed break-words;
+    @apply text-sm text-foreground/80 leading-relaxed break-words;
 }
 .markdown-view h1 { @apply text-xl font-semibold mt-3 mb-2; }
 .markdown-view h2 { @apply text-lg font-semibold mt-3 mb-2; }
@@ -38,37 +130,20 @@
 .markdown-view ul { @apply list-disc pl-5 my-1; }
 .markdown-view ol { @apply list-decimal pl-5 my-1; }
 .markdown-view li { @apply my-0.5; }
-.markdown-view a { @apply text-cyan-700 underline; }
+.markdown-view a { @apply text-primary underline; }
 .markdown-view strong { @apply font-semibold; }
 .markdown-view em { @apply italic; }
-.markdown-view blockquote { @apply border-l-4 border-gray-200 pl-3 my-2 text-gray-600; }
-.markdown-view code { @apply bg-gray-100 rounded px-1 py-0.5 text-xs font-mono; }
-.markdown-view pre { @apply bg-gray-100 rounded-md p-3 my-2 overflow-x-auto; }
+.markdown-view blockquote { @apply border-l-4 border-border pl-3 my-2 text-muted-foreground; }
+.markdown-view code { @apply bg-muted rounded px-1 py-0.5 text-xs font-mono; }
+.markdown-view pre { @apply bg-muted rounded-md p-3 my-2 overflow-x-auto; }
 .markdown-view pre code { @apply bg-transparent p-0 text-xs; }
-.markdown-view hr { @apply my-3 border-gray-200; }
+.markdown-view hr { @apply my-3 border-border; }
 .markdown-view table { @apply border-collapse my-2 text-sm; }
-.markdown-view th, .markdown-view td { @apply border border-gray-200 px-2 py-1; }
-.markdown-view th { @apply bg-gray-50 font-semibold text-left; }
+.markdown-view th, .markdown-view td { @apply border border-border px-2 py-1; }
+.markdown-view th { @apply bg-muted font-semibold text-left; }
 .markdown-view input[type="checkbox"] { @apply mr-1 align-middle; }
 
-/* BlockNote paints its own background; drop its default min-height so our
-   container owns the sizing. */
+/* BlockNote owns its own background; just round the outer container. */
 .bn-container {
     @apply rounded-md;
-}
-
-@theme {
-  --font-display: "Poppins", "system-ui";
-  --shadow-card: 0px 0px 20px 0px rgba(0, 0, 0, 0.15);
-  --transition-duration: 300ms;
-  --min-height-24: 96px;
-  --color-cyan-500: #46b6bf;
-  --color-cyan-700: #0f929a;
-  --color-cyan-200: #bceff3;
-  --color-red-500: #ee4322;
-  --color-black: #1d1e1c;
-  --color-white: #ffffff;
-  --color-transparent: transparent;
-  --container-padding: 2rem;
-  --container-center: center;
 }

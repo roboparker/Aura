@@ -2,10 +2,18 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { ENTRYPOINT } from "../../config/entrypoint";
-import MarkdownEditor from "../../components/editor/MarkdownEditor";
-import MarkdownView from "../../components/editor/MarkdownView";
+import { X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import MarkdownView from "@/components/editor/MarkdownView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 interface Member {
   "@id": string;
@@ -234,24 +242,26 @@ const ProjectDetail = () => {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-card p-6">
-          <h1 className="text-xl font-bold text-black mb-2">Project not found</h1>
-          <p className="text-gray-600 mb-4">
-            It may have been deleted, or you may not be a member.
-          </p>
-          <Link href="/projects" className="text-cyan-700 font-medium">
-            Back to projects
-          </Link>
-        </div>
+      <div className="min-h-screen bg-muted px-4 py-12">
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="pt-6">
+            <h1 className="text-xl font-bold mb-2">Project not found</h1>
+            <p className="text-muted-foreground mb-4">
+              It may have been deleted, or you may not be a member.
+            </p>
+            <Link href="/projects" className="text-primary font-medium">
+              Back to projects
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -264,179 +274,177 @@ const ProjectDetail = () => {
       <Head>
         <title>{project ? `${project.title} - Aura` : "Project - Aura"}</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
           <Link
             href="/projects"
-            className="inline-block text-sm text-cyan-700 hover:text-cyan-900 mb-3 no-underline"
+            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
           >
             ← All projects
           </Link>
 
           {isLoading || !project ? (
-            <p className="text-gray-500">Loading project...</p>
+            <p className="text-muted-foreground">Loading project...</p>
           ) : (
             <>
-              <div className="bg-white rounded-lg shadow-card p-6 mb-6">
-                <h1 className="text-2xl font-bold text-black mb-2">{project.title}</h1>
-                {project.description && (
-                  <MarkdownView source={project.description} className="mb-3" />
-                )}
-
-                <div className="mt-3">
-                  <p className="text-xs text-gray-500 mb-1">Members</p>
-                  <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
-                    {project.members.map((member) => (
-                      <li
-                        key={member["@id"]}
-                        className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
-                        data-testid="member-pill"
-                      >
-                        <span>{member.email}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMember(member)}
-                          aria-label={`Remove ${member.email}`}
-                          className="ml-1 text-gray-500 hover:text-red-600 leading-none bg-transparent border-0 cursor-pointer text-base"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <form
-                    onSubmit={handleAddMember}
-                    className="mt-2 flex items-center gap-2"
-                    data-testid="add-member-form"
-                  >
-                    <input
-                      type="email"
-                      value={newMemberEmail}
-                      onChange={(e) => setNewMemberEmail(e.target.value)}
-                      placeholder="member@example.com"
-                      aria-label="New member email"
-                      required
-                      className="flex-1 border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                    />
-                    <button
-                      type="submit"
-                      disabled={isAddingMember || !newMemberEmail.trim()}
-                      className="bg-cyan-700 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isAddingMember ? "Adding..." : "Add"}
-                    </button>
-                  </form>
-                  {memberError && (
-                    <p role="alert" className="mt-2 text-sm text-red-600">
-                      {memberError}
-                    </p>
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <h1 className="text-2xl font-bold mb-2">{project.title}</h1>
+                  {project.description && (
+                    <MarkdownView source={project.description} className="mb-3" />
                   )}
-                </div>
-              </div>
+
+                  <div className="mt-3">
+                    <p className="text-xs text-muted-foreground mb-1">Members</p>
+                    <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
+                      {project.members.map((member) => (
+                        <li key={member["@id"]} data-testid="member-pill">
+                          <Badge variant="secondary" className="gap-1">
+                            <span>{member.email}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMember(member)}
+                              aria-label={`Remove ${member.email}`}
+                              className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <form
+                      onSubmit={handleAddMember}
+                      className="mt-2 flex items-center gap-2"
+                      data-testid="add-member-form"
+                    >
+                      <Input
+                        type="email"
+                        value={newMemberEmail}
+                        onChange={(e) => setNewMemberEmail(e.target.value)}
+                        placeholder="member@example.com"
+                        aria-label="New member email"
+                        required
+                        className="flex-1"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={isAddingMember || !newMemberEmail.trim()}
+                      >
+                        {isAddingMember ? "Adding..." : "Add"}
+                      </Button>
+                    </form>
+                    {memberError && (
+                      <p role="alert" className="mt-2 text-sm text-destructive">
+                        {memberError}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
 
               {error && (
-                <div
-                  role="alert"
-                  className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded"
-                >
-                  {error}
-                </div>
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
               )}
 
-              <form
-                onSubmit={handleCreateTask}
-                className="bg-white rounded-lg shadow-card p-6 mb-6 space-y-4"
-                data-testid="create-task-form"
-              >
-                <h2 className="text-lg font-semibold text-black">Add a task</h2>
-                <div>
-                  <label htmlFor="task-title" className="block text-sm font-medium text-gray-700">
-                    Title
-                  </label>
-                  <input
-                    id="task-title"
-                    type="text"
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    required
-                    maxLength={255}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="task-description" className="block text-sm font-medium text-gray-700 mb-1">
-                    Description <span className="text-gray-400">(optional)</span>
-                  </label>
-                  <MarkdownEditor
-                    key={taskEditorKey}
-                    id="task-description"
-                    ariaLabel="Task description"
-                    value={newTaskDescription}
-                    onChange={setNewTaskDescription}
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={isCreatingTask || !newTaskTitle.trim()}
-                  className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isCreatingTask ? "Adding..." : "Add Task"}
-                </button>
-              </form>
+              <Card className="mb-6">
+                <CardContent className="pt-6">
+                  <form
+                    onSubmit={handleCreateTask}
+                    className="space-y-4"
+                    data-testid="create-task-form"
+                  >
+                    <h2 className="text-lg font-semibold">Add a task</h2>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="task-title">Title</Label>
+                      <Input
+                        id="task-title"
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        required
+                        maxLength={255}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="task-description">
+                        Description{" "}
+                        <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <MarkdownEditor
+                        key={taskEditorKey}
+                        id="task-description"
+                        ariaLabel="Task description"
+                        value={newTaskDescription}
+                        onChange={setNewTaskDescription}
+                      />
+                    </div>
+                    <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
+                      {isCreatingTask ? "Adding..." : "Add Task"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
 
-              <h2 className="text-lg font-semibold text-black mb-2">
+              <h2 className="text-lg font-semibold mb-2">
                 Tasks{" "}
-                <span className="text-sm font-normal text-gray-500">
+                <span className="text-sm font-normal text-muted-foreground">
                   ({openTasks.length} open
                   {completedTasks.length > 0 ? `, ${completedTasks.length} done` : ""})
                 </span>
               </h2>
 
               {tasks.length === 0 ? (
-                <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-                  No tasks in this project yet.
-                </p>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-muted-foreground">No tasks in this project yet.</p>
+                  </CardContent>
+                </Card>
               ) : (
                 <ul className="space-y-2" data-testid="project-task-list">
                   {[...openTasks, ...completedTasks].map((task) => (
-                    <li
-                      key={task["@id"]}
-                      className="bg-white rounded-lg shadow-card p-4 flex gap-3"
-                      data-testid="project-task-item"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={!!task.completedOn}
-                        onChange={() => toggleComplete(task)}
-                        aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-                        className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={`font-medium ${
-                            task.completedOn ? "text-gray-400 line-through" : "text-black"
-                          }`}
-                        >
-                          {task.title}
-                        </div>
-                        {task.description && (
-                          <MarkdownView source={task.description} className="mt-1 text-sm" />
-                        )}
-                        {task.tags.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {task.tags.map((tag) => (
-                              <span
-                                key={tag["@id"]}
-                                className="inline-block px-2 py-0.5 rounded text-xs text-white"
-                                style={{ backgroundColor: tag.color }}
-                              >
-                                {tag.title}
-                              </span>
-                            ))}
+                    <li key={task["@id"]} data-testid="project-task-item">
+                      <Card>
+                        <CardContent className="pt-4 pb-4 flex gap-3">
+                          <input
+                            type="checkbox"
+                            checked={!!task.completedOn}
+                            onChange={() => toggleComplete(task)}
+                            aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div
+                              className={cn(
+                                "font-medium",
+                                task.completedOn && "text-muted-foreground line-through",
+                              )}
+                            >
+                              {task.title}
+                            </div>
+                            {task.description && (
+                              <MarkdownView source={task.description} className="mt-1 text-sm" />
+                            )}
+                            {task.tags.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {task.tags.map((tag) => (
+                                  <span
+                                    key={tag["@id"]}
+                                    className="inline-block px-2 py-0.5 rounded text-xs text-white"
+                                    style={{ backgroundColor: tag.color }}
+                                  >
+                                    {tag.title}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </CardContent>
+                      </Card>
                     </li>
                   ))}
                 </ul>

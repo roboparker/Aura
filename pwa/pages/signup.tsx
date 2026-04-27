@@ -2,9 +2,13 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { Formik, Form, Field, ErrorMessage } from "formik";
-import { useAuth } from "../contexts/AuthContext";
-import { ENTRYPOINT } from "../config/entrypoint";
+import { Formik, Form } from "formik";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormikField } from "@/components/ui/formik-field";
 
 interface SignUpValues {
   givenName: string;
@@ -116,184 +120,139 @@ const SignUp = () => {
       <Head>
         <title>Sign Up - Aura</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-        <div className="w-full max-w-md bg-white rounded-lg shadow-card p-8">
-          <h1 className="text-2xl font-bold text-center text-black mb-6">
-            Create an Account
-          </h1>
-
-          {inviteLoading && (
-            <p className="text-sm text-gray-500 mb-4 text-center">
-              Checking your invitation…
-            </p>
-          )}
-
-          {inviteError && (
-            <div
-              role="alert"
-              className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 text-sm px-3 py-2 rounded"
-            >
-              {inviteError}
-            </div>
-          )}
-
-          {invite && (
-            <div
-              className="mb-4 bg-cyan-50 border border-cyan-200 text-cyan-800 text-sm px-3 py-2 rounded"
-              data-testid="invite-context"
-            >
-              <p className="font-semibold">You&apos;ve been invited to join:</p>
-              <ul className="list-disc list-inside mt-1">
-                {invite.groups.map((group) => (
-                  <li key={group.id}>
-                    <span className="font-medium">{group.title}</span>{" "}
-                    <span className="text-cyan-700/80">
-                      (invited by {group.invitedBy})
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs">
-                Sign up with <strong>{invite.email}</strong> and we&apos;ll add you
-                automatically.
+      <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {inviteLoading && (
+              <p className="text-sm text-muted-foreground text-center">
+                Checking your invitation…
               </p>
-            </div>
-          )}
+            )}
 
-          <Formik<SignUpValues>
-            enableReinitialize
-            initialValues={{
-              givenName: "",
-              familyName: "",
-              email: invite?.email ?? "",
-              password: "",
-              confirmPassword: "",
-            }}
-            validate={validate}
-            onSubmit={async (values, { setSubmitting, setStatus }) => {
-              try {
-                await register({
-                  email: values.email,
-                  password: values.password,
-                  givenName: values.givenName.trim(),
-                  familyName: values.familyName.trim(),
-                  inviteToken: invite ? (inviteToken ?? undefined) : undefined,
-                });
-                router.push("/signin?registered=true");
-              } catch (err) {
-                setStatus(
-                  err instanceof Error ? err.message : "Registration failed."
-                );
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-          >
-            {({ isSubmitting, status }) => (
-              <Form className="space-y-4" noValidate>
-                {status && (
-                  <div className="bg-red-50 text-red-500 p-3 rounded text-sm">
-                    {status}
-                  </div>
-                )}
+            {inviteError && (
+              <Alert>
+                <AlertDescription>{inviteError}</AlertDescription>
+              </Alert>
+            )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label htmlFor="givenName" className="block text-sm font-medium text-gray-700 mb-1">
-                      Given name
-                    </label>
-                    <Field
-                      id="givenName"
+            {invite && (
+              <Alert data-testid="invite-context">
+                <AlertDescription>
+                  <p className="font-semibold">You&apos;ve been invited to join:</p>
+                  <ul className="list-disc list-inside mt-1">
+                    {invite.groups.map((group) => (
+                      <li key={group.id}>
+                        <span className="font-medium">{group.title}</span>{" "}
+                        <span className="text-primary/80">
+                          (invited by {group.invitedBy})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-2 text-xs">
+                    Sign up with <strong>{invite.email}</strong> and we&apos;ll add
+                    you automatically.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Formik<SignUpValues>
+              enableReinitialize
+              initialValues={{
+                givenName: "",
+                familyName: "",
+                email: invite?.email ?? "",
+                password: "",
+                confirmPassword: "",
+              }}
+              validate={validate}
+              onSubmit={async (values, { setSubmitting, setStatus }) => {
+                try {
+                  await register({
+                    email: values.email,
+                    password: values.password,
+                    givenName: values.givenName.trim(),
+                    familyName: values.familyName.trim(),
+                    inviteToken: invite ? (inviteToken ?? undefined) : undefined,
+                  });
+                  router.push("/signin?registered=true");
+                } catch (err) {
+                  setStatus(
+                    err instanceof Error ? err.message : "Registration failed.",
+                  );
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+            >
+              {({ isSubmitting, status }) => (
+                <Form className="space-y-4" noValidate>
+                  {status && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{status}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormikField
                       name="givenName"
                       type="text"
                       autoComplete="given-name"
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                      label="Given name"
                     />
-                    <ErrorMessage name="givenName" component="p" className="mt-1 text-sm text-red-500" />
-                  </div>
-                  <div>
-                    <label htmlFor="familyName" className="block text-sm font-medium text-gray-700 mb-1">
-                      Family name
-                    </label>
-                    <Field
-                      id="familyName"
+                    <FormikField
                       name="familyName"
                       type="text"
                       autoComplete="family-name"
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                      label="Family name"
                     />
-                    <ErrorMessage name="familyName" component="p" className="mt-1 text-sm text-red-500" />
                   </div>
-                </div>
 
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <Field
-                    id="email"
+                  <FormikField
                     name="email"
                     type="email"
-                    readOnly={!!invite}
-                    className={`w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500 ${
-                      invite ? "bg-gray-100 text-gray-600" : ""
-                    }`}
+                    label="Email"
                     placeholder="you@example.com"
+                    readOnly={!!invite}
+                    inputClassName={invite ? "bg-muted text-muted-foreground" : undefined}
+                    description={
+                      invite ? "Locked to the email your invitation was sent to." : undefined
+                    }
                   />
-                  {invite && (
-                    <p className="mt-1 text-xs text-gray-500">
-                      Locked to the email your invitation was sent to.
-                    </p>
-                  )}
-                  <ErrorMessage name="email" component="p" className="mt-1 text-sm text-red-500" />
-                </div>
 
-                <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                    Password
-                  </label>
-                  <Field
-                    id="password"
+                  <FormikField
                     name="password"
                     type="password"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                    label="Password"
                     placeholder="At least 6 characters"
                   />
-                  <ErrorMessage name="password" component="p" className="mt-1 text-sm text-red-500" />
-                </div>
 
-                <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm Password
-                  </label>
-                  <Field
-                    id="confirmPassword"
+                  <FormikField
                     name="confirmPassword"
                     type="password"
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
+                    label="Confirm Password"
                     placeholder="Re-enter your password"
                   />
-                  <ErrorMessage name="confirmPassword" component="p" className="mt-1 text-sm text-red-500" />
-                </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? "Creating Account..." : "Sign Up"}
-                </button>
+                  <Button type="submit" disabled={isSubmitting} className="w-full">
+                    {isSubmitting ? "Creating Account..." : "Sign Up"}
+                  </Button>
 
-                <p className="text-center text-sm text-gray-600">
-                  Already have an account?{" "}
-                  <Link href="/signin" className="text-cyan-700 font-medium">
-                    Sign In
-                  </Link>
-                </p>
-              </Form>
-            )}
-          </Formik>
-        </div>
+                  <p className="text-center text-sm text-muted-foreground">
+                    Already have an account?{" "}
+                    <Link href="/signin" className="text-primary font-medium">
+                      Sign In
+                    </Link>
+                  </p>
+                </Form>
+              )}
+            </Formik>
+          </CardContent>
+        </Card>
       </div>
     </>
   );

@@ -38,13 +38,15 @@ Aura/
 
 ### PWA (Frontend)
 - **Framework**: Next.js 15 (React)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
+- **Language**: TypeScript (path alias `@/*` resolves to the `pwa/` root)
+- **Styling**: Tailwind CSS v4 + `tw-animate-css`
+- **UI components**: shadcn/ui — Radix-based source components owned in `pwa/components/ui/` (button, input, label, card, alert, badge, checkbox, dropdown-menu, separator, textarea). `cn()` helper in `pwa/lib/utils.ts`. Design tokens (CSS variables under `:root` + `@theme inline`) live in `pwa/styles/globals.css`. The `pwa/components.json` config means `npx shadcn@latest add <component>` will drop new ones into `pwa/components/ui/` automatically.
 - **State**: @tanstack/react-query
-- **Forms**: Formik
-- **Admin**: @api-platform/admin
+- **Forms**: Formik. shadcn's `Form` is react-hook-form-based, so we use a thin `FormikField` helper in `pwa/components/ui/formik-field.tsx` that wires `<Field as={Input}>` + `Label` + `ErrorMessage` together.
+- **Admin**: @api-platform/admin (mounted at `/admin`) — off-limits for shadcn, it has its own UI system.
 - **Rich text**: BlockNote (WYSIWYG markdown editor) + react-markdown / remark-gfm (read-only rendering). Shared editor lives in `pwa/components/editor/`.
 - **Avatars**: Reusable `UserAvatar` in `pwa/components/user/`. Renders the uploaded image when present, otherwise white initials on the user's `personalizedColor` (contrast-safe palette picked at registration).
+- **Icons**: lucide-react.
 - **Package manager**: pnpm
 
 ### E2E Tests
@@ -108,9 +110,11 @@ npx playwright test
 - Tests in `api/tests/Api/`
 
 ### TypeScript / PWA
-- Components in `pwa/components/`
-- Pages follow Next.js file-based routing in `pwa/pages/`
-- Use Tailwind CSS for styling
+- Components in `pwa/components/`; shadcn primitives live in `pwa/components/ui/` and should be the default for buttons, inputs, labels, alerts, cards, dropdowns, etc. Reach for raw Tailwind only when no primitive fits.
+- Pages follow Next.js file-based routing in `pwa/pages/`.
+- Imports prefer the `@/*` alias (`@/components/...`, `@/contexts/...`, `@/lib/...`) over deep relative paths.
+- Use Tailwind CSS for styling. Reference design tokens via the shadcn variables (`bg-background`, `text-muted-foreground`, `border-input`, `text-destructive`, etc.) where possible. shadcn tokens use the canonical neutral baseColor (no brand override yet); brand cyan still lives in raw utilities (`bg-cyan-700`, `text-cyan-700`) on the navbar and link elements.
+- Forms backed by Formik should use `FormikField` from `pwa/components/ui/formik-field.tsx` rather than hand-rolled `<Field>` + `<label>` + `<ErrorMessage>` blocks.
 - Long-form description fields use `MarkdownEditor` for input and `MarkdownView` for rendering (both from `pwa/components/editor/`). Content is stored as markdown in the API's `TEXT` columns.
 
 ### E2E Tests

@@ -1,10 +1,15 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import { ENTRYPOINT } from "../config/entrypoint";
-import MarkdownEditor from "../components/editor/MarkdownEditor";
-import MarkdownView from "../components/editor/MarkdownView";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import MarkdownView from "@/components/editor/MarkdownView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Tag {
   "@id": string;
@@ -169,8 +174,8 @@ const Tags = () => {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -180,155 +185,147 @@ const Tags = () => {
       <Head>
         <title>Tags - Aura</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-black mb-6">Tags</h1>
+          <h1 className="text-2xl font-bold mb-6">Tags</h1>
 
-          <form
-            onSubmit={handleCreate}
-            className="bg-white rounded-lg shadow-card p-6 mb-6 space-y-4"
-          >
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                maxLength={100}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-gray-400">(optional)</span>
-              </label>
-              <MarkdownEditor
-                key={editorResetKey}
-                id="description"
-                ariaLabel="Description"
-                value={description}
-                onChange={setDescription}
-              />
-            </div>
-            <div>
-              <label htmlFor="color" className="block text-sm font-medium text-gray-700">
-                Color
-              </label>
-              <div className="mt-1 flex items-center gap-3">
-                <input
-                  id="color"
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  className="h-10 w-16 border border-gray-300 rounded-md cursor-pointer"
-                />
-                <span className="text-sm font-mono text-gray-600">{color}</span>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting || !title.trim()}
-              className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Adding..." : "Add Tag"}
-            </button>
-          </form>
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    maxLength={100}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">
+                    Description{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <MarkdownEditor
+                    key={editorResetKey}
+                    id="description"
+                    ariaLabel="Description"
+                    value={description}
+                    onChange={setDescription}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="color">Color</Label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="color"
+                      type="color"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      className="h-10 w-16 border border-input rounded-md cursor-pointer"
+                    />
+                    <span className="text-sm font-mono text-muted-foreground">{color}</span>
+                  </div>
+                </div>
+                <Button type="submit" disabled={isSubmitting || !title.trim()}>
+                  {isSubmitting ? "Adding..." : "Add Tag"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           {error && (
-            <div
-              role="alert"
-              className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded"
-            >
-              {error}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {isLoading ? (
-            <p className="text-gray-500">Loading tags...</p>
+            <p className="text-muted-foreground">Loading tags...</p>
           ) : tags.length === 0 ? (
-            <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-              No tags yet. Create one above to start organizing your tasks.
-            </p>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">
+                  No tags yet. Create one above to start organizing your tasks.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <ul className="space-y-2" data-testid="tag-list">
               {tags.map((tag) => (
-                <li
-                  key={tag["@id"]}
-                  className="bg-white rounded-lg shadow-card p-4"
-                  data-testid="tag-item"
-                >
-                  {editingId === tag["@id"] ? (
-                    <form onSubmit={(e) => handleUpdate(e, tag)} className="space-y-3">
-                      <input
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        required
-                        maxLength={100}
-                        aria-label="Title"
-                        className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      />
-                      <MarkdownEditor
-                        ariaLabel="Description"
-                        value={editDescription}
-                        onChange={setEditDescription}
-                      />
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="color"
-                          value={editColor}
-                          onChange={(e) => setEditColor(e.target.value)}
-                          aria-label="Color"
-                          className="h-10 w-16 border border-gray-300 rounded-md cursor-pointer"
-                        />
-                        <span className="text-sm font-mono text-gray-600">{editColor}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          className="bg-cyan-700 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-cyan-800"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className="bg-gray-200 text-gray-700 py-1 px-3 rounded-md text-sm hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold text-white"
-                        style={{ backgroundColor: tag.color }}
-                      >
-                        {tag.title}
-                      </span>
-                      <div className="flex-1">
-                        {tag.description && <MarkdownView source={tag.description} />}
-                      </div>
-                      <button
-                        onClick={() => startEdit(tag)}
-                        className="text-cyan-700 hover:text-cyan-900 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(tag)}
-                        aria-label={`Delete "${tag.title}"`}
-                        className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
+                <li key={tag["@id"]} data-testid="tag-item">
+                  <Card>
+                    <CardContent className="pt-4 pb-4">
+                      {editingId === tag["@id"] ? (
+                        <form onSubmit={(e) => handleUpdate(e, tag)} className="space-y-3">
+                          <Input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            required
+                            maxLength={100}
+                            aria-label="Title"
+                          />
+                          <MarkdownEditor
+                            ariaLabel="Description"
+                            value={editDescription}
+                            onChange={setEditDescription}
+                          />
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="color"
+                              value={editColor}
+                              onChange={(e) => setEditColor(e.target.value)}
+                              aria-label="Color"
+                              className="h-10 w-16 border border-input rounded-md cursor-pointer"
+                            />
+                            <span className="text-sm font-mono text-muted-foreground">
+                              {editColor}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button type="submit" size="sm">
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={cancelEdit}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="flex items-start gap-3">
+                          <span
+                            className="inline-block mt-1 px-2 py-0.5 rounded text-xs font-semibold text-white shrink-0"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.title}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            {tag.description && <MarkdownView source={tag.description} />}
+                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => startEdit(tag)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(tag)}
+                            aria-label={`Delete "${tag.title}"`}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </li>
               ))}
             </ul>

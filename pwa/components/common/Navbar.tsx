@@ -1,59 +1,80 @@
 import Link from "next/link";
-import { useAuth } from "../../contexts/AuthContext";
-import UserAvatar from "../user/UserAvatar";
+import { useRouter } from "next/router";
+import { useAuth } from "@/contexts/AuthContext";
+import UserAvatar from "@/components/user/UserAvatar";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import ThemeToggle from "./ThemeToggle";
+
+const NAV_LINKS = [
+  { href: "/tasks", label: "Tasks" },
+  { href: "/projects", label: "Projects" },
+  { href: "/groups", label: "Groups" },
+  { href: "/tags", label: "Tags" },
+];
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
   return (
-    <nav className="bg-cyan-700 text-white">
+    <nav className="border-b bg-background">
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="text-white font-bold text-lg no-underline">
+        <Link href="/" className="font-bold text-lg no-underline text-foreground">
           Aura
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
           {isAuthenticated && user ? (
             <>
               {isAdmin && (
-                <Link href="/admin" className="text-cyan-200 hover:text-white no-underline text-sm">
-                  Admin
-                </Link>
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    router.pathname.startsWith("/admin") && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href="/admin">Admin</Link>
+                </Button>
               )}
-              <Link href="/tasks" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Tasks
-              </Link>
-              <Link href="/projects" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Projects
-              </Link>
-              <Link href="/groups" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Groups
-              </Link>
-              <Link href="/tags" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Tags
-              </Link>
-              <button
-                onClick={logout}
-                className="text-cyan-200 hover:text-white text-sm bg-transparent border-0 cursor-pointer"
-              >
+              {NAV_LINKS.map((link) => {
+                const active = router.pathname.startsWith(link.href);
+                return (
+                  <Button
+                    key={link.href}
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className={cn(active && "bg-accent text-accent-foreground")}
+                  >
+                    <Link href={link.href}>{link.label}</Link>
+                  </Button>
+                );
+              })}
+              <Button variant="ghost" size="sm" onClick={logout}>
                 Sign Out
-              </button>
-              <Link href="/account" aria-label="My Account" className="inline-flex">
+              </Button>
+              <ThemeToggle />
+              <Link
+                href="/account"
+                aria-label="My Account"
+                className="ml-2 inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
                 <UserAvatar user={user} size="sm" />
               </Link>
             </>
           ) : (
             <>
-              <Link href="/signin" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="bg-white text-cyan-700 px-3 py-1 rounded text-sm font-semibold no-underline hover:bg-cyan-100"
-              >
-                Sign Up
-              </Link>
+              <Button asChild variant="ghost" size="sm">
+                <Link href="/signin">Sign In</Link>
+              </Button>
+              <Button asChild size="sm">
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+              <ThemeToggle />
             </>
           )}
         </div>

@@ -1,8 +1,12 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useState } from "react";
-import { Formik, Form, Field, ErrorMessage } from "formik";
-import { useAuth } from "../contexts/AuthContext";
+import { Formik, Form } from "formik";
+import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormikField } from "@/components/ui/formik-field";
 
 interface ForgotPasswordValues {
   email: string;
@@ -29,98 +33,76 @@ const ForgotPassword = () => {
       <Head>
         <title>Forgot Password - Aura</title>
       </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="w-full max-w-md bg-white rounded-lg shadow-card p-8">
-          <h1 className="text-2xl font-bold text-center text-black mb-6">
-            Forgot Password
-          </h1>
-
-          {submitted ? (
-            <div
-              className="bg-green-50 text-green-700 p-4 rounded text-sm text-center space-y-3"
-              data-testid="forgot-password-success"
-            >
-              <p>
-                If an account exists for that email, a reset link has been
-                sent.
-              </p>
-              <p>
-                <Link href="/signin" className="text-cyan-700 font-medium">
-                  Back to Sign In
-                </Link>
-              </p>
-            </div>
-          ) : (
-            <Formik<ForgotPasswordValues>
-              initialValues={{ email: "" }}
-              validate={validate}
-              onSubmit={async (values, { setSubmitting, setStatus }) => {
-                try {
-                  await requestPasswordReset(values.email);
-                  setSubmitted(true);
-                } catch (err) {
-                  setStatus(
-                    err instanceof Error
-                      ? err.message
-                      : "Failed to request password reset."
-                  );
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-            >
-              {({ isSubmitting, status }) => (
-                <Form className="space-y-4" noValidate>
-                  <p className="text-sm text-gray-600 mb-2">
-                    Enter your email and we&apos;ll send you a link to reset
-                    your password.
-                  </p>
-
-                  {status && (
-                    <div className="bg-red-50 text-red-500 p-3 rounded text-sm">
-                      {status}
-                    </div>
-                  )}
-
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="block text-sm font-medium text-gray-700 mb-1"
-                    >
-                      Email
-                    </label>
-                    <Field
-                      id="email"
-                      name="email"
-                      type="email"
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-                      placeholder="you@example.com"
-                    />
-                    <ErrorMessage
-                      name="email"
-                      component="p"
-                      className="mt-1 text-sm text-red-500"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? "Sending..." : "Send Reset Link"}
-                  </button>
-
-                  <p className="text-center text-sm text-gray-600">
-                    <Link href="/signin" className="text-cyan-700 font-medium">
+      <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-8">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-2xl text-center">Forgot Password</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {submitted ? (
+              <Alert data-testid="forgot-password-success">
+                <AlertDescription>
+                  <p>If an account exists for that email, a reset link has been sent.</p>
+                  <p className="mt-2">
+                    <Link href="/signin" className="text-primary font-medium">
                       Back to Sign In
                     </Link>
                   </p>
-                </Form>
-              )}
-            </Formik>
-          )}
-        </div>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Formik<ForgotPasswordValues>
+                initialValues={{ email: "" }}
+                validate={validate}
+                onSubmit={async (values, { setSubmitting, setStatus }) => {
+                  try {
+                    await requestPasswordReset(values.email);
+                    setSubmitted(true);
+                  } catch (err) {
+                    setStatus(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to request password reset.",
+                    );
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+              >
+                {({ isSubmitting, status }) => (
+                  <Form className="space-y-4" noValidate>
+                    <p className="text-sm text-muted-foreground">
+                      Enter your email and we&apos;ll send you a link to reset your password.
+                    </p>
+
+                    {status && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{status}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <FormikField
+                      name="email"
+                      type="email"
+                      label="Email"
+                      placeholder="you@example.com"
+                    />
+
+                    <Button type="submit" disabled={isSubmitting} className="w-full">
+                      {isSubmitting ? "Sending..." : "Send Reset Link"}
+                    </Button>
+
+                    <p className="text-center text-sm text-muted-foreground">
+                      <Link href="/signin" className="text-primary font-medium">
+                        Back to Sign In
+                      </Link>
+                    </p>
+                  </Form>
+                )}
+              </Formik>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </>
   );

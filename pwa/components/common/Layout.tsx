@@ -5,7 +5,8 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { AuthProvider } from "../../contexts/AuthContext";
+import { ThemeProvider } from "next-themes";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Navbar from "./Navbar";
 
 const Layout = ({
@@ -18,14 +19,24 @@ const Layout = ({
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <HydrationBoundary state={dehydratedState}>
-        <AuthProvider>
-          <Navbar />
-          {children}
-        </AuthProvider>
-      </HydrationBoundary>
-    </QueryClientProvider>
+    // No explicit user choice → follow the OS `prefers-color-scheme`.
+    // Once the user clicks the toggle we persist their choice in localStorage,
+    // and that takes precedence over the system pref.
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <QueryClientProvider client={queryClient}>
+        <HydrationBoundary state={dehydratedState}>
+          <AuthProvider>
+            <Navbar />
+            {children}
+          </AuthProvider>
+        </HydrationBoundary>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

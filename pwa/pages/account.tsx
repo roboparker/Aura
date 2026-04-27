@@ -1,10 +1,13 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext";
-import AvatarSection from "../components/account/AvatarSection";
-import ProfileForm from "../components/account/ProfileForm";
-import ChangePasswordForm from "../components/account/ChangePasswordForm";
+import { useAuth } from "@/contexts/AuthContext";
+import AvatarSection from "@/components/account/AvatarSection";
+import ProfileForm from "@/components/account/ProfileForm";
+import ChangePasswordForm from "@/components/account/ChangePasswordForm";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Account = () => {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
@@ -18,8 +21,8 @@ const Account = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -33,47 +36,48 @@ const Account = () => {
       <Head>
         <title>My Account - Aura</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
-        <div className="max-w-md mx-auto bg-white rounded-lg shadow-card p-8">
-          <h1 className="text-2xl font-bold text-black mb-6">My Account</h1>
+      <div className="min-h-screen bg-muted px-4 py-12">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-2xl">My Account</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AvatarSection />
 
-          <AvatarSection />
+            <ProfileForm />
 
-          <ProfileForm />
+            <div className="mt-6 space-y-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Email</p>
+                <p>{user.email}</p>
+              </div>
 
-          <div className="mt-6 space-y-4">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Email</p>
-              <p className="text-black">{user.email}</p>
-            </div>
-
-            <div>
-              <p className="text-sm font-medium text-gray-500">Roles</p>
-              <div className="flex gap-2 mt-1">
-                {user.roles.map((role) => (
-                  <span
-                    key={role}
-                    className="inline-block bg-cyan-100 text-cyan-700 text-xs font-medium px-2 py-1 rounded"
-                  >
-                    {role}
-                  </span>
-                ))}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Roles</p>
+                <div className="flex gap-2 mt-1">
+                  {user.roles.map((role) => (
+                    <Badge key={role} variant="secondary">
+                      {role}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          <ChangePasswordForm />
+            <ChangePasswordForm />
 
-          <button
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
-            className="mt-8 w-full bg-red-500 text-white py-2 px-4 rounded-md font-semibold hover:bg-red-600"
-          >
-            Sign Out
-          </button>
-        </div>
+            <Button
+              variant="destructive"
+              className="mt-8 w-full"
+              onClick={() => {
+                logout();
+                router.push("/");
+              }}
+            >
+              Sign Out
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </>
   );
