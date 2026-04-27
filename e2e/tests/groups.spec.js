@@ -137,19 +137,26 @@ test.describe("Groups", () => {
     await ownerContext.close();
   });
 
-  test("invites that don't resolve surface an error but still create the group", async ({ page }) => {
+  test("inviting an unknown email creates the group with a pending invite", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/groups`);
 
-    const title = `Bad invite ${Date.now()}`;
+    const ghost = `ghost-${Date.now()}@example.invalid`;
+    const title = `Pending invite ${Date.now()}`;
     await page.fill("#title", title);
-    await page.fill("#invite-email", "ghost@example.invalid");
+    await page.fill("#invite-email", ghost);
     await page.locator('[data-testid="invite-members-section"] button', { hasText: /^Add$/ }).click();
     await page.locator('button[type="submit"]', { hasText: /Add Group/ }).click();
 
-    // Group exists, owner sees the invite-failed banner.
-    await expect(page.locator('[data-testid="group-item"]', { hasText: title })).toBeVisible();
-    await expect(page.locator('[role="alert"]')).toContainText("ghost@example.invalid");
+    const item = page.locator('[data-testid="group-item"]', { hasText: title });
+    await expect(item).toBeVisible();
+
+    // The unknown email is not a member (no Aura account yet) but the
+    // invite is recorded — visit the detail page to see the pending chip.
+    await item.locator(`a:has-text("${title}")`).click();
+    await expect(
+      page.locator('[data-testid="pending-invite-pill"]', { hasText: ghost }),
+    ).toBeVisible();
   });
 
   test("nav shows Groups link when authenticated", async ({ page }) => {

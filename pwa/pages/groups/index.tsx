@@ -300,7 +300,7 @@ const Groups = () => {
                 </ul>
               )}
               <p className="mt-1 text-xs text-gray-500">
-                You'll be added as the owner automatically. Existing users join immediately;
+                You&apos;ll be added as the owner automatically. Existing users join immediately;
                 others get an email invite to sign up.
               </p>
             </div>

@@ -80,7 +80,9 @@ const SignUp = () => {
     setInviteError(null);
     (async () => {
       try {
-        const res = await fetch(`${ENTRYPOINT}/invites/${inviteToken}`);
+        const res = await fetch(
+          `${ENTRYPOINT}/invites/${encodeURIComponent(inviteToken)}`,
+        );
         if (!res.ok) {
           if (!cancelled) {
             setInvite(null);
@@ -140,7 +142,7 @@ const SignUp = () => {
               className="mb-4 bg-cyan-50 border border-cyan-200 text-cyan-800 text-sm px-3 py-2 rounded"
               data-testid="invite-context"
             >
-              <p className="font-semibold">You've been invited to join:</p>
+              <p className="font-semibold">You&apos;ve been invited to join:</p>
               <ul className="list-disc list-inside mt-1">
                 {invite.groups.map((group) => (
                   <li key={group.id}>
@@ -152,7 +154,7 @@ const SignUp = () => {
                 ))}
               </ul>
               <p className="mt-2 text-xs">
-                Sign up with <strong>{invite.email}</strong> and we'll add you
+                Sign up with <strong>{invite.email}</strong> and we&apos;ll add you
                 automatically.
               </p>
             </div>

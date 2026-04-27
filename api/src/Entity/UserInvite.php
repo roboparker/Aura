@@ -26,7 +26,6 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Table(name: 'user_invite')]
 #[ORM\UniqueConstraint(name: 'uniq_user_invite_email', columns: ['email'])]
 #[ORM\UniqueConstraint(name: 'uniq_user_invite_token_hash', columns: ['token_hash'])]
-#[ORM\Index(columns: ['token_hash'], name: 'idx_user_invite_token_hash')]
 class UserInvite
 {
     #[ORM\Id]

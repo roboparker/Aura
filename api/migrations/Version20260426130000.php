@@ -25,7 +25,6 @@ final class Version20260426130000 extends AbstractMigration
         $this->addSql('CREATE TABLE user_invite (id UUID NOT NULL, email VARCHAR(180) NOT NULL, token_hash VARCHAR(64) NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, expires_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, accepted_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_user_invite_email ON user_invite (email)');
         $this->addSql('CREATE UNIQUE INDEX uniq_user_invite_token_hash ON user_invite (token_hash)');
-        $this->addSql('CREATE INDEX idx_user_invite_token_hash ON user_invite (token_hash)');
 
         $this->addSql('CREATE TABLE group_invite (id UUID NOT NULL, user_invite_id UUID NOT NULL, user_group_id UUID NOT NULL, invited_by_id UUID NOT NULL, created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, PRIMARY KEY (id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_group_invite_invite_group ON group_invite (user_invite_id, user_group_id)');

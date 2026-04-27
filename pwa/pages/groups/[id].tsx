@@ -70,10 +70,13 @@ const GroupDetail = () => {
     // try optimistically and silently swallow forbidden so non-owners just
     // see no pending-invites section.
     try {
-      const res = await fetch(`${ENTRYPOINT}/groups/${groupId}/invites`, {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
+      const res = await fetch(
+        `${ENTRYPOINT}/groups/${encodeURIComponent(groupId)}/invites`,
+        {
+          credentials: "include",
+          headers: { Accept: "application/json" },
+        },
+      );
       if (!res.ok) {
         setPendingInvites([]);
         return;
@@ -90,10 +93,13 @@ const GroupDetail = () => {
     setError(null);
     setIsLoading(true);
     try {
-      const res = await fetch(`${ENTRYPOINT}/groups/${groupId}`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
+      const res = await fetch(
+        `${ENTRYPOINT}/groups/${encodeURIComponent(groupId)}`,
+        {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        },
+      );
       if (res.status === 404 || res.status === 403) {
         setNotFound(true);
         return;
