@@ -26,7 +26,6 @@ import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -112,11 +111,12 @@ const SortableTaskItem = ({
           >
             <GripVertical className="h-4 w-4" />
           </button>
-          <Checkbox
+          <input
+            type="checkbox"
             checked={!!task.completedOn}
-            onCheckedChange={() => onToggle(task)}
+            onChange={() => onToggle(task)}
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
-            className="mt-1"
+            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-700"
           />
           <div className="flex-1 min-w-0">
             <p

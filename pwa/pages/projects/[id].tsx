@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -411,11 +410,12 @@ const ProjectDetail = () => {
                     <li key={task["@id"]} data-testid="project-task-item">
                       <Card>
                         <CardContent className="pt-4 pb-4 flex gap-3">
-                          <Checkbox
+                          <input
+                            type="checkbox"
                             checked={!!task.completedOn}
-                            onCheckedChange={() => toggleComplete(task)}
+                            onChange={() => toggleComplete(task)}
                             aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-                            className="mt-1"
+                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-cyan-700"
                           />
                           <div className="min-w-0 flex-1">
                             <div
