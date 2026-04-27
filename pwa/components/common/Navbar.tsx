@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
   { href: "/tasks", label: "Tasks" },
@@ -65,6 +66,7 @@ const Navbar = () => {
               >
                 Sign Out
               </Button>
+              <ThemeToggle />
               <Link
                 href="/account"
                 aria-label="My Account"
@@ -86,6 +88,7 @@ const Navbar = () => {
               <Button asChild variant="secondary" size="sm" className="bg-white text-cyan-700 hover:bg-cyan-100">
                 <Link href="/signup">Sign Up</Link>
               </Button>
+              <ThemeToggle />
             </>
           )}
         </div>

@@ -39,6 +39,37 @@
     --ring: hsl(0 0% 3.9%);
 }
 
+.dark {
+    /* Canonical shadcn neutral baseColor (dark). */
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+
+    --card: hsl(0 0% 3.9%);
+    --card-foreground: hsl(0 0% 98%);
+
+    --popover: hsl(0 0% 3.9%);
+    --popover-foreground: hsl(0 0% 98%);
+
+    --primary: hsl(0 0% 98%);
+    --primary-foreground: hsl(0 0% 9%);
+
+    --secondary: hsl(0 0% 14.9%);
+    --secondary-foreground: hsl(0 0% 98%);
+
+    --muted: hsl(0 0% 14.9%);
+    --muted-foreground: hsl(0 0% 63.9%);
+
+    --accent: hsl(0 0% 14.9%);
+    --accent-foreground: hsl(0 0% 98%);
+
+    --destructive: hsl(0 62.8% 30.6%);
+    --destructive-foreground: hsl(0 0% 98%);
+
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: hsl(0 0% 83.1%);
+}
+
 @theme inline {
     --color-background: var(--background);
     --color-foreground: var(--foreground);
@@ -91,7 +122,7 @@
     }
 
     a {
-        @apply no-underline text-cyan-700;
+        @apply no-underline text-cyan-700 dark:text-cyan-400;
     }
 }
 
@@ -110,9 +141,10 @@
   }
 }
 
-/* Stand-in for tailwindcss-typography so rendered markdown stays legible. */
+/* Stand-in for tailwindcss-typography so rendered markdown stays legible.
+   Uses shadcn tokens so dark mode flips automatically. */
 .markdown-view {
-    @apply text-sm text-gray-700 leading-relaxed break-words;
+    @apply text-sm text-foreground/80 leading-relaxed break-words;
 }
 .markdown-view h1 { @apply text-xl font-semibold mt-3 mb-2; }
 .markdown-view h2 { @apply text-lg font-semibold mt-3 mb-2; }
@@ -122,17 +154,17 @@
 .markdown-view ul { @apply list-disc pl-5 my-1; }
 .markdown-view ol { @apply list-decimal pl-5 my-1; }
 .markdown-view li { @apply my-0.5; }
-.markdown-view a { @apply text-cyan-700 underline; }
+.markdown-view a { @apply text-cyan-700 dark:text-cyan-400 underline; }
 .markdown-view strong { @apply font-semibold; }
 .markdown-view em { @apply italic; }
-.markdown-view blockquote { @apply border-l-4 border-gray-200 pl-3 my-2 text-gray-600; }
-.markdown-view code { @apply bg-gray-100 rounded px-1 py-0.5 text-xs font-mono; }
-.markdown-view pre { @apply bg-gray-100 rounded-md p-3 my-2 overflow-x-auto; }
+.markdown-view blockquote { @apply border-l-4 border-border pl-3 my-2 text-muted-foreground; }
+.markdown-view code { @apply bg-muted rounded px-1 py-0.5 text-xs font-mono; }
+.markdown-view pre { @apply bg-muted rounded-md p-3 my-2 overflow-x-auto; }
 .markdown-view pre code { @apply bg-transparent p-0 text-xs; }
-.markdown-view hr { @apply my-3 border-gray-200; }
+.markdown-view hr { @apply my-3 border-border; }
 .markdown-view table { @apply border-collapse my-2 text-sm; }
-.markdown-view th, .markdown-view td { @apply border border-gray-200 px-2 py-1; }
-.markdown-view th { @apply bg-gray-50 font-semibold text-left; }
+.markdown-view th, .markdown-view td { @apply border border-border px-2 py-1; }
+.markdown-view th { @apply bg-muted font-semibold text-left; }
 .markdown-view input[type="checkbox"] { @apply mr-1 align-middle; }
 
 /* BlockNote paints its own background; drop its default min-height so our
