@@ -37,13 +37,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read', 'project:read'])]
+    #[Groups(['user:read', 'project:read', 'group:read'])]
     private ?Uuid $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:write', 'project:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
     private string $email = '';
 
     #[ORM\Column]
@@ -54,6 +54,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private ?string $plainPassword = null;
 
+    /**
+     * Transient token from a UserInvite. When the signup payload includes
+     * one, UserPasswordHasherProcessor resolves it after persisting the new
+     * user and joins them to the invited group. Never stored.
+     */
+    #[Groups(['user:write'])]
+    private ?string $inviteToken = null;
+
     /** @var string[] */
     #[ORM\Column(type: 'json')]
     #[Groups(['user:read'])]
@@ -62,18 +70,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
     private string $givenName = '';
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Family name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
     private string $familyName = '';
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
     private ?string $nickname = null;
 
     /**
@@ -87,7 +95,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'project:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
@@ -130,6 +138,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPlainPassword(?string $plainPassword): static
     {
         $this->plainPassword = $plainPassword;
+        return $this;
+    }
+
+    public function getInviteToken(): ?string
+    {
+        return $this->inviteToken;
+    }
+
+    public function setInviteToken(?string $inviteToken): static
+    {
+        $this->inviteToken = $inviteToken;
         return $this;
     }
 
@@ -210,7 +229,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      *
      * @return array<string, string>|null
      */
-    #[Groups(['user:read', 'project:read'])]
+    #[Groups(['user:read', 'project:read', 'group:read'])]
     public function getAvatarUrls(): ?array
     {
         return $this->avatar?->getVariantUrls();
@@ -224,5 +243,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function eraseCredentials(): void
     {
         $this->plainPassword = null;
+        $this->inviteToken = null;
     }
 }
