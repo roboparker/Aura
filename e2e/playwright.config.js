@@ -3,6 +3,10 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
+  // The PWA runs `next dev` in CI and compiles routes on first hit. Warm
+  // them serially before workers start so cold compilation doesn't stall a
+  // parallel test's 5s `toHaveURL` assertion.
+  globalSetup: require.resolve('./global-setup.js'),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // Retry once in CI to absorb rare flakes in pointer/keyboard drag tests.
