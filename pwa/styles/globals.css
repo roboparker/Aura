@@ -1,9 +1,90 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @plugin "@tailwindcss/forms";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+    --radius: 0.5rem;
+
+    --background: #ffffff;
+    --foreground: #1d1e1c;
+
+    --card: #ffffff;
+    --card-foreground: #1d1e1c;
+
+    --popover: #ffffff;
+    --popover-foreground: #1d1e1c;
+
+    --primary: #0f929a;
+    --primary-foreground: #ffffff;
+
+    --secondary: #f3f4f6;
+    --secondary-foreground: #1d1e1c;
+
+    --muted: #f9fafb;
+    --muted-foreground: #6b7280;
+
+    --accent: #ecfeff;
+    --accent-foreground: #0f929a;
+
+    --destructive: #ee4322;
+    --destructive-foreground: #ffffff;
+
+    --border: #e5e7eb;
+    --input: #e5e7eb;
+    --ring: #46b6bf;
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+@theme {
+    --font-display: "Poppins", "system-ui";
+    --shadow-card: 0px 0px 20px 0px rgba(0, 0, 0, 0.15);
+    --transition-duration: 300ms;
+    --min-height-24: 96px;
+    --color-cyan-500: #46b6bf;
+    --color-cyan-700: #0f929a;
+    --color-cyan-200: #bceff3;
+    --color-red-500: #ee4322;
+    --color-black: #1d1e1c;
+    --color-white: #ffffff;
+    --color-transparent: transparent;
+    --container-padding: 2rem;
+    --container-center: center;
+}
 
 @layer base {
     * {
         font-family: Poppins;
+    }
+
+    body {
+        @apply bg-background text-foreground;
     }
 
     a {
@@ -55,20 +136,4 @@
    container owns the sizing. */
 .bn-container {
     @apply rounded-md;
-}
-
-@theme {
-  --font-display: "Poppins", "system-ui";
-  --shadow-card: 0px 0px 20px 0px rgba(0, 0, 0, 0.15);
-  --transition-duration: 300ms;
-  --min-height-24: 96px;
-  --color-cyan-500: #46b6bf;
-  --color-cyan-700: #0f929a;
-  --color-cyan-200: #bceff3;
-  --color-red-500: #ee4322;
-  --color-black: #1d1e1c;
-  --color-white: #ffffff;
-  --color-transparent: transparent;
-  --container-padding: 2rem;
-  --container-center: center;
 }

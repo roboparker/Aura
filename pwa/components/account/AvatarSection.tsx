@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { uploadAvatar } from "../../lib/uploadAvatar";
-import UserAvatar from "../user/UserAvatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { uploadAvatar } from "@/lib/uploadAvatar";
+import UserAvatar from "@/components/user/UserAvatar";
+import { Button } from "@/components/ui/button";
 
 const ACCEPTED = "image/jpeg,image/png,image/webp,image/gif";
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -45,14 +46,9 @@ const AvatarSection = () => {
     <div className="flex items-center gap-4">
       <UserAvatar user={user} size="lg" />
       <div>
-        <button
-          type="button"
-          onClick={onPick}
-          disabled={isUploading}
-          className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-        >
+        <Button type="button" onClick={onPick} disabled={isUploading} size="sm">
           {isUploading ? "Uploading..." : "Change avatar"}
-        </button>
+        </Button>
         <input
           ref={fileInput}
           type="file"
@@ -60,8 +56,10 @@ const AvatarSection = () => {
           onChange={onChange}
           className="hidden"
         />
-        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
-        <p className="mt-2 text-xs text-gray-500">JPEG, PNG, WebP, or GIF. Max 5 MB.</p>
+        {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+        <p className="mt-2 text-xs text-muted-foreground">
+          JPEG, PNG, WebP, or GIF. Max 5 MB.
+        </p>
       </div>
     </div>
   );

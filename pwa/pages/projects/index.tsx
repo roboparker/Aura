@@ -2,10 +2,16 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { ENTRYPOINT } from "../../config/entrypoint";
-import MarkdownEditor from "../../components/editor/MarkdownEditor";
-import MarkdownView from "../../components/editor/MarkdownView";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import MarkdownView from "@/components/editor/MarkdownView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Member {
   "@id": string;
@@ -176,8 +182,8 @@ const Projects = () => {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -187,153 +193,149 @@ const Projects = () => {
       <Head>
         <title>Projects - Aura</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-black mb-6">Projects</h1>
+          <h1 className="text-2xl font-bold mb-6">Projects</h1>
 
-          <form
-            onSubmit={handleCreate}
-            className="bg-white rounded-lg shadow-card p-6 mb-6 space-y-4"
-          >
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                maxLength={255}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-gray-400">(optional)</span>
-              </label>
-              <MarkdownEditor
-                key={editorResetKey}
-                id="description"
-                ariaLabel="Description"
-                value={description}
-                onChange={setDescription}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting || !title.trim()}
-              className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Adding..." : "Add Project"}
-            </button>
-          </form>
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    maxLength={255}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">
+                    Description{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <MarkdownEditor
+                    key={editorResetKey}
+                    id="description"
+                    ariaLabel="Description"
+                    value={description}
+                    onChange={setDescription}
+                  />
+                </div>
+                <Button type="submit" disabled={isSubmitting || !title.trim()}>
+                  {isSubmitting ? "Adding..." : "Add Project"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           {error && (
-            <div
-              role="alert"
-              className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded"
-            >
-              {error}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {isLoading ? (
-            <p className="text-gray-500">Loading projects...</p>
+            <p className="text-muted-foreground">Loading projects...</p>
           ) : projects.length === 0 ? (
-            <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-              No projects yet. Create one above to start collaborating.
-            </p>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">
+                  No projects yet. Create one above to start collaborating.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <ul className="space-y-2" data-testid="project-list">
               {projects.map((project) => (
-                <li
-                  key={project["@id"]}
-                  className="bg-white rounded-lg shadow-card p-4"
-                  data-testid="project-item"
-                >
-                  {editingId === project["@id"] ? (
-                    <form onSubmit={(e) => handleUpdate(e, project)} className="space-y-3">
-                      <input
-                        type="text"
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                        required
-                        maxLength={255}
-                        aria-label="Title"
-                        className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                      />
-                      <MarkdownEditor
-                        ariaLabel="Description"
-                        value={editDescription}
-                        onChange={setEditDescription}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          className="bg-cyan-700 text-white py-1 px-3 rounded-md text-sm font-semibold hover:bg-cyan-800"
-                        >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelEdit}
-                          className="bg-gray-200 text-gray-700 py-1 px-3 rounded-md text-sm hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <div>
-                      <div className="flex items-start justify-between gap-3">
-                        <h2 className="font-semibold text-black">
-                          <Link
-                            href={`/projects/${project.id}`}
-                            className="text-cyan-700 hover:text-cyan-900 no-underline"
-                          >
-                            {project.title}
-                          </Link>
-                        </h2>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <button
-                            onClick={() => startEdit(project)}
-                            className="text-cyan-700 hover:text-cyan-900 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(project)}
-                            aria-label={`Delete "${project.title}"`}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                      {project.description && (
-                        <MarkdownView source={project.description} className="mt-1" />
-                      )}
-                      {project.members.length > 0 && (
-                        <div
-                          className="mt-2 flex flex-wrap items-center gap-1"
-                          data-testid="project-members"
-                        >
-                          <span className="text-xs text-gray-500">Members:</span>
-                          {project.members.map((member) => (
-                            <span
-                              key={member["@id"]}
-                              className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
-                              data-testid="project-member"
+                <li key={project["@id"]} data-testid="project-item">
+                  <Card>
+                    <CardContent className="pt-4 pb-4">
+                      {editingId === project["@id"] ? (
+                        <form onSubmit={(e) => handleUpdate(e, project)} className="space-y-3">
+                          <Input
+                            type="text"
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            required
+                            maxLength={255}
+                            aria-label="Title"
+                          />
+                          <MarkdownEditor
+                            ariaLabel="Description"
+                            value={editDescription}
+                            onChange={setEditDescription}
+                          />
+                          <div className="flex gap-2">
+                            <Button type="submit" size="sm">
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={cancelEdit}
                             >
-                              {member.email}
-                            </span>
-                          ))}
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <h2 className="font-semibold">
+                              <Link
+                                href={`/projects/${project.id}`}
+                                className="text-cyan-700 hover:text-cyan-900 no-underline"
+                              >
+                                {project.title}
+                              </Link>
+                            </h2>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEdit(project)}
+                              >
+                                Edit
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(project)}
+                                aria-label={`Delete "${project.title}"`}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                          {project.description && (
+                            <MarkdownView source={project.description} className="mt-1" />
+                          )}
+                          {project.members.length > 0 && (
+                            <div
+                              className="mt-2 flex flex-wrap items-center gap-1"
+                              data-testid="project-members"
+                            >
+                              <span className="text-xs text-muted-foreground">Members:</span>
+                              {project.members.map((member) => (
+                                <Badge
+                                  key={member["@id"]}
+                                  variant="muted"
+                                  data-testid="project-member"
+                                >
+                                  {member.email}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
+                    </CardContent>
+                  </Card>
                 </li>
               ))}
             </ul>

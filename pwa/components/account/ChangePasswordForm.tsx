@@ -1,6 +1,10 @@
-import { Formik, Form, Field, ErrorMessage } from "formik";
+import { Formik, Form } from "formik";
 import { useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { FormikField } from "@/components/ui/formik-field";
+import { Separator } from "@/components/ui/separator";
 
 interface ChangePasswordValues {
   currentPassword: string;
@@ -35,8 +39,9 @@ const ChangePasswordForm = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   return (
-    <div className="mt-8 border-t border-gray-200 pt-6">
-      <h2 className="text-lg font-semibold text-black mb-4">Change Password</h2>
+    <div className="mt-8">
+      <Separator className="mb-6" />
+      <h2 className="text-lg font-semibold mb-4">Change Password</h2>
 
       <Formik<ChangePasswordValues>
         initialValues={{ currentPassword: "", newPassword: "", confirmPassword: "" }}
@@ -49,7 +54,7 @@ const ChangePasswordForm = () => {
             resetForm();
           } catch (err) {
             setStatus(
-              err instanceof Error ? err.message : "Failed to change password."
+              err instanceof Error ? err.message : "Failed to change password.",
             );
           } finally {
             setSubmitting(false);
@@ -59,91 +64,39 @@ const ChangePasswordForm = () => {
         {({ isSubmitting, status }) => (
           <Form className="space-y-4" noValidate>
             {status && (
-              <div
-                className="bg-red-50 text-red-500 p-3 rounded text-sm"
-                data-testid="change-password-error"
-              >
-                {status}
-              </div>
+              <Alert variant="destructive" data-testid="change-password-error">
+                <AlertDescription>{status}</AlertDescription>
+              </Alert>
             )}
 
             {successMessage && (
-              <div
-                className="bg-green-50 text-green-700 p-3 rounded text-sm"
-                data-testid="change-password-success"
-              >
-                {successMessage}
-              </div>
+              <Alert variant="success" data-testid="change-password-success">
+                <AlertDescription>{successMessage}</AlertDescription>
+              </Alert>
             )}
 
-            <div>
-              <label
-                htmlFor="currentPassword"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Current Password
-              </label>
-              <Field
-                id="currentPassword"
-                name="currentPassword"
-                type="password"
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-              />
-              <ErrorMessage
-                name="currentPassword"
-                component="p"
-                className="mt-1 text-sm text-red-500"
-              />
-            </div>
+            <FormikField
+              name="currentPassword"
+              type="password"
+              label="Current Password"
+            />
 
-            <div>
-              <label
-                htmlFor="newPassword"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                New Password
-              </label>
-              <Field
-                id="newPassword"
-                name="newPassword"
-                type="password"
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-                placeholder="At least 6 characters"
-              />
-              <ErrorMessage
-                name="newPassword"
-                component="p"
-                className="mt-1 text-sm text-red-500"
-              />
-            </div>
+            <FormikField
+              name="newPassword"
+              type="password"
+              label="New Password"
+              placeholder="At least 6 characters"
+            />
 
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Confirm New Password
-              </label>
-              <Field
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-cyan-500 focus:ring-cyan-500"
-              />
-              <ErrorMessage
-                name="confirmPassword"
-                component="p"
-                className="mt-1 text-sm text-red-500"
-              />
-            </div>
+            <FormikField
+              name="confirmPassword"
+              type="password"
+              label="Confirm New Password"
+            />
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <Button type="submit" disabled={isSubmitting} className="w-full">
               {isSubmitting ? "Updating..." : "Update Password"}
-            </button>
+            </Button>
           </Form>
         )}
       </Formik>

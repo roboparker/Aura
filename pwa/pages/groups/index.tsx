@@ -2,10 +2,17 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { useAuth } from "../../contexts/AuthContext";
-import { ENTRYPOINT } from "../../config/entrypoint";
-import MarkdownEditor from "../../components/editor/MarkdownEditor";
-import MarkdownView from "../../components/editor/MarkdownView";
+import { X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import MarkdownView from "@/components/editor/MarkdownView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Member {
   "@id": string;
@@ -195,8 +202,8 @@ const Groups = () => {
 
   if (authLoading || !isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -206,179 +213,174 @@ const Groups = () => {
       <Head>
         <title>Groups - Aura</title>
       </Head>
-      <div className="min-h-screen bg-gray-50 px-4 py-12">
+      <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-black mb-6">Groups</h1>
+          <h1 className="text-2xl font-bold mb-6">Groups</h1>
 
-          <form
-            onSubmit={handleCreate}
-            className="bg-white rounded-lg shadow-card p-6 mb-6 space-y-4"
-          >
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-                Title
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                maxLength={255}
-                className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
-              />
-            </div>
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                Description <span className="text-gray-400">(optional)</span>
-              </label>
-              <MarkdownEditor
-                key={editorResetKey}
-                id="description"
-                ariaLabel="Description"
-                value={description}
-                onChange={setDescription}
-              />
-            </div>
-            <div data-testid="invite-members-section">
-              <label htmlFor="invite-email" className="block text-sm font-medium text-gray-700 mb-1">
-                Invite members <span className="text-gray-400">(optional)</span>
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="invite-email"
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  onKeyDown={(e) => {
-                    // Enter inside a nested input would otherwise submit the
-                    // outer form; treat it as "add to invite list" instead.
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      queueInvite();
-                    }
-                  }}
-                  placeholder="member@example.com"
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                />
-                <button
-                  type="button"
-                  onClick={queueInvite}
-                  disabled={!inviteEmail.trim()}
-                  className="bg-gray-200 text-gray-700 py-2 px-3 rounded-md text-sm font-medium hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add
-                </button>
-              </div>
-              {inviteError && (
-                <p role="alert" className="mt-1 text-sm text-red-600">
-                  {inviteError}
-                </p>
-              )}
-              {pendingInvites.length > 0 && (
-                <ul
-                  className="mt-2 flex flex-wrap items-center gap-1"
-                  data-testid="pending-invites"
-                >
-                  {pendingInvites.map((email) => (
-                    <li
-                      key={email}
-                      className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded"
-                      data-testid="pending-invite"
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <form onSubmit={handleCreate} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="title">Title</Label>
+                  <Input
+                    id="title"
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                    maxLength={255}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">
+                    Description{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <MarkdownEditor
+                    key={editorResetKey}
+                    id="description"
+                    ariaLabel="Description"
+                    value={description}
+                    onChange={setDescription}
+                  />
+                </div>
+                <div className="space-y-1.5" data-testid="invite-members-section">
+                  <Label htmlFor="invite-email">
+                    Invite members{" "}
+                    <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="invite-email"
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        // Enter inside a nested input would otherwise submit the
+                        // outer form; treat it as "add to invite list" instead.
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          queueInvite();
+                        }
+                      }}
+                      placeholder="member@example.com"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={queueInvite}
+                      disabled={!inviteEmail.trim()}
                     >
-                      <span>{email}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeInvite(email)}
-                        aria-label={`Remove ${email} from invites`}
-                        className="ml-1 text-gray-500 hover:text-red-600 leading-none bg-transparent border-0 cursor-pointer text-base"
-                      >
-                        ×
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="mt-1 text-xs text-gray-500">
-                You&apos;ll be added as the owner automatically. Existing users join immediately;
-                others get an email invite to sign up.
-              </p>
-            </div>
-            <button
-              type="submit"
-              disabled={isSubmitting || !title.trim()}
-              className="bg-cyan-700 text-white py-2 px-4 rounded-md font-semibold hover:bg-cyan-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Adding..." : "Add Group"}
-            </button>
-          </form>
+                      Add
+                    </Button>
+                  </div>
+                  {inviteError && (
+                    <p role="alert" className="text-sm text-destructive">
+                      {inviteError}
+                    </p>
+                  )}
+                  {pendingInvites.length > 0 && (
+                    <ul
+                      className="flex flex-wrap items-center gap-1"
+                      data-testid="pending-invites"
+                    >
+                      {pendingInvites.map((email) => (
+                        <li key={email} data-testid="pending-invite">
+                          <Badge variant="muted" className="gap-1">
+                            <span>{email}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeInvite(email)}
+                              aria-label={`Remove ${email} from invites`}
+                              className="ml-0.5 text-gray-500 hover:text-destructive bg-transparent border-0 cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    You&apos;ll be added as the owner automatically. Existing users join
+                    immediately; others get an email invite to sign up.
+                  </p>
+                </div>
+                <Button type="submit" disabled={isSubmitting || !title.trim()}>
+                  {isSubmitting ? "Adding..." : "Add Group"}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
 
           {error && (
-            <div
-              role="alert"
-              className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded"
-            >
-              {error}
-            </div>
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {isLoading ? (
-            <p className="text-gray-500">Loading groups...</p>
+            <p className="text-muted-foreground">Loading groups...</p>
           ) : groups.length === 0 ? (
-            <p className="text-gray-500 bg-white rounded-lg shadow-card p-6">
-              No groups yet. Create one above to organize people.
-            </p>
+            <Card>
+              <CardContent className="pt-6">
+                <p className="text-muted-foreground">
+                  No groups yet. Create one above to organize people.
+                </p>
+              </CardContent>
+            </Card>
           ) : (
             <ul className="space-y-2" data-testid="group-list">
               {groups.map((group) => {
                 const isOwner = group.owner.id === user?.id;
                 return (
-                  <li
-                    key={group["@id"]}
-                    className="bg-white rounded-lg shadow-card p-4"
-                    data-testid="group-item"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <h2 className="font-semibold text-black">
-                        <Link
-                          href={`/groups/${group.id}`}
-                          className="text-cyan-700 hover:text-cyan-900 no-underline"
-                        >
-                          {group.title}
-                        </Link>
-                      </h2>
-                      {isOwner && (
-                        <div className="flex items-center gap-3 shrink-0">
-                          <button
-                            onClick={() => handleDelete(group)}
-                            aria-label={`Delete "${group.title}"`}
-                            className="text-red-600 hover:text-red-700 text-sm font-medium bg-transparent border-0 cursor-pointer"
-                          >
-                            Delete
-                          </button>
+                  <li key={group["@id"]} data-testid="group-item">
+                    <Card>
+                      <CardContent className="pt-4 pb-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <h2 className="font-semibold">
+                            <Link
+                              href={`/groups/${group.id}`}
+                              className="text-cyan-700 hover:text-cyan-900 no-underline"
+                            >
+                              {group.title}
+                            </Link>
+                          </h2>
+                          {isOwner && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(group)}
+                              aria-label={`Delete "${group.title}"`}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              Delete
+                            </Button>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    {group.description && (
-                      <MarkdownView source={group.description} className="mt-1" />
-                    )}
-                    {group.members.length > 0 && (
-                      <div
-                        className="mt-2 flex flex-wrap items-center gap-1"
-                        data-testid="group-members"
-                      >
-                        <span className="text-xs text-gray-500">Members:</span>
-                        {group.members.map((member) => (
-                          <span
-                            key={member["@id"]}
-                            className="inline-block px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700"
-                            data-testid="group-member"
+                        {group.description && (
+                          <MarkdownView source={group.description} className="mt-1" />
+                        )}
+                        {group.members.length > 0 && (
+                          <div
+                            className="mt-2 flex flex-wrap items-center gap-1"
+                            data-testid="group-members"
                           >
-                            {member.email}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                            <span className="text-xs text-muted-foreground">Members:</span>
+                            {group.members.map((member) => (
+                              <Badge
+                                key={member["@id"]}
+                                variant="muted"
+                                data-testid="group-member"
+                              >
+                                {member.email}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                   </li>
                 );
               })}

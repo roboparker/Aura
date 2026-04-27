@@ -1,10 +1,35 @@
 import Link from "next/link";
-import { useAuth } from "../../contexts/AuthContext";
-import UserAvatar from "../user/UserAvatar";
+import { useRouter } from "next/router";
+import { LogOut, ShieldCheck, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import UserAvatar from "@/components/user/UserAvatar";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+const NAV_LINKS = [
+  { href: "/tasks", label: "Tasks" },
+  { href: "/projects", label: "Projects" },
+  { href: "/groups", label: "Groups" },
+  { href: "/tags", label: "Tags" },
+];
 
 const Navbar = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
+
+  const handleLogout = () => {
+    logout();
+    router.push("/");
+  };
 
   return (
     <nav className="bg-cyan-700 text-white">
@@ -13,47 +38,74 @@ const Navbar = () => {
           Aura
         </Link>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1">
           {isAuthenticated && user ? (
             <>
-              {isAdmin && (
-                <Link href="/admin" className="text-cyan-200 hover:text-white no-underline text-sm">
-                  Admin
-                </Link>
-              )}
-              <Link href="/tasks" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Tasks
-              </Link>
-              <Link href="/projects" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Projects
-              </Link>
-              <Link href="/groups" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Groups
-              </Link>
-              <Link href="/tags" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Tags
-              </Link>
-              <button
-                onClick={logout}
-                className="text-cyan-200 hover:text-white text-sm bg-transparent border-0 cursor-pointer"
-              >
-                Sign Out
-              </button>
-              <Link href="/account" aria-label="My Account" className="inline-flex">
-                <UserAvatar user={user} size="sm" />
-              </Link>
+              {NAV_LINKS.map((link) => {
+                const active = router.pathname.startsWith(link.href);
+                return (
+                  <Button
+                    key={link.href}
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "text-cyan-200 hover:bg-cyan-800 hover:text-white",
+                      active && "text-white",
+                    )}
+                  >
+                    <Link href={link.href}>{link.label}</Link>
+                  </Button>
+                );
+              })}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label="My Account"
+                    className="ml-2 inline-flex rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-cyan-700"
+                  >
+                    <UserAvatar user={user} size="sm" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/account">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      My Account
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin">
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={handleLogout} className="text-red-600 focus:text-red-700">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <>
-              <Link href="/signin" className="text-cyan-200 hover:text-white no-underline text-sm">
-                Sign In
-              </Link>
-              <Link
-                href="/signup"
-                className="bg-white text-cyan-700 px-3 py-1 rounded text-sm font-semibold no-underline hover:bg-cyan-100"
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-cyan-200 hover:bg-cyan-800 hover:text-white"
               >
-                Sign Up
-              </Link>
+                <Link href="/signin">Sign In</Link>
+              </Button>
+              <Button asChild variant="secondary" size="sm" className="bg-white text-cyan-700 hover:bg-cyan-100">
+                <Link href="/signup">Sign Up</Link>
+              </Button>
             </>
           )}
         </div>
