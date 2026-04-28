@@ -10,7 +10,7 @@
         "doctrine/doctrine-bundle": "^2.7",
         "doctrine/doctrine-migrations-bundle": "^3.2",
         "doctrine/orm": "^3.0",
-        "intervention/image": "^3.7",
+        "intervention/image": "^4.0",
         "league/flysystem-bundle": "^3.3",
         "nelmio/cors-bundle": "^2.2",
         "phpdocumentor/reflection-docblock": "^6.0",
