@@ -88,7 +88,7 @@ const ProjectDetail = () => {
     setError(null);
     setIsLoading(true);
     try {
-      const projectRes = await fetch(`${ENTRYPOINT}/projects/${projectId}`, {
+      const projectRes = await fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
