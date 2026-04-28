@@ -55,4 +55,4 @@ jobs:
         name: Playwright
         # Run chromium only in CI for fast feedback — the full firefox/webkit
         # matrix is available locally via `npx playwright test`.
-        run: docker run --network host -w /app -v ./e2e:/app --rm --ipc=host -e CI=true mcr.microsoft.com/playwright:v1.50.0-noble /bin/sh -c 'npm i; npx playwright test --project=chromium;'
+        run: docker run --network host -w /app -v ./e2e:/app --rm --ipc=host -e CI=true mcr.microsoft.com/playwright:v1.59.1-noble /bin/sh -c 'npm i; npx playwright test --project=chromium;'
