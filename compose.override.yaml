@@ -7,11 +7,13 @@ services:
     volumes:
       - ./api:/app
       - /app/var
+      # Keep vendor/ inside the container instead of the host bind-mount.
+      # Required on Windows/macOS — pnpm/composer's symlink-heavy installs
+      # corrupt the WSL or osxfs share when written through a bind-mount.
+      # Named (vs. anonymous) so it persists across `compose run --rm`.
+      - api_vendor:/app/vendor
       - ./api/frankenphp/Caddyfile:/etc/frankenphp/Caddyfile:ro
       - ./api/frankenphp/conf.d/20-app.dev.ini:/usr/local/etc/php/app.conf.d/20-app.dev.ini:ro
-      # If you develop on Mac or Windows you can remove the vendor/ directory
-      #  from the bind-mount for better performance by enabling the next line:
-      #- /app/vendor
     environment:
       FRANKENPHP_WORKER_CONFIG: watch
       MERCURE_EXTRA_DIRECTIVES: demo
@@ -28,6 +30,9 @@ services:
       target: dev
     volumes:
       - ./pwa:/srv/app
+      # See note on `/app/vendor` above — keeps pnpm's symlinked store
+      # off the host filesystem so installs don't corrupt the WSL share.
+      - pwa_node_modules:/srv/app/node_modules
     environment:
       API_PLATFORM_CREATE_CLIENT_ENTRYPOINT: http://php
       API_PLATFORM_CREATE_CLIENT_OUTPUT: .
@@ -44,3 +49,7 @@ services:
 
 ###> symfony/mercure-bundle ###
 ###< symfony/mercure-bundle ###
+
+volumes:
+  api_vendor:
+  pwa_node_modules:
