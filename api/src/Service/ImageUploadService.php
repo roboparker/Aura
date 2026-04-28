@@ -6,6 +6,7 @@ use App\Entity\MediaObject;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\WebpEncoder;
 use Intervention\Image\ImageManager;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -41,17 +42,19 @@ final class ImageUploadService
         $this->assertValidImage($file);
 
         $manager = new ImageManager(new Driver());
-        $image = $manager->read($file->getPathname());
+        $image = $manager->decode($file->getPathname());
 
         $uuid = (string) Uuid::v7();
         $profilePath = sprintf('avatars/%s-profile.webp', $uuid);
         $thumbPath = sprintf('avatars/%s-thumb.webp', $uuid);
 
+        $webp = new WebpEncoder(self::WEBP_QUALITY);
+
         $profile = (clone $image)->cover(self::AVATAR_PROFILE_SIZE, self::AVATAR_PROFILE_SIZE);
-        $this->storage->write($profilePath, (string) $profile->toWebp(self::WEBP_QUALITY));
+        $this->storage->write($profilePath, (string) $profile->encode($webp));
 
         $thumb = (clone $image)->cover(self::AVATAR_THUMB_SIZE, self::AVATAR_THUMB_SIZE);
-        $this->storage->write($thumbPath, (string) $thumb->toWebp(self::WEBP_QUALITY));
+        $this->storage->write($thumbPath, (string) $thumb->encode($webp));
 
         $media = new MediaObject();
         $media->setOwner($owner);
