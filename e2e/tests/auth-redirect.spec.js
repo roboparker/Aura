@@ -44,15 +44,18 @@ test.describe("Auth redirect", () => {
     const password = "password123";
 
     // Land on /signin?next=/tasks, then click into the Sign Up tab.
+    // The Radix Tabs trigger has role="tab" while the form submit is a
+    // normal <button>, so role-based selectors disambiguate them — both
+    // happen to be labelled "Sign Up".
     await page.goto(`${BASE_URL}/signin?next=%2Ftasks`);
-    await page.click('button:has-text("Sign Up")');
+    await page.getByRole("tab", { name: "Sign Up" }).click();
 
     await page.fill('input[name="givenName"]', "New");
     await page.fill('input[name="familyName"]', "User");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
     await page.fill('input[name="confirmPassword"]', password);
-    await page.click('button:has-text("Sign Up")');
+    await page.getByRole("button", { name: "Sign Up" }).click();
 
     // Registration redirects to /signin with both `registered=true` and the
     // preserved next. Sign in to land on /tasks.
