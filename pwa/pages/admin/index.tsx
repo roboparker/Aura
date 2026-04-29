@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 import Head from "next/head";
 import { useAuth } from "../../contexts/AuthContext";
+import { signinHrefForCurrent } from "@/lib/authRedirect";
 
 // load the admin client-side
 const App = dynamic(() => import("../../components/admin/App"), {
@@ -18,7 +19,7 @@ const Admin: NextPage = () => {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/signin");
+      router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [isLoading, isAuthenticated, router]);
 

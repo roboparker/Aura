@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { signinHrefForCurrent } from "@/lib/authRedirect";
 import AvatarSection from "@/components/account/AvatarSection";
 import EmailChangeForm from "@/components/account/EmailChangeForm";
 import ProfileForm from "@/components/account/ProfileForm";
@@ -16,7 +17,7 @@ const Account = () => {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.push("/signin");
+      router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [isLoading, isAuthenticated, router]);
 

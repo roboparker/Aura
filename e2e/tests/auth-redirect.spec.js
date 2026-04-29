@@ -1,0 +1,91 @@
+// @ts-check
+const { test, expect } = require("@playwright/test");
+const { BASE_URL, uniqueEmail } = require("./helpers");
+
+test.describe("Auth redirect", () => {
+  test("unauthenticated visit to a restricted page lands on /signin with ?next, then comes back after login", async ({
+    page,
+    request,
+  }) => {
+    const email = uniqueEmail("redirect");
+    const password = "password123";
+
+    // Pre-create the account via the API so we can sign in cleanly.
+    const res = await request.post(`${BASE_URL}/users`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: {
+        email,
+        plainPassword: password,
+        givenName: "Redirect",
+        familyName: "Tester",
+      },
+    });
+    expect(res.ok()).toBeTruthy();
+
+    // Visit a restricted page anonymously.
+    await page.goto(`${BASE_URL}/projects`);
+
+    // We're bounced to /signin and the original path is preserved on `next`.
+    await expect(page).toHaveURL(/\/signin\?next=%2Fprojects/);
+
+    // Submit the sign-in form.
+    await page.fill("#email", email);
+    await page.fill("#password", password);
+    await page.click('button[type="submit"]');
+
+    // Now we're back on the page we originally tried to visit.
+    await expect(page).toHaveURL(/\/projects$/);
+  });
+
+  test("/signup tab on the unified auth card preserves ?next through registration", async ({
+    page,
+  }) => {
+    const email = uniqueEmail("signup-redirect");
+    const password = "password123";
+
+    // Land on /signin?next=/tasks, then click into the Sign Up tab.
+    await page.goto(`${BASE_URL}/signin?next=%2Ftasks`);
+    await page.click('button:has-text("Sign Up")');
+
+    await page.fill('input[name="givenName"]', "New");
+    await page.fill('input[name="familyName"]', "User");
+    await page.fill('input[name="email"]', email);
+    await page.fill('input[name="password"]', password);
+    await page.fill('input[name="confirmPassword"]', password);
+    await page.click('button:has-text("Sign Up")');
+
+    // Registration redirects to /signin with both `registered=true` and the
+    // preserved next. Sign in to land on /tasks.
+    await expect(page).toHaveURL(/\/signin\?.*registered=true.*next=%2Ftasks/);
+    await page.fill("#email", email);
+    await page.fill("#password", password);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/tasks$/);
+  });
+
+  test("an open-redirect ?next=//evil.example.com is ignored", async ({
+    page,
+    request,
+  }) => {
+    const email = uniqueEmail("safe-next");
+    const password = "password123";
+    await request.post(`${BASE_URL}/users`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: {
+        email,
+        plainPassword: password,
+        givenName: "Safe",
+        familyName: "Tester",
+      },
+    });
+
+    await page.goto(`${BASE_URL}/signin?next=${encodeURIComponent("//evil.example.com/x")}`);
+    await page.fill("#email", email);
+    await page.fill("#password", password);
+    await page.click('button[type="submit"]');
+
+    // Falls back to the default landing page rather than following the
+    // protocol-relative URL out of the app.
+    await expect(page).toHaveURL(/\/account$/);
+  });
+});
