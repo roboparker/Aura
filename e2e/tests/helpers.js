@@ -44,9 +44,22 @@ async function fillDescription(page, scope, text) {
   await page.keyboard.type(text);
 }
 
+/**
+ * Open the right-side "My Account" sheet from the navbar. The trigger
+ * is a button (with an aria-label of "Open my account menu") that
+ * contains the user's avatar and a hamburger icon. Most authenticated
+ * navigation lives inside the sheet, so tests have to open it first.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function openAccountMenu(page) {
+  await page.click('button[aria-label="Open my account menu"]');
+}
+
 module.exports = {
   BASE_URL,
   uniqueEmail,
   registerAndSignIn,
   fillDescription,
+  openAccountMenu,
 };
