@@ -63,29 +63,67 @@ test.describe("Auth redirect", () => {
     await expect(page).toHaveURL(/\/tasks$/);
   });
 
-  test("an open-redirect ?next=//evil.example.com is ignored", async ({
-    page,
-    request,
-  }) => {
-    const email = uniqueEmail("safe-next");
-    const password = "password123";
-    await request.post(`${BASE_URL}/users`, {
-      headers: { "Content-Type": "application/ld+json" },
-      data: {
-        email,
-        plainPassword: password,
-        givenName: "Safe",
-        familyName: "Tester",
-      },
+  // Each entry is a `?next=` value that should be rejected by `safeNextPath()`
+  // and fall back to /account. The list is the full set of attack vectors the
+  // helper guards against; if any of them ever land the user somewhere else,
+  // we want CI to scream.
+  const HOSTILE_NEXT_VALUES = [
+    {
+      label: "protocol-relative URL (`//host/...`)",
+      value: "//evil.example.com/x",
+    },
+    {
+      label: "absolute http URL",
+      value: "http://evil.example.com/x",
+    },
+    {
+      label: "absolute https URL",
+      value: "https://evil.example.com/x",
+    },
+    {
+      label: "javascript: URI",
+      value: "javascript:alert(1)",
+    },
+    {
+      label: "data: URI",
+      value: "data:text/html,<script>alert(1)</script>",
+    },
+    {
+      label: "backslash-after-slash (browser normalises to //host)",
+      value: "/\\evil.example.com/x",
+    },
+    {
+      label: "relative path without leading slash",
+      value: "projects",
+    },
+    {
+      label: "empty string",
+      value: "",
+    },
+  ];
+
+  for (const { label, value } of HOSTILE_NEXT_VALUES) {
+    test(`hostile ?next is ignored: ${label}`, async ({ page, request }) => {
+      const email = uniqueEmail("safe-next");
+      const password = "password123";
+      await request.post(`${BASE_URL}/users`, {
+        headers: { "Content-Type": "application/ld+json" },
+        data: {
+          email,
+          plainPassword: password,
+          givenName: "Safe",
+          familyName: "Tester",
+        },
+      });
+
+      await page.goto(`${BASE_URL}/signin?next=${encodeURIComponent(value)}`);
+      await page.fill("#email", email);
+      await page.fill("#password", password);
+      await page.click('button[type="submit"]');
+
+      // Falls back to the default landing page rather than wherever
+      // the attacker tried to send us.
+      await expect(page).toHaveURL(/\/account$/);
     });
-
-    await page.goto(`${BASE_URL}/signin?next=${encodeURIComponent("//evil.example.com/x")}`);
-    await page.fill("#email", email);
-    await page.fill("#password", password);
-    await page.click('button[type="submit"]');
-
-    // Falls back to the default landing page rather than following the
-    // protocol-relative URL out of the app.
-    await expect(page).toHaveURL(/\/account$/);
-  });
+  }
 });

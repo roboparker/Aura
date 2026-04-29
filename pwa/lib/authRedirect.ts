@@ -16,13 +16,19 @@ const FALLBACK_PATH = "/account";
 
 /**
  * Whether `candidate` is a safe relative path we can redirect to.
- * Rejects protocol-relative URLs (`//host/...`), absolute URLs, and
- * anything that doesn't start with a single `/`.
+ * Rejects:
+ *   - Anything that doesn't start with a single `/`
+ *     (covers absolute URLs, `javascript:`/`data:` URIs, and bare paths)
+ *   - Protocol-relative URLs (`//host/...`)
+ *   - Backslash-prefixed paths (`/\\host/...`) — some browsers normalise
+ *     `\` to `/`, which would turn the URL into a protocol-relative one
+ *     pointing off-site.
  */
 export const isSafeNextPath = (candidate: unknown): candidate is string => {
   if (typeof candidate !== "string") return false;
   if (!candidate.startsWith("/")) return false;
   if (candidate.startsWith("//")) return false;
+  if (candidate.startsWith("/\\")) return false;
   return true;
 };
 
