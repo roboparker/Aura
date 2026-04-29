@@ -6,11 +6,11 @@ import AvatarSection from "@/components/account/AvatarSection";
 import ProfileForm from "@/components/account/ProfileForm";
 import ChangePasswordForm from "@/components/account/ChangePasswordForm";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 const Account = () => {
-  const { user, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -36,22 +36,45 @@ const Account = () => {
       <Head>
         <title>My Account - Aura</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-12">
-        <Card className="max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl">My Account</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AvatarSection />
+      <main className="min-h-screen bg-muted">
+        <div className="max-w-5xl mx-auto px-4 py-12 space-y-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
+              My Account
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Manage how you appear to others and the credentials you sign in with.
+            </p>
+          </div>
 
-            <ProfileForm />
+          <Card>
+            <CardHeader>
+              <CardTitle>Avatar</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AvatarSection />
+            </CardContent>
+          </Card>
 
-            <div className="mt-6 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Account</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Email</p>
                 <p>{user.email}</p>
               </div>
+              <Separator />
+              <ProfileForm />
+            </CardContent>
+          </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle>Security</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Roles</p>
                 <div className="flex gap-2 mt-1">
@@ -62,23 +85,12 @@ const Account = () => {
                   ))}
                 </div>
               </div>
-            </div>
-
-            <ChangePasswordForm />
-
-            <Button
-              variant="destructive"
-              className="mt-8 w-full"
-              onClick={() => {
-                logout();
-                router.push("/");
-              }}
-            >
-              Sign Out
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+              <Separator />
+              <ChangePasswordForm />
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </>
   );
 };

@@ -31,6 +31,11 @@ interface AuthContextType {
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  // Optimistic, local-only patch of the user object — useful for
+  // form previews (e.g. avatar color picker) where we want every
+  // mounted UserAvatar to reflect the in-progress choice without
+  // round-tripping through the API.
+  updateUserLocally: (patch: Partial<User>) => void;
   error: string | null;
   clearError: () => void;
 }
@@ -146,6 +151,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateUserLocally = useCallback((patch: Partial<User>) => {
+    setUser((current) => (current ? { ...current, ...patch } : current));
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     fetch(`${ENTRYPOINT}/auth/logout`, {
@@ -167,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         requestPasswordReset,
         resetPassword,
         refreshUser: fetchMe,
+        updateUserLocally,
         error,
         clearError,
       }}

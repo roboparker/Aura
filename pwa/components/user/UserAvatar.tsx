@@ -1,7 +1,6 @@
-export interface AvatarUser {
-  givenName: string;
-  familyName: string;
-  nickname?: string | null;
+import { initialsFor, type NamedUser } from "@/lib/userDisplay";
+
+export interface AvatarUser extends NamedUser {
   personalizedColor: string;
   avatarUrls?: { thumb?: string; profile?: string } | null;
 }
@@ -13,14 +12,6 @@ const SIZE_TEXT: Record<Size, string> = {
   sm: "text-xs",
   md: "text-sm",
   lg: "text-2xl",
-};
-
-const initialsFor = (user: AvatarUser): string => {
-  const nick = user.nickname?.trim();
-  if (nick) return nick.charAt(0).toUpperCase();
-  const g = user.givenName?.charAt(0) ?? "";
-  const f = user.familyName?.charAt(0) ?? "";
-  return (g + f).toUpperCase() || "?";
 };
 
 interface Props {
@@ -35,7 +26,7 @@ const UserAvatar = ({ user, size = "md", className = "" }: Props) => {
   const src = useThumb ? user.avatarUrls?.thumb : user.avatarUrls?.profile;
 
   const sharedClass =
-    `rounded-full inline-block overflow-hidden select-none ${className}`.trim();
+    `rounded-full overflow-hidden select-none shrink-0 ${className}`.trim();
 
   if (src) {
     return (
@@ -45,7 +36,7 @@ const UserAvatar = ({ user, size = "md", className = "" }: Props) => {
         alt=""
         width={px}
         height={px}
-        className={`${sharedClass} object-cover`}
+        className={`${sharedClass} inline-block object-cover`}
         style={{ width: px, height: px }}
       />
     );
@@ -54,7 +45,7 @@ const UserAvatar = ({ user, size = "md", className = "" }: Props) => {
   return (
     <span
       aria-hidden
-      className={`${sharedClass} flex items-center justify-center font-semibold text-white ${SIZE_TEXT[size]}`}
+      className={`${sharedClass} inline-flex items-center justify-center leading-none font-semibold text-white ${SIZE_TEXT[size]}`}
       style={{
         backgroundColor: user.personalizedColor,
         width: px,
