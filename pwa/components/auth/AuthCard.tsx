@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { safeNextPath } from "@/lib/authRedirect";
@@ -10,6 +10,12 @@ import SignUpForm from "./SignUpForm";
 type Tab = "signin" | "signup";
 
 interface Props {
+  /**
+   * Which tab the page entry point selects. The currently-displayed tab
+   * is fully URL-driven — `/signin` shows "signin", `/signup` shows
+   * "signup", and tab triggers navigate between the two so the active
+   * form always matches the URL the user (and tests) can read.
+   */
   defaultTab: Tab;
 }
 
@@ -34,20 +40,27 @@ const AuthCard = ({ defaultTab }: Props) => {
     }
   }, [isLoading, isAuthenticated, next, router]);
 
-  const [tab, setTab] = useState<Tab>(defaultTab);
-  // Re-sync when navigating between /signin and /signup with shallow routing.
-  useEffect(() => {
-    setTab(defaultTab);
-  }, [defaultTab]);
+  // Tab clicks navigate between /signin and /signup, preserving any
+  // existing query string (so `?next=/tasks` and `?invite=xxx` flow
+  // through). This keeps the URL the source of truth — clicking Sign Up,
+  // submitting, then bouncing back to /signin lands on the *Sign In*
+  // form rather than re-showing whatever local state the user last had.
+  const switchTab = (target: Tab) => {
+    if (target === defaultTab) return;
+    const targetPath = target === "signin" ? "/signin" : "/signup";
+    const queryIndex = router.asPath.indexOf("?");
+    const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
+    router.push(`${targetPath}${search}`);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-8">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl text-center">{titleFor(tab)}</CardTitle>
+          <CardTitle className="text-2xl text-center">{titleFor(defaultTab)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Tabs value={tab} onValueChange={(value) => setTab(value as Tab)}>
+          <Tabs value={defaultTab} onValueChange={(value) => switchTab(value as Tab)}>
             <TabsList className="grid grid-cols-2 w-full">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>

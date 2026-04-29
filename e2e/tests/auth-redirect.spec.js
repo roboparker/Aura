@@ -46,9 +46,11 @@ test.describe("Auth redirect", () => {
     // Land on /signin?next=/tasks, then click into the Sign Up tab.
     // The Radix Tabs trigger has role="tab" while the form submit is a
     // normal <button>, so role-based selectors disambiguate them — both
-    // happen to be labelled "Sign Up".
+    // happen to be labelled "Sign Up". Tab clicks navigate to the
+    // matching URL so the form rendered always matches the URL.
     await page.goto(`${BASE_URL}/signin?next=%2Ftasks`);
     await page.getByRole("tab", { name: "Sign Up" }).click();
+    await expect(page).toHaveURL(/\/signup\?.*next=%2Ftasks/);
 
     await page.fill('input[name="givenName"]', "New");
     await page.fill('input[name="familyName"]', "User");
