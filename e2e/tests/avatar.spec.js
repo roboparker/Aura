@@ -20,7 +20,9 @@ test.describe("Avatar", () => {
       familyName: "Quinn",
     });
 
-    const avatar = page.locator('a[aria-label="My Account"] span').first();
+    const avatar = page
+      .locator('button[aria-label="Open my account menu"] span')
+      .first();
     await expect(avatar).toBeVisible();
     await expect(avatar).toHaveText("PQ");
   });
@@ -35,7 +37,7 @@ test.describe("Avatar", () => {
     await page.goto(`${BASE_URL}/account`);
     await page.locator('input[type="file"]').setInputFiles(AVATAR_FIXTURE);
 
-    const avatarImg = page.locator('a[aria-label="My Account"] img');
+    const avatarImg = page.locator('button[aria-label="Open my account menu"] img');
     await expect(avatarImg).toBeVisible({ timeout: 10000 });
     await expect(avatarImg).toHaveAttribute("src", /\/media\/avatars\/.+\.webp/);
   });

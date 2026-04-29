@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
-import { Separator } from "@/components/ui/separator";
 
 interface ChangePasswordValues {
   currentPassword: string;
@@ -39,10 +38,7 @@ const ChangePasswordForm = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   return (
-    <div className="mt-8">
-      <Separator className="mb-6" />
-      <h2 className="text-lg font-semibold mb-4">Change Password</h2>
-
+    <div>
       <Formik<ChangePasswordValues>
         initialValues={{ currentPassword: "", newPassword: "", confirmPassword: "" }}
         validate={validate}
@@ -94,7 +90,7 @@ const ChangePasswordForm = () => {
               label="Confirm New Password"
             />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Updating..." : "Update Password"}
             </Button>
           </Form>

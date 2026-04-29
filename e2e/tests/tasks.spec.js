@@ -1,6 +1,12 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
-const { BASE_URL, uniqueEmail: shared, registerAndSignIn, fillDescription } = require("./helpers");
+const {
+  BASE_URL,
+  uniqueEmail: shared,
+  registerAndSignIn,
+  fillDescription,
+  openAccountMenu,
+} = require("./helpers");
 
 const uniqueEmail = () => shared("tasks");
 
@@ -71,8 +77,9 @@ test.describe("Tasks", () => {
     await bobContext.close();
   });
 
-  test("nav shows Tasks link when authenticated", async ({ page }) => {
+  test("account menu shows Tasks link when authenticated", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
+    await openAccountMenu(page);
     await expect(page.locator('nav >> text=Tasks')).toBeVisible();
     await page.locator('nav >> text=Tasks').click();
     await expect(page).toHaveURL(/\/tasks/);

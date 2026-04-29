@@ -1,5 +1,6 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
+const { openAccountMenu } = require("./helpers");
 
 const BASE_URL = "https://localhost";
 const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:8025";
@@ -76,7 +77,9 @@ test.describe("Change password (authenticated)", () => {
       page.locator('[data-testid="change-password-success"]')
     ).toBeVisible();
 
-    // Sign out and sign back in with the new password
+    // Sign out and sign back in with the new password. The Sign Out button
+    // lives inside the right-side "My Account" sheet.
+    await openAccountMenu(page);
     await page.click('button:has-text("Sign Out")');
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
