@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import AvatarSection from "@/components/account/AvatarSection";
+import EmailChangeForm from "@/components/account/EmailChangeForm";
 import ProfileForm from "@/components/account/ProfileForm";
 import ChangePasswordForm from "@/components/account/ChangePasswordForm";
 import { Badge } from "@/components/ui/badge";
@@ -61,10 +62,7 @@ const Account = () => {
               <CardTitle>Account</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Email</p>
-                <p>{user.email}</p>
-              </div>
+              <EmailChangeForm />
               <Separator />
               <ProfileForm />
             </CardContent>

@@ -20,8 +20,15 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiResource(
     operations: [
         new GetCollection(security: "is_granted('ROLE_ADMIN')"),
-        new Post(processor: UserPasswordHasherProcessor::class),
+        // POST accepts both `user:create` (email, plainPassword, inviteToken)
+        // and `user:write` so signup can set everything in one shot.
+        new Post(
+            processor: UserPasswordHasherProcessor::class,
+            denormalizationContext: ['groups' => ['user:write', 'user:create']],
+        ),
         new Get(security: "is_granted('ROLE_ADMIN') or object == user"),
+        // PATCH only sees `user:write` — email changes go through
+        // EmailChangeController so the new address can be verified.
         new Patch(security: "is_granted('ROLE_ADMIN') or object == user"),
     ],
     normalizationContext: ['groups' => ['user:read']],
@@ -40,18 +47,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'project:read', 'group:read'])]
     private ?Uuid $id = null;
 
+    // Settable on signup (`user:create`), but not on PATCH — changes
+    // run through EmailChangeController so the new address is verified.
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read'])]
+    #[Groups(['user:read', 'user:create', 'project:read', 'group:read'])]
     private string $email = '';
 
     #[ORM\Column]
     private string $password = '';
 
-    #[Assert\NotBlank(groups: ['user:write'])]
+    #[Assert\NotBlank(groups: ['user:create'])]
     #[Assert\Length(min: 6, minMessage: 'Password must be at least {{ limit }} characters.')]
-    #[Groups(['user:write'])]
+    #[Groups(['user:create'])]
     private ?string $plainPassword = null;
 
     /**
@@ -59,7 +68,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * one, UserPasswordHasherProcessor resolves it after persisting the new
      * user and joins them to the invited group. Never stored.
      */
-    #[Groups(['user:write'])]
+    #[Groups(['user:create'])]
     private ?string $inviteToken = null;
 
     /** @var string[] */
