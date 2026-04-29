@@ -37,18 +37,18 @@ final class Version20260428120000 extends AbstractMigration
             PRIMARY KEY (id)
         )');
 
-        $this->addSql('CREATE INDEX idx_email_change_user ON email_change_request (user_id)');
-        $this->addSql('CREATE UNIQUE INDEX uniq_email_change_confirm_hash ON email_change_request (confirm_token_hash)');
-        $this->addSql('CREATE UNIQUE INDEX uniq_email_change_revert_hash ON email_change_request (revert_token_hash)');
-        $this->addSql('CREATE INDEX idx_email_change_confirm_hash ON email_change_request (confirm_token_hash)');
-        $this->addSql('CREATE INDEX idx_email_change_revert_hash ON email_change_request (revert_token_hash)');
+        // Names follow Doctrine's canonical IDX_/UNIQ_<sha1-prefix>
+        // convention so `doctrine:schema:validate` stays happy.
+        $this->addSql('CREATE UNIQUE INDEX UNIQ_136F31FF53989697 ON email_change_request (confirm_token_hash)');
+        $this->addSql('CREATE UNIQUE INDEX UNIQ_136F31FF50337588 ON email_change_request (revert_token_hash)');
+        $this->addSql('CREATE INDEX IDX_136F31FFA76ED395 ON email_change_request (user_id)');
 
-        $this->addSql('ALTER TABLE email_change_request ADD CONSTRAINT fk_email_change_user FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
+        $this->addSql('ALTER TABLE email_change_request ADD CONSTRAINT FK_136F31FFA76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE email_change_request DROP CONSTRAINT fk_email_change_user');
+        $this->addSql('ALTER TABLE email_change_request DROP CONSTRAINT FK_136F31FFA76ED395');
         $this->addSql('DROP TABLE email_change_request');
     }
 }

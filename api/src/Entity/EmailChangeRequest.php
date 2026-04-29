@@ -23,8 +23,6 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: EmailChangeRequestRepository::class)]
 #[ORM\Table(name: 'email_change_request')]
-#[ORM\Index(columns: ['confirm_token_hash'], name: 'idx_email_change_confirm_hash')]
-#[ORM\Index(columns: ['revert_token_hash'], name: 'idx_email_change_revert_hash')]
 class EmailChangeRequest
 {
     #[ORM\Id]
