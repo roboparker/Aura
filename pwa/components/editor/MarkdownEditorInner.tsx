@@ -53,10 +53,11 @@ const MarkdownEditorInner = ({ value, onChange, id, ariaLabel }: MarkdownEditorP
       // overrides Mantine paints `--mantine-color-body` underneath in
       // dark mode, which shows up as a lighter band around the cursor.
       //
-      // The drag handle's pill background is normally only painted on
-      // hover. Force the hovered colour on by default so the dots are
-      // always visible and easier to grab once they appear.
-      className="block w-full border border-input rounded-md focus-within:ring-2 focus-within:ring-ring min-h-24 py-1 [&_.bn-editor]:!px-3 [&_.bn-mantine]:!bg-transparent [&_.bn-editor]:!bg-transparent [&_.bn-side-menu_button]:!bg-[var(--bn-colors-hovered-background)]"
+      // The drag handle's pill background is handled in globals.css
+      // because BlockNote portals the side menu out of this subtree
+      // into a separate `.bn-root` on <body>, so a descendant selector
+      // here would never match it.
+      className="block w-full border border-input rounded-md focus-within:ring-2 focus-within:ring-ring min-h-24 py-1 [&_.bn-editor]:!px-3 [&_.bn-mantine]:!bg-transparent [&_.bn-editor]:!bg-transparent"
     >
       <BlockNoteView
         editor={editor}
