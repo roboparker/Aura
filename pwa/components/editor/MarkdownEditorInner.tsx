@@ -1,6 +1,12 @@
 import { BlockNoteEditor, PartialBlock } from "@blocknote/core";
 import { BlockNoteView } from "@blocknote/mantine";
-import { useCreateBlockNote } from "@blocknote/react";
+import {
+  DragHandleButton,
+  SideMenu,
+  SideMenuController,
+  useCreateBlockNote,
+} from "@blocknote/react";
+import { useTheme } from "next-themes";
 import { useMemo } from "react";
 import type { MarkdownEditorProps } from "./MarkdownEditor";
 
@@ -24,19 +30,54 @@ const MarkdownEditorInner = ({ value, onChange, id, ariaLabel }: MarkdownEditorP
 
   const editor = useCreateBlockNote({ initialContent: initial });
 
+  // BlockNote ships its own light/dark themes; bind to the same `next-themes`
+  // resolution the rest of the app uses so the editor follows the toggle and
+  // the OS preference. `resolvedTheme` is undefined for one render before
+  // next-themes hydrates — fall back to "light" so we don't flash the dark
+  // theme on a light-mode page.
+  const { resolvedTheme } = useTheme();
+  const editorTheme = resolvedTheme === "dark" ? "dark" : "light";
+
   return (
     <div
       id={id}
       aria-label={ariaLabel}
-      className="block w-full border border-input rounded-md bg-background focus-within:ring-2 focus-within:ring-ring min-h-24 py-1"
+      // BlockNote ships with `padding-inline: 54px` on `.bn-editor` to leave
+      // room for its side menu and drag handle. We render only the drag
+      // handle (and only on hover), so most of that gutter is wasted —
+      // override it to a tighter, symmetric value scoped to this instance.
+      //
+      // Background is fully transparent at every layer (our wrapper, the
+      // .bn-mantine container, and the .bn-editor itself) so the editor
+      // picks up whatever Card/page surface it sits on. Without these
+      // overrides Mantine paints `--mantine-color-body` underneath in
+      // dark mode, which shows up as a lighter band around the cursor.
+      //
+      // The drag handle's pill background is normally only painted on
+      // hover. Force the hovered colour on by default so the dots are
+      // always visible and easier to grab once they appear.
+      className="block w-full border border-input rounded-md focus-within:ring-2 focus-within:ring-ring min-h-24 py-1 [&_.bn-editor]:!px-3 [&_.bn-mantine]:!bg-transparent [&_.bn-editor]:!bg-transparent [&_.bn-side-menu_button]:!bg-[var(--bn-colors-hovered-background)]"
     >
       <BlockNoteView
         editor={editor}
-        theme="light"
+        theme={editorTheme}
+        sideMenu={false}
         onChange={() => {
           onChange(editor.blocksToMarkdownLossy(editor.document));
         }}
-      />
+      >
+        {/* Replace BlockNote's default side menu (drag handle + add-block "+")
+            with one that only renders the drag handle. Pressing Enter already
+            inserts a new block, so the "+" was just eating the small gutter
+            on narrow forms. */}
+        <SideMenuController
+          sideMenu={(props) => (
+            <SideMenu {...props}>
+              <DragHandleButton {...props} />
+            </SideMenu>
+          )}
+        />
+      </BlockNoteView>
     </div>
   );
 };
