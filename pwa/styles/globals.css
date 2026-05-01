@@ -147,3 +147,18 @@
 .bn-container {
     @apply rounded-md;
 }
+
+/* BlockNote portals the side-menu (drag handle) into a separate `.bn-root`
+ * attached to <body>, so a Tailwind arbitrary-variant scoped to the editor
+ * wrapper can't reach it. The drag handle's pill background is normally
+ * only painted on hover-of-the-dots; force it on whenever the menu is
+ * visible so the handle is easier to grab. Targets the entire side menu
+ * intentionally — we only render one button (the drag handle) inside it.
+ *
+ * The selector mirrors BlockNote's own `:not(.mantine-Menu-item)` form
+ * so we match its specificity (0,3,0) and win on source order — without
+ * the `:not()`, BlockNote's "transparent by default" rule would beat us.
+ */
+.bn-side-menu .mantine-UnstyledButton-root:not(.mantine-Menu-item) {
+    background-color: var(--bn-colors-hovered-background);
+}
