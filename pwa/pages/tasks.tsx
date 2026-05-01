@@ -21,6 +21,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -222,7 +223,7 @@ const Tasks = () => {
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      router.push("/signin");
+      router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [authLoading, isAuthenticated, router]);
 
