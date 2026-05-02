@@ -5,6 +5,7 @@ const {
   uniqueEmail: shared,
   registerAndSignIn,
   fillDescription,
+  createTaskInline,
   openAccountMenu,
 } = require("./helpers");
 
@@ -69,32 +70,35 @@ test.describe("Tags", () => {
     // Create a task
     await page.goto(`${BASE_URL}/tasks`);
     const taskTitle = `Tagged task ${suffix}`;
-    await page.fill("#title", taskTitle);
-    await page.click('button[type="submit"]');
+    await createTaskInline(page, taskTitle);
     const item = page.locator('[data-testid="task-item"]', { hasText: taskTitle });
-    await expect(item).toBeVisible();
 
     // No tags attached yet
     await expect(item.locator('[data-testid="task-tag"]')).toHaveCount(0);
 
-    // Attach Blue tag via the picker
-    await item.getByRole("button", { name: /Add tag to/ }).click();
-    await page.getByRole("menuitem", { name: `Blue-${suffix}` }).click();
+    // Open the tag picker (TagsCombobox edit button — `Add tags for "<title>"`
+    // when empty, `Edit tags for "<title>"` once any are attached). Pick Blue.
+    await item.getByRole("button", { name: new RegExp(`tags for "${taskTitle}"`) }).click();
+    await page.getByRole("option", { name: `Blue-${suffix}` }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(`Blue-${suffix}`);
 
-    // Attach Red tag
-    await item.getByRole("button", { name: /Add tag to/ }).click();
-    await page.getByRole("menuitem", { name: `Red-${suffix}` }).click();
+    // Picker stays open in multi-select; pick Red, then dismiss by clicking
+    // outside the popover.
+    await page.getByRole("option", { name: `Red-${suffix}` }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toHaveCount(2);
+    // Click the page heading to take focus out of the combobox.
+    await page.locator("h1", { hasText: "Tasks" }).click();
 
     // Reload — order persisted by server
     await page.reload();
     const reloaded = page.locator('[data-testid="task-item"]', { hasText: taskTitle });
     await expect(reloaded.locator('[data-testid="task-tag"]')).toHaveCount(2);
 
-    // Remove Blue tag via the × on the badge
+    // Remove Blue tag via the X on the chip (Base UI ChipRemove inside the
+    // chip whose aria-label matches the tag title).
     await reloaded
-      .getByRole("button", { name: `Remove tag "Blue-${suffix}"` })
+      .locator(`[data-slot="combobox-chip"][aria-label="Blue-${suffix}"]`)
+      .locator('[data-slot="combobox-chip-remove"]')
       .click();
     await expect(reloaded.locator('[data-testid="task-tag"]')).toHaveCount(1);
     await expect(reloaded.locator('[data-testid="task-tag"]')).toContainText(`Red-${suffix}`);
@@ -114,12 +118,13 @@ test.describe("Tags", () => {
     await expect(page.locator('[data-testid="tag-item"]', { hasText: tagTitle })).toBeVisible();
 
     await page.goto(`${BASE_URL}/tasks`);
-    await page.fill("#title", taskTitle);
-    await page.click('button[type="submit"]');
+    await createTaskInline(page, taskTitle);
     const item = page.locator('[data-testid="task-item"]', { hasText: taskTitle });
-    await item.getByRole("button", { name: /Add tag to/ }).click();
-    await page.getByRole("menuitem", { name: tagTitle }).click();
+    await item.getByRole("button", { name: new RegExp(`tags for "${taskTitle}"`) }).click();
+    await page.getByRole("option", { name: tagTitle }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(tagTitle);
+    // Dismiss the popover.
+    await page.locator("h1", { hasText: "Tasks" }).click();
 
     // Delete the tag from the Tags page
     await page.goto(`${BASE_URL}/tags`);

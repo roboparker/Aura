@@ -4,7 +4,7 @@ const {
   BASE_URL,
   uniqueEmail: shared,
   registerAndSignIn,
-  fillDescription,
+  createTaskInline,
   openAccountMenu,
 } = require("./helpers");
 
@@ -21,20 +21,20 @@ test.describe("Tasks", () => {
 
     await page.goto(`${BASE_URL}/tasks`);
     await expect(page).toHaveTitle("Tasks - Aura");
-    await expect(page.locator("text=No tasks yet")).toBeVisible();
+    // Empty state: only the new-task input row, no real task rows.
+    await expect(page.locator('[data-testid="task-item"]')).toHaveCount(0);
 
-    // Create
+    // Create — title + staged description via the inline new-task row.
     const title = `Buy groceries ${Date.now()}`;
-    await page.fill("#title", title);
-    await fillDescription(page, undefined, "Milk, eggs, bread");
-    await page.click('button[type="submit"]');
+    await createTaskInline(page, title, { description: "Milk, eggs, bread" });
 
     const item = page.locator('[data-testid="task-item"]', { hasText: title });
-    await expect(item).toBeVisible();
     await expect(item.locator("text=Milk, eggs, bread")).toBeVisible();
 
-    // Form clears after submit
-    await expect(page.locator("#title")).toHaveValue("");
+    // New-task input clears after submit and is ready for the next entry.
+    await expect(
+      page.locator('[data-testid="new-task-title-input"]'),
+    ).toHaveValue("");
 
     // Complete
     await item.locator('input[type="checkbox"]').check();
@@ -44,8 +44,8 @@ test.describe("Tasks", () => {
     await item.locator('input[type="checkbox"]').uncheck();
     await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
 
-    // Delete
-    await item.getByRole("button", { name: /Delete/i }).click();
+    // Delete (trash icon button — accessible name is `Delete "<title>"`)
+    await item.getByRole("button", { name: /^Delete "/ }).click();
     await expect(item).toHaveCount(0);
   });
 
@@ -59,11 +59,7 @@ test.describe("Tasks", () => {
     await registerAndSignIn(alicePage, aliceEmail);
     await alicePage.goto(`${BASE_URL}/tasks`);
     const aliceTitle = `Alice secret ${Date.now()}`;
-    await alicePage.fill("#title", aliceTitle);
-    await alicePage.click('button[type="submit"]');
-    await expect(
-      alicePage.locator('[data-testid="task-item"]', { hasText: aliceTitle }),
-    ).toBeVisible();
+    await createTaskInline(alicePage, aliceTitle);
 
     // Bob signs in in an isolated context and should not see Alice's task
     const bobContext = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -71,7 +67,7 @@ test.describe("Tasks", () => {
     await registerAndSignIn(bobPage, bobEmail);
     await bobPage.goto(`${BASE_URL}/tasks`);
     await expect(bobPage.locator(`text=${aliceTitle}`)).not.toBeVisible();
-    await expect(bobPage.locator("text=No tasks yet")).toBeVisible();
+    await expect(bobPage.locator('[data-testid="task-item"]')).toHaveCount(0);
 
     await aliceContext.close();
     await bobContext.close();
@@ -97,15 +93,13 @@ test.describe("Tasks", () => {
     const suffix = Date.now();
     const titles = [`A-${suffix}`, `B-${suffix}`, `C-${suffix}`];
     for (const t of titles) {
-      await page.fill("#title", t);
-      await page.click('button[type="submit"]');
-      await expect(
-        page.locator('[data-testid="task-item"]', { hasText: t }),
-      ).toBeVisible();
+      await createTaskInline(page, t);
     }
 
     // Verify initial order (newest first): C, B, A
-    const listItems = page.locator('[data-testid="task-item"] p.font-medium').first();
+    const listItems = page
+      .locator('[data-testid="task-item"] [data-testid="task-title"]')
+      .first();
     await expect(listItems).toHaveText(titles[2]);
 
     // Grab the grip on the top item (C) and move it down twice to position 3.
@@ -126,16 +120,25 @@ test.describe("Tasks", () => {
 
     // Now the order should be B, A, C — verify via the top item
     await expect(
-      page.locator('[data-testid="task-item"]').first().locator("p.font-medium"),
+      page
+        .locator('[data-testid="task-item"]')
+        .first()
+        .locator('[data-testid="task-title"]'),
     ).toHaveText(titles[1]);
 
     // Reloading should preserve the server-persisted order
     await page.reload();
     await expect(
-      page.locator('[data-testid="task-item"]').first().locator("p.font-medium"),
+      page
+        .locator('[data-testid="task-item"]')
+        .first()
+        .locator('[data-testid="task-title"]'),
     ).toHaveText(titles[1]);
     await expect(
-      page.locator('[data-testid="task-item"]').last().locator("p.font-medium"),
+      page
+        .locator('[data-testid="task-item"]')
+        .last()
+        .locator('[data-testid="task-title"]'),
     ).toHaveText(titles[2]);
   });
 });
