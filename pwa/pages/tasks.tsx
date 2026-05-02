@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { GripVertical, Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Trash2 } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -23,18 +23,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import MarkdownView from "@/components/editor/MarkdownView";
+import TagsCombobox from "@/components/tasks/TagsCombobox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
 interface Tag {
@@ -61,23 +61,89 @@ interface Collection<T> {
   "hydra:member"?: T[];
 }
 
-interface SortableTaskItemProps {
+// "manual" maps to the persisted `position` order — drag-to-reorder is only
+// active in this mode because anything else would snap rows back the moment
+// we re-sorted. The other keys are derived sort orders that don't touch the
+// underlying tasks array, just the rendered view.
+type SortKey = "manual" | "completed" | "title";
+type SortDir = "asc" | "desc";
+
+interface SortState {
+  key: SortKey;
+  dir: SortDir;
+}
+
+const DEFAULT_SORT: SortState = { key: "manual", dir: "asc" };
+
+// Strip the most common markdown punctuation so the description in the
+// dedicated sub-row reads as plain text. We keep paragraph breaks via `\n`
+// so multi-paragraph descriptions still feel structured. A real markdown
+// renderer (`MarkdownView`) can replace this later if we want bold/links.
+const plainTextDescription = (markdown: string | null): string => {
+  if (!markdown) return "";
+  return markdown
+    .replace(/`{3}[\s\S]*?`{3}/g, "")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^[#>*_~`\-]+\s*/gm, "")
+    .replace(/\!?\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/[*_~]+/g, "")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+};
+
+interface SortableHeaderProps {
+  label: string;
+  sortKey: SortKey;
+  active: SortState;
+  onSort: (key: SortKey) => void;
+  className?: string;
+}
+
+const SortableHeader = ({ label, sortKey, active, onSort, className }: SortableHeaderProps) => {
+  const isActive = active.key === sortKey;
+  const Icon = isActive ? (active.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className="inline-flex items-center gap-1 -ml-2 px-2 py-1 rounded-sm hover:bg-accent text-left font-medium"
+        aria-sort={
+          isActive ? (active.dir === "asc" ? "ascending" : "descending") : "none"
+        }
+      >
+        <span>{label}</span>
+        <Icon className={cn("h-3.5 w-3.5", isActive ? "opacity-100" : "opacity-50")} />
+      </button>
+    </TableHead>
+  );
+};
+
+interface TaskRowProps {
   task: Task;
   allTags: Tag[];
+  reorderable: boolean;
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
   onTagsChange: (task: Task, nextTagIris: string[]) => Promise<void>;
+  onTitleChange: (task: Task, nextTitle: string) => Promise<void>;
+  onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
 }
 
-const SortableTaskItem = ({
+const TaskRow = ({
   task,
   allTags,
+  reorderable,
   onToggle,
   onDelete,
   onTagsChange,
-}: SortableTaskItemProps) => {
+  onTitleChange,
+  onDescriptionChange,
+}: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
+    disabled: !reorderable,
   });
 
   const style = {
@@ -86,32 +152,92 @@ const SortableTaskItem = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const attachedIris = new Set(task.tags.map((t) => t["@id"]));
-  const availableTags = allTags.filter((t) => !attachedIris.has(t["@id"]));
+  // --- Inline title editing ---------------------------------------------
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(task.title);
+  // Keep the draft in sync if the task's title is updated externally
+  // (e.g. an optimistic patch elsewhere or a reload).
+  useEffect(() => {
+    if (!editingTitle) setTitleDraft(task.title);
+  }, [task.title, editingTitle]);
 
-  const handleRemoveTag = async (tag: Tag) => {
-    const next = task.tags.filter((t) => t["@id"] !== tag["@id"]).map((t) => t["@id"]);
-    await onTagsChange(task, next);
+  const startEditTitle = () => {
+    setTitleDraft(task.title);
+    setEditingTitle(true);
+  };
+  const cancelTitle = () => {
+    setTitleDraft(task.title);
+    setEditingTitle(false);
+  };
+  const saveTitle = async () => {
+    const next = titleDraft.trim();
+    setEditingTitle(false);
+    if (!next || next === task.title) {
+      // Empty / unchanged → silently revert; no API call.
+      setTitleDraft(task.title);
+      return;
+    }
+    await onTitleChange(task, next);
   };
 
-  const handleAddTag = async (tag: Tag) => {
-    const next = [...task.tags.map((t) => t["@id"]), tag["@id"]];
-    await onTagsChange(task, next);
+  // --- Inline description editing ---------------------------------------
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState(task.description ?? "");
+  // BlockNote reads `value` only at mount, so we bump this key each time we
+  // open the editor to force a fresh remount with the current saved content.
+  const [descEditorKey, setDescEditorKey] = useState(0);
+
+  useEffect(() => {
+    if (!editingDesc) setDescDraft(task.description ?? "");
+  }, [task.description, editingDesc]);
+
+  const startEditDesc = () => {
+    setDescDraft(task.description ?? "");
+    setDescEditorKey((k) => k + 1);
+    setEditingDesc(true);
+  };
+  const cancelDesc = () => {
+    setDescDraft(task.description ?? "");
+    setEditingDesc(false);
+  };
+  const saveDesc = async () => {
+    setEditingDesc(false);
+    const trimmed = descDraft.trim();
+    const next = trimmed === "" ? null : descDraft;
+    const current = task.description ?? null;
+    if (next === current) return;
+    await onDescriptionChange(task, next);
   };
 
+  const description = plainTextDescription(task.description);
+  const titleClass = cn("font-medium", task.completedOn && "line-through text-muted-foreground");
+
+  // Each task gets its own <tbody> so dnd-kit drags the main row + the
+  // description sub-row together as a single unit. Multiple <tbody>s in one
+  // <table> is valid HTML and avoids fighting the table layout. We also use
+  // a `group/task` so hovering either row paints the bg on both, making the
+  // pair feel like one card.
   return (
-    <li ref={setNodeRef} style={style} data-testid="task-item">
-      <Card>
-        <CardContent className="pt-4 pb-4 flex items-start gap-3">
+    <tbody ref={setNodeRef} style={style} data-testid="task-item">
+      <TableRow className="border-b-0 hover:bg-transparent">
+        <TableCell className="w-8 align-top">
           <button
             type="button"
             aria-label={`Drag to reorder "${task.title}"`}
-            className="mt-0.5 px-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none bg-transparent border-0"
+            className={cn(
+              "px-1 text-muted-foreground touch-none bg-transparent border-0",
+              reorderable
+                ? "cursor-grab active:cursor-grabbing hover:text-foreground"
+                : "cursor-not-allowed opacity-30",
+            )}
+            disabled={!reorderable}
             {...attributes}
             {...listeners}
           >
             <GripVertical className="h-4 w-4" />
           </button>
+        </TableCell>
+        <TableCell className="w-10 align-top">
           <input
             type="checkbox"
             checked={!!task.completedOn}
@@ -119,83 +245,300 @@ const SortableTaskItem = ({
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
             className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
           />
-          <div className="flex-1 min-w-0">
-            <p
-              className={cn(
-                "font-medium",
-                task.completedOn && "line-through text-muted-foreground",
-              )}
+        </TableCell>
+        <TableCell className="align-top pl-0">
+          {editingTitle ? (
+            <Input
+              autoFocus
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void saveTitle();
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelTitle();
+                }
+              }}
+              onBlur={() => void saveTitle()}
+              maxLength={255}
+              aria-label={`Edit title for "${task.title}"`}
+              className="h-8"
+              data-testid="task-title-input"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startEditTitle}
+              aria-label={`Edit title "${task.title}"`}
+              className="text-left w-full cursor-text"
+              data-testid="task-title"
             >
-              {task.title}
-            </p>
-            {task.description && (
-              <MarkdownView
-                source={task.description}
-                className={cn("mt-1", task.completedOn && "line-through text-muted-foreground")}
-              />
-            )}
-            <div className="mt-2 flex flex-wrap items-center gap-1" data-testid="task-tags">
-              {task.tags.map((tag) => (
-                <span
-                  key={tag["@id"]}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold text-white"
-                  style={{ backgroundColor: tag.color }}
-                  data-testid="task-tag"
-                >
-                  {tag.title}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTag(tag)}
-                    aria-label={`Remove tag "${tag.title}" from "${task.title}"`}
-                    className="ml-0.5 text-white/80 hover:text-white bg-transparent border-0 cursor-pointer leading-none"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-              {availableTags.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label={`Add tag to "${task.title}"`}
-                      className="text-xs text-primary hover:underline bg-transparent border border-dashed border-input rounded px-2 py-0.5 cursor-pointer inline-flex items-center gap-1"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Tag
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="min-w-[150px] max-h-60 overflow-y-auto">
-                    {availableTags.map((tag) => (
-                      <DropdownMenuItem
-                        key={tag["@id"]}
-                        onSelect={() => handleAddTag(tag)}
-                      >
-                        <span
-                          className="inline-block h-3 w-3 rounded shrink-0"
-                          style={{ backgroundColor: tag.color }}
-                          aria-hidden="true"
-                        />
-                        <span>{tag.title}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </div>
+              <span className={titleClass}>{task.title}</span>
+            </button>
+          )}
+        </TableCell>
+        <TableCell className="align-top" data-testid="task-tags">
+          <TagsCombobox
+            value={task.tags}
+            options={allTags}
+            onChange={(nextIris) => onTagsChange(task, nextIris)}
+            subjectLabel={task.title}
+          />
+        </TableCell>
+        <TableCell className="align-top text-right">
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={() => onDelete(task)}
             aria-label={`Delete "${task.title}"`}
             className="text-destructive hover:text-destructive"
           >
-            Delete
+            <Trash2 className="h-4 w-4" />
           </Button>
-        </CardContent>
-      </Card>
-    </li>
+        </TableCell>
+      </TableRow>
+      <TableRow
+        className="hover:bg-transparent"
+        data-testid="task-description-row"
+      >
+        {/* Empty cells preserve the column layout so the description cell
+            below starts exactly where the title cell does — no fragile
+            pixel-math with pl-24. */}
+        <TableCell className="w-8" aria-hidden="true" />
+        <TableCell className="w-10" aria-hidden="true" />
+        <TableCell colSpan={3} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+          {editingDesc ? (
+            <div className="space-y-2">
+              <MarkdownEditor
+                key={descEditorKey}
+                ariaLabel={`Description for "${task.title}"`}
+                value={descDraft}
+                onChange={setDescDraft}
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={() => void saveDesc()}
+                  data-testid="task-description-save"
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={cancelDesc}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : description ? (
+            <button
+              type="button"
+              onClick={startEditDesc}
+              aria-label={`Edit description for "${task.title}"`}
+              className="text-left w-full text-muted-foreground whitespace-pre-wrap rounded-sm hover:text-foreground"
+              data-testid="task-description"
+            >
+              {description}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startEditDesc}
+              aria-label={`Add description for "${task.title}"`}
+              className="text-left w-full italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
+              data-testid="task-description-add"
+            >
+              Add description
+            </button>
+          )}
+        </TableCell>
+      </TableRow>
+    </tbody>
+  );
+};
+
+interface NewTaskInput {
+  title: string;
+  description: string | null;
+  tags: string[];
+}
+
+interface NewTaskRowProps {
+  allTags: Tag[];
+  /** Resolves on success, rejects on failure so we know whether to clear the draft. */
+  onCreate: (input: NewTaskInput) => Promise<void>;
+  isCreating: boolean;
+}
+
+// Inline "add a task" row that lives at the top of the table. Mirrors the
+// layout of TaskRow (main row + description sub-row) so the user can stage
+// title, tags, and description before pressing Enter to submit. Failures
+// keep the draft intact (parent shows the error).
+const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState<string | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Description inline editing — local-only; nothing hits the API until
+  // submit. Mirrors TaskRow's editing state machine.
+  const [editingDesc, setEditingDesc] = useState(false);
+  const [descDraft, setDescDraft] = useState("");
+  const [descEditorKey, setDescEditorKey] = useState(0);
+
+  const startEditDesc = () => {
+    setDescDraft(description ?? "");
+    setDescEditorKey((k) => k + 1);
+    setEditingDesc(true);
+  };
+  const cancelDesc = () => {
+    setDescDraft(description ?? "");
+    setEditingDesc(false);
+  };
+  const saveDesc = () => {
+    setEditingDesc(false);
+    const trimmed = descDraft.trim();
+    setDescription(trimmed === "" ? null : descDraft);
+  };
+
+  const handleTagsChange = (nextIris: string[]) => {
+    const next = nextIris
+      .map((iri) => allTags.find((tag) => tag["@id"] === iri))
+      .filter((tag): tag is Tag => Boolean(tag));
+    setTags(next);
+  };
+
+  const reset = () => {
+    setTitle("");
+    setDescription(null);
+    setTags([]);
+    setEditingDesc(false);
+    setDescDraft("");
+  };
+
+  const submit = async () => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    try {
+      await onCreate({
+        title: trimmed,
+        description,
+        tags: tags.map((tag) => tag["@id"]),
+      });
+      reset();
+      // Refocus on next tick so the input isn't briefly disabled when we
+      // try to focus it.
+      requestAnimationFrame(() => titleInputRef.current?.focus());
+    } catch {
+      // Parent has already surfaced the error in the alert region; keep
+      // the draft so the user can retry without retyping.
+    }
+  };
+
+  const descriptionPreview = plainTextDescription(description);
+
+  return (
+    <tbody data-testid="new-task-row">
+      <TableRow className="border-b-0 hover:bg-transparent">
+        <TableCell className="w-8" aria-hidden="true" />
+        <TableCell className="w-10" aria-hidden="true" />
+        <TableCell className="pl-0 align-top">
+          <Input
+            ref={titleInputRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                reset();
+                titleInputRef.current?.blur();
+              }
+            }}
+            placeholder="Add a task…"
+            maxLength={255}
+            disabled={isCreating}
+            aria-label="New task title"
+            className="h-8"
+            data-testid="new-task-title-input"
+          />
+        </TableCell>
+        <TableCell className="align-top" data-testid="new-task-tags">
+          <TagsCombobox
+            value={tags}
+            options={allTags}
+            onChange={handleTagsChange}
+            subjectLabel="new task"
+          />
+        </TableCell>
+        <TableCell aria-hidden="true" />
+      </TableRow>
+      <TableRow
+        className="hover:bg-transparent"
+        data-testid="new-task-description-row"
+      >
+        <TableCell className="w-8" aria-hidden="true" />
+        <TableCell className="w-10" aria-hidden="true" />
+        <TableCell colSpan={3} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+          {editingDesc ? (
+            <div className="space-y-2">
+              <MarkdownEditor
+                key={descEditorKey}
+                ariaLabel="Description for new task"
+                value={descDraft}
+                onChange={setDescDraft}
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  type="button"
+                  onClick={saveDesc}
+                  data-testid="new-task-description-save"
+                >
+                  Save
+                </Button>
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                  onClick={cancelDesc}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : descriptionPreview ? (
+            <button
+              type="button"
+              onClick={startEditDesc}
+              aria-label="Edit description for new task"
+              className="text-left w-full text-muted-foreground whitespace-pre-wrap rounded-sm hover:text-foreground"
+              data-testid="new-task-description"
+            >
+              {descriptionPreview}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startEditDesc}
+              aria-label="Add description for new task"
+              className="text-left w-full italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
+              data-testid="new-task-description-add"
+            >
+              Add description
+            </button>
+          )}
+        </TableCell>
+      </TableRow>
+    </tbody>
   );
 };
 
@@ -207,12 +550,8 @@ const Tasks = () => {
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Bumped after a successful create so the MarkdownEditor remounts with
-  // an empty value — its initialContent is only read once at creation.
-  const [editorResetKey, setEditorResetKey] = useState(0);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
 
   const sensors = useSensors(
     // Require an 8px drag before activating so a quick click on the grip
@@ -265,9 +604,9 @@ const Tasks = () => {
     }
   }, [isAuthenticated, loadData]);
 
-  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!title.trim()) return;
+  const handleCreate = async (input: NewTaskInput) => {
+    const trimmed = input.title.trim();
+    if (!trimmed) return;
 
     setIsSubmitting(true);
     setError(null);
@@ -277,8 +616,9 @@ const Tasks = () => {
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
+          title: trimmed,
+          description: input.description,
+          tags: input.tags,
         }),
       });
       if (!res.ok) {
@@ -287,12 +627,11 @@ const Tasks = () => {
           data.description || data.detail || data["hydra:description"] || "Failed to create task.",
         );
       }
-      setTitle("");
-      setDescription("");
-      setEditorResetKey((k) => k + 1);
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
+      // Re-throw so NewTaskRow keeps the user's draft for retry.
+      throw err;
     } finally {
       setIsSubmitting(false);
     }
@@ -338,6 +677,63 @@ const Tasks = () => {
       await loadData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete task.");
+    }
+  };
+
+  const handleTitleChange = async (task: Task, nextTitle: string) => {
+    // Optimistic title update — input has already returned to read mode.
+    const previous = tasks;
+    setTasks(tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, title: nextTitle } : t)));
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ title: nextTitle }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description || data.detail || data["hydra:description"] || "Failed to update title.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update title.");
+    }
+  };
+
+  const handleDescriptionChange = async (task: Task, nextDescription: string | null) => {
+    // Optimistic description update.
+    const previous = tasks;
+    setTasks(
+      tasks.map((t) =>
+        t["@id"] === task["@id"] ? { ...t, description: nextDescription } : t,
+      ),
+    );
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ description: nextDescription }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to update description.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update description.");
     }
   };
 
@@ -396,6 +792,38 @@ const Tasks = () => {
     }
   };
 
+  const handleSort = (key: SortKey) => {
+    setSort((current) => {
+      // Cycle: same column asc → desc → back to manual default.
+      if (current.key !== key) return { key, dir: "asc" };
+      if (current.dir === "asc") return { key, dir: "desc" };
+      return DEFAULT_SORT;
+    });
+  };
+
+  // Sorted *view* of the tasks. Manual order leaves them as-is so the dnd-kit
+  // index math stays aligned with what's painted; any other sort produces a
+  // shallow copy ordered by the picked column.
+  const visibleTasks = useMemo(() => {
+    if (sort.key === "manual") return tasks;
+    const flip = sort.dir === "asc" ? 1 : -1;
+    const copy = [...tasks];
+    copy.sort((a, b) => {
+      switch (sort.key) {
+        case "completed":
+          // Sort completed flag first — undone tasks sort before done.
+          return ((a.completedOn ? 1 : 0) - (b.completedOn ? 1 : 0)) * flip;
+        case "title":
+          return a.title.localeCompare(b.title) * flip;
+        default:
+          return 0;
+      }
+    });
+    return copy;
+  }, [tasks, sort]);
+
+  const reorderable = sort.key === "manual";
+
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -410,42 +838,8 @@ const Tasks = () => {
         <title>Tasks - Aura</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-7xl mx-auto">
           <h1 className="text-2xl font-bold mb-6">Tasks</h1>
-
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="description">
-                    Description{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <MarkdownEditor
-                    key={editorResetKey}
-                    id="description"
-                    ariaLabel="Description"
-                    value={description}
-                    onChange={setDescription}
-                  />
-                </div>
-                <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                  {isSubmitting ? "Adding..." : "Add Task"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
 
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -453,38 +847,74 @@ const Tasks = () => {
             </Alert>
           )}
 
+          {!reorderable && (
+            <p
+              className="mb-2 text-xs text-muted-foreground"
+              data-testid="reorder-disabled-hint"
+            >
+              Drag-to-reorder is paused while the table is sorted by a column. Click
+              the active column header again to return to your custom order.
+            </p>
+          )}
+
           {isLoading ? (
             <p className="text-muted-foreground">Loading tasks...</p>
-          ) : tasks.length === 0 ? (
+          ) : (
             <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground">No tasks yet. Add one above to get started.</p>
+              <CardContent className="p-0">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={visibleTasks.map((t) => t["@id"])}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <Table data-testid="task-list">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-8" />
+                          <SortableHeader
+                            label="Done"
+                            sortKey="completed"
+                            active={sort}
+                            onSort={handleSort}
+                            className="w-16"
+                          />
+                          <SortableHeader
+                            label="Title"
+                            sortKey="title"
+                            active={sort}
+                            onSort={handleSort}
+                          />
+                          <TableHead>Tags</TableHead>
+                          <TableHead className="w-20 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <NewTaskRow
+                        allTags={allTags}
+                        onCreate={handleCreate}
+                        isCreating={isSubmitting}
+                      />
+                      {visibleTasks.map((task) => (
+                        <TaskRow
+                          key={task["@id"]}
+                          task={task}
+                          allTags={allTags}
+                          reorderable={reorderable}
+                          onToggle={handleToggle}
+                          onDelete={handleDelete}
+                          onTagsChange={handleTagsChange}
+                          onTitleChange={handleTitleChange}
+                          onDescriptionChange={handleDescriptionChange}
+                        />
+                      ))}
+                    </Table>
+                  </SortableContext>
+                </DndContext>
               </CardContent>
             </Card>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={tasks.map((t) => t["@id"])}
-                strategy={verticalListSortingStrategy}
-              >
-                <ul className="space-y-2" data-testid="task-list">
-                  {tasks.map((task) => (
-                    <SortableTaskItem
-                      key={task["@id"]}
-                      task={task}
-                      allTags={allTags}
-                      onToggle={handleToggle}
-                      onDelete={handleDelete}
-                      onTagsChange={handleTagsChange}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
           )}
         </div>
       </div>

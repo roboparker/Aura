@@ -32,4 +32,23 @@ final class TaskRepository extends ServiceEntityRepository
 
         return null === $min ? null : (int) $min;
     }
+
+    /**
+     * Tasks the user is allowed to reorder: anything they own directly,
+     * plus tasks attached to a project they're a member of (every project
+     * member can edit project tasks alongside the owner — see Task entity
+     * docs). Mirrors the visibility rule in TaskOwnerExtension.
+     *
+     * @return Task[]
+     */
+    public function findReorderableForUser(User $user): array
+    {
+        return $this->createQueryBuilder('t')
+            ->leftJoin('t.project', 'p')
+            ->leftJoin('p.members', 'pm', 'WITH', 'pm = :user')
+            ->where('t.owner = :user OR pm IS NOT NULL')
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->getResult();
+    }
 }
