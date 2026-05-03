@@ -1030,6 +1030,94 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testOverdueFilterReturnsOnlyIncompletePastDueTasks(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        // 1. overdue (past due, incomplete)
+        $overdue = $this->createTask($alice, 'Overdue task');
+        $overdue->setDueDate(new \DateTimeImmutable('-2 days'));
+        // 2. due in the future — must NOT match
+        $future = $this->createTask($alice, 'Future task');
+        $future->setDueDate(new \DateTimeImmutable('+2 days'));
+        // 3. past due BUT completed — must NOT match
+        $done = $this->createTask($alice, 'Past but done');
+        $done->setDueDate(new \DateTimeImmutable('-2 days'));
+        $done->setCompletedOn(new \DateTimeImmutable('-1 day'));
+        // 4. no due date — must NOT match
+        $this->createTask($alice, 'No due date');
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?overdue=true');
+
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+        $this->assertSame(1, $body['totalItems']);
+        $this->assertSame('Overdue task', $body['member'][0]['title']);
+    }
+
+    public function testOverdueFilterCountOnlyMode(): void
+    {
+        // The navbar polls with `itemsPerPage=1` and reads `totalItems` to
+        // avoid pulling the full collection just for the badge count. Lock in
+        // that contract.
+        $alice = $this->createUser('alice@example.com');
+
+        for ($i = 0; $i < 3; ++$i) {
+            $task = $this->createTask($alice, "Late {$i}");
+            $task->setDueDate(new \DateTimeImmutable('-1 day'));
+        }
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?overdue=true&itemsPerPage=1');
+
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+        $this->assertSame(3, $body['totalItems']);
+        $this->assertCount(1, $body['member']);
+    }
+
+    public function testOverdueFilterFalseIsNoOp(): void
+    {
+        // `overdue=false` is intentionally not the inverse — tasks with no due
+        // date and tasks due in the future are very different things. Treat it
+        // as "no filter" so the parameter has a single useful interpretation.
+        $alice = $this->createUser('alice@example.com');
+        $past = $this->createTask($alice, 'Past');
+        $past->setDueDate(new \DateTimeImmutable('-1 day'));
+        $this->createTask($alice, 'No due date');
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?overdue=false');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 2]);
+    }
+
+    public function testOverdueFilterRespectsAccessControl(): void
+    {
+        // Bob's overdue task must not show up in Alice's overdue count even
+        // though TaskOwnerExtension is a separate concern — defense-in-depth.
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $bobOverdue = $this->createTask($bob, "Bob's overdue");
+        $bobOverdue->setDueDate(new \DateTimeImmutable('-3 days'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?overdue=true');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 0]);
+    }
+
     public function testAssignableUsersIncludesSelf(): void
     {
         $alice = $this->createUser('alice@example.com');
