@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -163,6 +164,37 @@ const formatDueDate = (iso: string | null): string => {
   return date ? dueDateFormatter.format(date) : "";
 };
 
+// Local-midnight "today" so day comparisons line up with the dates the picker
+// stores (also local-midnight). Cheaper than a fresh Date() per row.
+const todayLocalMidnight = (): Date => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
+
+type DueDateStatus = "overdue" | "today" | "future" | "none";
+
+const dueDateStatus = (iso: string | null, completed: boolean): DueDateStatus => {
+  if (completed || !iso) return "none";
+  const due = isoToLocalDate(iso);
+  if (!due) return "none";
+  const today = todayLocalMidnight();
+  if (due.getTime() < today.getTime()) return "overdue";
+  if (due.getTime() === today.getTime()) return "today";
+  return "future";
+};
+
+const addDays = (date: Date, days: number): Date => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+};
+
+const addMonths = (date: Date, months: number): Date => {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + months);
+  return next;
+};
+
 interface DueDateCellProps {
   value: string | null;
   onChange: (next: string | null) => void | Promise<void>;
@@ -173,6 +205,9 @@ interface DueDateCellProps {
    *  also clears the rule (a recurrence with no anchor is invalid server-side). */
   recurrenceValue?: RecurrenceRule | null;
   onRecurrenceChange?: (next: RecurrenceRule | null) => void | Promise<void>;
+  /** Toggles overdue/today colouring. Completed tasks pass `"none"` so a missed
+   *  deadline doesn't keep glowing red after the work is done. */
+  status?: DueDateStatus;
 }
 
 const DueDateCell = ({
@@ -182,6 +217,7 @@ const DueDateCell = ({
   testIdPrefix,
   recurrenceValue = null,
   onRecurrenceChange,
+  status = "none",
 }: DueDateCellProps) => {
   const [open, setOpen] = useState(false);
   const selected = isoToLocalDate(value);
@@ -189,6 +225,13 @@ const DueDateCell = ({
   const handleSelect = (date: Date | undefined) => {
     setOpen(false);
     const next = date ? localDateToIso(date) : null;
+    if (next === value) return;
+    void onChange(next);
+  };
+
+  const handleQuickPick = (date: Date) => {
+    setOpen(false);
+    const next = localDateToIso(date);
     if (next === value) return;
     void onChange(next);
   };
@@ -204,16 +247,44 @@ const DueDateCell = ({
     void onChange(null);
   };
 
+  const today = todayLocalMidnight();
+  const quickPicks: Array<{ label: string; date: Date; testId: string }> = [
+    { label: "Today", date: today, testId: "today" },
+    { label: "Tomorrow", date: addDays(today, 1), testId: "tomorrow" },
+    { label: "Next week", date: addDays(today, 7), testId: "next-week" },
+    { label: "Next month", date: addMonths(today, 1), testId: "next-month" },
+  ];
+
+  const dateClassName = cn(
+    "text-left text-sm rounded-sm inline-flex items-center gap-1 hover:text-foreground",
+    status === "overdue" && "text-destructive font-medium hover:text-destructive",
+    status === "today" && "text-amber-600 dark:text-amber-400 font-medium",
+  );
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {value ? (
           <button
             type="button"
-            aria-label={ariaLabel}
-            className="text-left text-sm rounded-sm hover:text-foreground inline-flex items-center gap-1"
+            aria-label={
+              status === "overdue"
+                ? `${ariaLabel} (overdue)`
+                : status === "today"
+                  ? `${ariaLabel} (due today)`
+                  : ariaLabel
+            }
+            className={dateClassName}
             data-testid={testIdPrefix}
+            data-status={status}
           >
+            {status === "overdue" && (
+              <AlertTriangle
+                className="h-3.5 w-3.5"
+                aria-hidden="true"
+                data-testid={`${testIdPrefix}-overdue-icon`}
+              />
+            )}
             <span>{formatDueDate(value)}</span>
             {recurrenceValue && (
               <Repeat
@@ -239,6 +310,23 @@ const DueDateCell = ({
         align="start"
         data-testid={`${testIdPrefix}-popover`}
       >
+        {/* Quick-picks above the calendar — covers the common case of "soon"
+            without making the user navigate the grid. */}
+        <div className="grid grid-cols-2 gap-1 border-b p-2">
+          {quickPicks.map((pick) => (
+            <Button
+              key={pick.testId}
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="justify-start"
+              onClick={() => handleQuickPick(pick.date)}
+              data-testid={`${testIdPrefix}-quick-${pick.testId}`}
+            >
+              {pick.label}
+            </Button>
+          ))}
+        </div>
         <Calendar
           mode="single"
           selected={selected}
@@ -573,6 +661,7 @@ const TaskRow = ({
             testIdPrefix="task-due-date"
             recurrenceValue={task.recurrenceRule}
             onRecurrenceChange={(next) => onRecurrenceChange(task, next)}
+            status={dueDateStatus(task.dueDate, !!task.completedOn)}
           />
         </TableCell>
         <TableCell className="align-top" data-testid="task-tags">
@@ -941,6 +1030,7 @@ const Tasks = () => {
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>(
     isMyTasksPage ? "me" : "all",
   );
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   const sensors = useSensors(
     // Require an 8px drag before activating so a quick click on the grip
@@ -1331,15 +1421,32 @@ const Tasks = () => {
     });
   };
 
-  // Apply the assignee filter, then sort. "all" leaves tasks intact so the
-  // manual-order drag math stays aligned. "me" matches the logged-in user;
-  // a specific IRI matches just that user.
-  const filteredTasks = useMemo(() => {
+  // Count of overdue tasks across the current assignee scope (so the chip
+  // shows e.g. "3 overdue" when "Assigned to me" is active). Computed off the
+  // assignee-filtered list, *before* the overdue filter is applied.
+  const assigneeFilteredTasks = useMemo(() => {
     if (assigneeFilter === "all") return tasks;
     const targetIri = assigneeFilter === "me" ? currentUserIri : assigneeFilter;
     if (!targetIri) return tasks;
     return tasks.filter((t) => t.assignees.some((a) => a["@id"] === targetIri));
   }, [tasks, assigneeFilter, currentUserIri]);
+
+  const overdueCount = useMemo(
+    () =>
+      assigneeFilteredTasks.filter(
+        (t) => dueDateStatus(t.dueDate, !!t.completedOn) === "overdue",
+      ).length,
+    [assigneeFilteredTasks],
+  );
+
+  // Apply the assignee filter, then the overdue toggle, then sort. "all"
+  // leaves tasks intact so the manual-order drag math stays aligned.
+  const filteredTasks = useMemo(() => {
+    if (!overdueOnly) return assigneeFilteredTasks;
+    return assigneeFilteredTasks.filter(
+      (t) => dueDateStatus(t.dueDate, !!t.completedOn) === "overdue",
+    );
+  }, [assigneeFilteredTasks, overdueOnly]);
 
   const visibleTasks = useMemo(() => {
     if (sort.key === "manual") return filteredTasks;
@@ -1371,7 +1478,8 @@ const Tasks = () => {
   // Reordering is only safe in the "manual" sort *and* when nothing is being
   // filtered out — drag-end math assumes the index lines up with the
   // persisted position.
-  const reorderable = sort.key === "manual" && assigneeFilter === "all";
+  const reorderable =
+    sort.key === "manual" && assigneeFilter === "all" && !overdueOnly;
 
   const assignableForTask = useCallback(
     (task: Task): AssigneeOption[] => {
@@ -1427,10 +1535,39 @@ const Tasks = () => {
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">{pageTitle}</h1>
-            {/* The filter dropdown is redundant on /my-tasks (everything
-                shown is already filtered to the current user). */}
-            {!isMyTasksPage && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Overdue chip is always available — it's useful on /my-tasks
+                  even though the assignee dropdown is hidden there. The chip
+                  is disabled when there's nothing overdue so users still see
+                  the zero-state at a glance. */}
+              <Button
+                variant={overdueOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setOverdueOnly((v) => !v)}
+                disabled={overdueCount === 0 && !overdueOnly}
+                aria-pressed={overdueOnly}
+                data-testid="overdue-filter-toggle"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                Overdue
+                <span
+                  className={cn(
+                    "ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
+                    overdueOnly
+                      ? "bg-primary-foreground/20 text-primary-foreground"
+                      : overdueCount > 0
+                        ? "bg-destructive text-destructive-foreground"
+                        : "bg-muted text-muted-foreground",
+                  )}
+                  data-testid="overdue-filter-count"
+                >
+                  {overdueCount}
+                </span>
+              </Button>
+              {/* The assignee dropdown is redundant on /my-tasks (everything
+                  shown is already filtered to the current user). */}
+              {!isMyTasksPage && (
+              <>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -1484,8 +1621,9 @@ const Tasks = () => {
                   <X className="h-3.5 w-3.5" />
                 </Button>
               )}
+              </>
+              )}
             </div>
-            )}
           </div>
 
           {error && (
