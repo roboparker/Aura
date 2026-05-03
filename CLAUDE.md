@@ -116,6 +116,7 @@ npx playwright test
 - Use Tailwind CSS for styling. Reference design tokens via the shadcn variables (`bg-background`, `text-muted-foreground`, `border-input`, `text-destructive`, etc.) where possible. shadcn tokens use the canonical neutral baseColor (no brand override yet); brand cyan still lives in raw utilities (`bg-cyan-700`, `text-cyan-700`) on the navbar and link elements.
 - Forms backed by Formik should use `FormikField` from `pwa/components/ui/formik-field.tsx` rather than hand-rolled `<Field>` + `<label>` + `<ErrorMessage>` blocks.
 - Long-form description fields use `MarkdownEditor` for input and `MarkdownView` for rendering (both from `pwa/components/editor/`). Content is stored as markdown in the API's `TEXT` columns.
+- **Developer component docs**: every reusable component in `pwa/components/ui/` and the shared pieces under `pwa/components/{editor,user,common}/` has a documentation page at `pwa/pages/dev/components/<slug>.tsx`, indexed by `pwa/components/dev/registry.ts`. When you add a new reusable component, rename one, change a prop's public shape, or add a new variant, update the matching docs page (live example + source snippet via the `<CodeBlock />` helper) and the registry entry in the same PR. The index lives at `/dev/components`.
 
 ### E2E Tests
 - Shared helpers (auth + markdown editor) live in `e2e/tests/helpers.js` — prefer them over duplicating `registerAndSignIn` per spec.
