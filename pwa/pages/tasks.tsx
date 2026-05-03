@@ -9,6 +9,7 @@ import {
   Bell,
   Filter,
   GripVertical,
+  MessageSquare,
   Repeat,
   Trash2,
   X,
@@ -38,6 +39,9 @@ import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
 import TagsCombobox from "@/components/tasks/TagsCombobox";
+import CommentsPanel, {
+  type Comment,
+} from "@/components/tasks/CommentsPanel";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -100,6 +104,10 @@ interface Task {
   createdOn: string;
   completedOn: string | null;
   dueDate: string | null;
+  // Embedded user shape under `task:read` (the User entity exposes its
+  // basic fields in that group). Used here only to widen comment
+  // delete-rights for the task owner without an extra fetch.
+  owner: { "@id": string };
   recurrenceRule: RecurrenceRule | null;
   reminders: ReminderOffset[] | null;
   position: number;
@@ -564,6 +572,9 @@ interface TaskRowProps {
   allTags: Tag[];
   assignableUsers: AssigneeOption[];
   reorderable: boolean;
+  currentUserIri: string | null;
+  comments: Comment[] | undefined;
+  commentsLoading: boolean;
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
   onTagsChange: (task: Task, nextTagIris: string[]) => Promise<void>;
@@ -577,6 +588,12 @@ interface TaskRowProps {
   ) => Promise<void>;
   onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
   onAssigneeAvatarClick: (assignee: AssigneeOption) => void;
+  /** Lazy-load trigger: parent fetches `/comments?task=…` the first time
+   *  this fires for a task. */
+  onLoadComments: (task: Task) => Promise<void>;
+  onCreateComment: (task: Task, body: string) => Promise<void>;
+  onEditComment: (comment: Comment, body: string) => Promise<void>;
+  onDeleteComment: (comment: Comment) => Promise<void>;
 }
 
 const TaskRow = ({
@@ -584,6 +601,9 @@ const TaskRow = ({
   allTags,
   assignableUsers,
   reorderable,
+  currentUserIri,
+  comments,
+  commentsLoading,
   onToggle,
   onDelete,
   onTagsChange,
@@ -594,6 +614,10 @@ const TaskRow = ({
   onRemindersChange,
   onAssigneesChange,
   onAssigneeAvatarClick,
+  onLoadComments,
+  onCreateComment,
+  onEditComment,
+  onDeleteComment,
 }: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
@@ -605,6 +629,32 @@ const TaskRow = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // --- Comments expansion -----------------------------------------------
+  // Comments are fetched lazily — the load fires the first time the user
+  // expands the section, then the parent caches the result so subsequent
+  // toggles are free.
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
+  const commentCount = comments?.length;
+  // Used only to decide whether to render the trash icon on a comment the
+  // current user didn't author. The server is the source of truth — a
+  // wrong-positive here just yields a 403 on the actual DELETE.
+  const isLikelyTaskOwner =
+    currentUserIri !== null && task.owner["@id"] === currentUserIri;
+  const toggleComments = () => {
+    setCommentsExpanded((open) => !open);
+  };
+
+  // Trigger the lazy fetch *after* commit so we don't call setState on the
+  // parent during a child render (React would warn and bail).
+  useEffect(() => {
+    if (commentsExpanded && comments === undefined) {
+      void onLoadComments(task);
+    }
+    // `onLoadComments` is memoized in the parent on its dependencies; this
+    // effect re-runs only on the values we actually care about.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentsExpanded, comments]);
 
   // --- Inline title editing ---------------------------------------------
   const [editingTitle, setEditingTitle] = useState(false);
@@ -833,8 +883,46 @@ const TaskRow = ({
               Add description
             </button>
           )}
+          <button
+            type="button"
+            onClick={toggleComments}
+            aria-expanded={commentsExpanded}
+            aria-label={`${commentsExpanded ? "Hide" : "Show"} comments for "${task.title}"`}
+            className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-sm"
+            data-testid="task-comments-toggle"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span>
+              {commentCount === undefined
+                ? "Comments"
+                : commentCount === 0
+                  ? "Comment"
+                  : `Comments (${commentCount})`}
+            </span>
+          </button>
         </TableCell>
       </TableRow>
+      {commentsExpanded && (
+        <TableRow
+          className="hover:bg-transparent"
+          data-testid="task-comments-row"
+        >
+          <TableCell className="w-8" aria-hidden="true" />
+          <TableCell className="w-10" aria-hidden="true" />
+          <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-4">
+            <CommentsPanel
+              taskTitle={task.title}
+              comments={comments ?? []}
+              isLoading={commentsLoading && comments === undefined}
+              currentUserIri={currentUserIri}
+              isTaskOwner={isLikelyTaskOwner}
+              onCreate={(body) => onCreateComment(task, body)}
+              onEdit={(comment, body) => onEditComment(comment, body)}
+              onDelete={(comment) => onDeleteComment(comment)}
+            />
+          </TableCell>
+        </TableRow>
+      )}
     </tbody>
   );
 };
@@ -1113,6 +1201,15 @@ const Tasks = () => {
     isMyTasksPage ? "me" : "all",
   );
   const [overdueOnly, setOverdueOnly] = useState(false);
+  // Lazy-loaded comments per task IRI. Undefined entry = not yet fetched;
+  // empty array = fetched and there are none. The TaskRow uses the
+  // distinction to show "Comments" vs "Comments (0)" before the first load.
+  const [commentsByTask, setCommentsByTask] = useState<
+    Record<string, Comment[] | undefined>
+  >({});
+  const [loadingCommentsFor, setLoadingCommentsFor] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const sensors = useSensors(
     // Require an 8px drag before activating so a quick click on the grip
@@ -1498,6 +1595,125 @@ const Tasks = () => {
     }
   };
 
+  const handleLoadComments = useCallback(
+    async (task: Task) => {
+      const taskIri = task["@id"];
+      // Already loaded or in flight — bail out.
+      if (commentsByTask[taskIri] !== undefined) return;
+      if (loadingCommentsFor.has(taskIri)) return;
+      setLoadingCommentsFor((prev) => {
+        const next = new Set(prev);
+        next.add(taskIri);
+        return next;
+      });
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/comments?task=${encodeURIComponent(taskIri)}&itemsPerPage=200`,
+          {
+            credentials: "include",
+            headers: { Accept: "application/ld+json" },
+          },
+        );
+        if (!res.ok) throw new Error("Failed to load comments.");
+        const data: { member?: Comment[]; "hydra:member"?: Comment[] } =
+          await res.json();
+        const list = data.member ?? data["hydra:member"] ?? [];
+        setCommentsByTask((prev) => ({ ...prev, [taskIri]: list }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load comments.");
+      } finally {
+        setLoadingCommentsFor((prev) => {
+          const next = new Set(prev);
+          next.delete(taskIri);
+          return next;
+        });
+      }
+    },
+    [commentsByTask, loadingCommentsFor],
+  );
+
+  const handleCreateComment = useCallback(
+    async (task: Task, body: string) => {
+      const trimmed = body.trim();
+      if (!trimmed) return;
+      const res = await fetch(`${ENTRYPOINT}/comments`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/ld+json" },
+        body: JSON.stringify({ task: task["@id"], body }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data["hydra:description"] || data.detail || "Failed to post comment.",
+        );
+      }
+      const created: Comment = await res.json();
+      setCommentsByTask((prev) => ({
+        ...prev,
+        [task["@id"]]: [...(prev[task["@id"]] ?? []), created],
+      }));
+    },
+    [],
+  );
+
+  const handleEditComment = useCallback(
+    async (comment: Comment, body: string) => {
+      const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ body }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data["hydra:description"] || data.detail || "Failed to update comment.",
+        );
+      }
+      const updated: Comment = await res.json();
+      // Comment doesn't carry its task IRI on the wire (`task` is the bare
+      // IRI string serialized at write time, but the read response from
+      // PATCH inlines the embedded task). Either way, walk every loaded
+      // task list and replace the matching comment.
+      setCommentsByTask((prev) => {
+        const next: typeof prev = {};
+        for (const [taskIri, list] of Object.entries(prev)) {
+          if (!list) {
+            next[taskIri] = list;
+            continue;
+          }
+          next[taskIri] = list.map((c) =>
+            c["@id"] === comment["@id"] ? { ...c, ...updated } : c,
+          );
+        }
+        return next;
+      });
+    },
+    [],
+  );
+
+  const handleDeleteComment = useCallback(async (comment: Comment) => {
+    const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      throw new Error("Failed to delete comment.");
+    }
+    setCommentsByTask((prev) => {
+      const next: typeof prev = {};
+      for (const [taskIri, list] of Object.entries(prev)) {
+        if (!list) {
+          next[taskIri] = list;
+          continue;
+        }
+        next[taskIri] = list.filter((c) => c["@id"] !== comment["@id"]);
+      }
+      return next;
+    });
+  }, []);
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1817,6 +2033,9 @@ const Tasks = () => {
                           allTags={allTags}
                           assignableUsers={assignableForTask(task)}
                           reorderable={reorderable}
+                          currentUserIri={currentUserIri}
+                          comments={commentsByTask[task["@id"]]}
+                          commentsLoading={loadingCommentsFor.has(task["@id"])}
                           onToggle={handleToggle}
                           onDelete={handleDelete}
                           onTagsChange={handleTagsChange}
@@ -1829,6 +2048,10 @@ const Tasks = () => {
                           onAssigneeAvatarClick={(assignee) =>
                             setAssigneeFilter(assignee["@id"])
                           }
+                          onLoadComments={handleLoadComments}
+                          onCreateComment={handleCreateComment}
+                          onEditComment={handleEditComment}
+                          onDeleteComment={handleDeleteComment}
                         />
                       ))}
                     </Table>
