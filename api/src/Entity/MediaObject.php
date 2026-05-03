@@ -194,4 +194,20 @@ class MediaObject
         }
         return $urls;
     }
+
+    /**
+     * Authenticated download URL for attachment-kind media. Avatars stay on
+     * the public `/media/...` URL — they're displayed everywhere inside the
+     * app and don't carry sensitive content. Returning null for non-
+     * attachment kinds keeps the frontend selector trivial: prefer
+     * `downloadUrl` when present, fall back to `variantUrls.original`.
+     */
+    #[Groups(['media_object:read', 'task:read'])]
+    public function getDownloadUrl(): ?string
+    {
+        if (self::KIND_ATTACHMENT !== $this->kind) {
+            return null;
+        }
+        return null === $this->id ? null : '/media-objects/' . $this->id . '/download';
+    }
 }

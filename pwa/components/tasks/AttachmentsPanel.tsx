@@ -20,6 +20,10 @@ export interface Attachment {
   mimeType: string;
   byteSize: number;
   variantUrls: { original?: string };
+  // Authenticated download URL — present for kind=attachment, null for
+  // avatars. Prefer this over the public variantUrls.original because the
+  // gated endpoint re-checks task readability before streaming bytes.
+  downloadUrl?: string | null;
 }
 
 interface AttachmentsPanelProps {
@@ -169,7 +173,12 @@ const AttachmentsPanel = ({
       {attachments.length > 0 && (
         <ul className="space-y-1">
           {attachments.map((file) => {
-            const url = file.variantUrls.original;
+            // Gated endpoint preferred; fall back to the public variant URL
+            // for older payloads or other media kinds (avatars are public).
+            // Both `<img src>` and `<a href>` work against the gated route
+            // because PWA + API are same-origin and the browser will send
+            // the auth cookie on either request.
+            const url = file.downloadUrl || file.variantUrls.original;
             if (isImage(file.mimeType)) {
               const imageIndex = imageAttachments.indexOf(file);
               return (
@@ -322,7 +331,10 @@ const AttachmentsPanel = ({
             </>
           )}
           <img
-            src={imageAttachments[lightboxIndex].variantUrls.original}
+            src={
+              imageAttachments[lightboxIndex].downloadUrl ||
+              imageAttachments[lightboxIndex].variantUrls.original
+            }
             alt={imageAttachments[lightboxIndex].originalName}
             onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] max-w-[90vw] object-contain"
