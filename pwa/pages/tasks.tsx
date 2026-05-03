@@ -26,8 +26,14 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import TagsCombobox from "@/components/tasks/TagsCombobox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableCell,
@@ -76,19 +82,22 @@ interface SortState {
 
 const DEFAULT_SORT: SortState = { key: "manual", dir: "asc" };
 
-// Native `<input type="date">` works in YYYY-MM-DD; the API stores a full
-// ISO datetime. We persist UTC midnight on the picked day so round-trips
-// are stable across timezones — what the user picked is what they see.
-const isoToDateInput = (iso: string | null): string => {
-  if (!iso) return "";
-  // Slice off the date portion of the ISO string so we read back exactly
-  // the day the user picked, regardless of local timezone offsets.
-  return iso.slice(0, 10);
+// Stored as ISO datetime on the wire but only the calendar day matters —
+// we persist UTC midnight on the picked day so round-trips are stable
+// across timezones. Read back via the YYYY-MM-DD slice and rebuild as a
+// local Date so the calendar / formatter render the day the user picked.
+const isoToLocalDate = (iso: string | null): Date | undefined => {
+  if (!iso) return undefined;
+  const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
 };
 
-const dateInputToIso = (value: string): string | null => {
-  if (!value) return null;
-  return `${value}T00:00:00+00:00`;
+const localDateToIso = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}T00:00:00+00:00`;
 };
 
 const dueDateFormatter = new Intl.DateTimeFormat(undefined, {
@@ -98,12 +107,8 @@ const dueDateFormatter = new Intl.DateTimeFormat(undefined, {
 });
 
 const formatDueDate = (iso: string | null): string => {
-  if (!iso) return "";
-  // Build the date from the YYYY-MM-DD slice so we ignore the stored UTC
-  // time portion — picking "Jun 1" should display "Jun 1" everywhere.
-  const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
-  if (!year || !month || !day) return "";
-  return dueDateFormatter.format(new Date(year, month - 1, day));
+  const date = isoToLocalDate(iso);
+  return date ? dueDateFormatter.format(date) : "";
 };
 
 interface DueDateCellProps {
@@ -114,69 +119,72 @@ interface DueDateCellProps {
 }
 
 const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellProps) => {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(isoToDateInput(value));
+  const [open, setOpen] = useState(false);
+  const selected = isoToLocalDate(value);
 
-  useEffect(() => {
-    if (!editing) setDraft(isoToDateInput(value));
-  }, [value, editing]);
-
-  const commit = (raw: string) => {
-    setEditing(false);
-    const next = dateInputToIso(raw);
+  const handleSelect = (date: Date | undefined) => {
+    setOpen(false);
+    const next = date ? localDateToIso(date) : null;
     if (next === value) return;
     void onChange(next);
   };
 
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        type="date"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit((e.target as HTMLInputElement).value);
-          } else if (e.key === "Escape") {
-            e.preventDefault();
-            setDraft(isoToDateInput(value));
-            setEditing(false);
-          }
-        }}
-        aria-label={ariaLabel}
-        data-testid={`${testIdPrefix}-input`}
-        className="h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs"
-      />
-    );
-  }
-
-  if (value) {
-    return (
-      <button
-        type="button"
-        onClick={() => setEditing(true)}
-        aria-label={ariaLabel}
-        className="text-left text-sm rounded-sm hover:text-foreground"
-        data-testid={testIdPrefix}
-      >
-        {formatDueDate(value)}
-      </button>
-    );
-  }
+  const handleClear = () => {
+    setOpen(false);
+    if (value === null) return;
+    void onChange(null);
+  };
 
   return (
-    <button
-      type="button"
-      onClick={() => setEditing(true)}
-      aria-label={ariaLabel}
-      className="text-left text-sm italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
-      data-testid={`${testIdPrefix}-add`}
-    >
-      Add date
-    </button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {value ? (
+          <button
+            type="button"
+            aria-label={ariaLabel}
+            className="text-left text-sm rounded-sm hover:text-foreground"
+            data-testid={testIdPrefix}
+          >
+            {formatDueDate(value)}
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label={ariaLabel}
+            className="text-left text-sm italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
+            data-testid={`${testIdPrefix}-add`}
+          >
+            Add date
+          </button>
+        )}
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto p-0"
+        align="start"
+        data-testid={`${testIdPrefix}-popover`}
+      >
+        <Calendar
+          mode="single"
+          selected={selected}
+          onSelect={handleSelect}
+          autoFocus
+        />
+        {value && (
+          <div className="border-t p-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full justify-center"
+              onClick={handleClear}
+              data-testid={`${testIdPrefix}-clear`}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 };
 
