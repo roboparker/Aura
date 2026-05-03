@@ -9,8 +9,11 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  ATTACHMENT_SUPPORTED_MIMES,
+  uploadAttachmentFile,
+} from "@/lib/attachments";
 import { cn } from "@/lib/utils";
 
 export interface Attachment {
@@ -39,20 +42,7 @@ interface AttachmentsPanelProps {
   onDetach: (attachment: Attachment) => Promise<void>;
 }
 
-const SUPPORTED_MIMES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-  "text/plain",
-  "text/markdown",
-  "text/csv",
-  "application/zip",
-  "application/json",
-];
-const ACCEPT_ATTRIBUTE = SUPPORTED_MIMES.join(",");
-const MAX_BYTES = 10 * 1024 * 1024;
+const ACCEPT_ATTRIBUTE = ATTACHMENT_SUPPORTED_MIMES.join(",");
 
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -108,31 +98,6 @@ const AttachmentsPanel = ({
     return () => window.removeEventListener("keydown", handler);
   }, [lightboxIndex, imageAttachments.length]);
 
-  const uploadOne = async (file: File): Promise<string | null> => {
-    if (file.size > MAX_BYTES) {
-      throw new Error(`${file.name} is larger than 10 MB.`);
-    }
-    if (!SUPPORTED_MIMES.includes(file.type)) {
-      throw new Error(`${file.name}: unsupported type "${file.type || "unknown"}".`);
-    }
-    const form = new FormData();
-    form.append("file", file);
-    form.append("kind", "attachment");
-    const res = await fetch(`${ENTRYPOINT}/media-objects`, {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(
-        data.detail || data.description || data.error || `Upload failed (${res.status}).`,
-      );
-    }
-    const media = (await res.json()) as { "@id": string };
-    return media["@id"];
-  };
-
   const handleFiles = async (files: FileList | File[]) => {
     const list = Array.from(files);
     if (list.length === 0) return;
@@ -140,8 +105,8 @@ const AttachmentsPanel = ({
     setError(null);
     for (const file of list) {
       try {
-        const iri = await uploadOne(file);
-        if (iri) await onAttach(iri);
+        const iri = await uploadAttachmentFile(file);
+        await onAttach(iri);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed.");
       } finally {

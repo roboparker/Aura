@@ -34,6 +34,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import {
+  synthesizePastedImageName,
+  uploadAttachmentFile,
+} from "@/lib/attachments";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import AssigneesCombobox, {
@@ -645,7 +649,47 @@ const TaskRow = ({
   // Attachments embed inline on the Task payload, so no lazy fetch — we
   // just toggle the panel visibility. The count is always known.
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(false);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const attachmentCount = task.attachments.length;
+
+  // Paste-to-upload: when the user pastes an image while focused inside this
+  // task row (description editor, comment composer, etc.), upload it as an
+  // attachment instead of letting the editor try to render the bytes inline.
+  // Text and other non-image clipboard payloads pass through untouched.
+  const handleTaskPaste = async (e: React.ClipboardEvent<HTMLElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const f = item.getAsFile();
+        if (f) imageFiles.push(f);
+      }
+    }
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    setAttachmentsExpanded(true);
+    setPasteError(null);
+    for (const original of imageFiles) {
+      // Browsers usually return clipboard images as `File` with a name like
+      // "image.png" and a real type, but native screenshot tools sometimes
+      // hand us empty/bogus names. Re-wrap with a synthesised name so the
+      // server-side filename slug is meaningful.
+      const named =
+        original.name && original.name !== "image.png"
+          ? original
+          : new File([original], synthesizePastedImageName(original.type), {
+              type: original.type,
+            });
+      try {
+        const iri = await uploadAttachmentFile(named);
+        await onAttachMedia(task, iri);
+      } catch (err) {
+        setPasteError(err instanceof Error ? err.message : "Paste upload failed.");
+      }
+    }
+  };
 
   // --- Comments expansion -----------------------------------------------
   // Comments are fetched lazily — the load fires the first time the user
@@ -739,7 +783,12 @@ const TaskRow = ({
   // a `group/task` so hovering either row paints the bg on both, making the
   // pair feel like one card.
   return (
-    <tbody ref={setNodeRef} style={style} data-testid="task-item">
+    <tbody
+      ref={setNodeRef}
+      style={style}
+      data-testid="task-item"
+      onPaste={handleTaskPaste}
+    >
       <TableRow className="border-b-0 hover:bg-transparent">
         <TableCell className="w-8 align-top">
           <button
@@ -944,6 +993,15 @@ const TaskRow = ({
           <TableCell className="w-8" aria-hidden="true" />
           <TableCell className="w-10" aria-hidden="true" />
           <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-3">
+            {pasteError && (
+              <Alert
+                variant="destructive"
+                className="mb-2"
+                data-testid="task-paste-error"
+              >
+                <AlertDescription>{pasteError}</AlertDescription>
+              </Alert>
+            )}
             <AttachmentsPanel
               taskTitle={task.title}
               attachments={task.attachments}
