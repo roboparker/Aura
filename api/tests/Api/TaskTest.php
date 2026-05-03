@@ -287,6 +287,198 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
+    public function testCreateTaskWithRecurrenceRule(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Water the plants',
+                'dueDate' => '2026-05-10T00:00:00+00:00',
+                'recurrenceRule' => ['frequency' => 'weekly', 'interval' => 1],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $task = $this->reloadTaskByTitle('Water the plants');
+        $this->assertSame(
+            ['frequency' => 'weekly', 'interval' => 1],
+            $task->getRecurrenceRule(),
+        );
+    }
+
+    public function testRecurrenceWithoutDueDateIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Orphaned recurrence',
+                'recurrenceRule' => ['frequency' => 'daily', 'interval' => 1],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testInvalidRecurrenceFrequencyIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Bad freq',
+                'dueDate' => '2026-05-10T00:00:00+00:00',
+                'recurrenceRule' => ['frequency' => 'fortnightly', 'interval' => 1],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testInvalidRecurrenceIntervalIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Bad interval',
+                'dueDate' => '2026-05-10T00:00:00+00:00',
+                'recurrenceRule' => ['frequency' => 'daily', 'interval' => 0],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    /**
+     * Completing a recurring task creates a fresh, incomplete task whose due
+     * date is advanced per the rule. The original stays completed; tags,
+     * description, project, and assignees carry over.
+     *
+     * @dataProvider provideRecurrenceAdvanceCases
+     */
+    public function testCompletingRecurringTaskCreatesNextOccurrence(
+        string $frequency,
+        int $interval,
+        string $start,
+        string $expectedNext,
+    ): void {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Recurring');
+        $task->setDueDate(new \DateTimeImmutable($start));
+        $task->setDescription('Notes');
+        $task->setRecurrenceRule(['frequency' => $frequency, 'interval' => $interval]);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-06-01T12:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Task::class);
+        /** @var Task[] $all */
+        $all = $repo->findBy(['title' => 'Recurring']);
+        $this->assertCount(2, $all, 'Expected the original + a freshly cloned next occurrence.');
+
+        $completedRows = array_values(array_filter($all, fn (Task $t) => null !== $t->getCompletedOn()));
+        $pendingRows = array_values(array_filter($all, fn (Task $t) => null === $t->getCompletedOn()));
+        $this->assertCount(1, $completedRows);
+        $this->assertCount(1, $pendingRows);
+
+        $next = $pendingRows[0];
+        $this->assertNotNull($next->getDueDate());
+        $this->assertSame(
+            (new \DateTimeImmutable($expectedNext))->format('Y-m-d'),
+            $next->getDueDate()->format('Y-m-d'),
+        );
+        $this->assertSame('Notes', $next->getDescription());
+        $this->assertSame(
+            ['frequency' => $frequency, 'interval' => $interval],
+            $next->getRecurrenceRule(),
+        );
+    }
+
+    /**
+     * @return array<string, array{string, int, string, string}>
+     */
+    public static function provideRecurrenceAdvanceCases(): array
+    {
+        return [
+            'daily +1' => ['daily', 1, '2026-05-10T00:00:00+00:00', '2026-05-11'],
+            'daily +3' => ['daily', 3, '2026-05-10T00:00:00+00:00', '2026-05-13'],
+            'weekly +2' => ['weekly', 2, '2026-05-10T00:00:00+00:00', '2026-05-24'],
+            'monthly +1' => ['monthly', 1, '2026-05-10T00:00:00+00:00', '2026-06-10'],
+            'yearly +1' => ['yearly', 1, '2026-05-10T00:00:00+00:00', '2027-05-10'],
+        ];
+    }
+
+    public function testCompletingNonRecurringTaskDoesNotClone(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'One-shot');
+        $task->setDueDate(new \DateTimeImmutable('2026-05-10T00:00:00+00:00'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-06-01T12:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $count = (int) $this->entityManager->createQuery(
+            'SELECT COUNT(t) FROM App\Entity\Task t WHERE t.title = :title',
+        )->setParameter('title', 'One-shot')->getSingleScalarResult();
+        $this->assertSame(1, $count, 'Non-recurring task must not spawn an extra row.');
+    }
+
+    public function testReCompletingRecurringTaskDoesNotCreateAnotherOccurrence(): void
+    {
+        // Once a task is already completed, PATCHing completedOn again (e.g.
+        // touching another field on the completed row) must not produce a
+        // second clone — the trigger is the null → set transition only.
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Recurring twice');
+        $task->setDueDate(new \DateTimeImmutable('2026-05-10T00:00:00+00:00'));
+        $task->setRecurrenceRule(['frequency' => 'weekly', 'interval' => 1]);
+        $task->setCompletedOn(new \DateTimeImmutable('2026-05-11T00:00:00+00:00'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-05-12T00:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $count = (int) $this->entityManager->createQuery(
+            'SELECT COUNT(t) FROM App\Entity\Task t WHERE t.title = :title',
+        )->setParameter('title', 'Recurring twice')->getSingleScalarResult();
+        $this->assertSame(1, $count);
+    }
+
     public function testDeleteOwnTask(): void
     {
         $alice = $this->createUser('alice@example.com');

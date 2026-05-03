@@ -7,6 +7,7 @@ import {
   ArrowUpDown,
   Filter,
   GripVertical,
+  Repeat,
   Trash2,
   X,
 } from "lucide-react";
@@ -71,6 +72,13 @@ interface Tag {
   color: string;
 }
 
+type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+interface RecurrenceRule {
+  frequency: RecurrenceFrequency;
+  interval: number;
+}
+
 interface Task {
   "@id": string;
   id: string;
@@ -79,6 +87,7 @@ interface Task {
   createdOn: string;
   completedOn: string | null;
   dueDate: string | null;
+  recurrenceRule: RecurrenceRule | null;
   position: number;
   tags: Tag[];
   assignees: AssigneeOption[];
@@ -86,6 +95,19 @@ interface Task {
   // null means "personal task" — only the owner is assignable.
   project: string | null;
 }
+
+const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
+  daily: "day",
+  weekly: "week",
+  monthly: "month",
+  yearly: "year",
+};
+
+const formatRecurrenceSummary = (rule: RecurrenceRule): string => {
+  const noun = FREQUENCY_LABELS[rule.frequency];
+  if (rule.interval === 1) return `Every ${noun}`;
+  return `Every ${rule.interval} ${noun}s`;
+};
 
 interface ProjectMembership {
   "@id": string;
@@ -146,9 +168,21 @@ interface DueDateCellProps {
   onChange: (next: string | null) => void | Promise<void>;
   ariaLabel: string;
   testIdPrefix: string;
+  /** Optional recurrence controls. When `recurrenceValue` is provided we render
+   *  a frequency + interval picker in the same popover; clearing the date
+   *  also clears the rule (a recurrence with no anchor is invalid server-side). */
+  recurrenceValue?: RecurrenceRule | null;
+  onRecurrenceChange?: (next: RecurrenceRule | null) => void | Promise<void>;
 }
 
-const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellProps) => {
+const DueDateCell = ({
+  value,
+  onChange,
+  ariaLabel,
+  testIdPrefix,
+  recurrenceValue = null,
+  onRecurrenceChange,
+}: DueDateCellProps) => {
   const [open, setOpen] = useState(false);
   const selected = isoToLocalDate(value);
 
@@ -162,6 +196,11 @@ const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellPr
   const handleClear = () => {
     setOpen(false);
     if (value === null) return;
+    // Recurrence is meaningless without a date anchor; drop it together to
+    // avoid leaving the row in a state the server-side validator rejects.
+    if (recurrenceValue && onRecurrenceChange) {
+      void onRecurrenceChange(null);
+    }
     void onChange(null);
   };
 
@@ -172,10 +211,17 @@ const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellPr
           <button
             type="button"
             aria-label={ariaLabel}
-            className="text-left text-sm rounded-sm hover:text-foreground"
+            className="text-left text-sm rounded-sm hover:text-foreground inline-flex items-center gap-1"
             data-testid={testIdPrefix}
           >
-            {formatDueDate(value)}
+            <span>{formatDueDate(value)}</span>
+            {recurrenceValue && (
+              <Repeat
+                className="h-3 w-3 text-muted-foreground"
+                aria-label={formatRecurrenceSummary(recurrenceValue)}
+                data-testid={`${testIdPrefix}-repeat-icon`}
+              />
+            )}
           </button>
         ) : (
           <button
@@ -199,6 +245,13 @@ const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellPr
           onSelect={handleSelect}
           autoFocus
         />
+        {onRecurrenceChange && value && (
+          <RecurrencePicker
+            value={recurrenceValue}
+            onChange={onRecurrenceChange}
+            testIdPrefix={`${testIdPrefix}-recurrence`}
+          />
+        )}
         {value && (
           <div className="border-t p-2">
             <Button
@@ -215,6 +268,86 @@ const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellPr
         )}
       </PopoverContent>
     </Popover>
+  );
+};
+
+interface RecurrencePickerProps {
+  value: RecurrenceRule | null;
+  onChange: (next: RecurrenceRule | null) => void | Promise<void>;
+  testIdPrefix: string;
+}
+
+// Inline recurrence controls — renders inside the date popover so users
+// don't have to context-switch to set a repeat. "Off" clears the rule;
+// otherwise the (frequency, interval) pair is sent as a single update.
+const RecurrencePicker = ({ value, onChange, testIdPrefix }: RecurrencePickerProps) => {
+  const frequency: "off" | RecurrenceFrequency = value?.frequency ?? "off";
+  const interval = value?.interval ?? 1;
+
+  const handleFrequencyChange = (next: string) => {
+    if (next === "off") {
+      void onChange(null);
+      return;
+    }
+    void onChange({ frequency: next as RecurrenceFrequency, interval });
+  };
+
+  const handleIntervalChange = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed) || parsed < 1) return;
+    if (!value) return;
+    void onChange({ frequency: value.frequency, interval: parsed });
+  };
+
+  return (
+    <div className="border-t p-2 space-y-2 min-w-56">
+      <div className="flex items-center gap-2 text-sm">
+        <Repeat className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        <label
+          htmlFor={`${testIdPrefix}-frequency`}
+          className="text-muted-foreground"
+        >
+          Repeat
+        </label>
+        <select
+          id={`${testIdPrefix}-frequency`}
+          value={frequency}
+          onChange={(e) => handleFrequencyChange(e.target.value)}
+          className="ml-auto h-8 rounded-md border border-input bg-background px-2 text-sm"
+          data-testid={`${testIdPrefix}-frequency`}
+        >
+          <option value="off">Off</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </div>
+      {value && (
+        <div className="flex items-center gap-2 text-sm">
+          <label
+            htmlFor={`${testIdPrefix}-interval`}
+            className="text-muted-foreground"
+          >
+            Every
+          </label>
+          <Input
+            id={`${testIdPrefix}-interval`}
+            type="number"
+            min={1}
+            max={99}
+            value={interval}
+            onChange={(e) => handleIntervalChange(e.target.value)}
+            className="h-8 w-16"
+            data-testid={`${testIdPrefix}-interval`}
+          />
+          <span className="text-muted-foreground">
+            {FREQUENCY_LABELS[value.frequency]}
+            {interval === 1 ? "" : "s"}
+          </span>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -274,6 +407,7 @@ interface TaskRowProps {
   onTitleChange: (task: Task, nextTitle: string) => Promise<void>;
   onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
   onDueDateChange: (task: Task, nextDueDate: string | null) => Promise<void>;
+  onRecurrenceChange: (task: Task, nextRule: RecurrenceRule | null) => Promise<void>;
   onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
   onAssigneeAvatarClick: (assignee: AssigneeOption) => void;
 }
@@ -289,6 +423,7 @@ const TaskRow = ({
   onTitleChange,
   onDescriptionChange,
   onDueDateChange,
+  onRecurrenceChange,
   onAssigneesChange,
   onAssigneeAvatarClick,
 }: TaskRowProps) => {
@@ -436,6 +571,8 @@ const TaskRow = ({
             onChange={(next) => onDueDateChange(task, next)}
             ariaLabel={`Due date for "${task.title}"`}
             testIdPrefix="task-due-date"
+            recurrenceValue={task.recurrenceRule}
+            onRecurrenceChange={(next) => onRecurrenceChange(task, next)}
           />
         </TableCell>
         <TableCell className="align-top" data-testid="task-tags">
@@ -933,6 +1070,11 @@ const Tasks = () => {
     // state without waiting for the server round-trip.
     const previous = tasks;
     const nextCompletedOn = task.completedOn ? null : new Date().toISOString();
+    // Completing a recurring task spawns a fresh occurrence server-side; we
+    // need to refetch so that new row appears in the list. Toggling *off*
+    // (un-completing) doesn't need a refetch.
+    const willSpawnNextOccurrence =
+      !task.completedOn && task.recurrenceRule !== null && task.dueDate !== null;
     setTasks(
       tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t)),
     );
@@ -947,6 +1089,9 @@ const Tasks = () => {
       });
       if (!res.ok) {
         throw new Error("Failed to update task.");
+      }
+      if (willSpawnNextOccurrence) {
+        await loadData();
       }
     } catch (err) {
       setTasks(previous);
@@ -1024,6 +1169,40 @@ const Tasks = () => {
     } catch (err) {
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update description.");
+    }
+  };
+
+  const handleRecurrenceChange = async (
+    task: Task,
+    nextRule: RecurrenceRule | null,
+  ) => {
+    const previous = tasks;
+    setTasks(
+      tasks.map((t) =>
+        t["@id"] === task["@id"] ? { ...t, recurrenceRule: nextRule } : t,
+      ),
+    );
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ recurrenceRule: nextRule }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to update recurrence.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update recurrence.");
     }
   };
 
@@ -1390,6 +1569,7 @@ const Tasks = () => {
                           onTitleChange={handleTitleChange}
                           onDescriptionChange={handleDescriptionChange}
                           onDueDateChange={handleDueDateChange}
+                          onRecurrenceChange={handleRecurrenceChange}
                           onAssigneesChange={handleAssigneesChange}
                           onAssigneeAvatarClick={(assignee) =>
                             setAssigneeFilter(assignee["@id"])
