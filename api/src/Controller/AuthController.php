@@ -46,6 +46,9 @@ class AuthController extends AbstractController
             'nickname' => $user->getNickname(),
             'personalizedColor' => $user->getPersonalizedColor(),
             'avatarUrls' => $user->getAvatarUrls(),
+            // Inlined so the PWA can apply the saved theme on initial render
+            // without an extra round-trip to /me/preferences.
+            'preferences' => $user->getPreferences(),
         ];
     }
 }

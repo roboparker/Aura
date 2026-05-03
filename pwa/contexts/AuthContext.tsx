@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { useTheme } from "next-themes";
 import { ENTRYPOINT } from "../config/entrypoint";
+
+export type ThemePreference = "light" | "dark" | "system";
+export type NotificationFrequency = "realtime" | "hourly" | "daily";
+
+export interface UserPreferences {
+  theme: ThemePreference;
+  emailNotificationsEnabled: boolean;
+  pushNotificationsEnabled: boolean;
+  notificationFrequency: NotificationFrequency;
+}
 
 export interface User {
   id: string;
@@ -10,6 +21,9 @@ export interface User {
   nickname: string | null;
   personalizedColor: string;
   avatarUrls: { thumb?: string; profile?: string } | null;
+  // Inlined on /api/me so the PWA can apply the saved theme on first paint.
+  // Always present — the API merges in defaults for older rows.
+  preferences: UserPreferences;
 }
 
 export interface RegisterInput {
@@ -46,8 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { setTheme } = useTheme();
 
   const clearError = useCallback(() => setError(null), []);
+
+  // Apply the user's saved theme whenever the profile changes (login, refresh,
+  // settings update via updateUserLocally). This makes the theme follow the
+  // user across devices instead of being pinned to whatever localStorage on
+  // *this* browser remembers from a prior visit.
+  useEffect(() => {
+    const theme = user?.preferences?.theme;
+    if (theme) setTheme(theme);
+  }, [user?.preferences?.theme, setTheme]);
 
   const fetchMe = useCallback(async () => {
     try {
