@@ -22,21 +22,24 @@ async function registerAndSignIn(page, email, password = "password123", options 
 }
 
 /**
- * Type into the BlockNote description editor. The editor is a contenteditable
- * ProseMirror instance wrapped in our MarkdownEditor component, which exposes
- * an `aria-label` starting with "Description" (e.g. "Description",
- * "Description for new task", or `Description for "task title"`). Playwright's
- * `.fill()` is brittle on block editors, so we click into the editable and
- * use keyboard.type.
+ * Type into a BlockNote editor — used for both task descriptions and task
+ * comments. The editor is a contenteditable ProseMirror instance wrapped
+ * in our MarkdownEditor component, which exposes an `aria-label` set by the
+ * caller (e.g. "Description", `Description for "task title"`,
+ * `Comment on "task title"`, "Edit comment"). Playwright's `.fill()` is
+ * brittle on block editors, so we click into the editable and use
+ * keyboard.type.
  *
  * @param {import('@playwright/test').Page} page
  * @param {import('@playwright/test').Locator | undefined} scope optional scope (e.g. a specific edit form)
  * @param {string} text
+ * @param {{ ariaLabelPrefix?: string }} [options] aria-label prefix to disambiguate when multiple editors exist in scope; defaults to "Description"
  */
-async function fillDescription(page, scope, text) {
+async function fillDescription(page, scope, text, options = {}) {
+  const { ariaLabelPrefix = "Description" } = options;
   const root = scope ?? page;
   const editor = root
-    .locator('[aria-label^="Description"] [contenteditable="true"]')
+    .locator(`[aria-label^="${ariaLabelPrefix}"] [contenteditable="true"]`)
     .first();
   await editor.click();
   // Clear any existing content (edit mode pre-populates the block editor).
