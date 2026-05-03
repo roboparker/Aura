@@ -64,7 +64,11 @@ jobs:
         run: docker compose exec -T php bin/console -e test doctrine:migrations:migrate --no-interaction
       -
         name: Run PHPUnit
-        run: docker compose exec -T php bin/phpunit
+        # PHPUnit's deprecation tracker accumulates context across the whole
+        # suite, so peak memory grows with test count. The default 128M was
+        # tight even before; bumping to 512M leaves headroom as the suite
+        # keeps growing.
+        run: docker compose exec -T php php -d memory_limit=512M bin/phpunit
       -
         name: Doctrine Schema Validator
         run: docker compose exec -T php bin/console -e test doctrine:schema:validate

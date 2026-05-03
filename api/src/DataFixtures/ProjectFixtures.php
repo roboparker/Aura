@@ -55,16 +55,19 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $project->addMember($ada);
         $manager->persist($project);
 
+        // [title, description, tagTitles, assignees]. Mix of solo, joint,
+        // and unassigned tasks so the avatar group, "Assigned to me" filter,
+        // and "Assign" empty-state all show up in the demo data.
         $taskDefinitions = [
-            ['Wire up Stripe checkout', 'Hook the pricing page CTA to a Stripe-hosted checkout session.', ['urgent', 'backend']],
-            ['Draft onboarding email', 'Three-step welcome series. Tone: friendly, no jargon.', ['docs']],
-            ['Polish empty states', "Replace the placeholder copy on Projects, Tasks, and Tags with the new illustrations.", ['design']],
-            ['Add password-reset rate limiting', 'Limit to 3 attempts per email per hour.', ['urgent', 'backend']],
-            ['Write API auth docs', 'Cover login, refresh, and logout end-to-end.', ['docs']],
+            ['Wire up Stripe checkout', 'Hook the pricing page CTA to a Stripe-hosted checkout session.', ['urgent', 'backend'], [$uma]],
+            ['Draft onboarding email', 'Three-step welcome series. Tone: friendly, no jargon.', ['docs'], [$ada]],
+            ['Polish empty states', "Replace the placeholder copy on Projects, Tasks, and Tags with the new illustrations.", ['design'], [$uma, $ada]],
+            ['Add password-reset rate limiting', 'Limit to 3 attempts per email per hour.', ['urgent', 'backend'], []],
+            ['Write API auth docs', 'Cover login, refresh, and logout end-to-end.', ['docs'], [$ada]],
         ];
 
         $position = 0;
-        foreach ($taskDefinitions as [$title, $description, $tagTitles]) {
+        foreach ($taskDefinitions as [$title, $description, $tagTitles, $assignees]) {
             $task = new Task();
             $task->setOwner($uma);
             $task->setProject($project);
@@ -73,6 +76,9 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
             $task->setPosition($position++);
             foreach ($tagTitles as $tagTitle) {
                 $task->addTag($tags[$tagTitle]);
+            }
+            foreach ($assignees as $assignee) {
+                $task->addAssignee($assignee);
             }
             $manager->persist($task);
         }
@@ -84,6 +90,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $personal->setTitle('Plan team offsite');
         $personal->setDescription('Shortlist three venues and email Ada for input.');
         $personal->setPosition($position++);
+        $personal->addAssignee($uma);
         $manager->persist($personal);
 
         $done = new Task();

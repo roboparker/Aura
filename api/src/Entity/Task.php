@@ -12,6 +12,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
+use App\Validator\ValidAssignees;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -42,12 +43,13 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'assignees' => 'exact'])]
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
 #[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
+#[ValidAssignees]
 class Task
 {
     #[ORM\Id]
@@ -120,10 +122,26 @@ class Task
     #[Groups(['task:read', 'task:write'])]
     private Collection $tags;
 
+    /**
+     * Users assigned to this task. Always a subset of {owner ∪ project members}
+     * — enforced by ValidAssignees on persist. Assignment is purely a "who's
+     * responsible" label; it grants no extra read/edit privileges (those still
+     * follow owner + project membership).
+     *
+     * @var Collection<int, User>
+     */
+    #[ORM\ManyToMany(targetEntity: User::class)]
+    #[ORM\JoinTable(name: 'task_assignee')]
+    #[ORM\JoinColumn(name: 'task_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['task:read', 'task:write'])]
+    private Collection $assignees;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tags = new ArrayCollection();
+        $this->assignees = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -237,6 +255,28 @@ class Task
     public function removeTag(Tag $tag): static
     {
         $this->tags->removeElement($tag);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, User>
+     */
+    public function getAssignees(): Collection
+    {
+        return $this->assignees;
+    }
+
+    public function addAssignee(User $user): static
+    {
+        if (!$this->assignees->contains($user)) {
+            $this->assignees->add($user);
+        }
+        return $this;
+    }
+
+    public function removeAssignee(User $user): static
+    {
+        $this->assignees->removeElement($user);
         return $this;
     }
 }
