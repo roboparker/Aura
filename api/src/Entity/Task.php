@@ -12,7 +12,9 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
+use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
+use App\Validator\ValidRecurrence;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -34,6 +36,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
+            processor: TaskUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
@@ -50,6 +53,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
 #[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
 #[ValidAssignees]
+#[ValidRecurrence]
 class Task
 {
     #[ORM\Id]
@@ -96,6 +100,20 @@ class Task
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private ?\DateTimeImmutable $dueDate = null;
+
+    /**
+     * Optional recurrence rule. Persisted as a JSON object with shape
+     * `{"frequency": "daily"|"weekly"|"monthly"|"yearly", "interval": int}`.
+     * Validated in detail by {@see ValidRecurrence}; the cross-field rule
+     * (recurrence requires a due date) lives there too. When set, completing
+     * the task triggers {@see TaskUpdateProcessor} to clone the next
+     * occurrence with `dueDate` advanced by the rule.
+     *
+     * @var array{frequency: string, interval: int}|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['task:read', 'task:write'])]
+    private ?array $recurrenceRule = null;
 
     /**
      * Per-owner sort key. Lower positions render first. Set server-side:
@@ -222,6 +240,23 @@ class Task
     public function setDueDate(?\DateTimeImmutable $dueDate): static
     {
         $this->dueDate = $dueDate;
+        return $this;
+    }
+
+    /**
+     * @return array{frequency: string, interval: int}|null
+     */
+    public function getRecurrenceRule(): ?array
+    {
+        return $this->recurrenceRule;
+    }
+
+    /**
+     * @param array{frequency: string, interval: int}|null $recurrenceRule
+     */
+    public function setRecurrenceRule(?array $recurrenceRule): static
+    {
+        $this->recurrenceRule = $recurrenceRule;
         return $this;
     }
 

@@ -87,6 +87,60 @@ test.describe("Tasks", () => {
     await expect(page).toHaveURL(/\/tasks$/);
   });
 
+  test("setting a weekly recurrence shows a repeat icon and spawns the next occurrence on completion", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+
+    // Seed a task with a known due date via the API so the recurrence-advance
+    // assertion below can predict the next occurrence's date deterministically.
+    const title = `Water plants ${Date.now()}`;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 3);
+    startDate.setHours(0, 0, 0, 0);
+    const createRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title, dueDate: startDate.toISOString() },
+    });
+    expect(createRes.ok()).toBeTruthy();
+
+    await page.goto(`${BASE_URL}/tasks`);
+    const item = page.locator('[data-testid="task-item"]', { hasText: title });
+    await expect(item).toBeVisible();
+
+    // Open picker, set weekly recurrence with interval 2
+    await item.locator('[data-testid="task-due-date"]').click();
+    await page
+      .locator('[data-testid="task-due-date-recurrence-frequency"]')
+      .selectOption("weekly");
+    await page
+      .locator('[data-testid="task-due-date-recurrence-interval"]')
+      .fill("2");
+    // Close popover by clicking outside
+    await page.keyboard.press("Escape");
+
+    // Repeat icon now shows on the row
+    await expect(
+      item.locator('[data-testid="task-due-date-repeat-icon"]'),
+    ).toBeVisible();
+
+    // Complete the task — backend clones the next occurrence; frontend
+    // refetches because the toggled task carries a recurrence rule.
+    await item.locator('input[type="checkbox"]').check();
+
+    // Two rows now share the title — one completed (the original) and one
+    // pending (the next occurrence, due 14 days after the original date).
+    const allRows = page.locator('[data-testid="task-item"]', { hasText: title });
+    await expect(allRows).toHaveCount(2);
+
+    // The new row also shows the recurrence icon (rule carries over).
+    await expect(
+      allRows
+        .filter({ hasNot: page.locator("input[type=checkbox]:checked") })
+        .locator('[data-testid="task-due-date-repeat-icon"]'),
+    ).toBeVisible();
+  });
+
   test("user can reorder tasks via keyboard drag", async ({ page }) => {
     // dnd-kit's KeyboardSensor is deterministic across browsers, unlike
     // pointer-based drag which is flaky with dnd-kit's distance constraint.
