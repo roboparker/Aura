@@ -16,6 +16,7 @@ use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
 use App\Validator\ValidRecurrence;
 use App\Validator\ValidReminders;
+use App\Validator\ValidTaskAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -56,6 +57,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ValidAssignees]
 #[ValidRecurrence]
 #[ValidReminders]
+#[ValidTaskAttachments]
 class Task
 {
     #[ORM\Id]
@@ -170,11 +172,28 @@ class Task
     #[Groups(['task:read', 'task:write'])]
     private Collection $assignees;
 
+    /**
+     * MediaObjects attached to this task. Membership is edited via PATCH
+     * with an `attachments` array of MediaObject IRIs; the PWA uploads via
+     * `POST /media-objects` (kind=attachment) first to obtain the IRI.
+     * {@see ValidTaskAttachments} enforces that each attached MediaObject
+     * belongs to the current user and is the right kind.
+     *
+     * @var Collection<int, MediaObject>
+     */
+    #[ORM\ManyToMany(targetEntity: MediaObject::class)]
+    #[ORM\JoinTable(name: 'task_attachment')]
+    #[ORM\JoinColumn(name: 'task_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'media_object_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['task:read', 'task:write'])]
+    private Collection $attachments;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tags = new ArrayCollection();
         $this->assignees = new ArrayCollection();
+        $this->attachments = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -346,6 +365,28 @@ class Task
     public function removeAssignee(User $user): static
     {
         $this->assignees->removeElement($user);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, MediaObject>
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function addAttachment(MediaObject $media): static
+    {
+        if (!$this->attachments->contains($media)) {
+            $this->attachments->add($media);
+        }
+        return $this;
+    }
+
+    public function removeAttachment(MediaObject $media): static
+    {
+        $this->attachments->removeElement($media);
         return $this;
     }
 }
