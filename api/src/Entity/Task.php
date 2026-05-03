@@ -5,6 +5,7 @@ namespace App\Entity;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
+use App\Filter\OverdueFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -27,6 +28,11 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            // The navbar badge polls `?overdue=true&itemsPerPage=1` so it can
+            // read just `totalItems` and skip downloading task bodies. Without
+            // client-controlled pagination the per-page size is fixed at the
+            // 30-item default and the savings disappear.
+            paginationClientItemsPerPage: true,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -48,6 +54,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
 #[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'assignees' => 'exact'])]
+#[ApiFilter(OverdueFilter::class)]
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
