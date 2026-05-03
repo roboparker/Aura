@@ -91,6 +91,10 @@ class Task
     #[Groups(['task:read', 'task:write'])]
     private ?\DateTimeImmutable $completedOn = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['task:read', 'task:write'])]
+    private ?\DateTimeImmutable $dueDate = null;
+
     /**
      * Per-owner sort key. Lower positions render first. Set server-side:
      * assigned by the persist processor on create, rewritten in bulk by the
@@ -190,6 +194,17 @@ class Task
     public function isCompleted(): bool
     {
         return null !== $this->completedOn;
+    }
+
+    public function getDueDate(): ?\DateTimeImmutable
+    {
+        return $this->dueDate;
+    }
+
+    public function setDueDate(?\DateTimeImmutable $dueDate): static
+    {
+        $this->dueDate = $dueDate;
+        return $this;
     }
 
     public function getPosition(): int

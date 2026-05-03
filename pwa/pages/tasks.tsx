@@ -51,6 +51,7 @@ interface Task {
   description: string | null;
   createdOn: string;
   completedOn: string | null;
+  dueDate: string | null;
   position: number;
   tags: Tag[];
 }
@@ -65,7 +66,7 @@ interface Collection<T> {
 // active in this mode because anything else would snap rows back the moment
 // we re-sorted. The other keys are derived sort orders that don't touch the
 // underlying tasks array, just the rendered view.
-type SortKey = "manual" | "completed" | "title";
+type SortKey = "manual" | "completed" | "title" | "due";
 type SortDir = "asc" | "desc";
 
 interface SortState {
@@ -74,6 +75,110 @@ interface SortState {
 }
 
 const DEFAULT_SORT: SortState = { key: "manual", dir: "asc" };
+
+// Native `<input type="date">` works in YYYY-MM-DD; the API stores a full
+// ISO datetime. We persist UTC midnight on the picked day so round-trips
+// are stable across timezones — what the user picked is what they see.
+const isoToDateInput = (iso: string | null): string => {
+  if (!iso) return "";
+  // Slice off the date portion of the ISO string so we read back exactly
+  // the day the user picked, regardless of local timezone offsets.
+  return iso.slice(0, 10);
+};
+
+const dateInputToIso = (value: string): string | null => {
+  if (!value) return null;
+  return `${value}T00:00:00+00:00`;
+};
+
+const dueDateFormatter = new Intl.DateTimeFormat(undefined, {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+});
+
+const formatDueDate = (iso: string | null): string => {
+  if (!iso) return "";
+  // Build the date from the YYYY-MM-DD slice so we ignore the stored UTC
+  // time portion — picking "Jun 1" should display "Jun 1" everywhere.
+  const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
+  if (!year || !month || !day) return "";
+  return dueDateFormatter.format(new Date(year, month - 1, day));
+};
+
+interface DueDateCellProps {
+  value: string | null;
+  onChange: (next: string | null) => void | Promise<void>;
+  ariaLabel: string;
+  testIdPrefix: string;
+}
+
+const DueDateCell = ({ value, onChange, ariaLabel, testIdPrefix }: DueDateCellProps) => {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(isoToDateInput(value));
+
+  useEffect(() => {
+    if (!editing) setDraft(isoToDateInput(value));
+  }, [value, editing]);
+
+  const commit = (raw: string) => {
+    setEditing(false);
+    const next = dateInputToIso(raw);
+    if (next === value) return;
+    void onChange(next);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="date"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit((e.target as HTMLInputElement).value);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setDraft(isoToDateInput(value));
+            setEditing(false);
+          }
+        }}
+        aria-label={ariaLabel}
+        data-testid={`${testIdPrefix}-input`}
+        className="h-8 rounded-md border border-input bg-transparent px-2 text-sm shadow-xs"
+      />
+    );
+  }
+
+  if (value) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        aria-label={ariaLabel}
+        className="text-left text-sm rounded-sm hover:text-foreground"
+        data-testid={testIdPrefix}
+      >
+        {formatDueDate(value)}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      aria-label={ariaLabel}
+      className="text-left text-sm italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
+      data-testid={`${testIdPrefix}-add`}
+    >
+      Add date
+    </button>
+  );
+};
 
 // Strip the most common markdown punctuation so the description in the
 // dedicated sub-row reads as plain text. We keep paragraph breaks via `\n`
@@ -129,6 +234,7 @@ interface TaskRowProps {
   onTagsChange: (task: Task, nextTagIris: string[]) => Promise<void>;
   onTitleChange: (task: Task, nextTitle: string) => Promise<void>;
   onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
+  onDueDateChange: (task: Task, nextDueDate: string | null) => Promise<void>;
 }
 
 const TaskRow = ({
@@ -140,6 +246,7 @@ const TaskRow = ({
   onTagsChange,
   onTitleChange,
   onDescriptionChange,
+  onDueDateChange,
 }: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
@@ -279,6 +386,14 @@ const TaskRow = ({
             </button>
           )}
         </TableCell>
+        <TableCell className="align-top" data-testid="task-due">
+          <DueDateCell
+            value={task.dueDate}
+            onChange={(next) => onDueDateChange(task, next)}
+            ariaLabel={`Due date for "${task.title}"`}
+            testIdPrefix="task-due-date"
+          />
+        </TableCell>
         <TableCell className="align-top" data-testid="task-tags">
           <TagsCombobox
             value={task.tags}
@@ -308,7 +423,7 @@ const TaskRow = ({
             pixel-math with pl-24. */}
         <TableCell className="w-8" aria-hidden="true" />
         <TableCell className="w-10" aria-hidden="true" />
-        <TableCell colSpan={3} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+        <TableCell colSpan={4} className="pl-0 pr-4 pt-0 pb-3 text-sm">
           {editingDesc ? (
             <div className="space-y-2">
               <MarkdownEditor
@@ -367,6 +482,7 @@ interface NewTaskInput {
   title: string;
   description: string | null;
   tags: string[];
+  dueDate: string | null;
 }
 
 interface NewTaskRowProps {
@@ -384,6 +500,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [dueDate, setDueDate] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   // Description inline editing — local-only; nothing hits the API until
@@ -418,6 +535,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
     setTitle("");
     setDescription(null);
     setTags([]);
+    setDueDate(null);
     setEditingDesc(false);
     setDescDraft("");
   };
@@ -430,6 +548,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
         title: trimmed,
         description,
         tags: tags.map((tag) => tag["@id"]),
+        dueDate,
       });
       reset();
       // Refocus on next tick so the input isn't briefly disabled when we
@@ -471,6 +590,14 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
             data-testid="new-task-title-input"
           />
         </TableCell>
+        <TableCell className="align-top" data-testid="new-task-due">
+          <DueDateCell
+            value={dueDate}
+            onChange={(next) => setDueDate(next)}
+            ariaLabel="Due date for new task"
+            testIdPrefix="new-task-due-date"
+          />
+        </TableCell>
         <TableCell className="align-top" data-testid="new-task-tags">
           <TagsCombobox
             value={tags}
@@ -487,7 +614,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
       >
         <TableCell className="w-8" aria-hidden="true" />
         <TableCell className="w-10" aria-hidden="true" />
-        <TableCell colSpan={3} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+        <TableCell colSpan={4} className="pl-0 pr-4 pt-0 pb-3 text-sm">
           {editingDesc ? (
             <div className="space-y-2">
               <MarkdownEditor
@@ -619,6 +746,7 @@ const Tasks = () => {
           title: trimmed,
           description: input.description,
           tags: input.tags,
+          dueDate: input.dueDate,
         }),
       });
       if (!res.ok) {
@@ -737,6 +865,33 @@ const Tasks = () => {
     }
   };
 
+  const handleDueDateChange = async (task: Task, nextDueDate: string | null) => {
+    // Optimistic due-date update; rollback on server reject.
+    const previous = tasks;
+    setTasks(
+      tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, dueDate: nextDueDate } : t)),
+    );
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ dueDate: nextDueDate }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description || data.detail || data["hydra:description"] || "Failed to update due date.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update due date.");
+    }
+  };
+
   const handleTagsChange = async (task: Task, nextTagIris: string[]) => {
     // Optimistic update so badges appear instantly. Roll back on server reject.
     const previous = tasks;
@@ -815,6 +970,15 @@ const Tasks = () => {
           return ((a.completedOn ? 1 : 0) - (b.completedOn ? 1 : 0)) * flip;
         case "title":
           return a.title.localeCompare(b.title) * flip;
+        case "due": {
+          // Null due dates always sort to the end regardless of direction.
+          const aMissing = !a.dueDate;
+          const bMissing = !b.dueDate;
+          if (aMissing && bMissing) return 0;
+          if (aMissing) return 1;
+          if (bMissing) return -1;
+          return a.dueDate!.localeCompare(b.dueDate!) * flip;
+        }
         default:
           return 0;
       }
@@ -888,6 +1052,13 @@ const Tasks = () => {
                             active={sort}
                             onSort={handleSort}
                           />
+                          <SortableHeader
+                            label="Due"
+                            sortKey="due"
+                            active={sort}
+                            onSort={handleSort}
+                            className="w-36"
+                          />
                           <TableHead>Tags</TableHead>
                           <TableHead className="w-20 text-right">Actions</TableHead>
                         </TableRow>
@@ -908,6 +1079,7 @@ const Tasks = () => {
                           onTagsChange={handleTagsChange}
                           onTitleChange={handleTitleChange}
                           onDescriptionChange={handleDescriptionChange}
+                          onDueDateChange={handleDueDateChange}
                         />
                       ))}
                     </Table>
