@@ -45,10 +45,13 @@ test.describe("Task attachments", () => {
       item.locator('[data-testid="task-attachments-toggle"]'),
     ).toContainText("Attachments (1)");
 
-    // Download link points at the served media path.
+    // Download link points at the authenticated media-object download
+    // endpoint (which 404s for callers who can't read the host task);
+    // the panel falls back to the public /media/ URL only for legacy
+    // payloads with no downloadUrl.
     const link = attachment.locator('[data-testid="attachment-link"]');
     const href = await link.getAttribute("href");
-    expect(href).toMatch(/^\/media\/attachments\//);
+    expect(href).toMatch(/^\/media-objects\/[0-9a-f-]+\/download$/);
 
     // Remove the attachment.
     await attachment.locator('[data-testid="attachment-delete"]').click();

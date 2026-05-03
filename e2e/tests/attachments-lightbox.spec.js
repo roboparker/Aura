@@ -150,6 +150,11 @@ test.describe("Image attachment lightbox", () => {
     const link = attachment.locator('[data-testid="attachment-link"]');
     const tag = await link.evaluate((el) => el.tagName.toLowerCase());
     expect(tag).toBe("a");
-    expect(await link.getAttribute("href")).toMatch(/^\/media\/attachments\//);
+    // Non-image attachments now route through the gated download endpoint
+    // introduced in #112; legacy `/media/attachments/...` URLs still resolve
+    // but the panel no longer constructs them.
+    expect(await link.getAttribute("href")).toMatch(
+      /^\/media-objects\/[0-9a-f-]+\/download$/,
+    );
   });
 });
