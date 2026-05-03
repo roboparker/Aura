@@ -479,6 +479,101 @@ class TaskTest extends ApiTestCase
         $this->assertSame(1, $count);
     }
 
+    public function testCreateTaskWithReminders(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Take medication',
+                'dueDate' => '2026-06-01T08:00:00+00:00',
+                'reminders' => ['1h', '15m'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $task = $this->reloadTaskByTitle('Take medication');
+        $this->assertSame(['1h', '15m'], $task->getReminders());
+    }
+
+    public function testRemindersWithoutDueDateAreRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Orphan reminder',
+                'reminders' => ['1h'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testInvalidReminderOffsetIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Bad offset',
+                'dueDate' => '2026-06-01T08:00:00+00:00',
+                'reminders' => ['2h'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testDuplicateReminderOffsetIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Dup offset',
+                'dueDate' => '2026-06-01T08:00:00+00:00',
+                'reminders' => ['1h', '1h'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testEmptyRemindersArrayIsAllowedWithoutDueDate(): void
+    {
+        // Equivalent to "no reminders" — must not trip the dueDate-required
+        // rule, otherwise users couldn't clear reminders before clearing
+        // the due date.
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'No reminders',
+                'reminders' => [],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $task = $this->reloadTaskByTitle('No reminders');
+        $this->assertNull($task->getReminders());
+    }
+
     public function testDeleteOwnTask(): void
     {
         $alice = $this->createUser('alice@example.com');
