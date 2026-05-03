@@ -76,9 +76,15 @@ test.describe("Tasks", () => {
   test("account menu shows Tasks link when authenticated", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     await openAccountMenu(page);
-    await expect(page.locator('nav >> text=Tasks')).toBeVisible();
-    await page.locator('nav >> text=Tasks').click();
-    await expect(page).toHaveURL(/\/tasks/);
+    // `text=Tasks` would substring-match the new "My Tasks" entry too —
+    // pin to an exact-name role lookup so each link is targeted on its own.
+    const tasksLink = page.locator("nav").getByRole("link", {
+      name: "Tasks",
+      exact: true,
+    });
+    await expect(tasksLink).toBeVisible();
+    await tasksLink.click();
+    await expect(page).toHaveURL(/\/tasks$/);
   });
 
   test("user can reorder tasks via keyboard drag", async ({ page }) => {
