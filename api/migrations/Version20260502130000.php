@@ -27,16 +27,19 @@ final class Version20260502130000 extends AbstractMigration
             user_id UUID NOT NULL,
             PRIMARY KEY (task_id, user_id)
         )');
-        $this->addSql('CREATE INDEX IDX_TA_TASK ON task_assignee (task_id)');
-        $this->addSql('CREATE INDEX IDX_TA_USER ON task_assignee (user_id)');
-        $this->addSql('ALTER TABLE task_assignee ADD CONSTRAINT FK_TA_TASK FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE NOT DEFERRABLE');
-        $this->addSql('ALTER TABLE task_assignee ADD CONSTRAINT FK_TA_USER FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
+        // Index/FK names follow Doctrine's IDX_/FK_<sha1-prefix> convention so
+        // `doctrine:schema:validate` stays happy. The 3C5D1640 prefix is the
+        // table-name hash; the suffix on each is the column-name hash.
+        $this->addSql('CREATE INDEX IDX_3C5D16408DB60186 ON task_assignee (task_id)');
+        $this->addSql('CREATE INDEX IDX_3C5D1640A76ED395 ON task_assignee (user_id)');
+        $this->addSql('ALTER TABLE task_assignee ADD CONSTRAINT FK_3C5D16408DB60186 FOREIGN KEY (task_id) REFERENCES task (id) ON DELETE CASCADE NOT DEFERRABLE');
+        $this->addSql('ALTER TABLE task_assignee ADD CONSTRAINT FK_3C5D1640A76ED395 FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE NOT DEFERRABLE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE task_assignee DROP CONSTRAINT FK_TA_USER');
-        $this->addSql('ALTER TABLE task_assignee DROP CONSTRAINT FK_TA_TASK');
+        $this->addSql('ALTER TABLE task_assignee DROP CONSTRAINT FK_3C5D1640A76ED395');
+        $this->addSql('ALTER TABLE task_assignee DROP CONSTRAINT FK_3C5D16408DB60186');
         $this->addSql('DROP TABLE task_assignee');
     }
 }
