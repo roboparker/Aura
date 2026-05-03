@@ -141,6 +141,73 @@ test.describe("Tasks", () => {
     ).toBeVisible();
   });
 
+  test("quick-pick sets a due date and shows today/overdue indicators", async ({
+    page,
+  }) => {
+    // Two tasks: one we mark overdue via the API (yesterday), one we set to
+    // today via the UI quick-pick. Verifies styling + filter chip count.
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/tasks`);
+
+    const todayTitle = `Today task ${Date.now()}`;
+    await createTaskInline(page, todayTitle);
+
+    // Open the picker on the new "today" task and click the Today quick-pick.
+    const todayItem = page.locator('[data-testid="task-item"]', {
+      hasText: todayTitle,
+    });
+    await todayItem.locator('[data-testid="task-due-date-add"]').click();
+    await page.locator('[data-testid="task-due-date-quick-today"]').click();
+    const todayCell = todayItem.locator('[data-testid="task-due-date"]');
+    await expect(todayCell).toHaveAttribute("data-status", "today");
+
+    // Create an overdue task by patching dueDate to yesterday via the API.
+    const overdueTitle = `Overdue task ${Date.now()}`;
+    const createRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title: overdueTitle },
+    });
+    expect(createRes.ok()).toBeTruthy();
+    const created = await createRes.json();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    const patchRes = await page.request.patch(`${BASE_URL}${created["@id"]}`, {
+      headers: { "Content-Type": "application/merge-patch+json" },
+      data: { dueDate: yesterday.toISOString() },
+    });
+    expect(patchRes.ok()).toBeTruthy();
+    await page.reload();
+
+    const overdueItem = page.locator('[data-testid="task-item"]', {
+      hasText: overdueTitle,
+    });
+    const overdueCell = overdueItem.locator('[data-testid="task-due-date"]');
+    await expect(overdueCell).toHaveAttribute("data-status", "overdue");
+    await expect(
+      overdueItem.locator('[data-testid="task-due-date-overdue-icon"]'),
+    ).toBeVisible();
+
+    // Filter chip reports a count and toggles the list.
+    const filter = page.locator('[data-testid="overdue-filter-toggle"]');
+    await expect(
+      filter.locator('[data-testid="overdue-filter-count"]'),
+    ).toHaveText("1");
+    await filter.click();
+    await expect(overdueItem).toBeVisible();
+    await expect(todayItem).not.toBeVisible();
+
+    // Completing the overdue task strips the overdue status (no longer a
+    // missed deadline once the work is done). Clear the overdue filter
+    // *before* completing so the row stays mounted while .check() waits
+    // for the controlled checkbox to flip — completing while filtered
+    // would yank the row out of view and time the check out.
+    await filter.click();
+    await expect(todayItem).toBeVisible();
+    await overdueItem.locator('input[type="checkbox"]').check();
+    await expect(overdueCell).toHaveAttribute("data-status", "none");
+  });
+
   test("user can reorder tasks via keyboard drag", async ({ page }) => {
     // dnd-kit's KeyboardSensor is deterministic across browsers, unlike
     // pointer-based drag which is flaky with dnd-kit's distance constraint.
