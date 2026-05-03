@@ -112,6 +112,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private ?MediaObject $avatar = null;
 
+    /**
+     * Per-user preferences (theme, notification toggles, frequency). Stored
+     * as a JSON object so we can extend the shape without a migration each
+     * time. The canonical defaults live in {@see DEFAULT_PREFERENCES} and are
+     * merged in by the getter, so older rows don't need backfilling and
+     * partial PATCH updates Just Work.
+     *
+     * Mutated only via App\Controller\UserPreferencesController so the
+     * allowed-keys + enum-values constraints stay enforced — never exposed
+     * on the generic Patch operation above.
+     *
+     * @var array<string, mixed>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $preferences = null;
+
+    public const ALLOWED_THEMES = ['light', 'dark', 'system'];
+    public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
+    public const DEFAULT_PREFERENCES = [
+        'theme' => 'system',
+        'emailNotificationsEnabled' => true,
+        'pushNotificationsEnabled' => false,
+        'notificationFrequency' => 'realtime',
+    ];
+
     public function getId(): ?Uuid
     {
         return $this->id;
@@ -253,5 +278,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->plainPassword = null;
         $this->inviteToken = null;
+    }
+
+    /**
+     * Always returns the full preference set, defaults merged in for any
+     * keys the stored row is missing. Callers can read e.g.
+     * `$user->getPreferences()['theme']` without null-checks.
+     *
+     * @return array<string, mixed>
+     */
+    public function getPreferences(): array
+    {
+        return array_merge(self::DEFAULT_PREFERENCES, $this->preferences ?? []);
+    }
+
+    /**
+     * Replaces the stored preferences. Pass an already-validated, full
+     * preference array (callers should merge over {@see getPreferences()}
+     * for partial updates).
+     *
+     * @param array<string, mixed> $preferences
+     */
+    public function setPreferences(array $preferences): static
+    {
+        $this->preferences = $preferences;
+        return $this;
     }
 }

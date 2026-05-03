@@ -88,7 +88,17 @@ const Navbar = () => {
                         <Link href="/account">My Account</Link>
                       </Button>
                     </SheetClose>
-                    <Button variant="outline" size="sm" onClick={logout}>
+                    <SheetClose asChild>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/settings">Settings</Link>
+                      </Button>
+                    </SheetClose>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={logout}
+                      className="col-span-2"
+                    >
                       Sign Out
                     </Button>
                   </div>
