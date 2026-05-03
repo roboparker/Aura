@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
+  { href: "/my-tasks", label: "My Tasks" },
   { href: "/tasks", label: "Tasks" },
   { href: "/projects", label: "Projects" },
   { href: "/groups", label: "Groups" },

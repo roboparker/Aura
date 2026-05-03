@@ -21,6 +21,7 @@ class TaskTest extends ApiTestCase
             ->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -538,6 +539,269 @@ class TaskTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testCreateTaskAcceptsAssigneeOwner(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Solo task',
+                'assignees' => ['/users/' . $alice->getId()],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $task = $this->reloadTaskByTitle('Solo task');
+        $this->assertCount(1, $task->getAssignees());
+        $this->assertTrue($alice->getId()->equals($task->getAssignees()->first()?->getId()));
+    }
+
+    public function testCreateTaskRejectsNonProjectMemberAssignee(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Personal but with bob',
+                'assignees' => ['/users/' . $bob->getId()],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        // Personal task (no project) — only owner can be assigned. Bob is rejected.
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchAssigneesAcceptsProjectMembers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Team task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => [
+                'assignees' => [
+                    '/users/' . $alice->getId(),
+                    '/users/' . $bob->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertCount(2, $reloaded->getAssignees());
+    }
+
+    public function testPatchAssigneesRejectsOutsideProject(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Team task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['assignees' => ['/users/' . $carol->getId()]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testFilterTasksByAssignee(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+
+        $aliceOnly = $this->createTaskInProject($alice, $project, 'Alice only');
+        $aliceOnly->addAssignee($alice);
+        $bothAssigned = $this->createTaskInProject($alice, $project, 'Both assigned');
+        $bothAssigned->addAssignee($alice);
+        $bothAssigned->addAssignee($bob);
+        $unassigned = $this->createTaskInProject($alice, $project, 'Unassigned');
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?assignees=/users/' . $bob->getId());
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'],
+        );
+        $this->assertSame(['Both assigned'], $titles);
+    }
+
+    public function testAddAssigneeEndpoint(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Team task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks/' . $task->getId() . '/assignees', [
+            'json' => ['userId' => (string) $bob->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->entityManager->clear();
+        $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertCount(1, $reloaded->getAssignees());
+        $this->assertTrue($bob->getId()->equals($reloaded->getAssignees()->first()?->getId()));
+    }
+
+    public function testAddAssigneeEndpointRejectsDuplicate(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Personal');
+        $task->addAssignee($alice);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks/' . $task->getId() . '/assignees', [
+            'json' => ['userId' => (string) $alice->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(409);
+    }
+
+    public function testAddAssigneeEndpointRejectsNonMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $task = $this->createTask($alice, 'Personal');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks/' . $task->getId() . '/assignees', [
+            'json' => ['userId' => (string) $bob->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        // Personal task — only Alice (owner) can be assigned. Bob is rejected.
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testRemoveAssigneeEndpoint(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Team task');
+        $task->addAssignee($bob);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request(
+            'DELETE',
+            '/tasks/' . $task->getId() . '/assignees/' . $bob->getId(),
+        );
+
+        $this->assertResponseStatusCodeSame(204);
+        $this->entityManager->clear();
+        $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertCount(0, $reloaded->getAssignees());
+    }
+
+    public function testAssigneeEndpointsHide404ForOtherUsersTask(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $bobTask = $this->createTask($bob, "Bob's task");
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks/' . $bobTask->getId() . '/assignees', [
+            'json' => ['userId' => (string) $alice->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testAssignableUsersIncludesSelf(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/assignable-users');
+
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+        $emails = array_map(fn ($u) => $u['email'], $body['member'] ?? []);
+        $this->assertSame(['alice@example.com'], $emails);
+    }
+
+    public function testAssignableUsersIncludesProjectTeammates(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+        $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        // Carol shares no project with alice — must not appear.
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/assignable-users');
+
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+        $emails = array_map(fn ($u) => $u['email'], $body['member'] ?? []);
+        sort($emails);
+        $this->assertSame(['alice@example.com', 'bob@example.com'], $emails);
+        $this->assertNotContains('carol@example.com', $emails);
+    }
+
+    /**
+     * @param User[] $members
+     */
+    private function createSharedProject(User $owner, array $members, string $title): Project
+    {
+        $project = new Project();
+        $project->setOwner($owner);
+        $project->setTitle($title);
+        foreach ($members as $member) {
+            $project->addMember($member);
+        }
+        $this->entityManager->persist($project);
+        $this->entityManager->flush();
+        return $project;
+    }
+
+    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    {
+        $task = new Task();
+        $task->setOwner($owner);
+        $task->setProject($project);
+        $task->setTitle($title);
+        $this->entityManager->persist($task);
+        $this->entityManager->flush();
+        return $task;
     }
 
     /**

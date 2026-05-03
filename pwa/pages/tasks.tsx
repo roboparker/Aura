@@ -1,7 +1,15 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Filter,
+  GripVertical,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -23,12 +31,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import AssigneesCombobox, {
+  type AssigneeOption,
+} from "@/components/tasks/AssigneesCombobox";
 import TagsCombobox from "@/components/tasks/TagsCombobox";
+import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { displayName } from "@/lib/userDisplay";
 import {
   Popover,
   PopoverContent,
@@ -60,6 +81,15 @@ interface Task {
   dueDate: string | null;
   position: number;
   tags: Tag[];
+  assignees: AssigneeOption[];
+  // The API serializes Task.project as a bare IRI string under `task:read`.
+  // null means "personal task" — only the owner is assignable.
+  project: string | null;
+}
+
+interface ProjectMembership {
+  "@id": string;
+  members: Array<{ "@id": string }>;
 }
 
 interface Collection<T> {
@@ -236,6 +266,7 @@ const SortableHeader = ({ label, sortKey, active, onSort, className }: SortableH
 interface TaskRowProps {
   task: Task;
   allTags: Tag[];
+  assignableUsers: AssigneeOption[];
   reorderable: boolean;
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
@@ -243,11 +274,14 @@ interface TaskRowProps {
   onTitleChange: (task: Task, nextTitle: string) => Promise<void>;
   onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
   onDueDateChange: (task: Task, nextDueDate: string | null) => Promise<void>;
+  onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
+  onAssigneeAvatarClick: (assignee: AssigneeOption) => void;
 }
 
 const TaskRow = ({
   task,
   allTags,
+  assignableUsers,
   reorderable,
   onToggle,
   onDelete,
@@ -255,6 +289,8 @@ const TaskRow = ({
   onTitleChange,
   onDescriptionChange,
   onDueDateChange,
+  onAssigneesChange,
+  onAssigneeAvatarClick,
 }: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
@@ -410,6 +446,15 @@ const TaskRow = ({
             subjectLabel={task.title}
           />
         </TableCell>
+        <TableCell className="align-top">
+          <AssigneesCombobox
+            value={task.assignees}
+            options={assignableUsers}
+            onChange={(nextIris) => onAssigneesChange(task, nextIris)}
+            onAvatarClick={onAssigneeAvatarClick}
+            subjectLabel={task.title}
+          />
+        </TableCell>
         <TableCell className="align-top text-right">
           <Button
             variant="ghost"
@@ -431,7 +476,7 @@ const TaskRow = ({
             pixel-math with pl-24. */}
         <TableCell className="w-8" aria-hidden="true" />
         <TableCell className="w-10" aria-hidden="true" />
-        <TableCell colSpan={4} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+        <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-3 text-sm">
           {editingDesc ? (
             <div className="space-y-2">
               <MarkdownEditor
@@ -491,24 +536,58 @@ interface NewTaskInput {
   description: string | null;
   tags: string[];
   dueDate: string | null;
+  assignees: string[];
 }
 
 interface NewTaskRowProps {
   allTags: Tag[];
+  assignableUsers: AssigneeOption[];
   /** Resolves on success, rejects on failure so we know whether to clear the draft. */
   onCreate: (input: NewTaskInput) => Promise<void>;
   isCreating: boolean;
+  currentUserIri: string | null;
+  /** When true, new tasks default to being assigned to the current user — used
+   *  on /my-tasks so a freshly created row doesn't immediately filter itself
+   *  out. */
+  autoAssignSelf?: boolean;
 }
 
 // Inline "add a task" row that lives at the top of the table. Mirrors the
 // layout of TaskRow (main row + description sub-row) so the user can stage
 // title, tags, and description before pressing Enter to submit. Failures
 // keep the draft intact (parent shows the error).
-const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
+const NewTaskRow = ({
+  allTags,
+  assignableUsers,
+  onCreate,
+  isCreating,
+  currentUserIri,
+  autoAssignSelf,
+}: NewTaskRowProps) => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [dueDate, setDueDate] = useState<string | null>(null);
+  // Personal tasks (no project) only allow the owner. Restrict the picker to
+  // self so we don't surface teammates the validator would reject.
+  const newTaskAssignableUsers = useMemo(
+    () => assignableUsers.filter((u) => u["@id"] === currentUserIri),
+    [assignableUsers, currentUserIri],
+  );
+  const selfOption = newTaskAssignableUsers[0] ?? null;
+  const [assignees, setAssignees] = useState<AssigneeOption[]>(() =>
+    autoAssignSelf && selfOption ? [selfOption] : [],
+  );
+  // If the assignable list arrives after mount (async), seed the default
+  // assignment then. Subsequent changes are user-driven, so only seed once.
+  const seededRef = useRef(false);
+  useEffect(() => {
+    if (seededRef.current) return;
+    if (autoAssignSelf && selfOption && assignees.length === 0) {
+      setAssignees([selfOption]);
+      seededRef.current = true;
+    }
+  }, [autoAssignSelf, selfOption, assignees.length]);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   // Description inline editing — local-only; nothing hits the API until
@@ -539,11 +618,19 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
     setTags(next);
   };
 
+  const handleAssigneesChange = (nextIris: string[]) => {
+    const next = nextIris
+      .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
+      .filter((u): u is AssigneeOption => Boolean(u));
+    setAssignees(next);
+  };
+
   const reset = () => {
     setTitle("");
     setDescription(null);
     setTags([]);
     setDueDate(null);
+    setAssignees(autoAssignSelf && selfOption ? [selfOption] : []);
     setEditingDesc(false);
     setDescDraft("");
   };
@@ -557,6 +644,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
         description,
         tags: tags.map((tag) => tag["@id"]),
         dueDate,
+        assignees: assignees.map((u) => u["@id"]),
       });
       reset();
       // Refocus on next tick so the input isn't briefly disabled when we
@@ -614,6 +702,14 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
             subjectLabel="new task"
           />
         </TableCell>
+        <TableCell className="align-top" data-testid="new-task-assignees">
+          <AssigneesCombobox
+            value={assignees}
+            options={newTaskAssignableUsers}
+            onChange={handleAssigneesChange}
+            subjectLabel="new task"
+          />
+        </TableCell>
         <TableCell aria-hidden="true" />
       </TableRow>
       <TableRow
@@ -622,7 +718,7 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
       >
         <TableCell className="w-8" aria-hidden="true" />
         <TableCell className="w-10" aria-hidden="true" />
-        <TableCell colSpan={4} className="pl-0 pr-4 pt-0 pb-3 text-sm">
+        <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-3 text-sm">
           {editingDesc ? (
             <div className="space-y-2">
               <MarkdownEditor
@@ -677,16 +773,37 @@ const NewTaskRow = ({ allTags, onCreate, isCreating }: NewTaskRowProps) => {
   );
 };
 
+// "all" shows every task; "me" filters to the current user; an IRI string
+// filters to that specific assignable user. Stored as a single value rather
+// than three separate flags so each setter call replaces the previous filter.
+type AssigneeFilter = "all" | "me" | string;
+
 const Tasks = () => {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
+  const currentUserIri = user ? `/users/${user.id}` : null;
+  // Both `/tasks` and `/my-tasks` mount this component. The latter pins the
+  // assignee filter to the logged-in user and hides the picker, so the page
+  // is effectively a fixed "everything assigned to me" view.
+  const isMyTasksPage = router.pathname === "/my-tasks";
+  const pageTitle = isMyTasksPage ? "My Tasks" : "Tasks";
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
+  // Map of project IRI → set of member IRIs. Used to filter the assignee
+  // picker per task (project tasks accept only that project's members; the
+  // server-side validator enforces the same rule).
+  const [projectMembers, setProjectMembers] = useState<Map<string, Set<string>>>(
+    new Map(),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>(
+    isMyTasksPage ? "me" : "all",
+  );
 
   const sensors = useSensors(
     // Require an 8px drag before activating so a quick click on the grip
@@ -704,14 +821,23 @@ const Tasks = () => {
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      // Load tasks and tags in parallel — the task list embeds its current
-      // tag badges, the full tag list populates the "+ Tag" picker.
-      const [tasksRes, tagsRes] = await Promise.all([
+      // Tasks, tags, the assignable-users universe, and the projects-with-
+      // members set all load in parallel — the page needs the projects to
+      // know which assignable users are valid for each project task.
+      const [tasksRes, tagsRes, assignablesRes, projectsRes] = await Promise.all([
         fetch(`${ENTRYPOINT}/tasks`, {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
         }),
         fetch(`${ENTRYPOINT}/tags`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+        fetch(`${ENTRYPOINT}/me/assignable-users`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+        fetch(`${ENTRYPOINT}/projects`, {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
         }),
@@ -722,10 +848,30 @@ const Tasks = () => {
       if (!tagsRes.ok) {
         throw new Error("Failed to load tags.");
       }
+      if (!assignablesRes.ok) {
+        throw new Error("Failed to load assignable users.");
+      }
+      if (!projectsRes.ok) {
+        throw new Error("Failed to load projects.");
+      }
       const tasksData: Collection<Task> = await tasksRes.json();
       const tagsData: Collection<Tag> = await tagsRes.json();
+      const assignablesData: Collection<AssigneeOption> = await assignablesRes.json();
+      const projectsData: Collection<ProjectMembership> = await projectsRes.json();
       setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
+      setAssignableUsers(
+        assignablesData.member ?? assignablesData["hydra:member"] ?? [],
+      );
+      const projectMap = new Map<string, Set<string>>();
+      const projects = projectsData.member ?? projectsData["hydra:member"] ?? [];
+      for (const project of projects) {
+        projectMap.set(
+          project["@id"],
+          new Set(project.members.map((m) => m["@id"])),
+        );
+      }
+      setProjectMembers(projectMap);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load tasks.");
     } finally {
@@ -733,11 +879,18 @@ const Tasks = () => {
     }
   }, []);
 
+  // /tasks and /my-tasks render the *same* component instance via the
+  // re-export in pages/my-tasks.tsx, so the `useState` initializer above
+  // only runs once. Without this effect the filter (and the cached tasks
+  // list) would carry over from the previous route. Re-pin the filter and
+  // refetch whenever the page mode flips — this also covers the initial
+  // mount once `isAuthenticated` becomes true.
   useEffect(() => {
+    setAssigneeFilter(isMyTasksPage ? "me" : "all");
     if (isAuthenticated) {
       loadData();
     }
-  }, [isAuthenticated, loadData]);
+  }, [isMyTasksPage, isAuthenticated, loadData]);
 
   const handleCreate = async (input: NewTaskInput) => {
     const trimmed = input.title.trim();
@@ -755,6 +908,7 @@ const Tasks = () => {
           description: input.description,
           tags: input.tags,
           dueDate: input.dueDate,
+          assignees: input.assignees,
         }),
       });
       if (!res.ok) {
@@ -900,6 +1054,40 @@ const Tasks = () => {
     }
   };
 
+  const handleAssigneesChange = async (task: Task, nextIris: string[]) => {
+    const previous = tasks;
+    const nextAssignees = nextIris
+      .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
+      .filter((u): u is AssigneeOption => Boolean(u));
+    setTasks(
+      tasks.map((t) =>
+        t["@id"] === task["@id"] ? { ...t, assignees: nextAssignees } : t,
+      ),
+    );
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ assignees: nextIris }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to update assignees.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update assignees.");
+    }
+  };
+
   const handleTagsChange = async (task: Task, nextTagIris: string[]) => {
     // Optimistic update so badges appear instantly. Roll back on server reject.
     const previous = tasks;
@@ -964,13 +1152,20 @@ const Tasks = () => {
     });
   };
 
-  // Sorted *view* of the tasks. Manual order leaves them as-is so the dnd-kit
-  // index math stays aligned with what's painted; any other sort produces a
-  // shallow copy ordered by the picked column.
+  // Apply the assignee filter, then sort. "all" leaves tasks intact so the
+  // manual-order drag math stays aligned. "me" matches the logged-in user;
+  // a specific IRI matches just that user.
+  const filteredTasks = useMemo(() => {
+    if (assigneeFilter === "all") return tasks;
+    const targetIri = assigneeFilter === "me" ? currentUserIri : assigneeFilter;
+    if (!targetIri) return tasks;
+    return tasks.filter((t) => t.assignees.some((a) => a["@id"] === targetIri));
+  }, [tasks, assigneeFilter, currentUserIri]);
+
   const visibleTasks = useMemo(() => {
-    if (sort.key === "manual") return tasks;
+    if (sort.key === "manual") return filteredTasks;
     const flip = sort.dir === "asc" ? 1 : -1;
-    const copy = [...tasks];
+    const copy = [...filteredTasks];
     copy.sort((a, b) => {
       switch (sort.key) {
         case "completed":
@@ -992,9 +1187,49 @@ const Tasks = () => {
       }
     });
     return copy;
-  }, [tasks, sort]);
+  }, [filteredTasks, sort]);
 
-  const reorderable = sort.key === "manual";
+  // Reordering is only safe in the "manual" sort *and* when nothing is being
+  // filtered out — drag-end math assumes the index lines up with the
+  // persisted position.
+  const reorderable = sort.key === "manual" && assigneeFilter === "all";
+
+  const assignableForTask = useCallback(
+    (task: Task): AssigneeOption[] => {
+      if (!task.project) {
+        // Personal task — only the owner can be assigned. The owner is
+        // always in the assignable-users set when it's the current user; for
+        // admin-viewed tasks owned by others, fall back to the task's
+        // current assignees (already known-valid).
+        const owner = task.assignees.find((a) => a["@id"] === currentUserIri);
+        return owner ? [owner] : task.assignees;
+      }
+      const memberIris = projectMembers.get(task.project);
+      if (!memberIris) return assignableUsers;
+      return assignableUsers.filter((u) => memberIris.has(u["@id"]));
+    },
+    [assignableUsers, projectMembers, currentUserIri],
+  );
+
+  // Users that have ever been assigned to a task on the page — drives the
+  // "specific person" entries in the filter dropdown so we don't list
+  // everyone the API would accept.
+  const filterableUsers = useMemo(() => {
+    const seen = new Map<string, AssigneeOption>();
+    for (const t of tasks) {
+      for (const a of t.assignees) {
+        if (!seen.has(a["@id"])) seen.set(a["@id"], a);
+      }
+    }
+    return Array.from(seen.values());
+  }, [tasks]);
+
+  const filterLabel = useMemo(() => {
+    if (assigneeFilter === "all") return "All assignees";
+    if (assigneeFilter === "me") return "Assigned to me";
+    const match = filterableUsers.find((u) => u["@id"] === assigneeFilter);
+    return match ? `Assigned to ${displayName(match)}` : "Filtered";
+  }, [assigneeFilter, filterableUsers]);
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -1007,11 +1242,72 @@ const Tasks = () => {
   return (
     <>
       <Head>
-        <title>Tasks - Aura</title>
+        <title>{pageTitle} - Aura</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">Tasks</h1>
+          <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
+            <h1 className="text-2xl font-bold">{pageTitle}</h1>
+            {/* The filter dropdown is redundant on /my-tasks (everything
+                shown is already filtered to the current user). */}
+            {!isMyTasksPage && (
+            <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-testid="assignee-filter-trigger"
+                  >
+                    <Filter className="h-3.5 w-3.5 mr-1" />
+                    {filterLabel}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Filter by assignee</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={assigneeFilter === "all"}
+                    onCheckedChange={() => setAssigneeFilter("all")}
+                  >
+                    All assignees
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={assigneeFilter === "me"}
+                    onCheckedChange={() => setAssigneeFilter("me")}
+                    disabled={!currentUserIri}
+                  >
+                    Assigned to me
+                  </DropdownMenuCheckboxItem>
+                  {filterableUsers.length > 0 && <DropdownMenuSeparator />}
+                  {filterableUsers.map((u) => (
+                    <DropdownMenuCheckboxItem
+                      key={u["@id"]}
+                      checked={assigneeFilter === u["@id"]}
+                      onCheckedChange={() => setAssigneeFilter(u["@id"])}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <UserAvatar user={u} size="sm" className="h-5 w-5" />
+                        <span className="truncate">{displayName(u)}</span>
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {assigneeFilter !== "all" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setAssigneeFilter("all")}
+                  aria-label="Clear assignee filter"
+                  data-testid="assignee-filter-clear"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+            )}
+          </div>
 
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -1024,8 +1320,9 @@ const Tasks = () => {
               className="mb-2 text-xs text-muted-foreground"
               data-testid="reorder-disabled-hint"
             >
-              Drag-to-reorder is paused while the table is sorted by a column. Click
-              the active column header again to return to your custom order.
+              Drag-to-reorder is paused while the list is filtered or sorted by a
+              column. Clear the filter and reset the column header to return to
+              your custom order.
             </p>
           )}
 
@@ -1068,19 +1365,24 @@ const Tasks = () => {
                             className="w-36"
                           />
                           <TableHead>Tags</TableHead>
+                          <TableHead>Assignees</TableHead>
                           <TableHead className="w-20 text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <NewTaskRow
                         allTags={allTags}
+                        assignableUsers={assignableUsers}
                         onCreate={handleCreate}
                         isCreating={isSubmitting}
+                        currentUserIri={currentUserIri}
+                        autoAssignSelf={isMyTasksPage}
                       />
                       {visibleTasks.map((task) => (
                         <TaskRow
                           key={task["@id"]}
                           task={task}
                           allTags={allTags}
+                          assignableUsers={assignableForTask(task)}
                           reorderable={reorderable}
                           onToggle={handleToggle}
                           onDelete={handleDelete}
@@ -1088,6 +1390,10 @@ const Tasks = () => {
                           onTitleChange={handleTitleChange}
                           onDescriptionChange={handleDescriptionChange}
                           onDueDateChange={handleDueDateChange}
+                          onAssigneesChange={handleAssigneesChange}
+                          onAssigneeAvatarClick={(assignee) =>
+                            setAssigneeFilter(assignee["@id"])
+                          }
                         />
                       ))}
                     </Table>
