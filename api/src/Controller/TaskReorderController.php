@@ -15,17 +15,22 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Bulk reorder the authenticated user's tasks. Accepts an ordered list of
- * Task IRIs and renumbers their `position` to match (0, 1, 2, ...).
+ * Bulk reorder the tasks the user can act on. Accepts an ordered list of
+ * Task IRIs and renumbers `position` (0, 1, 2, ...) on each reorderable
+ * task in the input.
  *
- * This is an all-or-nothing operation — it rejects the whole payload if any
- * IRI is malformed, unknown, not owned by the current user, or if the list
- * does not cover exactly the user's current task set. Covering the full set
- * prevents partial writes from interleaving awkwardly with concurrent
- * creates/deletes, and keeps positions contiguous and easy to reason about.
+ * "Reorderable" matches the project-member edit rule on Task: the user
+ * can reorder tasks they own plus any task in a project they belong to
+ * (anyone who can add a task to the project can also reorder its tasks).
+ * Tasks outside that set — e.g. another user's personal tasks an admin's
+ * unfiltered view turns up — are silently skipped, so the frontend can
+ * send the full visible list without classifying rows up-front.
  *
- * Admins reorder their own tasks only; cross-user reordering is intentionally
- * not exposed via this endpoint.
+ * Still rejects the whole payload when:
+ *   - any IRI is malformed,
+ *   - the input contains a duplicate, or
+ *   - the input doesn't include every one of the reorderable tasks.
+ * The "every one" requirement keeps position numbers contiguous.
  */
 final class TaskReorderController extends AbstractController
 {
@@ -57,29 +62,32 @@ final class TaskReorderController extends AbstractController
         }
 
         $requestedIds = array_keys($ids);
-        $owned = $this->tasks->findBy(['owner' => $user]);
-        $ownedById = [];
-        foreach ($owned as $task) {
-            $ownedById[(string) $task->getId()] = $task;
+        $reorderable = $this->tasks->findReorderableForUser($user);
+        $reorderableById = [];
+        foreach ($reorderable as $task) {
+            $reorderableById[(string) $task->getId()] = $task;
         }
 
-        // Ownership check runs first so cross-user or non-existent IRIs return
-        // 404 rather than leaking existence via a 400 count-mismatch response.
-        // This mirrors TaskOwnerExtension's item-lookup behavior.
+        // Walk the input in order, renumbering each reorderable task as we
+        // hit it. IRIs that aren't reorderable (other users' personal tasks
+        // an admin's unfiltered view turns up, etc.) are skipped so the
+        // frontend can send the full visible list without classifying rows.
+        $renumbered = [];
+        $position = 0;
         foreach ($requestedIds as $id) {
-            if (!isset($ownedById[$id])) {
-                return $this->json(['error' => sprintf('Task %s not found.', $id)], 404);
+            if (!isset($reorderableById[$id])) {
+                continue;
             }
+            $reorderableById[$id]->setPosition($position++);
+            $renumbered[$id] = true;
         }
 
-        if (count($requestedIds) !== count($ownedById)) {
-            return $this->json(['error' => 'Reorder payload must include every one of your tasks exactly once.'], 400);
-        }
-
-        foreach ($requestedIds as $index => $id) {
-            /** @var Task $task */
-            $task = $ownedById[$id];
-            $task->setPosition($index);
+        // Every reorderable task must have appeared somewhere in the input —
+        // otherwise we'd leave gaps or duplicate `position` values.
+        if (count($renumbered) !== count($reorderableById)) {
+            return $this->json([
+                'error' => 'Reorder payload must include every one of your tasks exactly once.',
+            ], 400);
         }
 
         $this->em->flush();

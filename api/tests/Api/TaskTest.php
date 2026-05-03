@@ -3,6 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -318,12 +319,72 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(401);
     }
 
-    public function testReorderRejectsOtherUsersTask(): void
+    public function testReorderLetsProjectMemberReorderProjectTasks(): void
     {
+        // Project members can reorder tasks attached to the project even
+        // when they don't own them — anyone who can add a task to the
+        // project can also reorder its tasks. Bob is the project owner
+        // and creates a task on it; Alice is a member who reorders.
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+
+        $project = new Project();
+        $project->setOwner($bob);
+        $project->setTitle('Shared');
+        $project->addMember($alice);
+        $project->addMember($bob);
+        $this->entityManager->persist($project);
+
+        $shared1 = new Task();
+        $shared1->setOwner($bob);
+        $shared1->setProject($project);
+        $shared1->setTitle('Shared 1');
+        $this->entityManager->persist($shared1);
+
+        $shared2 = new Task();
+        $shared2->setOwner($bob);
+        $shared2->setProject($project);
+        $shared2->setTitle('Shared 2');
+        $this->entityManager->persist($shared2);
+
+        $alicePersonal = $this->createTask($alice, 'Alice personal');
+
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks/reorder', [
+            'json' => [
+                'order' => [
+                    '/tasks/' . $shared2->getId(),
+                    '/tasks/' . $alicePersonal->getId(),
+                    '/tasks/' . $shared1->getId(),
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Task::class);
+        $this->assertSame(0, $repo->findOneBy(['title' => 'Shared 2'])->getPosition());
+        $this->assertSame(1, $repo->findOneBy(['title' => 'Alice personal'])->getPosition());
+        $this->assertSame(2, $repo->findOneBy(['title' => 'Shared 1'])->getPosition());
+    }
+
+    public function testReorderSilentlySkipsNonOwnedIris(): void
+    {
+        // Reorder is permissive about extra IRIs in the input — Bob's task
+        // is silently ignored so the frontend doesn't have to know which
+        // visible rows belong to the current user (admins, project members,
+        // etc. can see tasks they don't own). Bob's `position` must stay
+        // exactly where it was.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $aliceTask = $this->createTask($alice, 'Alice only');
         $bobsTask = $this->createTask($bob, 'Bob owns this');
+        $bobsOriginalPosition = $bobsTask->getPosition();
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -337,9 +398,16 @@ class TaskTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
 
-        // 404 rather than 403 to avoid leaking existence, matching the
-        // item-lookup behavior of the owner query extension.
-        $this->assertResponseStatusCodeSame(404);
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Task::class);
+        $this->assertSame(0, $repo->findOneBy(['title' => 'Alice only'])->getPosition());
+        $this->assertSame(
+            $bobsOriginalPosition,
+            $repo->findOneBy(['title' => 'Bob owns this'])->getPosition(),
+            "Bob's task position must not change when Alice reorders.",
+        );
     }
 
     public function testReorderRejectsIncompleteOrder(): void

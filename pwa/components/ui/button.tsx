@@ -25,6 +25,9 @@ const buttonVariants = cva(
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        // Used by the shadcn `Combobox` for inline chip-remove and trigger
+        // buttons that sit inside an InputGroup.
+        "icon-xs": "h-5 w-5 rounded-sm",
       },
     },
     defaultVariants: {

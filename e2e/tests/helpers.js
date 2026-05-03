@@ -24,7 +24,8 @@ async function registerAndSignIn(page, email, password = "password123", options 
 /**
  * Type into the BlockNote description editor. The editor is a contenteditable
  * ProseMirror instance wrapped in our MarkdownEditor component, which exposes
- * `aria-label="Description"` (or an `id` when one is provided). Playwright's
+ * an `aria-label` starting with "Description" (e.g. "Description",
+ * "Description for new task", or `Description for "task title"`). Playwright's
  * `.fill()` is brittle on block editors, so we click into the editable and
  * use keyboard.type.
  *
@@ -35,13 +36,39 @@ async function registerAndSignIn(page, email, password = "password123", options 
 async function fillDescription(page, scope, text) {
   const root = scope ?? page;
   const editor = root
-    .locator('[aria-label="Description"] [contenteditable="true"]')
+    .locator('[aria-label^="Description"] [contenteditable="true"]')
     .first();
   await editor.click();
   // Clear any existing content (edit mode pre-populates the block editor).
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("Delete");
   await page.keyboard.type(text);
+}
+
+/**
+ * Create a task using the inline new-task row at the top of the Tasks
+ * table. Pre-condition: the page is already at /tasks (or visible there).
+ * Optionally stages a description by opening the inline editor first.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {string} title
+ * @param {{ description?: string }} [options]
+ */
+async function createTaskInline(page, title, options = {}) {
+  const input = page.locator('[data-testid="new-task-title-input"]');
+  await input.fill(title);
+  if (options.description) {
+    const newRow = page.locator('[data-testid="new-task-row"]');
+    await newRow.locator('[data-testid="new-task-description-add"]').click();
+    await fillDescription(page, newRow, options.description);
+    await newRow.locator('[data-testid="new-task-description-save"]').click();
+  }
+  // Locator.press focuses before pressing, which puts the cursor back in
+  // the title input even if focus drifted into the description editor.
+  await input.press("Enter");
+  await expect(
+    page.locator('[data-testid="task-item"]', { hasText: title }),
+  ).toBeVisible();
 }
 
 /**
@@ -61,5 +88,6 @@ module.exports = {
   uniqueEmail,
   registerAndSignIn,
   fillDescription,
+  createTaskInline,
   openAccountMenu,
 };
