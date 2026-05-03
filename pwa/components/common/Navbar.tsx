@@ -16,6 +16,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
@@ -62,6 +63,7 @@ const Navbar = () => {
         <div className="flex items-center gap-1">
           {isAuthenticated && user ? (
             <Sheet>
+              <NotificationBell enabled={isAuthenticated} />
               <ThemeToggle />
               <SheetTrigger asChild>
                 <Button

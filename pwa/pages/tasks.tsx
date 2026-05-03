@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
+  Bell,
   Filter,
   GripVertical,
   Repeat,
@@ -80,6 +81,17 @@ interface RecurrenceRule {
   interval: number;
 }
 
+// Allowlist of reminder offsets the API accepts on Task.reminders. Kept in
+// the same order the picker renders so checkbox state ↔ JSON array stay
+// trivially aligned.
+const REMINDER_OFFSETS = ["15m", "1h", "1d"] as const;
+type ReminderOffset = (typeof REMINDER_OFFSETS)[number];
+const REMINDER_LABELS: Record<ReminderOffset, string> = {
+  "15m": "15 minutes before",
+  "1h": "1 hour before",
+  "1d": "1 day before",
+};
+
 interface Task {
   "@id": string;
   id: string;
@@ -89,6 +101,7 @@ interface Task {
   completedOn: string | null;
   dueDate: string | null;
   recurrenceRule: RecurrenceRule | null;
+  reminders: ReminderOffset[] | null;
   position: number;
   tags: Tag[];
   assignees: AssigneeOption[];
@@ -205,6 +218,12 @@ interface DueDateCellProps {
    *  also clears the rule (a recurrence with no anchor is invalid server-side). */
   recurrenceValue?: RecurrenceRule | null;
   onRecurrenceChange?: (next: RecurrenceRule | null) => void | Promise<void>;
+  /** Optional reminder controls. When `remindersValue` is provided we render
+   *  checkboxes for each allowed offset inside the same popover. Clearing
+   *  the date also clears reminders (the server-side validator rejects
+   *  reminders without an anchor). */
+  remindersValue?: ReminderOffset[] | null;
+  onRemindersChange?: (next: ReminderOffset[] | null) => void | Promise<void>;
   /** Toggles overdue/today colouring. Completed tasks pass `"none"` so a missed
    *  deadline doesn't keep glowing red after the work is done. */
   status?: DueDateStatus;
@@ -217,10 +236,13 @@ const DueDateCell = ({
   testIdPrefix,
   recurrenceValue = null,
   onRecurrenceChange,
+  remindersValue = null,
+  onRemindersChange,
   status = "none",
 }: DueDateCellProps) => {
   const [open, setOpen] = useState(false);
   const selected = isoToLocalDate(value);
+  const reminderCount = remindersValue?.length ?? 0;
 
   const handleSelect = (date: Date | undefined) => {
     setOpen(false);
@@ -239,10 +261,14 @@ const DueDateCell = ({
   const handleClear = () => {
     setOpen(false);
     if (value === null) return;
-    // Recurrence is meaningless without a date anchor; drop it together to
-    // avoid leaving the row in a state the server-side validator rejects.
+    // Recurrence and reminders are meaningless without a date anchor; drop
+    // them together to avoid leaving the row in a state the server-side
+    // validator rejects.
     if (recurrenceValue && onRecurrenceChange) {
       void onRecurrenceChange(null);
+    }
+    if (remindersValue && remindersValue.length > 0 && onRemindersChange) {
+      void onRemindersChange(null);
     }
     void onChange(null);
   };
@@ -260,6 +286,15 @@ const DueDateCell = ({
     status === "overdue" && "text-destructive font-medium hover:text-destructive",
     status === "today" && "text-amber-600 dark:text-amber-400 font-medium",
   );
+
+  const toggleReminder = (offset: ReminderOffset) => {
+    if (!onRemindersChange) return;
+    const current = remindersValue ?? [];
+    const next = current.includes(offset)
+      ? current.filter((o) => o !== offset)
+      : [...current, offset];
+    void onRemindersChange(next.length === 0 ? null : next);
+  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -293,6 +328,13 @@ const DueDateCell = ({
                 data-testid={`${testIdPrefix}-repeat-icon`}
               />
             )}
+            {reminderCount > 0 && (
+              <Bell
+                className="h-3 w-3 text-muted-foreground"
+                aria-label={`${reminderCount} reminder${reminderCount === 1 ? "" : "s"} set`}
+                data-testid={`${testIdPrefix}-reminder-icon`}
+              />
+            )}
           </button>
         ) : (
           <button
@@ -306,7 +348,12 @@ const DueDateCell = ({
         )}
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0"
+        // Cap the popover height and let it scroll internally — calendar +
+        // recurrence picker + reminders + clear stack tall enough to spill
+        // off short viewports otherwise. Radix exposes its own
+        // `--radix-popover-content-available-height` so the cap also
+        // tracks the actual gap between trigger and viewport edge.
+        className="w-auto p-0 max-h-[min(560px,var(--radix-popover-content-available-height))] overflow-y-auto"
         align="start"
         data-testid={`${testIdPrefix}-popover`}
       >
@@ -339,6 +386,34 @@ const DueDateCell = ({
             onChange={onRecurrenceChange}
             testIdPrefix={`${testIdPrefix}-recurrence`}
           />
+        )}
+        {onRemindersChange && value && (
+          <div
+            className="border-t p-2 space-y-1 min-w-56"
+            data-testid={`${testIdPrefix}-reminders`}
+          >
+            <p className="text-xs font-medium text-muted-foreground px-1">
+              Remind me
+            </p>
+            {REMINDER_OFFSETS.map((offset) => {
+              const checked = (remindersValue ?? []).includes(offset);
+              return (
+                <label
+                  key={offset}
+                  className="flex items-center gap-2 px-1 py-1 text-sm cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleReminder(offset)}
+                    className="h-3.5 w-3.5"
+                    data-testid={`${testIdPrefix}-reminder-${offset}`}
+                  />
+                  {REMINDER_LABELS[offset]}
+                </label>
+              );
+            })}
+          </div>
         )}
         {value && (
           <div className="border-t p-2">
@@ -496,6 +571,10 @@ interface TaskRowProps {
   onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
   onDueDateChange: (task: Task, nextDueDate: string | null) => Promise<void>;
   onRecurrenceChange: (task: Task, nextRule: RecurrenceRule | null) => Promise<void>;
+  onRemindersChange: (
+    task: Task,
+    nextReminders: ReminderOffset[] | null,
+  ) => Promise<void>;
   onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
   onAssigneeAvatarClick: (assignee: AssigneeOption) => void;
 }
@@ -512,6 +591,7 @@ const TaskRow = ({
   onDescriptionChange,
   onDueDateChange,
   onRecurrenceChange,
+  onRemindersChange,
   onAssigneesChange,
   onAssigneeAvatarClick,
 }: TaskRowProps) => {
@@ -661,6 +741,8 @@ const TaskRow = ({
             testIdPrefix="task-due-date"
             recurrenceValue={task.recurrenceRule}
             onRecurrenceChange={(next) => onRecurrenceChange(task, next)}
+            remindersValue={task.reminders}
+            onRemindersChange={(next) => onRemindersChange(task, next)}
             status={dueDateStatus(task.dueDate, !!task.completedOn)}
           />
         </TableCell>
@@ -1323,6 +1405,40 @@ const Tasks = () => {
     }
   };
 
+  const handleRemindersChange = async (
+    task: Task,
+    nextReminders: ReminderOffset[] | null,
+  ) => {
+    const previous = tasks;
+    setTasks(
+      tasks.map((t) =>
+        t["@id"] === task["@id"] ? { ...t, reminders: nextReminders } : t,
+      ),
+    );
+    setError(null);
+
+    try {
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ reminders: nextReminders ?? [] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to update reminders.",
+        );
+      }
+    } catch (err) {
+      setTasks(previous);
+      setError(err instanceof Error ? err.message : "Failed to update reminders.");
+    }
+  };
+
   const handleAssigneesChange = async (task: Task, nextIris: string[]) => {
     const previous = tasks;
     const nextAssignees = nextIris
@@ -1708,6 +1824,7 @@ const Tasks = () => {
                           onDescriptionChange={handleDescriptionChange}
                           onDueDateChange={handleDueDateChange}
                           onRecurrenceChange={handleRecurrenceChange}
+                          onRemindersChange={handleRemindersChange}
                           onAssigneesChange={handleAssigneesChange}
                           onAssigneeAvatarClick={(assignee) =>
                             setAssigneeFilter(assignee["@id"])

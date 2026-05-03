@@ -208,6 +208,50 @@ test.describe("Tasks", () => {
     await expect(overdueCell).toHaveAttribute("data-status", "none");
   });
 
+  test("user can set reminders on a task with a due date", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail());
+
+    const title = `Take medication ${Date.now()}`;
+    const due = new Date();
+    due.setDate(due.getDate() + 1);
+    const createRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title, dueDate: due.toISOString() },
+    });
+    expect(createRes.ok()).toBeTruthy();
+
+    await page.goto(`${BASE_URL}/tasks`);
+    const item = page.locator('[data-testid="task-item"]', { hasText: title });
+    await expect(item).toBeVisible();
+
+    // Open the date popover and tick "1 hour before". The reminder section
+    // sits below the calendar + recurrence picker, so on a 720px viewport
+    // it scrolls within the popover (PopoverContent caps its own height
+    // and lets overflow scroll internally).
+    await item.locator('[data-testid="task-due-date"]').click();
+    const reminderCheckbox = page.locator(
+      '[data-testid="task-due-date-reminder-1h"]',
+    );
+    await reminderCheckbox.scrollIntoViewIfNeeded();
+    await reminderCheckbox.check();
+    await page.keyboard.press("Escape");
+
+    // Bell icon appears next to the date now that a reminder is set.
+    await expect(
+      item.locator('[data-testid="task-due-date-reminder-icon"]'),
+    ).toBeVisible();
+
+    // The persisted task carries the reminder offset.
+    const list = await page.request.get(`${BASE_URL}/tasks`, {
+      headers: { Accept: "application/ld+json" },
+    });
+    const json = await list.json();
+    const persisted = (json.member ?? json["hydra:member"] ?? []).find(
+      (t) => t.title === title,
+    );
+    expect(persisted.reminders).toEqual(["1h"]);
+  });
+
   test("user can reorder tasks via keyboard drag", async ({ page }) => {
     // dnd-kit's KeyboardSensor is deterministic across browsers, unlike
     // pointer-based drag which is flaky with dnd-kit's distance constraint.

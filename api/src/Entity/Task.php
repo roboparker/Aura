@@ -15,6 +15,7 @@ use App\State\TaskOwnerProcessor;
 use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
 use App\Validator\ValidRecurrence;
+use App\Validator\ValidReminders;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -54,6 +55,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
 #[ValidAssignees]
 #[ValidRecurrence]
+#[ValidReminders]
 class Task
 {
     #[ORM\Id]
@@ -114,6 +116,19 @@ class Task
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private ?array $recurrenceRule = null;
+
+    /**
+     * Reminder offsets to fire ahead of the due date. Each item is one of
+     * the strings in {@see ValidReminders::ALLOWED_OFFSETS} (e.g. "15m",
+     * "1h", "1d"). Empty array and null are equivalent — both mean "no
+     * reminders". Validated by {@see ValidReminders}, which also enforces
+     * the cross-field rule that reminders need a due date.
+     *
+     * @var string[]|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['task:read', 'task:write'])]
+    private ?array $reminders = null;
 
     /**
      * Per-owner sort key. Lower positions render first. Set server-side:
@@ -257,6 +272,25 @@ class Task
     public function setRecurrenceRule(?array $recurrenceRule): static
     {
         $this->recurrenceRule = $recurrenceRule;
+        return $this;
+    }
+
+    /**
+     * @return string[]|null
+     */
+    public function getReminders(): ?array
+    {
+        return $this->reminders;
+    }
+
+    /**
+     * @param string[]|null $reminders
+     */
+    public function setReminders(?array $reminders): static
+    {
+        // Normalise empty array to null so we have one canonical "no
+        // reminders" representation for downstream queries.
+        $this->reminders = (null === $reminders || [] === $reminders) ? null : array_values($reminders);
         return $this;
     }
 
