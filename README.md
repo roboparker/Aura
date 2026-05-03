@@ -1,47 +1,83 @@
-<h1 align="center"><a href="https://api-platform.com"><img src="https://api-platform.com/images/logos/Logo_Circle%20webby%20text%20blue.png" alt="API Platform" width="250" height="250"></a></h1>
+# Aura
 
-API Platform is a next-generation web framework designed to easily create API-first projects without compromising extensibility
-and flexibility:
+Aura is an API-first task and project management app. The backend is a Symfony / [API Platform](https://api-platform.com) service; the frontend is a Next.js PWA. The two run side-by-side behind FrankenPHP in development.
 
-* Design your own data model as plain old PHP classes or [**import an existing ontology**](https://api-platform.com/docs/schema-generator).
-* **Expose in minutes a hypermedia REST or a GraphQL API** with pagination, data validation, access control, relation embedding,
-  filters, and error handling...
-* Benefit from Content Negotiation: [GraphQL](https://api-platform.com/docs/core/graphql/), [JSON-LD](https://json-ld.org), [Hydra](https://hydra-cg.com),
-  [HAL](https://github.com/mikekelly/hal_specification/blob/master/hal_specification.md), [JSON:API](https://jsonapi.org/), [YAML](https://yaml.org/), [JSON](https://www.json.org/), [XML](https://www.w3.org/XML/) and [CSV](https://www.ietf.org/rfc/rfc4180.txt) are supported out of the box.
-* Enjoy the **beautiful automatically generated API documentation** ([OpenAPI](https://api-platform.com/docs/core/openapi/)).
-* Add [**a convenient Material Design administration interface**](https://api-platform.com/docs/admin) built with [React](https://reactjs.org/)
-  without writing a line of code.
-* **Scaffold fully functional Progressive-Web-Apps and mobile apps** built with [Next.js](https://api-platform.com/docs/client-generator/nextjs/) (React),
-[Nuxt.js](https://api-platform.com/docs/client-generator/nuxtjs/) (Vue.js) or [React Native](https://api-platform.com/docs/client-generator/react-native/)
-thanks to [the client generator](https://api-platform.com/docs/client-generator/) (a Vue.js generator is also available).
-* Install a development environment and deploy your project in production using **[Docker](https://api-platform.com/docs/distribution)**
-and [Kubernetes](https://api-platform.com/docs/deployment/kubernetes).
-* Easily add **[OAuth](https://oauth.net/) authentication**.
-* Create specs and tests with **[a developer friendly API testing tool](https://api-platform.com/docs/distribution/testing/)**.
+## Features
 
-The official project documentation is available **[on the API Platform website](https://api-platform.com)**.
+- **Projects** with markdown descriptions and a detail view.
+- **Tasks** that are inline-editable in a table, draggable to reorder, with due dates, assignees, status filters, and a personal *My Tasks* view.
+- **Groups** — reusable, owner-managed sets of users with email-based invitations. Invitees get a signup link and are auto-joined on registration.
+- **Accounts** — sign up / sign in on a unified page, verified email-change flow, password reset, profile pictures, and personalized avatar colors.
+- **Real-time updates** via Mercure (server-sent events) on collaborative resources.
+- **Auto-generated admin UI** at `/admin` via `@api-platform/admin`.
 
-API Platform embraces open web standards and the
-[Linked Data](https://www.w3.org/standards/semanticweb/data) movement. Your API will automatically expose structured data.
-It means that your API Platform application is usable **out of the box** with technologies of
-the semantic web.
+## Repository layout
 
-It also means that **your SEO will be improved** because **[Google leverages these formats](https://developers.google.com/search/docs/guides/intro-structured-data)**.
+```
+api/    Symfony 7 / API Platform 4 backend (PHP 8.4, PostgreSQL 16, Doctrine, Mercure)
+pwa/    Next.js 15 frontend (TypeScript, Tailwind v4, shadcn/ui, TanStack Query, Formik, BlockNote)
+e2e/    Playwright end-to-end tests
+helm/   Kubernetes / Helm deployment charts
+docs/   Architecture, API guide, branching, deployment
+```
 
-Last but not least, the server component of API Platform is built on top of the [Symfony](https://symfony.com) framework,
-while client components leverage [React](https://reactjs.org/) ([Vue.js](https://vuejs.org/) flavors are also available).
-It means that you can:
+## Quick start
 
-* Use **thousands of Symfony bundles and React components** with API Platform.
-* Integrate API Platform in **any existing Symfony, React, or Vue application**.
-* Reuse **all your Symfony and JavaScript skills**, and benefit from the incredible amount of documentation available.
-* Enjoy the popular [Doctrine ORM](https://www.doctrine-project.org/projects/orm.html) (used by default, but fully optional:
-  you can use the data provider you want, including but not limited to MongoDB and Elasticsearch)
+Requires Docker and Docker Compose.
 
-## Install
+```bash
+docker compose up -d
+```
 
-[Read the official "Getting Started" guide](https://api-platform.com/docs/distribution/).
+The app is served at [https://localhost](https://localhost). FrankenPHP terminates TLS, serves the API at `/api/*`, and proxies the PWA at the root.
 
-## Credits
+### Running multiple worktrees
 
-Created by [Kévin Dunglas](https://dunglas.fr). Commercial support is available at [Les-Tilleuls.coop](https://les-tilleuls.coop).
+To bring up a second stack alongside the main checkout without port collisions:
+
+```bash
+scripts/worktree-env.sh    # writes ./.env with a unique project name and port block
+docker compose up -d
+```
+
+See [`docs/deployment.md`](docs/deployment.md) for details.
+
+## Local development
+
+### API
+
+```bash
+cd api
+composer install
+bin/console doctrine:migrations:migrate
+bin/phpunit
+```
+
+### PWA
+
+```bash
+cd pwa
+pnpm install
+pnpm dev      # http://localhost:3000
+pnpm lint
+```
+
+### End-to-end
+
+```bash
+cd e2e
+npm install
+npx playwright test
+```
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — how the API, PWA, and Mercure fit together.
+- [API guide](docs/api-guide.md) — entity, resource, and serialization conventions.
+- [Branching and releases](docs/branching-and-releases.md) — branch naming, conventional commits, release tags.
+- [Deployment](docs/deployment.md) — Docker, Helm, and parallel-worktree setup.
+- [Contributing](.github/CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), [Security](.github/SECURITY.md).
+
+## License
+
+[MIT](LICENSE).
