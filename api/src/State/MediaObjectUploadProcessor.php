@@ -49,6 +49,13 @@ final class MediaObjectUploadProcessor implements ProcessorInterface
             throw new BadRequestHttpException('A "file" form field is required.');
         }
 
-        return $this->imageUploadService->uploadAvatar($file, $user);
+        // `kind` selects the upload pipeline. Defaults to avatar so existing
+        // PWA callers (which don't send `kind`) keep their current behaviour.
+        $kind = $request?->request->get('kind');
+        return match ($kind) {
+            MediaObject::KIND_ATTACHMENT => $this->imageUploadService->uploadAttachment($file, $user),
+            null, '', MediaObject::KIND_AVATAR => $this->imageUploadService->uploadAvatar($file, $user),
+            default => throw new BadRequestHttpException(sprintf('Unsupported kind "%s".', $kind)),
+        };
     }
 }

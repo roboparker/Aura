@@ -10,6 +10,7 @@ import {
   Filter,
   GripVertical,
   MessageSquare,
+  Paperclip,
   Repeat,
   Trash2,
   X,
@@ -42,6 +43,9 @@ import TagsCombobox from "@/components/tasks/TagsCombobox";
 import CommentsPanel, {
   type Comment,
 } from "@/components/tasks/CommentsPanel";
+import AttachmentsPanel, {
+  type Attachment,
+} from "@/components/tasks/AttachmentsPanel";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -110,6 +114,9 @@ interface Task {
   owner: { "@id": string };
   recurrenceRule: RecurrenceRule | null;
   reminders: ReminderOffset[] | null;
+  // Attachments embed inline under `task:read`. The PWA uploads via
+  // `POST /media-objects?kind=attachment`, then PATCHes the IRI here.
+  attachments: Attachment[];
   position: number;
   tags: Tag[];
   assignees: AssigneeOption[];
@@ -594,6 +601,8 @@ interface TaskRowProps {
   onCreateComment: (task: Task, body: string) => Promise<void>;
   onEditComment: (comment: Comment, body: string) => Promise<void>;
   onDeleteComment: (comment: Comment) => Promise<void>;
+  onAttachMedia: (task: Task, mediaObjectIri: string) => Promise<void>;
+  onDetachMedia: (task: Task, attachment: Attachment) => Promise<void>;
 }
 
 const TaskRow = ({
@@ -618,6 +627,8 @@ const TaskRow = ({
   onCreateComment,
   onEditComment,
   onDeleteComment,
+  onAttachMedia,
+  onDetachMedia,
 }: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
@@ -629,6 +640,12 @@ const TaskRow = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // --- Attachments expansion --------------------------------------------
+  // Attachments embed inline on the Task payload, so no lazy fetch — we
+  // just toggle the panel visibility. The count is always known.
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(false);
+  const attachmentCount = task.attachments.length;
 
   // --- Comments expansion -----------------------------------------------
   // Comments are fetched lazily — the load fires the first time the user
@@ -883,25 +900,60 @@ const TaskRow = ({
               Add description
             </button>
           )}
-          <button
-            type="button"
-            onClick={toggleComments}
-            aria-expanded={commentsExpanded}
-            aria-label={`${commentsExpanded ? "Hide" : "Show"} comments for "${task.title}"`}
-            className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-sm"
-            data-testid="task-comments-toggle"
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>
-              {commentCount === undefined
-                ? "Comments"
-                : commentCount === 0
-                  ? "Comment"
-                  : `Comments (${commentCount})`}
-            </span>
-          </button>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleComments}
+              aria-expanded={commentsExpanded}
+              aria-label={`${commentsExpanded ? "Hide" : "Show"} comments for "${task.title}"`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-sm"
+              data-testid="task-comments-toggle"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              <span>
+                {commentCount === undefined
+                  ? "Comments"
+                  : commentCount === 0
+                    ? "Comment"
+                    : `Comments (${commentCount})`}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAttachmentsExpanded((v) => !v)}
+              aria-expanded={attachmentsExpanded}
+              aria-label={`${attachmentsExpanded ? "Hide" : "Show"} attachments for "${task.title}"`}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground rounded-sm"
+              data-testid="task-attachments-toggle"
+            >
+              <Paperclip className="h-3.5 w-3.5" />
+              <span>
+                {attachmentCount === 0
+                  ? "Attach"
+                  : `Attachments (${attachmentCount})`}
+              </span>
+            </button>
+          </div>
         </TableCell>
       </TableRow>
+      {attachmentsExpanded && (
+        <TableRow
+          className="hover:bg-transparent"
+          data-testid="task-attachments-row"
+        >
+          <TableCell className="w-8" aria-hidden="true" />
+          <TableCell className="w-10" aria-hidden="true" />
+          <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-3">
+            <AttachmentsPanel
+              taskTitle={task.title}
+              attachments={task.attachments}
+              canDeleteAll={isLikelyTaskOwner}
+              onAttach={(iri) => onAttachMedia(task, iri)}
+              onDetach={(att) => onDetachMedia(task, att)}
+            />
+          </TableCell>
+        </TableRow>
+      )}
       {commentsExpanded && (
         <TableRow
           className="hover:bg-transparent"
@@ -1693,6 +1745,59 @@ const Tasks = () => {
     [],
   );
 
+  const handleAttachMedia = useCallback(
+    async (task: Task, mediaObjectIri: string) => {
+      // Server expects the full attachments IRI list, so derive the next
+      // set from the current task entity (already in state) plus the new
+      // upload, then PATCH and merge the response back.
+      const nextIris = [
+        ...task.attachments.map((a) => a["@id"]),
+        mediaObjectIri,
+      ];
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ attachments: nextIris }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.detail ||
+            data["hydra:description"] ||
+            "Failed to attach file.",
+        );
+      }
+      const updated = (await res.json()) as Task;
+      setTasks((current) =>
+        current.map((t) => (t["@id"] === task["@id"] ? updated : t)),
+      );
+    },
+    [],
+  );
+
+  const handleDetachMedia = useCallback(
+    async (task: Task, attachment: Attachment) => {
+      const nextIris = task.attachments
+        .filter((a) => a["@id"] !== attachment["@id"])
+        .map((a) => a["@id"]);
+      const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ attachments: nextIris }),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to remove attachment.");
+      }
+      const updated = (await res.json()) as Task;
+      setTasks((current) =>
+        current.map((t) => (t["@id"] === task["@id"] ? updated : t)),
+      );
+    },
+    [],
+  );
+
   const handleDeleteComment = useCallback(async (comment: Comment) => {
     const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
       method: "DELETE",
@@ -2052,6 +2157,8 @@ const Tasks = () => {
                           onCreateComment={handleCreateComment}
                           onEditComment={handleEditComment}
                           onDeleteComment={handleDeleteComment}
+                          onAttachMedia={handleAttachMedia}
+                          onDetachMedia={handleDetachMedia}
                         />
                       ))}
                     </Table>

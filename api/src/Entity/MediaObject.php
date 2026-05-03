@@ -20,6 +20,7 @@ use Symfony\Component\Uid\Uuid;
 #[ApiResource(
     operations: [
         new Get(
+            uriTemplate: '/media-objects/{id}',
             security: "is_granted('ROLE_USER')",
         ),
         new Post(
@@ -60,7 +61,7 @@ class MediaObject
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -68,7 +69,7 @@ class MediaObject
     private ?User $owner = null;
 
     #[ORM\Column(length: 32)]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private string $kind = self::KIND_ATTACHMENT;
 
     /** @var array<string, string> */
@@ -76,19 +77,19 @@ class MediaObject
     private array $variants = [];
 
     #[ORM\Column(length: 255)]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private string $originalName = '';
 
     #[ORM\Column(length: 100)]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private string $mimeType = '';
 
     #[ORM\Column(type: 'integer')]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private int $byteSize = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     private \DateTimeImmutable $createdOn;
 
     public function __construct()
@@ -184,7 +185,7 @@ class MediaObject
      *
      * @return array<string, string>
      */
-    #[Groups(['media_object:read'])]
+    #[Groups(['media_object:read', 'task:read'])]
     public function getVariantUrls(): array
     {
         $urls = [];
