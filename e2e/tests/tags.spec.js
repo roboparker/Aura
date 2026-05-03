@@ -77,13 +77,17 @@ test.describe("Tags", () => {
     await expect(item.locator('[data-testid="task-tag"]')).toHaveCount(0);
 
     // Open the tag picker (TagsCombobox edit button — `Add tags for "<title>"`
-    // when empty, `Edit tags for "<title>"` once any are attached). Pick Blue.
+    // when empty, `Edit tags for "<title>"` once any are attached). Then
+    // click into the chip-input so Base UI opens the options popover.
     await item.getByRole("button", { name: new RegExp(`tags for "${taskTitle}"`) }).click();
+    const tagInput = item.locator('[data-slot="combobox-chip-input"]');
+    await tagInput.click();
     await page.getByRole("option", { name: `Blue-${suffix}` }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(`Blue-${suffix}`);
 
-    // Picker stays open in multi-select; pick Red, then dismiss by clicking
-    // outside the popover.
+    // Picker may close after a pick — click the input again to reopen, then
+    // pick Red.
+    await tagInput.click();
     await page.getByRole("option", { name: `Red-${suffix}` }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toHaveCount(2);
     // Click the page heading to take focus out of the combobox.
@@ -121,6 +125,8 @@ test.describe("Tags", () => {
     await createTaskInline(page, taskTitle);
     const item = page.locator('[data-testid="task-item"]', { hasText: taskTitle });
     await item.getByRole("button", { name: new RegExp(`tags for "${taskTitle}"`) }).click();
+    // Click into the chip-input to open the Base UI Combobox popover.
+    await item.locator('[data-slot="combobox-chip-input"]').click();
     await page.getByRole("option", { name: tagTitle }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(tagTitle);
     // Dismiss the popover.
