@@ -207,6 +207,85 @@ class TaskTest extends ApiTestCase
         $this->assertNull($reloaded->getCompletedOn());
     }
 
+    public function testCreateTaskWithDueDate(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $due = (new \DateTimeImmutable('2026-06-01T09:00:00+00:00'));
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Submit report',
+                'dueDate' => $due->format(\DateTimeInterface::ATOM),
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertJsonContains([
+            '@type' => 'Task',
+            'title' => 'Submit report',
+        ]);
+        $task = $this->reloadTaskByTitle('Submit report');
+        $this->assertNotNull($task->getDueDate());
+        $this->assertSame($due->getTimestamp(), $task->getDueDate()->getTimestamp());
+    }
+
+    public function testPatchDueDate(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Plan trip');
+        $this->assertNull($task->getDueDate());
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $due = new \DateTimeImmutable('2026-07-04T12:00:00+00:00');
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['dueDate' => $due->format(\DateTimeInterface::ATOM)],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $reloaded = $this->reloadTaskByTitle('Plan trip');
+        $this->assertNotNull($reloaded->getDueDate());
+        $this->assertSame($due->getTimestamp(), $reloaded->getDueDate()->getTimestamp());
+    }
+
+    public function testClearDueDate(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Has due date');
+        $task->setDueDate(new \DateTimeImmutable('2026-07-04T12:00:00+00:00'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['dueDate' => null],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $reloaded = $this->reloadTaskByTitle('Has due date');
+        $this->assertNull($reloaded->getDueDate());
+    }
+
+    public function testRejectsInvalidDueDateFormat(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Bad date');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['dueDate' => 'not-a-real-date'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+    }
+
     public function testDeleteOwnTask(): void
     {
         $alice = $this->createUser('alice@example.com');
