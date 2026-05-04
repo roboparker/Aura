@@ -1,0 +1,15 @@
+{# @var notifications App\Entity\Notification[] #}
+{# @var recipient \App\Entity\User #}
+Hi {{ recipient.givenName ?: recipient.email }},
+
+Here's your {{ period }} digest from Aura — {{ notifications|length }} notification{{ notifications|length == 1 ? '' : 's' }} since the last batch.
+
+{% for n in notifications %}
+- {{ n.title }}{% if n.body %}
+    {{ n.body }}
+{% endif %}
+{% endfor %}
+
+Open Aura to review the details or change your notification frequency: {{ tasksUrl }}
+
+— Aura

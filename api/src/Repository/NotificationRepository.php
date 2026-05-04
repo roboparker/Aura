@@ -32,4 +32,23 @@ class NotificationRepository extends ServiceEntityRepository
             'reminderOffset' => $offset,
         ]);
     }
+
+    /**
+     * Returns notifications for a recipient that have not yet been
+     * included in any digest email — what the digest dispatcher needs to
+     * roll up into the next outgoing message. Ordered oldest-first so
+     * the email reads chronologically.
+     *
+     * @return Notification[]
+     */
+    public function findPendingDigestForRecipient(User $recipient): array
+    {
+        return $this->createQueryBuilder('n')
+            ->andWhere('n.recipient = :recipient')
+            ->andWhere('n.digestedAt IS NULL')
+            ->setParameter('recipient', $recipient)
+            ->orderBy('n.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }
