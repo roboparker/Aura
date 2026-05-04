@@ -107,6 +107,17 @@ class Notification
     #[Groups(['notification:read'])]
     private \DateTimeImmutable $createdAt;
 
+    /**
+     * Stamped by App\Command\DispatchNotificationDigestCommand once a row
+     * has been included in a digest email so the next digest run skips it.
+     * Independent of {@see $readAt} — a digest can ship before the user
+     * opens the bell, and a user can read a notification without ever
+     * having received a digest (realtime path).
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['notification:read'])]
+    private ?\DateTimeImmutable $digestedAt = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -207,5 +218,16 @@ class Notification
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getDigestedAt(): ?\DateTimeImmutable
+    {
+        return $this->digestedAt;
+    }
+
+    public function setDigestedAt(?\DateTimeImmutable $digestedAt): static
+    {
+        $this->digestedAt = $digestedAt;
+        return $this;
     }
 }

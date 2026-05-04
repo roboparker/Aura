@@ -136,3 +136,15 @@ Use the `update-deps.sh` script to update all project dependencies:
 ```bash
 ./update-deps.sh
 ```
+
+## Scheduled background jobs
+
+Two console commands need to run on a cron in production:
+
+| Command | Recommended cadence | Purpose |
+| --- | --- | --- |
+| `bin/console app:tasks:reminders:dispatch` | Every 5 minutes | Creates in-app notifications for due task reminders and (for users on `notificationFrequency=realtime` with `emailNotificationsEnabled=true`) sends a per-reminder email. |
+| `bin/console app:notifications:dispatch-digest --period=hourly` | Hourly at minute 55 | Rolls up pending in-app notifications for users on `notificationFrequency=hourly` into a single grouped digest email. |
+| `bin/console app:notifications:dispatch-digest --period=daily` | Daily at 08:00 UTC | Same as above for users on `notificationFrequency=daily`. |
+
+The digest commands stamp each notification with `digestedAt` once shipped, so reruns within the same window are no-ops. The realtime path skips users whose frequency is `hourly` or `daily`, so the two paths never double-deliver.

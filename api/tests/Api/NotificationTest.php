@@ -3,11 +3,13 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Command\DispatchNotificationDigestCommand;
 use App\Command\DispatchTaskRemindersCommand;
 use App\Entity\Notification;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -282,11 +284,119 @@ class NotificationTest extends ApiTestCase
         return $task;
     }
 
+    public function testDigestGroupsPendingNotificationsForHourlyUser(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'hourly']);
+        $this->entityManager->flush();
+        $this->seedNotification($alice, 'First');
+        $this->seedNotification($alice, 'Second');
+
+        $exit = $this->runDigest('hourly');
+        $this->assertSame(0, $exit);
+
+        // One email containing both items.
+        $this->assertEmailCount(1);
+        $msg = $this->getMailerMessage(0);
+        $this->assertEmailHeaderSame($msg, 'To', 'alice@example.com');
+        $this->assertEmailHeaderSame($msg, 'Subject', 'Hourly digest: 2 notifications waiting');
+        $this->assertEmailHtmlBodyContains($msg, 'First');
+        $this->assertEmailHtmlBodyContains($msg, 'Second');
+
+        // Both rows are stamped so the next run skips them.
+        $this->entityManager->clear();
+        foreach ($this->entityManager->getRepository(Notification::class)->findAll() as $row) {
+            $this->assertNotNull($row->getDigestedAt());
+        }
+    }
+
+    public function testDigestRerunDoesNotResendAlreadyShipped(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'daily']);
+        $this->entityManager->flush();
+        $this->seedNotification($alice, 'Yesterday');
+
+        $this->runDigest('daily');
+        $this->runDigest('daily');
+
+        // Same notification, only one digest email — second run was a no-op.
+        $this->assertEmailCount(1);
+    }
+
+    public function testDigestSkipsRealtimeUsers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'realtime']);
+        $this->entityManager->flush();
+        $this->seedNotification($alice, 'Realtime row');
+
+        $this->runDigest('hourly');
+        $this->runDigest('daily');
+
+        $this->assertEmailCount(0);
+    }
+
+    public function testDigestRespectsEmailNotificationsDisabled(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences([
+            'notificationFrequency' => 'hourly',
+            'emailNotificationsEnabled' => false,
+        ]);
+        $this->entityManager->flush();
+        $this->seedNotification($alice, 'Pending');
+
+        $this->runDigest('hourly');
+
+        $this->assertEmailCount(0);
+        $this->entityManager->clear();
+        // Row stays "undigested" so toggling email back on later still
+        // gathers it into the next digest, rather than silently swallowing
+        // the user's pending notifications during the opt-out window.
+        $this->assertNull(
+            $this->entityManager->getRepository(Notification::class)
+                ->findOneBy(['title' => 'Pending'])
+                ?->getDigestedAt(),
+        );
+    }
+
+    public function testDigestRequiresValidPeriod(): void
+    {
+        $command = static::getContainer()->get(DispatchNotificationDigestCommand::class);
+        $tester = new CommandTester($command);
+        $this->assertSame(Command::INVALID, $tester->execute(['--period' => 'weekly']));
+    }
+
+    public function testDigestPeriodsDoNotPoachEachOthersUsers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'hourly']);
+        $bob = $this->createUser('bob@example.com');
+        $bob->setPreferences(['notificationFrequency' => 'daily']);
+        $this->entityManager->flush();
+        $this->seedNotification($alice, 'Alice item');
+        $this->seedNotification($bob, 'Bob item');
+
+        $this->runDigest('hourly');
+
+        $this->assertEmailCount(1);
+        $msg = $this->getMailerMessage(0);
+        $this->assertEmailHeaderSame($msg, 'To', 'alice@example.com');
+    }
+
     private function runDispatcher(): int
     {
         $command = static::getContainer()->get(DispatchTaskRemindersCommand::class);
         $tester = new CommandTester($command);
         return $tester->execute([]);
+    }
+
+    private function runDigest(string $period): int
+    {
+        $command = static::getContainer()->get(DispatchNotificationDigestCommand::class);
+        $tester = new CommandTester($command);
+        return $tester->execute(['--period' => $period]);
     }
 
     private function seedNotification(User $recipient, string $title): Notification
