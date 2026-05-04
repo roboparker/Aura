@@ -39,6 +39,10 @@ import {
   uploadAttachmentFile,
 } from "@/lib/attachments";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import {
+  useCommentLiveUpdates,
+  type CommentLiveEvent,
+} from "@/lib/useCommentLiveUpdates";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import AssigneesCombobox, {
   type AssigneeOption,
@@ -607,6 +611,9 @@ interface TaskRowProps {
   onDeleteComment: (comment: Comment) => Promise<void>;
   onAttachMedia: (task: Task, mediaObjectIri: string) => Promise<void>;
   onDetachMedia: (task: Task, attachment: Attachment) => Promise<void>;
+  /** Forwarded to useCommentLiveUpdates: parent merges deltas published
+   *  by Mercure into commentsByTask state. */
+  onCommentLiveEvent: (taskIri: string, event: CommentLiveEvent) => void;
 }
 
 const TaskRow = ({
@@ -633,6 +640,7 @@ const TaskRow = ({
   onDeleteComment,
   onAttachMedia,
   onDetachMedia,
+  onCommentLiveEvent,
 }: TaskRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task["@id"],
@@ -716,6 +724,13 @@ const TaskRow = ({
     // effect re-runs only on the values we actually care about.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commentsExpanded, comments]);
+
+  // Subscribe to live comment updates only while the panel is open.
+  // Closes the EventSource on collapse so we don't leave a connection
+  // open per task in the list.
+  useCommentLiveUpdates(commentsExpanded ? task.id : null, commentsExpanded, (event) => {
+    onCommentLiveEvent(task["@id"], event);
+  });
 
   // --- Inline title editing ---------------------------------------------
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1856,6 +1871,41 @@ const Tasks = () => {
     [],
   );
 
+  const handleCommentLiveEvent = useCallback(
+    (taskIri: string, event: CommentLiveEvent) => {
+      // Live deltas merge into the parent's commentsByTask cache. We
+      // dedupe on @id so the event from the user's own POST doesn't
+      // double-insert when the optimistic local push and the Mercure
+      // echo race each other.
+      setCommentsByTask((prev) => {
+        const list = prev[taskIri];
+        if (!list) {
+          // Panel hasn't loaded comments yet — nothing to merge into.
+          // The lazy fetch will pick up the new comment when expanded.
+          return prev;
+        }
+        if (event.type === "delete") {
+          return {
+            ...prev,
+            [taskIri]: list.filter((c) => c["@id"] !== event.id),
+          };
+        }
+        const incoming = event.comment as unknown as Comment;
+        const idx = list.findIndex((c) => c["@id"] === incoming["@id"]);
+        if (event.type === "create") {
+          if (idx !== -1) return prev;
+          return { ...prev, [taskIri]: [...list, incoming] };
+        }
+        // update
+        if (idx === -1) return prev;
+        const next = list.slice();
+        next[idx] = incoming;
+        return { ...prev, [taskIri]: next };
+      });
+    },
+    [],
+  );
+
   const handleDeleteComment = useCallback(async (comment: Comment) => {
     const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
       method: "DELETE",
@@ -2217,6 +2267,7 @@ const Tasks = () => {
                           onDeleteComment={handleDeleteComment}
                           onAttachMedia={handleAttachMedia}
                           onDetachMedia={handleDetachMedia}
+                          onCommentLiveEvent={handleCommentLiveEvent}
                         />
                       ))}
                     </Table>
