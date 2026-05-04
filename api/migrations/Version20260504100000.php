@@ -27,13 +27,17 @@ final class Version20260504100000 extends AbstractMigration
                 token_hash VARCHAR(64) NOT NULL,
                 name VARCHAR(80) NOT NULL,
                 scopes JSON NOT NULL,
-                last_used_at TIMESTAMP(0) WITH TIME ZONE DEFAULT NULL,
-                expires_at TIMESTAMP(0) WITH TIME ZONE DEFAULT NULL,
-                created_at TIMESTAMP(0) WITH TIME ZONE NOT NULL,
+                last_used_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
+                expires_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
+                created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
                 PRIMARY KEY(id)
             )
         SQL);
-        $this->addSql('CREATE UNIQUE INDEX uniq_api_token_hash ON api_token (token_hash)');
+        // Doctrine auto-names the unique constraint from `unique: true` on
+        // the column attribute; matching that name here keeps
+        // `doctrine:schema:validate` clean. Mirrors the password_reset_token
+        // pattern from the initial schema migration.
+        $this->addSql('CREATE UNIQUE INDEX UNIQ_7BA2F5EBB3BC57DA ON api_token (token_hash)');
         $this->addSql('CREATE INDEX idx_api_token_user ON api_token (user_id)');
         $this->addSql('CREATE INDEX idx_api_token_hash ON api_token (token_hash)');
         $this->addSql(<<<'SQL'
