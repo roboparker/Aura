@@ -148,3 +148,15 @@ Two console commands need to run on a cron in production:
 | `bin/console app:notifications:dispatch-digest --period=daily` | Daily at 08:00 UTC | Same as above for users on `notificationFrequency=daily`. |
 
 The digest commands stamp each notification with `digestedAt` once shipped, so reruns within the same window are no-ops. The realtime path skips users whose frequency is `hourly` or `daily`, so the two paths never double-deliver.
+
+## Web Push (VAPID)
+
+Web Push delivery (#100) signs requests to the browser's push service with a VAPID key pair. The endpoints (`POST /me/push-subscriptions`, `DELETE /me/push-subscriptions/{id}`) and storage are wired up; the actual `web-push` send + service-worker handler land in a follow-up. When that follow-up adds the dispatcher integration, point it at:
+
+| Env var | Purpose |
+| --- | --- |
+| `VAPID_PUBLIC_KEY` | Base64-url-encoded P-256 public key. Shipped to the PWA so `PushManager.subscribe()` can apply it. |
+| `VAPID_PRIVATE_KEY` | Base64-url-encoded P-256 private key. **Server-only** — never exposed to clients. |
+| `VAPID_SUBJECT` | `mailto:` or `https://` contact for push services to reach you about issues. |
+
+Generate a fresh pair with `web-push generate-vapid-keys` (Node) or any equivalent tool, store the private key as a Kubernetes Secret, and never rotate it without re-prompting users — the public key changes invalidate every existing subscription row.
