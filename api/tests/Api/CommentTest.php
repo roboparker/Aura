@@ -305,6 +305,113 @@ class CommentTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testReplyToCommentOnSameTaskSucceeds(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Task');
+        $root = $this->seedComment($alice, $task, 'Root');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'parentComment' => '/comments/' . $root->getId(),
+                'body' => 'A reply',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertJsonContains([
+            '@type' => 'Comment',
+            'body' => 'A reply',
+            'parentComment' => '/comments/' . $root->getId(),
+        ]);
+    }
+
+    public function testReplyParentMustBelongToSameTask(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $taskA = $this->createTask($alice, 'Task A');
+        $taskB = $this->createTask($alice, 'Task B');
+        $rootOnA = $this->seedComment($alice, $taskA, 'Root on A');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $taskB->getId(),
+                'parentComment' => '/comments/' . $rootOnA->getId(),
+                'body' => 'Wrong task',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testReplyDepthCapped(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Task');
+        $depth1 = $this->seedComment($alice, $task, 'd1');
+        $depth2 = $this->seedReply($alice, $task, $depth1, 'd2');
+        $depth3 = $this->seedReply($alice, $task, $depth2, 'd3');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'parentComment' => '/comments/' . $depth3->getId(),
+                'body' => 'too deep',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testDeletingParentCascadesToReplies(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Task');
+        $root = $this->seedComment($alice, $task, 'Root');
+        $reply = $this->seedReply($alice, $task, $root, 'reply');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('DELETE', '/comments/' . $root->getId());
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $stillThere = $this->entityManager->getRepository(Comment::class)->find($reply->getId());
+        $this->assertNull($stillThere, 'Reply should be removed when its parent is deleted.');
+    }
+
+    public function testCanFilterCommentsByParent(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Task');
+        $root = $this->seedComment($alice, $task, 'Root');
+        $this->seedReply($alice, $task, $root, 'reply-1');
+        $this->seedReply($alice, $task, $root, 'reply-2');
+        $this->seedComment($alice, $task, 'Other root');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/comments?parentComment=/comments/' . $root->getId());
+
+        $this->assertResponseIsSuccessful();
+        $bodies = array_map(
+            fn ($c) => $c['body'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        sort($bodies);
+        $this->assertSame(['reply-1', 'reply-2'], $bodies);
+    }
+
     public function testOversizedBodyRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -328,6 +435,18 @@ class CommentTest extends ApiTestCase
         $c = new Comment();
         $c->setAuthor($author);
         $c->setTask($task);
+        $c->setBody($body);
+        $this->entityManager->persist($c);
+        $this->entityManager->flush();
+        return $c;
+    }
+
+    private function seedReply(User $author, Task $task, Comment $parent, string $body): Comment
+    {
+        $c = new Comment();
+        $c->setAuthor($author);
+        $c->setTask($task);
+        $c->setParentComment($parent);
         $c->setBody($body);
         $this->entityManager->persist($c);
         $this->entityManager->flush();

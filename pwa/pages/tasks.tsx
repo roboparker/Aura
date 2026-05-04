@@ -554,6 +554,31 @@ const plainTextDescription = (markdown: string | null): string => {
     .trim();
 };
 
+// Removes a comment and every descendant whose `parentComment` chain
+// terminates at the deleted IRI. Used after a manual delete *and* when a
+// Mercure delete event arrives — the server cascade fires at the DB
+// level and only the top of the subtree is broadcast.
+const pruneSubtree = (list: Comment[], removedIri: string): Comment[] => {
+  const removed = new Set<string>([removedIri]);
+  // Comments arrive oldest-first; a single forward pass catches all
+  // descendants because a reply is always created after its parent.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const c of list) {
+      if (
+        !removed.has(c["@id"]) &&
+        c.parentComment !== null &&
+        removed.has(c.parentComment)
+      ) {
+        removed.add(c["@id"]);
+        changed = true;
+      }
+    }
+  }
+  return list.filter((c) => !removed.has(c["@id"]));
+};
+
 interface SortableHeaderProps {
   label: string;
   sortKey: SortKey;
@@ -606,7 +631,11 @@ interface TaskRowProps {
   /** Lazy-load trigger: parent fetches `/comments?task=…` the first time
    *  this fires for a task. */
   onLoadComments: (task: Task) => Promise<void>;
-  onCreateComment: (task: Task, body: string) => Promise<void>;
+  onCreateComment: (
+    task: Task,
+    body: string,
+    parentIri?: string | null,
+  ) => Promise<void>;
   onEditComment: (comment: Comment, body: string) => Promise<void>;
   onDeleteComment: (comment: Comment) => Promise<void>;
   onAttachMedia: (task: Task, mediaObjectIri: string) => Promise<void>;
@@ -1041,7 +1070,9 @@ const TaskRow = ({
               isLoading={commentsLoading && comments === undefined}
               currentUserIri={currentUserIri}
               isTaskOwner={isLikelyTaskOwner}
-              onCreate={(body) => onCreateComment(task, body)}
+              onCreate={(body, parentIri) =>
+                onCreateComment(task, body, parentIri)
+              }
               onEdit={(comment, body) => onEditComment(comment, body)}
               onDelete={(comment) => onDeleteComment(comment)}
             />
@@ -1758,14 +1789,19 @@ const Tasks = () => {
   );
 
   const handleCreateComment = useCallback(
-    async (task: Task, body: string) => {
+    async (task: Task, body: string, parentIri: string | null = null) => {
       const trimmed = body.trim();
       if (!trimmed) return;
+      const payload: { task: string; body: string; parentComment?: string } = {
+        task: task["@id"],
+        body,
+      };
+      if (parentIri) payload.parentComment = parentIri;
       const res = await fetch(`${ENTRYPOINT}/comments`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({ task: task["@id"], body }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -1896,7 +1932,7 @@ const Tasks = () => {
         if (event.type === "delete") {
           return {
             ...prev,
-            [taskIri]: list.filter((c) => c["@id"] !== event.id),
+            [taskIri]: pruneSubtree(list, event.id),
           };
         }
         const incoming = event.comment as unknown as Comment;
@@ -1923,6 +1959,9 @@ const Tasks = () => {
     if (!res.ok) {
       throw new Error("Failed to delete comment.");
     }
+    // Server CASCADE drops the reply subtree at the DB level but doesn't
+    // publish a Mercure delete per descendant — mirror that here so the
+    // UI doesn't keep showing orphaned replies until the next reload.
     setCommentsByTask((prev) => {
       const next: typeof prev = {};
       for (const [taskIri, list] of Object.entries(prev)) {
@@ -1930,7 +1969,7 @@ const Tasks = () => {
           next[taskIri] = list;
           continue;
         }
-        next[taskIri] = list.filter((c) => c["@id"] !== comment["@id"]);
+        next[taskIri] = pruneSubtree(list, comment["@id"]);
       }
       return next;
     });
