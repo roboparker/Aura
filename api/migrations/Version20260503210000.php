@@ -28,16 +28,19 @@ final class Version20260503210000 extends AbstractMigration
                 PRIMARY KEY(project_id, media_object_id)
             )
         SQL);
-        $this->addSql('CREATE INDEX IDX_PROJATT_PROJECT ON project_attachment (project_id)');
-        $this->addSql('CREATE INDEX IDX_PROJATT_MEDIA ON project_attachment (media_object_id)');
-        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_PROJATT_PROJECT FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_PROJATT_MEDIA FOREIGN KEY (media_object_id) REFERENCES media_object (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
+        // Index/FK names follow Doctrine's auto-generated convention
+        // (IDX_<hash> / FK_<hash>) so doctrine:schema:validate matches the
+        // entity mapping with no rename diffs.
+        $this->addSql('CREATE INDEX IDX_61F9A289166D1F9C ON project_attachment (project_id)');
+        $this->addSql('CREATE INDEX IDX_61F9A28964DE5A5 ON project_attachment (media_object_id)');
+        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_61F9A289166D1F9C FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
+        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_61F9A28964DE5A5 FOREIGN KEY (media_object_id) REFERENCES media_object (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE project_attachment DROP CONSTRAINT FK_PROJATT_PROJECT');
-        $this->addSql('ALTER TABLE project_attachment DROP CONSTRAINT FK_PROJATT_MEDIA');
+        $this->addSql('ALTER TABLE project_attachment DROP CONSTRAINT FK_61F9A289166D1F9C');
+        $this->addSql('ALTER TABLE project_attachment DROP CONSTRAINT FK_61F9A28964DE5A5');
         $this->addSql('DROP TABLE project_attachment');
     }
 }
