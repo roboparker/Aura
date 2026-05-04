@@ -1488,7 +1488,16 @@ const Tasks = () => {
           data.description || data.detail || data["hydra:description"] || "Failed to create task.",
         );
       }
-      await loadData();
+      // Splice the freshly-created task into local state from the POST
+      // response instead of refetching the whole list. The previous
+      // `await loadData()` issued four parallel GETs and a single
+      // network blip on any of them dropped the new task on the floor —
+      // observed as a flaky "Failed to fetch" alert under E2E parallel
+      // load. The POST response already includes every relation the row
+      // needs (owner, tags, assignees, attachments, position assigned
+      // server-side), so a local insert is both faster and resilient.
+      const created: Task = await res.json();
+      setTasks((prev) => [created, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
       // Re-throw so NewTaskRow keeps the user's draft for retry.

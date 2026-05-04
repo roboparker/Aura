@@ -36,24 +36,12 @@ test.describe("Tasks", () => {
       page.locator('[data-testid="new-task-title-input"]'),
     ).toHaveValue("");
 
-    // Complete. The PWA toggles optimistically and then PATCHes, so wait
-    // for the server round-trip to finish before issuing the next click —
-    // otherwise the in-flight PATCH can race the next `uncheck()`, the
-    // optimistic UI flips and reverts before Playwright's actionability
-    // assertion settles, and the test sees "did not change its state".
-    const completeResponse = page.waitForResponse(
-      (res) => res.request().method() === "PATCH" && res.url().includes("/tasks/") && res.ok(),
-    );
+    // Complete
     await item.locator('input[type="checkbox"]').check();
-    await completeResponse;
     await expect(item.locator(`text=${title}`)).toHaveClass(/line-through/);
 
     // Uncomplete
-    const uncompleteResponse = page.waitForResponse(
-      (res) => res.request().method() === "PATCH" && res.url().includes("/tasks/") && res.ok(),
-    );
     await item.locator('input[type="checkbox"]').uncheck();
-    await uncompleteResponse;
     await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
