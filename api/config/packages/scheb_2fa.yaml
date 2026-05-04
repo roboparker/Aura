@@ -1,0 +1,23 @@
+# See the configuration reference at https://symfony.com/bundles/SchebTwoFactorBundle/current/configuration.html
+scheb_two_factor:
+    # Token classes that already represent "password verified" — Scheb wraps
+    # these in a TwoFactorToken when the user has 2FA enabled. json_login
+    # produces a PostAuthenticationToken; UsernamePasswordToken is kept for
+    # the loginUser() helper used by tests.
+    security_tokens:
+        - Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken
+        - Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken
+    totp:
+        # Shown by authenticator apps next to the OTP code so users can
+        # tell their Aura account apart from other TOTP entries.
+        issuer: Aura
+        server_name: Aura
+        # 15-second leeway covers the most common race ("I started typing
+        # the code as it rolled over"). Must stay below the 30-second
+        # TOTP period (otphp throws if leeway >= period).
+        leeway: 15
+    backup_codes:
+        # Recovery codes ship from scheb/2fa-backup-code; the bundle
+        # exposes isBackupCode() / invalidateBackupCode() on the User
+        # entity automatically when this is enabled.
+        enabled: true

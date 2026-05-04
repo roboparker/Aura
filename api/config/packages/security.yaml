@@ -20,6 +20,18 @@ security:
                 check_path: auth_login
                 username_path: email
                 password_path: password
+            # SchebTwoFactorBundle: when the password-auth step succeeds and
+            # the user has TOTP enabled, swap the token for a TwoFactorToken
+            # and route the next POST to /auth/2fa-check through the
+            # JSON handlers below.
+            two_factor:
+                auth_form_path: 2fa_login_check   # POST target (no GET form)
+                check_path: 2fa_login_check
+                post_only: true
+                auth_code_parameter_name: code
+                authentication_required_handler: App\Security\TwoFactorJsonHandler
+                success_handler: App\Security\TwoFactorJsonHandler
+                failure_handler: App\Security\TwoFactorJsonHandler
             logout:
                 path: /auth/logout
 
@@ -28,8 +40,12 @@ security:
         - { path: ^/auth/login$, roles: PUBLIC_ACCESS }
         - { path: ^/auth/forgot-password$, roles: PUBLIC_ACCESS }
         - { path: ^/auth/reset-password$, roles: PUBLIC_ACCESS }
+        # Allow the half-authenticated 2FA token through the check endpoint
+        # (and only that endpoint) so users can submit their code.
+        - { path: ^/auth/2fa-check$, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
         - { path: ^/auth/change-password$, roles: ROLE_USER }
         - { path: ^/api/me$, roles: ROLE_USER }
+        - { path: ^/me/2fa, roles: ROLE_USER }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/docs, roles: PUBLIC_ACCESS }

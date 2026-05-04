@@ -1,7 +1,8 @@
 // @ts-check
 const { request } = require("@playwright/test");
 
-const BASE_URL = "https://localhost";
+// Mirrors helpers.js — see the note there.
+const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
 
 // Routes the auth/redirect-heavy specs land on. In CI the PWA runs `next dev`
 // and compiles each route on first hit; cold compilation has caused 5s

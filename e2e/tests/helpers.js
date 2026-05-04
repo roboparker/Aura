@@ -1,7 +1,10 @@
 // @ts-check
 const { expect } = require("@playwright/test");
 
-const BASE_URL = "https://localhost";
+// Honour E2E_BASE_URL so per-worktree compose stacks (which publish on
+// non-default ports via scripts/worktree-env.sh) can run the suite without
+// editing this file. CI leaves it unset and gets the default.
+const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
 
 const uniqueEmail = (prefix = "e2e") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
