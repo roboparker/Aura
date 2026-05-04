@@ -33,6 +33,14 @@ doctrine:
                 alias: App
         controller_resolver:
             auto_mapping: false
+        # Postgres-specific full-text search wrappers used by
+        # App\Filter\TaskSearchFilter. Registered as string functions
+        # because they return scalar values (boolean / float) that DQL
+        # treats as string-position expressions in WHERE/ORDER BY.
+        dql:
+            string_functions:
+                SEARCH_VECTOR_MATCH: App\Doctrine\Functions\SearchVectorMatch
+                SEARCH_VECTOR_RANK: App\Doctrine\Functions\SearchVectorRank
 
 when@test:
     doctrine:

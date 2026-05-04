@@ -112,6 +112,15 @@ class Comment
     private string $body = '';
 
     /**
+     * Postgres-managed full-text search vector over `body`, populated by
+     * a STORED generated column — see Version20260504090000. Mapped here
+     * so DQL can reference `c.searchVector` from the task search filter's
+     * EXISTS subquery; never written from PHP, never serialised.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
+
+    /**
      * Self-referencing parent for threaded replies. Nullable for root
      * comments. ON DELETE CASCADE means deleting a parent drops its
      * subtree in one shot — depth is bounded so the cascade stays small.

@@ -1357,6 +1357,140 @@ class TaskTest extends ApiTestCase
         $this->assertSame(['Alice launch plan'], $titles);
     }
 
+    public function testSearchRanksTitleAboveDescription(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        // Title-only hit (created first → would lose the createdOn
+        // tie-break without proper ranking)
+        $titleHit = new Task();
+        $titleHit->setOwner($alice);
+        $titleHit->setTitle('Schema migration plan');
+        $this->entityManager->persist($titleHit);
+        $this->entityManager->flush();
+
+        $descriptionHit = new Task();
+        $descriptionHit->setOwner($alice);
+        $descriptionHit->setTitle('Random task');
+        $descriptionHit->setDescription('We need to think about migration.');
+        $this->entityManager->persist($descriptionHit);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=migration');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        // Title weight A > description weight B, so the title hit must
+        // come first regardless of insertion order.
+        $this->assertSame(['Schema migration plan', 'Random task'], $titles);
+    }
+
+    public function testStatusFilterOpen(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'Open one');
+        $done = $this->createTask($alice, 'Done one');
+        $done->setCompletedOn(new \DateTimeImmutable());
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?status=open');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Open one'], $titles);
+    }
+
+    public function testStatusFilterCompleted(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'Open');
+        $done = $this->createTask($alice, 'Done');
+        $done->setCompletedOn(new \DateTimeImmutable());
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?status=completed');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Done'], $titles);
+    }
+
+    public function testStatusFilterIgnoresUnknownValue(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'A');
+        $this->createTask($alice, 'B');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?status=banana');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(2, $client->getResponse()->toArray()['member'] ?? []);
+    }
+
+    public function testDueDateRangeFilter(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $earlier = $this->createTask($alice, 'Earlier');
+        $earlier->setDueDate(new \DateTimeImmutable('2026-04-01'));
+        $inRange = $this->createTask($alice, 'In window');
+        $inRange->setDueDate(new \DateTimeImmutable('2026-05-15'));
+        $later = $this->createTask($alice, 'Later');
+        $later->setDueDate(new \DateTimeImmutable('2026-06-30'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request(
+            'GET',
+            '/tasks?dueDate%5Bafter%5D=2026-05-01&dueDate%5Bbefore%5D=2026-05-31',
+        );
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['In window'], $titles);
+    }
+
+    public function testOrderByDueDateAsc(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->createTask($alice, 'A');
+        $a->setDueDate(new \DateTimeImmutable('2026-06-01'));
+        $b = $this->createTask($alice, 'B');
+        $b->setDueDate(new \DateTimeImmutable('2026-05-01'));
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?order%5BdueDate%5D=asc');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['B', 'A'], $titles);
+    }
+
     private function reloadTaskByTitle(string $title): Task
     {
         $this->entityManager->clear();
