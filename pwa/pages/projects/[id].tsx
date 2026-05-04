@@ -8,6 +8,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
+import ActivityPanel from "@/components/activity/ActivityPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -450,6 +451,10 @@ const ProjectDetail = () => {
                   ))}
                 </ul>
               )}
+
+              <div className="mt-6">
+                <ActivityPanel endpoint={`/projects/${project.id}/activity`} />
+              </div>
             </>
           )}
         </div>
