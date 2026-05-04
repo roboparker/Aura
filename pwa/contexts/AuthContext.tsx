@@ -12,6 +12,11 @@ export interface UserPreferences {
   notificationFrequency: NotificationFrequency;
 }
 
+export interface TwoFactorStatus {
+  enabled: boolean;
+  recoveryCodesRemaining: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -24,6 +29,19 @@ export interface User {
   // Inlined on /api/me so the PWA can apply the saved theme on first paint.
   // Always present — the API merges in defaults for older rows.
   preferences: UserPreferences;
+  // Inlined so the security-card render doesn't have to chase a separate
+  // /me/2fa/status request — the API merges defaults for legacy rows.
+  twoFactor: TwoFactorStatus;
+}
+
+/**
+ * Result of a `login()` call. When 2FA is required, `requiresTwoFactor` is
+ * true and the password step has succeeded — the caller must follow up
+ * with `submitTwoFactorCode()` to complete sign-in. The user object isn't
+ * populated until the second step succeeds.
+ */
+export interface LoginResult {
+  requiresTwoFactor: boolean;
 }
 
 export interface RegisterInput {
@@ -38,7 +56,14 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  /**
+   * Submits the second-factor code (TOTP or recovery) after `login()` has
+   * returned `requiresTwoFactor: true`. Resolves with the now-authenticated
+   * user; throws on a wrong code, leaving the half-authenticated session
+   * in place so the user can retry.
+   */
+  submitTwoFactorCode: (code: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -93,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     fetchMe();
   }, [fetchMe]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setError(null);
     const res = await fetch(`${ENTRYPOINT}/auth/login`, {
       method: "POST",
@@ -102,9 +127,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
 
-    if (!res.ok) {
-      const data = await res.json();
+    // 401 with `requiresTwoFactor: true` means the password matched but
+    // the user has 2FA enabled — keep the half-authenticated session
+    // alive (the cookie is set) and let the caller drive the code step.
+    if (res.status === 401) {
+      const data = await res.json().catch(() => ({}));
+      if (data.requiresTwoFactor) {
+        return { requiresTwoFactor: true };
+      }
       throw new Error(data.error || "Invalid credentials.");
+    }
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Invalid credentials.");
+    }
+
+    const data = await res.json();
+    setUser(data);
+    return { requiresTwoFactor: false };
+  }, []);
+
+  const submitTwoFactorCode = useCallback(async (code: string) => {
+    const res = await fetch(`${ENTRYPOINT}/auth/2fa-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ code }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Invalid authentication code.");
     }
 
     const data = await res.json();
@@ -194,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isLoading,
         login,
+        submitTwoFactorCode,
         register,
         logout,
         changePassword,

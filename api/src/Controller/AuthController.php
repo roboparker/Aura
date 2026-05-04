@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
@@ -10,9 +12,26 @@ use App\Entity\User;
 
 class AuthController extends AbstractController
 {
+    public function __construct(private Security $security)
+    {
+    }
+
     #[Route('/auth/login', name: 'auth_login', methods: ['POST'])]
     public function login(#[CurrentUser] ?User $user): JsonResponse
     {
+        // After json_login succeeds Scheb's AuthenticationTokenListener
+        // wraps the token in a TwoFactorToken when the user has 2FA on.
+        // The json_login firewall's default success path still routes
+        // here, so we surface the "challenge needed" response ourselves
+        // instead of leaking the user payload pre-2FA.
+        $token = $this->security->getToken();
+        if ($token instanceof TwoFactorTokenInterface) {
+            return $this->json([
+                'requiresTwoFactor' => true,
+                'providers' => $token->getTwoFactorProviders(),
+            ], 401);
+        }
+
         if (null === $user) {
             return $this->json([
                 'error' => 'Invalid credentials.',
@@ -49,6 +68,13 @@ class AuthController extends AbstractController
             // Inlined so the PWA can apply the saved theme on initial render
             // without an extra round-trip to /me/preferences.
             'preferences' => $user->getPreferences(),
+            // Surfaced so the PWA can show "2FA on" in the security card
+            // and the count-of-remaining-codes warning without an extra
+            // round-trip to /me/2fa/status on every render.
+            'twoFactor' => [
+                'enabled' => $user->isTotpEnabled(),
+                'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+            ],
         ];
     }
 }

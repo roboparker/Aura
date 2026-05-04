@@ -7,6 +7,7 @@ import AvatarSection from "@/components/account/AvatarSection";
 import EmailChangeForm from "@/components/account/EmailChangeForm";
 import ProfileForm from "@/components/account/ProfileForm";
 import ChangePasswordForm from "@/components/account/ChangePasswordForm";
+import TwoFactorSection from "@/components/account/TwoFactorSection";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -86,6 +87,8 @@ const Account = () => {
               </div>
               <Separator />
               <ChangePasswordForm />
+              <Separator />
+              <TwoFactorSection />
             </CardContent>
           </Card>
         </div>

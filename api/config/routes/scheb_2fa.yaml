@@ -1,0 +1,7 @@
+# Only the check endpoint is needed — there's no server-rendered form,
+# the PWA POSTs the code directly. The route still has to exist with this
+# name so SchebTwoFactorBundle's firewall listener can intercept POSTs
+# to it and feed them through the two-factor authenticator.
+2fa_login_check:
+    path: /auth/2fa-check
+    methods: [POST]

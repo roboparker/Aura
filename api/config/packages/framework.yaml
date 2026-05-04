@@ -16,6 +16,16 @@ framework:
         default_uuid_version: 7
         time_based_uuid_version: 7
 
+    # Per-user throttle on 2FA verification + login challenge attempts so
+    # a stolen password can't be brute-forced past TOTP. Limiter is keyed
+    # by user id (in-app code), not IP, so concurrent honest sessions on
+    # the same network don't lock each other out.
+    rate_limiter:
+        two_factor_verify:
+            policy: 'token_bucket'
+            limit: 5
+            rate: { interval: '1 minute', amount: 5 }
+
     #esi: true
     #fragments: true
 
