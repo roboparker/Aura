@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\MediaObject;
+use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -106,8 +107,8 @@ class MediaObjectDownloadController extends AbstractController
 
     /**
      * The caller may download the MediaObject if they own it OR if at least
-     * one task they can read attaches it. Mirrors the Task GET security
-     * expression: admin, task owner, or project member.
+     * one task or project they can read attaches it. Mirrors the Task and
+     * Project GET security expressions.
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
@@ -115,13 +116,15 @@ class MediaObjectDownloadController extends AbstractController
             return true;
         }
         if ($this->isGranted('ROLE_ADMIN')) {
-            // Admins can read any task, so by transitivity any attachment
-            // surfaced by a task. Avatars don't reach here (avatar-kind
-            // media never gets attached to a task), so the broad allow is
-            // limited to legitimately attached files.
-            return $this->mediaIsAttachedToAnyTask($media);
+            // Admins can read any task or project, so by transitivity any
+            // attachment surfaced by either. Avatars don't reach here
+            // (avatar-kind media never gets attached), so the broad allow
+            // is limited to legitimately attached files.
+            return $this->mediaIsAttachedToAnyTask($media)
+                || $this->mediaIsAttachedToAnyProject($media);
         }
-        return $this->mediaIsAttachedToReadableTask($media, $user);
+        return $this->mediaIsAttachedToReadableTask($media, $user)
+            || $this->mediaIsAttachedToReadableProject($media, $user);
     }
 
     private function mediaIsAttachedToAnyTask(MediaObject $media): bool
@@ -150,6 +153,37 @@ class MediaObjectDownloadController extends AbstractController
             ->leftJoin('p.members', 'pm')
             ->where(':media MEMBER OF t.attachments')
             ->andWhere('t.owner = :user OR pm = :user')
+            ->setParameter('media', $media)
+            ->setParameter('user', $user)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getSingleScalarResult();
+        return $count > 0;
+    }
+
+    private function mediaIsAttachedToAnyProject(MediaObject $media): bool
+    {
+        $count = (int) $this->em->getRepository(Project::class)
+            ->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->where(':media MEMBER OF p.attachments')
+            ->setParameter('media', $media)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getSingleScalarResult();
+        return $count > 0;
+    }
+
+    private function mediaIsAttachedToReadableProject(MediaObject $media, User $user): bool
+    {
+        // Any member of a project can read every attachment on it; same
+        // rule as Project::Get's security expression.
+        $count = (int) $this->em->getRepository(Project::class)
+            ->createQueryBuilder('p')
+            ->select('COUNT(p.id)')
+            ->innerJoin('p.members', 'pm')
+            ->where(':media MEMBER OF p.attachments')
+            ->andWhere('pm = :user')
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)
