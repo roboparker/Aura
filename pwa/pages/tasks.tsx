@@ -1774,10 +1774,19 @@ const Tasks = () => {
         );
       }
       const created: Comment = await res.json();
-      setCommentsByTask((prev) => ({
-        ...prev,
-        [task["@id"]]: [...(prev[task["@id"]] ?? []), created],
-      }));
+      setCommentsByTask((prev) => {
+        const existing = prev[task["@id"]] ?? [];
+        // The Mercure echo of this POST can race the response and
+        // get applied first by handleCommentLiveEvent. Dedup on @id
+        // so we don't end up with two copies of the same comment.
+        if (existing.some((c) => c["@id"] === created["@id"])) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [task["@id"]]: [...existing, created],
+        };
+      });
     },
     [],
   );
