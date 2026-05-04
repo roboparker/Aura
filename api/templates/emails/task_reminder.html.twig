@@ -1,0 +1,19 @@
+{# @var task \App\Entity\Task #}
+{# @var recipient \App\Entity\User #}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p>
+    This is a reminder that
+    <strong>&ldquo;{{ task.title }}&rdquo;</strong>
+    is due in {{ offsetLabel }}{% if task.dueDate %} (<time datetime="{{ task.dueDate|date('c') }}">{{ task.dueDate|date('M j, Y g:i a') }}</time>){% endif %}.
+</p>
+
+{% if task.recurrenceRule %}
+    <p>This task recurs on a schedule, so a fresh occurrence will be created once you mark this one complete.</p>
+{% endif %}
+
+<p>
+    <a href="{{ tasksUrl }}">Open Aura</a> to view or update the task.
+</p>
+
+<p>&mdash; Aura</p>
