@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DiscussionsPanel from "@/components/discussions/DiscussionsPanel";
 import { cn } from "@/lib/utils";
 
 interface Member {
@@ -410,7 +412,20 @@ const ProjectDetail = () => {
                 </CardContent>
               </Card>
 
-              <Card className="mb-6">
+              <Tabs defaultValue="tasks" className="mb-6">
+                <TabsList>
+                  <TabsTrigger value="tasks" data-testid="project-tab-tasks">
+                    Tasks
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="discussions"
+                    data-testid="project-tab-discussions"
+                  >
+                    Discussions
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="tasks" className="space-y-6">
+              <Card>
                 <CardContent className="pt-6">
                   <form
                     onSubmit={handleCreateTask}
@@ -508,6 +523,15 @@ const ProjectDetail = () => {
                   ))}
                 </ul>
               )}
+                </TabsContent>
+                <TabsContent value="discussions">
+                  <DiscussionsPanel
+                    projectIri={project["@id"]}
+                    currentUserIri={user ? `/users/${user.id}` : null}
+                    isProjectOwner={user?.email === project.owner.email}
+                  />
+                </TabsContent>
+              </Tabs>
 
               <div className="mt-6">
                 <ActivityPanel endpoint={`/projects/${project.id}/activity`} />

@@ -1,7 +1,15 @@
 export type RegistryEntry = {
   slug: string;
   name: string;
-  category: "Primitive" | "Form" | "Overlay" | "Data" | "Editor" | "User" | "Theme";
+  category:
+    | "Primitive"
+    | "Form"
+    | "Overlay"
+    | "Data"
+    | "Editor"
+    | "User"
+    | "Theme"
+    | "Discussions";
   description: string;
 };
 
@@ -31,5 +39,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "markdown-editor", name: "MarkdownEditor", category: "Editor", description: "BlockNote-backed WYSIWYG markdown editor." },
   { slug: "markdown-view", name: "MarkdownView", category: "Editor", description: "Read-only markdown renderer." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
+  { slug: "discussions-panel", name: "DiscussionsPanel", category: "Discussions", description: "Project discussion board with list, filter, create, edit, pin/lock." },
   { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },
 ];
