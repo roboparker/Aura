@@ -70,6 +70,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
 #[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
+// GIN index over the FTS-only generated column. The `gin` flag is the
+// PostgreSQL DBAL platform's hook for emitting `USING GIN`. Declared
+// here (in addition to the migration) so doctrine:schema:validate
+// stops trying to drop it on every CI run.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_task_search_vector', flags: ['gin'])]
 #[ValidAssignees]
 #[ValidRecurrence]
 #[ValidReminders]

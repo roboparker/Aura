@@ -66,6 +66,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'comment')]
 #[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_comment_task_created')]
 #[ORM\Index(columns: ['parent_comment_id'], name: 'idx_comment_parent')]
+// GIN index over the FTS-only generated column. See the Task entity
+// for the matching declaration / migration provenance.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_comment_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
 class Comment
 {
