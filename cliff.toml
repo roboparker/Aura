@@ -1,0 +1,77 @@
+# git-cliff configuration for Aura.
+#
+# Generates a Keep-a-Changelog–formatted CHANGELOG.md from conventional
+# commit messages. Tag format is YYYY.MM.DD.N — git-cliff doesn't need
+# a tag-pattern hint because we feed it tags explicitly via the action.
+#
+# Section mapping mirrors Keep a Changelog headings:
+#   feat              -> Added
+#   fix               -> Fixed
+#   security          -> Security
+#   perf, refactor    -> Changed
+#   deprecate         -> Deprecated
+#   remove            -> Removed
+# Everything else (chore, docs, test, ci, build, style) is dropped on
+# the floor — release notes describe user-visible changes, not housekeeping.
+
+[changelog]
+header = """
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/), and \
+this project uses [date-based build numbers](docs/branching-and-releases.md) \
+for versioning (`YYYY.MM.DD.N`).
+"""
+body = """
+{% if version -%}
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+    ## [Unreleased]
+{% endif %}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | upper_first | trim }}\
+{% endfor %}
+{% endfor %}\n
+"""
+trim = true
+footer = ""
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+# Commit-parser rules in priority order. Set `skip = true` to drop a
+# category entirely.
+commit_parsers = [
+    { message = "^feat", group = "Added" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^security", group = "Security" },
+    { message = "^perf", group = "Changed" },
+    { message = "^refactor", group = "Changed" },
+    { message = "^deprecate", group = "Deprecated" },
+    { message = "^remove", group = "Removed" },
+    { message = "^chore", skip = true },
+    { message = "^docs", skip = true },
+    { message = "^test", skip = true },
+    { message = "^ci", skip = true },
+    { message = "^build", skip = true },
+    { message = "^style", skip = true },
+    # Squash-merge PRs may produce "Merge pull request" if anything
+    # slips past — drop them too.
+    { message = "^Merge", skip = true },
+    # Catch-all: any conventional-looking commit whose type wasn't
+    # listed above (e.g. legacy `#2412:` style) gets dropped rather
+    # than producing a section header out of the literal type. Without
+    # this, commits like `#2412: Fix for docker build issue` create a
+    # `### #2412` heading in the changelog.
+    { message = ".*", skip = true },
+]
+filter_commits = false
+# Tag pattern: YYYY.MM.DD.N (no `v` prefix). Anchored so we don't pick
+# up arbitrary numeric tags.
+tag_pattern = "^[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[0-9]+$"
+sort_commits = "newest"

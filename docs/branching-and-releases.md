@@ -85,7 +85,10 @@ git tag 2026.04.12.1
 git push origin 2026.04.12.1
 ```
 
-4. Create a GitHub release from the tag (optional but recommended)
+4. The **Changelog workflow** (`.github/workflows/changelog.yml`) fires automatically on tag push:
+   - Regenerates `CHANGELOG.md` from conventional commits via [git-cliff](https://github.com/orhun/git-cliff) and pushes the update to `main`.
+   - Creates a GitHub Release whose body is the just-cut section of the changelog.
+   No manual step is required for either; the workflow uses `cliff.toml` at the repo root for grouping rules. Commits that don't follow `feat:`/`fix:`/`security:`/`perf:`/`refactor:` are dropped from the user-visible changelog (housekeeping like `chore:`, `docs:`, `ci:` is intentionally excluded).
 
 ### What Triggers a Release
 
