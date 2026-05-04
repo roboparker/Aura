@@ -8,6 +8,13 @@ doctrine:
 
         profiling_collect_backtrace: '%kernel.debug%'
         use_savepoints: true
+        # doctrine/dbal 4 dropped the legacy `array` type. Gedmo's
+        # AbstractLogEntry still declares its `data` column as
+        # `array`, so we re-register it as a JSON-backed alias.
+        # JsonType encodes/decodes arrays cleanly — exactly what the
+        # Loggable listener needs to serialise change sets.
+        types:
+            array: Doctrine\DBAL\Types\JsonType
     orm:
         auto_generate_proxy_classes: true
         enable_lazy_ghost_objects: true

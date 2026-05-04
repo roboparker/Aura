@@ -1,0 +1,11 @@
+# Gedmo Doctrine Extensions, wired through stof/doctrine-extensions-bundle.
+#
+# Only `loggable` is enabled today (issue #89: activity history for tasks
+# and projects). Other extensions can be enabled per-EM as we adopt
+# them — keep this list minimal so we only pay the listener cost for
+# behaviours we use.
+stof_doctrine_extensions:
+    default_locale: en_US
+    orm:
+        default:
+            loggable: true

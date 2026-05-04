@@ -21,6 +21,7 @@ use App\Validator\ValidTaskAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -65,6 +66,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ValidRecurrence]
 #[ValidReminders]
 #[ValidTaskAttachments]
+#[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 class Task
 {
     #[ORM\Id]
@@ -93,11 +95,13 @@ class Task
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
     #[Groups(['task:read', 'task:write'])]
+    #[Gedmo\Versioned]
     private string $title = '';
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Assert\Length(max: 100000, maxMessage: 'Description cannot be longer than {{ limit }} characters.')]
     #[Groups(['task:read', 'task:write'])]
+    #[Gedmo\Versioned]
     private ?string $description = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -106,10 +110,12 @@ class Task
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
+    #[Gedmo\Versioned]
     private ?\DateTimeImmutable $completedOn = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
+    #[Gedmo\Versioned]
     private ?\DateTimeImmutable $dueDate = null;
 
     /**

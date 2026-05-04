@@ -32,3 +32,11 @@ services:
         tags:
             - { name: api_platform.doctrine.orm.query_extension.collection }
             - { name: api_platform.doctrine.orm.query_extension.item }
+
+    # Replace stof's default actor provider with one that yields the
+    # user's IRI (`/users/{uuid}`) instead of `getUserIdentifier()`
+    # (= email). The IRI is stable across email changes and lets the
+    # activity controllers resolve the actor back to a User row.
+    stof_doctrine_extensions.tool.actor_provider:
+        class: App\Service\IriActorProvider
+        arguments: ['@security.helper']
