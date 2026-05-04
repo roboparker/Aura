@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
+use App\Entity\Notification;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -21,6 +22,10 @@ class CommentTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
+        // Notifications hold FKs to both Comment and Task (mention rows
+        // and reminder rows respectively); wipe them first so the bulk
+        // entity deletes below don't trip on orphans.
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -428,6 +433,181 @@ class CommentTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testMentionCreatesNotificationForProjectMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => 'Heads up @bob — can you review?',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $rows = $this->entityManager->getRepository(Notification::class)->findAll();
+        $this->assertCount(1, $rows);
+        $this->assertSame(Notification::TYPE_TASK_MENTION, $rows[0]->getType());
+        $this->assertSame(
+            (string) $bob->getId(),
+            (string) $rows[0]->getRecipient()?->getId(),
+        );
+    }
+
+    public function testMentionOfNonMemberIsIgnored(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        // Charlie exists but isn't a member of the task's project.
+        $charlie = $this->createUser('charlie@example.com');
+        $project = $this->createSharedProject($alice, [$alice], 'Solo');
+        $task = $this->createTaskInProject($alice, $project, 'Task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => 'cc @charlie',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        // Comment itself still posts — unknown @ tokens are plain text,
+        // not validation errors.
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertNotNull($charlie->getId());
+
+        $this->entityManager->clear();
+        $this->assertCount(
+            0,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
+    }
+
+    public function testMentionDoesNotNotifyAuthor(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createSharedProject($alice, [$alice], 'Solo');
+        $task = $this->createTaskInProject($alice, $project, 'Task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => 'Reminding @alice (me)',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $this->assertCount(
+            0,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
+    }
+
+    public function testEditingCommentDoesNotResendExistingMention(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => 'Hey @bob',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $created = $client->getResponse()->toArray();
+
+        // Edit keeps the same mention — must NOT create a second notification.
+        $client->request('PATCH', $created['@id'], [
+            'json' => ['body' => 'Hey @bob (small typo fix)'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $this->assertCount(
+            1,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
+    }
+
+    public function testEditingCommentToAddNewMentionFiresOnlyForNewRecipient(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => 'Hey @bob',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $created = $client->getResponse()->toArray();
+
+        $client->request('PATCH', $created['@id'], [
+            'json' => ['body' => 'Hey @bob and @carol'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $rows = $this->entityManager->getRepository(Notification::class)->findAll();
+        $this->assertCount(2, $rows);
+        $emails = array_map(
+            fn (Notification $n) => $n->getRecipient()?->getEmail(),
+            $rows,
+        );
+        sort($emails);
+        $this->assertSame(['bob@example.com', 'carol@example.com'], $emails);
+    }
+
+    public function testDuplicateMentionsInOneCommentNotifyOnce(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Task');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/comments', [
+            'json' => [
+                'task' => '/tasks/' . $task->getId(),
+                'body' => '@bob @BOB @bob — please look',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $this->assertCount(
+            1,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
     }
 
     private function seedComment(User $author, Task $task, string $body): Comment

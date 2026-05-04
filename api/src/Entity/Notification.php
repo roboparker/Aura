@@ -50,9 +50,14 @@ use Symfony\Component\Uid\Uuid;
     name: 'uniq_task_reminder',
     columns: ['recipient_id', 'task_id', 'reminder_offset'],
 )]
+#[ORM\UniqueConstraint(
+    name: 'uniq_comment_mention',
+    columns: ['recipient_id', 'comment_id'],
+)]
 class Notification
 {
     public const TYPE_TASK_REMINDER = 'task_reminder';
+    public const TYPE_TASK_MENTION = 'task_mention';
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -94,6 +99,19 @@ class Notification
      */
     #[ORM\Column(length: 16, nullable: true)]
     private ?string $reminderOffset = null;
+
+    /**
+     * Comment that triggered this notification — only set for
+     * `task_mention` rows. Together with `recipient` it forms a unique
+     * key so editing a comment can't re-fire mentions to the same user.
+     * The bare IRI is exposed under `notification:read` so the PWA can
+     * deep-link to the comment without an extra fetch.
+     */
+    #[\ApiPlatform\Metadata\ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: Comment::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['notification:read'])]
+    private ?Comment $comment = null;
 
     /**
      * Set by NotificationUpdateProcessor when the user marks the row read.
@@ -228,6 +246,17 @@ class Notification
     public function setDigestedAt(?\DateTimeImmutable $digestedAt): static
     {
         $this->digestedAt = $digestedAt;
+        return $this;
+    }
+
+    public function getComment(): ?Comment
+    {
+        return $this->comment;
+    }
+
+    public function setComment(?Comment $comment): static
+    {
+        $this->comment = $comment;
         return $this;
     }
 }

@@ -461,6 +461,7 @@ const CommentRow = ({
           <MarkdownView
             source={comment.body}
             className="text-sm mt-1"
+            highlightMentions
           />
         )}
         {replying && (
