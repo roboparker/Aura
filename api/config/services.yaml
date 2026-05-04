@@ -55,3 +55,14 @@ services:
     stof_doctrine_extensions.tool.actor_provider:
         class: App\Service\IriActorProvider
         arguments: ['@security.helper']
+
+    App\Push\PushSenderInterface: '@App\Push\WebPushSender'
+
+# In test the dispatcher must not open real sockets to FCM/Mozilla — alias
+# the interface to an in-memory recorder the test suite can inspect and
+# pre-arm with "expired" endpoints to exercise the prune-dead-rows path.
+when@test:
+    services:
+        App\Tests\Push\InMemoryPushSender:
+            public: true
+        App\Push\PushSenderInterface: '@App\Tests\Push\InMemoryPushSender'

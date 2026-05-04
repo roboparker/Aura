@@ -151,7 +151,7 @@ The digest commands stamp each notification with `digestedAt` once shipped, so r
 
 ## Web Push (VAPID)
 
-Web Push delivery (#100) signs requests to the browser's push service with a VAPID key pair. The endpoints (`POST /me/push-subscriptions`, `DELETE /me/push-subscriptions/{id}`) and storage are wired up; the actual `web-push` send + service-worker handler land in a follow-up. When that follow-up adds the dispatcher integration, point it at:
+Web Push delivery (#100) signs requests to the browser's push service with a VAPID key pair. The reminder dispatcher (`app:tasks:reminders:dispatch`) sends a Web Push to every registered device of a recipient who has `pushNotificationsEnabled=true`; subscriptions the push service rejects with 404/410 are pruned inline so dead endpoints don't accumulate. The PWA service worker that turns these payloads into desktop notifications is the remaining piece of #100 and lands in a follow-up.
 
 | Env var | Purpose |
 | --- | --- |
@@ -159,4 +159,6 @@ Web Push delivery (#100) signs requests to the browser's push service with a VAP
 | `VAPID_PRIVATE_KEY` | Base64-url-encoded P-256 private key. **Server-only** — never exposed to clients. |
 | `VAPID_SUBJECT` | `mailto:` or `https://` contact for push services to reach you about issues. |
 
-Generate a fresh pair with `web-push generate-vapid-keys` (Node) or any equivalent tool, store the private key as a Kubernetes Secret, and never rotate it without re-prompting users — the public key changes invalidate every existing subscription row.
+Leaving any of the three slots empty disables push send: the dispatcher logs a warning, the in-app notification + email paths still run, and existing subscription rows are left untouched. This keeps a fresh checkout green without forcing every contributor to generate a key pair.
+
+Generate a fresh pair with `web-push generate-vapid-keys` (Node) or any equivalent tool, store the private key as a Kubernetes Secret, and never rotate it without re-prompting users — public-key changes invalidate every existing subscription row.
