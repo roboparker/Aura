@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
 
-const BASE_URL = "https://localhost";
+const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
 const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:8025";
 
 const uniqueEmail = (prefix = "email-change") =>

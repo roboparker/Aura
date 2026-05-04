@@ -1,7 +1,7 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
 
-const BASE_URL = "https://localhost";
+const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
 
 // Generate unique email per test run to avoid conflicts
 const uniqueEmail = () => `test-${Date.now()}@example.com`;

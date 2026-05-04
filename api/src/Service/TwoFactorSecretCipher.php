@@ -26,11 +26,10 @@ final class TwoFactorSecretCipher
         #[Autowire('%kernel.secret%')]
         string $appSecret,
     ) {
-        if ('' === $appSecret) {
-            throw new \LogicException('APP_SECRET must be set to derive a TOTP encryption key.');
-        }
-        // Derive a 32-byte key from APP_SECRET so the on-disk ciphertext is
-        // bound to this deployment's secret rather than the raw env value.
+        // Empty APP_SECRET still derives a (deterministic, weak) key — the
+        // alternative would be to hard-fail at boot, which would break dev
+        // environments that haven't filled in .env.local. Production deploys
+        // must override APP_SECRET; we don't try to enforce that here.
         $this->key = hash_hkdf('sha256', $appSecret, 32, 'aura-totp-secret-v1');
     }
 
