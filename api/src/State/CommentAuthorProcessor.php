@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Comment;
 use App\Entity\User;
+use App\Service\CommentMentionService;
 use App\Service\CommentMercurePublisher;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -29,6 +30,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private Security $security,
         private CommentMercurePublisher $publisher,
+        private CommentMentionService $mentions,
     ) {
     }
 
@@ -45,6 +47,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
         $data->setAuthor($user);
 
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        $this->mentions->dispatchMentions($result);
         $this->publisher->publishCreated($result);
 
         return $result;

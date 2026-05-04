@@ -26,6 +26,16 @@ const MarkdownViewPage = () => (
         code: `<MarkdownView source={project.description} />`,
         preview: <MarkdownView source={SAMPLE} />,
       },
+      {
+        title: "Highlight @mention chips (comment view)",
+        code: `<MarkdownView source={comment.body} highlightMentions />`,
+        preview: (
+          <MarkdownView
+            source={"Heads up @bob — please look. cc @carol"}
+            highlightMentions
+          />
+        ),
+      },
     ]}
   />
 );
