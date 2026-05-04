@@ -19,6 +19,7 @@ use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
 use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
+use App\Validator\ValidCustomFieldValues;
 use App\Validator\ValidRecurrence;
 use App\Validator\ValidReminders;
 use App\Validator\ValidTaskAttachments;
@@ -79,6 +80,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ValidRecurrence]
 #[ValidReminders]
 #[ValidTaskAttachments]
+#[ValidCustomFieldValues]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 class Task
 {
@@ -223,12 +225,31 @@ class Task
     #[Groups(['task:read', 'task:write'])]
     private Collection $attachments;
 
+    /**
+     * Per-task values for the project's {@see CustomFieldDefinition}s
+     * (#84). Mutated via the Task write group: clients PATCH a fresh
+     * array of `{definition, value}` pairs and orphanRemoval reaps any
+     * row whose definition isn't in the new payload. Type/required/scope
+     * rules are enforced by {@see ValidCustomFieldValues}.
+     *
+     * @var Collection<int, CustomFieldValue>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'task',
+        targetEntity: CustomFieldValue::class,
+        cascade: ['persist', 'remove'],
+        orphanRemoval: true,
+    )]
+    #[Groups(['task:read', 'task:write'])]
+    private Collection $customFieldValues;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tags = new ArrayCollection();
         $this->assignees = new ArrayCollection();
         $this->attachments = new ArrayCollection();
+        $this->customFieldValues = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -422,6 +443,33 @@ class Task
     public function removeAttachment(MediaObject $media): static
     {
         $this->attachments->removeElement($media);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, CustomFieldValue>
+     */
+    public function getCustomFieldValues(): Collection
+    {
+        return $this->customFieldValues;
+    }
+
+    public function addCustomFieldValue(CustomFieldValue $value): static
+    {
+        if (!$this->customFieldValues->contains($value)) {
+            $this->customFieldValues->add($value);
+            $value->setTask($this);
+        }
+        return $this;
+    }
+
+    public function removeCustomFieldValue(CustomFieldValue $value): static
+    {
+        if ($this->customFieldValues->removeElement($value)) {
+            if ($value->getTask() === $this) {
+                $value->setTask(null);
+            }
+        }
         return $this;
     }
 }
