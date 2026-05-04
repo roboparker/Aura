@@ -1,0 +1,122 @@
+name: Changelog
+
+# Two triggers:
+#  - On tag push matching `YYYY.MM.DD.N`: regenerate the full CHANGELOG.md
+#    from the entire git history, commit the result back to `main`, and
+#    attach the just-released section to the GitHub Release notes.
+#  - On `workflow_dispatch`: same regenerate-and-commit flow without
+#    tagging — useful for re-running after a config tweak.
+#
+# `pull_request` runs (separate job) only generate the changelog and
+# upload it as a build artifact so reviewers can preview what the next
+# release section will look like, without writing to the repo.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "cliff.toml"
+      - ".github/workflows/changelog.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  # Tag pushes run sequentially so two same-day releases don't race on
+  # the CHANGELOG.md commit. PR previews can run in parallel — they
+  # don't touch main.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: Update CHANGELOG.md on release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main with full history
+        uses: actions/checkout@v4
+        with:
+          # Always check out main rather than the tag commit — git-cliff
+          # reads tags from the fetched history regardless of HEAD, and
+          # we need to be on main to commit + push the regenerated file.
+          ref: main
+          fetch-depth: 0
+          # The default GITHUB_TOKEN has `contents: write` (granted at
+          # the workflow level above) so it can push to main.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate full CHANGELOG.md
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose
+        env:
+          OUTPUT: CHANGELOG.md
+
+      - name: Generate latest-release section
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          # `--latest --strip header` keeps just the section for the
+          # most recent tag — perfect body for a GitHub Release.
+          args: --latest --strip header
+        env:
+          OUTPUT: RELEASE_NOTES.md
+
+      - name: Commit CHANGELOG.md back to main
+        # Only commit if the file actually changed — re-runs after a
+        # successful release should be no-ops, not empty commits.
+        run: |
+          if git diff --quiet CHANGELOG.md; then
+            echo "CHANGELOG.md unchanged — skipping commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: update CHANGELOG.md for ${GITHUB_REF_NAME}"
+          git push origin main
+
+      - name: Update GitHub Release body
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create the release if it doesn't exist yet, otherwise
+          # update the body. Either way the latest-release section
+          # becomes the visible release notes.
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release edit "${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "${GITHUB_REF_NAME}" --notes-file RELEASE_NOTES.md --title "${GITHUB_REF_NAME}"
+          fi
+
+  preview:
+    if: github.event_name == 'pull_request'
+    name: Preview CHANGELOG diff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Render unreleased section
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --unreleased --strip header
+        env:
+          OUTPUT: unreleased.md
+
+      - name: Upload preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog-preview
+          path: |
+            unreleased.md
+            cliff.toml
+          retention-days: 7

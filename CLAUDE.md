@@ -130,6 +130,7 @@ npx playwright test
 ### Releases
 - Date-based build numbers: `YYYY.MM.DD.N` (e.g., `2026.04.12.1`)
 - Tag `main` when ready to release: `git tag 2026.04.12.1 && git push origin 2026.04.12.1`
+- The **Changelog workflow** (`.github/workflows/changelog.yml`) auto-regenerates `CHANGELOG.md` and creates the GitHub Release via [git-cliff](https://github.com/orhun/git-cliff) on tag push; rules live in `cliff.toml`. Only `feat:`/`fix:`/`security:`/`perf:`/`refactor:` commits make the changelog — keep PR titles in conventional-commit form so they land in the right section.
 
 ## Key Configuration
 - **Database URL**: `DATABASE_URL` env var (default: PostgreSQL on `database:5432`)
