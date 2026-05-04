@@ -9,6 +9,9 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import ActivityPanel from "@/components/activity/ActivityPanel";
+import AttachmentsPanel, {
+  type Attachment,
+} from "@/components/tasks/AttachmentsPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +34,7 @@ interface Project {
   createdOn: string;
   owner: Member;
   members: Member[];
+  attachments: Attachment[];
 }
 
 interface Tag {
@@ -204,6 +208,43 @@ const ProjectDetail = () => {
     }
   };
 
+  const handleAttach = async (mediaObjectIri: string) => {
+    if (!project) return;
+    const nextIris = [...project.attachments.map((a) => a["@id"]), mediaObjectIri];
+    const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ attachments: nextIris }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.detail || data["hydra:description"] || "Failed to attach file.",
+      );
+    }
+    const updated: Project = await res.json();
+    setProject(updated);
+  };
+
+  const handleDetach = async (attachment: Attachment) => {
+    if (!project) return;
+    const nextIris = project.attachments
+      .filter((a) => a["@id"] !== attachment["@id"])
+      .map((a) => a["@id"]);
+    const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ attachments: nextIris }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to remove attachment.");
+    }
+    const updated: Project = await res.json();
+    setProject(updated);
+  };
+
   const handleRemoveMember = async (member: Member) => {
     if (!project) return;
     if (
@@ -352,6 +393,22 @@ const ProjectDetail = () => {
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
+
+              <Card className="mb-6" data-testid="project-attachments">
+                <CardContent className="pt-6">
+                  <h2 className="text-lg font-semibold mb-3">Attachments</h2>
+                  <AttachmentsPanel
+                    taskTitle={project.title}
+                    attachments={project.attachments ?? []}
+                    // Mirrors the task-attachment affordance: only the
+                    // project owner gets the delete button. Members can
+                    // still upload via the drop zone.
+                    canDeleteAll={user?.email === project.owner.email}
+                    onAttach={handleAttach}
+                    onDetach={handleDetach}
+                  />
+                </CardContent>
+              </Card>
 
               <Card className="mb-6">
                 <CardContent className="pt-6">
