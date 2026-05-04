@@ -6,8 +6,10 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Command\DispatchNotificationDigestCommand;
 use App\Command\DispatchTaskRemindersCommand;
 use App\Entity\Notification;
+use App\Entity\PushSubscription;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Tests\Push\InMemoryPushSender;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -27,8 +29,28 @@ class NotificationTest extends ApiTestCase
         // Wipe the join tables before the entity tables so Postgres doesn't
         // bail on residual FK rows from a previous test class.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\PushSubscription')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
+
+        $this->pushSender()->reset();
+    }
+
+    private function pushSender(): InMemoryPushSender
+    {
+        return static::getContainer()->get(InMemoryPushSender::class);
+    }
+
+    private function seedPushSubscription(User $user, string $endpoint): PushSubscription
+    {
+        $sub = new PushSubscription();
+        $sub->setUser($user);
+        $sub->setEndpoint($endpoint);
+        $sub->setP256dh('p256dh-' . bin2hex(random_bytes(4)));
+        $sub->setAuth('auth-' . bin2hex(random_bytes(4)));
+        $this->entityManager->persist($sub);
+        $this->entityManager->flush();
+        return $sub;
     }
 
     public function testListNotificationsRequiresAuth(): void
@@ -282,6 +304,93 @@ class NotificationTest extends ApiTestCase
         $this->entityManager->persist($task);
         $this->entityManager->flush();
         return $task;
+    }
+
+    public function testDispatcherSendsPushWhenEnabledAndSubscribed(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['pushNotificationsEnabled' => true]);
+        $this->entityManager->flush();
+        $this->seedPushSubscription($alice, 'https://fcm.example/alice-laptop');
+        $this->seedPushSubscription($alice, 'https://fcm.example/alice-phone');
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+
+        // Both registrations get a push (one row per device).
+        $sends = $this->pushSender()->sends;
+        $this->assertCount(2, $sends);
+        $endpoints = array_map(fn ($s) => $s['endpoint'], $sends);
+        sort($endpoints);
+        $this->assertSame(
+            ['https://fcm.example/alice-laptop', 'https://fcm.example/alice-phone'],
+            $endpoints,
+        );
+        $this->assertSame('Reminder: Standup', $sends[0]['payload']->title);
+    }
+
+    public function testDispatcherSkipsPushWhenPreferenceDisabled(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        // Default for `pushNotificationsEnabled` is false; subscriptions
+        // can exist on the user from a previous opt-in but the dispatcher
+        // must respect the current preference.
+        $this->seedPushSubscription($alice, 'https://fcm.example/alice');
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+
+        $this->assertSame([], $this->pushSender()->sends);
+    }
+
+    public function testDispatcherNoOpsForUserWithoutSubscriptions(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['pushNotificationsEnabled' => true]);
+        $this->entityManager->flush();
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+
+        // Preference is on but no devices registered — no sends, no errors.
+        $this->assertSame([], $this->pushSender()->sends);
+    }
+
+    public function testDispatcherPrunesExpiredSubscriptions(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['pushNotificationsEnabled' => true]);
+        $this->entityManager->flush();
+        $this->seedPushSubscription($alice, 'https://fcm.example/alive');
+        $this->seedPushSubscription($alice, 'https://fcm.example/dead');
+
+        $this->pushSender()->expiredEndpoints = ['https://fcm.example/dead'];
+
+        $this->seedDueTask($alice, 'Standup');
+        $this->runDispatcher();
+
+        // The 410 row gets pruned so the next dispatcher pass doesn't
+        // re-attempt it; the working row stays.
+        $this->entityManager->clear();
+        $remaining = $this->entityManager->getRepository(PushSubscription::class)->findAll();
+        $endpoints = array_map(fn ($s) => $s->getEndpoint(), $remaining);
+        $this->assertSame(['https://fcm.example/alive'], $endpoints);
+    }
+
+    public function testDispatcherDoesNotResendPushOnIdempotentRerun(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['pushNotificationsEnabled' => true]);
+        $this->entityManager->flush();
+        $this->seedPushSubscription($alice, 'https://fcm.example/alice');
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+        $this->runDispatcher();
+
+        // The second pass skips the already-created notification row, so
+        // it must skip the push too — cron retries can't double-buzz.
+        $this->assertCount(1, $this->pushSender()->sends);
     }
 
     public function testDigestGroupsPendingNotificationsForHourlyUser(): void

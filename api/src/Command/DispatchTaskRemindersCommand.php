@@ -5,7 +5,10 @@ namespace App\Command;
 use App\Entity\Notification;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Push\PushPayload;
+use App\Push\PushSenderInterface;
 use App\Repository\NotificationRepository;
+use App\Repository\PushSubscriptionRepository;
 use App\Repository\TaskRepository;
 use App\Validator\ValidReminders;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -42,6 +45,8 @@ final class DispatchTaskRemindersCommand extends Command
     public function __construct(
         private TaskRepository $tasks,
         private NotificationRepository $notifications,
+        private PushSubscriptionRepository $pushSubscriptions,
+        private PushSenderInterface $pushSender,
         private EntityManagerInterface $em,
         private MailerInterface $mailer,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
@@ -57,6 +62,7 @@ final class DispatchTaskRemindersCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $now = new \DateTimeImmutable();
         $emailsSent = 0;
+        $pushesSent = 0;
 
         // We could narrow this by `dueDate >= now - 7 days` to bound the
         // scan, but for an MVP the dataset is small enough that the
@@ -117,16 +123,66 @@ final class DispatchTaskRemindersCommand extends Command
                     if ($this->sendReminderEmail($recipient, $task, $offset, $io)) {
                         ++$emailsSent;
                     }
+
+                    $pushesSent += $this->sendReminderPush($recipient, $task, $offset);
                 }
             }
         }
 
         $io->success(sprintf(
-            'Created %d notification(s); sent %d email(s).',
+            'Created %d notification(s); sent %d email(s); delivered %d push(es).',
             $created,
             $emailsSent,
+            $pushesSent,
         ));
         return Command::SUCCESS;
+    }
+
+    /**
+     * Sends a Web Push for the reminder to every subscription the recipient
+     * has registered, gated on `pushNotificationsEnabled`. Subscriptions
+     * the browser's push service reports as expired (404/410) are pruned
+     * inline so the next dispatcher pass doesn't re-attempt them.
+     *
+     * Returns the count of pushes the transport accepted (i.e. pushes that
+     * actually left the box) so the caller can keep the success summary
+     * accurate.
+     */
+    private function sendReminderPush(User $recipient, Task $task, string $offset): int
+    {
+        $prefs = $recipient->getPreferences();
+        if (true !== ($prefs['pushNotificationsEnabled'] ?? false)) {
+            return 0;
+        }
+
+        $subscriptions = $this->pushSubscriptions->findActiveForUser($recipient);
+        if ([] === $subscriptions) {
+            return 0;
+        }
+
+        $payload = new PushPayload(
+            title: sprintf('Reminder: %s', $task->getTitle()),
+            body: $this->buildBody($task, $offset),
+            url: rtrim($this->frontendUrl, '/') . '/tasks/' . $task->getId(),
+            tag: 'task-reminder-' . $task->getId() . '-' . $offset,
+        );
+
+        $delivered = 0;
+        foreach ($subscriptions as $subscription) {
+            $result = $this->pushSender->send($subscription, $payload);
+            if ($result->subscriptionExpired) {
+                // Browser revoked or GC'd the registration. Prune the row
+                // so we don't keep retrying a dead endpoint forever.
+                $this->em->remove($subscription);
+                $this->em->flush();
+                continue;
+            }
+            if ($result->success) {
+                ++$delivered;
+            }
+        }
+
+        return $delivered;
     }
 
     /**
