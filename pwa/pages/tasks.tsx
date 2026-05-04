@@ -1380,14 +1380,23 @@ const Tasks = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  // The navbar's global search drops users on /tasks?search=X. Forward
+  // that to the API so the listing only shows matching tasks.
+  const searchQuery = typeof router.query.search === "string"
+    ? router.query.search
+    : "";
+
   const loadData = useCallback(async () => {
     setError(null);
     try {
       // Tasks, tags, the assignable-users universe, and the projects-with-
       // members set all load in parallel — the page needs the projects to
       // know which assignable users are valid for each project task.
+      const tasksUrl = searchQuery.trim().length > 0
+        ? `${ENTRYPOINT}/tasks?search=${encodeURIComponent(searchQuery)}`
+        : `${ENTRYPOINT}/tasks`;
       const [tasksRes, tagsRes, assignablesRes, projectsRes] = await Promise.all([
-        fetch(`${ENTRYPOINT}/tasks`, {
+        fetch(tasksUrl, {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
         }),
@@ -1439,7 +1448,7 @@ const Tasks = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [searchQuery]);
 
   // /tasks and /my-tasks render the *same* component instance via the
   // re-export in pages/my-tasks.tsx, so the `useState` initializer above

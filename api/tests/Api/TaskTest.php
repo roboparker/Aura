@@ -3,6 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Comment;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -20,6 +21,11 @@ class TaskTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
+        // Notification + Comment hold FKs to Task; clear them first so
+        // the bulk Task delete below doesn't fail when search-fixture
+        // comments are still around from a previous test class.
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -1212,6 +1218,143 @@ class TaskTest extends ApiTestCase
         $this->entityManager->flush();
 
         return $task;
+    }
+
+    public function testSearchMatchesTitle(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'Plan launch checklist');
+        $this->createTask($alice, 'Buy groceries');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=launch');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Plan launch checklist'], $titles);
+    }
+
+    public function testSearchMatchesDescription(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = new Task();
+        $task->setOwner($alice);
+        $task->setTitle('Misc');
+        $task->setDescription('Need to follow up on the moonshot proposal.');
+        $this->entityManager->persist($task);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=moonshot');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(
+            1,
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+    }
+
+    public function testSearchMatchesCommentBody(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Misc');
+        $other = $this->createTask($alice, 'Other');
+
+        $comment = new Comment();
+        $comment->setTask($task);
+        $comment->setAuthor($alice);
+        $comment->setBody('We discussed the moonshot rollout in standup.');
+        $this->entityManager->persist($comment);
+        $this->entityManager->flush();
+        $this->assertNotNull($other->getId());
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=moonshot');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Misc'], $titles);
+    }
+
+    public function testSearchIsCaseInsensitive(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'Plan LAUNCH checklist');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=launch');
+
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(
+            1,
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+    }
+
+    public function testSearchEscapesLikeWildcards(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'Plan launch');
+        $this->createTask($alice, '50% off promo');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        // The literal `%` in the query must not match every row — the
+        // filter has to escape LIKE wildcards or this returns 2.
+        $client->request('GET', '/tasks?search=' . urlencode('50%'));
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['50% off promo'], $titles);
+    }
+
+    public function testEmptySearchIsNoOp(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->createTask($alice, 'A');
+        $this->createTask($alice, 'B');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=' . urlencode('   '));
+
+        $this->assertResponseIsSuccessful();
+        $this->assertCount(
+            2,
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+    }
+
+    public function testSearchRespectsTaskScope(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $this->createTask($alice, 'Alice launch plan');
+        $this->createTask($bob, 'Bob launch plan');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=launch');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Alice launch plan'], $titles);
     }
 
     private function reloadTaskByTitle(string $title): Task
