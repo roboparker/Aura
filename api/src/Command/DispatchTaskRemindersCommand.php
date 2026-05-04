@@ -10,11 +10,15 @@ use App\Repository\TaskRepository;
 use App\Validator\ValidReminders;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * Walks every active recurring or due-soon task and creates Notification
@@ -39,6 +43,11 @@ final class DispatchTaskRemindersCommand extends Command
         private TaskRepository $tasks,
         private NotificationRepository $notifications,
         private EntityManagerInterface $em,
+        private MailerInterface $mailer,
+        #[Autowire('%env(APP_FRONTEND_URL)%')]
+        private string $frontendUrl,
+        #[Autowire('%env(default::MAILER_FROM)%')]
+        private ?string $mailerFrom = null,
     ) {
         parent::__construct();
     }
@@ -47,6 +56,7 @@ final class DispatchTaskRemindersCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
         $now = new \DateTimeImmutable();
+        $emailsSent = 0;
 
         // We could narrow this by `dueDate >= now - 7 days` to bound the
         // scan, but for an MVP the dataset is small enough that the
@@ -101,13 +111,72 @@ final class DispatchTaskRemindersCommand extends Command
                         // notification still landed, just from the other
                         // worker.
                         $this->em->clear();
+                        continue;
+                    }
+
+                    if ($this->sendReminderEmail($recipient, $task, $offset, $io)) {
+                        ++$emailsSent;
                     }
                 }
             }
         }
 
-        $io->success(sprintf('Created %d notification(s).', $created));
+        $io->success(sprintf(
+            'Created %d notification(s); sent %d email(s).',
+            $created,
+            $emailsSent,
+        ));
         return Command::SUCCESS;
+    }
+
+    /**
+     * Sends the reminder email if the recipient's preferences allow it.
+     * Digest frequencies (hourly/daily) are explicitly skipped — that's
+     * #102's territory. Returns true when an email was actually handed to
+     * the mailer transport so the caller can keep an accurate count for
+     * the success summary.
+     */
+    private function sendReminderEmail(
+        User $recipient,
+        Task $task,
+        string $offset,
+        SymfonyStyle $io,
+    ): bool {
+        $prefs = $recipient->getPreferences();
+        if (false === ($prefs['emailNotificationsEnabled'] ?? true)) {
+            return false;
+        }
+        if ('realtime' !== ($prefs['notificationFrequency'] ?? 'realtime')) {
+            return false;
+        }
+
+        $email = (new TemplatedEmail())
+            ->from($this->mailerFrom ?: 'no-reply@aura.test')
+            ->to($recipient->getEmail())
+            ->subject(sprintf('Reminder: %s', $task->getTitle()))
+            ->htmlTemplate('emails/task_reminder.html.twig')
+            ->textTemplate('emails/task_reminder.txt.twig')
+            ->context([
+                'recipient' => $recipient,
+                'task' => $task,
+                'offsetLabel' => $this->humanOffset($offset),
+                'tasksUrl' => rtrim($this->frontendUrl, '/') . '/tasks',
+            ]);
+
+        try {
+            $this->mailer->send($email);
+            return true;
+        } catch (TransportExceptionInterface $e) {
+            // Don't blow up the whole dispatcher run if the mail server is
+            // momentarily unreachable — the in-app notification already
+            // landed, and the next cron pass will retry untouched users.
+            $io->warning(sprintf(
+                'Failed to send reminder email to %s: %s',
+                $recipient->getEmail(),
+                $e->getMessage(),
+            ));
+            return false;
+        }
     }
 
     /**
@@ -143,13 +212,22 @@ final class DispatchTaskRemindersCommand extends Command
 
     private function buildBody(Task $task, string $offset): string
     {
-        $human = match ($offset) {
+        $due = $task->getDueDate()?->format('M j, Y g:i a') ?? '';
+        return sprintf(
+            '"%s" is due in %s (%s).',
+            $task->getTitle(),
+            $this->humanOffset($offset),
+            $due,
+        );
+    }
+
+    private function humanOffset(string $offset): string
+    {
+        return match ($offset) {
             '15m' => '15 minutes',
             '1h' => '1 hour',
             '1d' => '1 day',
             default => $offset,
         };
-        $due = $task->getDueDate()?->format('M j, Y g:i a') ?? '';
-        return sprintf('"%s" is due in %s (%s).', $task->getTitle(), $human, $due);
     }
 }

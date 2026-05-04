@@ -202,6 +202,86 @@ class NotificationTest extends ApiTestCase
         $this->assertSame(['alice@example.com', 'bob@example.com'], $emails);
     }
 
+    public function testDispatcherSendsEmailForRealtimeRecipient(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+
+        $this->assertEmailCount(1);
+        $message = $this->getMailerMessage(0);
+        $this->assertEmailHeaderSame($message, 'To', 'alice@example.com');
+        $this->assertEmailHeaderSame($message, 'Subject', 'Reminder: Standup');
+        $this->assertEmailHtmlBodyContains($message, 'Standup');
+        $this->assertEmailHtmlBodyContains($message, 'due in 1 hour');
+        $this->assertEmailTextBodyContains($message, 'due in 1 hour');
+    }
+
+    public function testDispatcherSkipsEmailWhenUserDisabledIt(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['emailNotificationsEnabled' => false]);
+        $this->entityManager->flush();
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+
+        // The in-app row should still land — only the email is suppressed.
+        $this->assertCount(
+            1,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
+        $this->assertEmailCount(0);
+    }
+
+    public function testDispatcherSkipsEmailForDigestFrequencies(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'hourly']);
+        $bob = $this->createUser('bob@example.com');
+        $bob->setPreferences(['notificationFrequency' => 'daily']);
+        $this->entityManager->flush();
+
+        $this->seedDueTask($alice, 'Alice task');
+        $this->seedDueTask($bob, 'Bob task');
+
+        $this->runDispatcher();
+
+        $this->assertCount(
+            2,
+            $this->entityManager->getRepository(Notification::class)->findAll(),
+        );
+        // Both users are on digest frequencies — #102 owns those, the
+        // realtime path here must stay quiet.
+        $this->assertEmailCount(0);
+    }
+
+    public function testDispatcherDoesNotResendEmailOnIdempotentRerun(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $this->seedDueTask($alice, 'Standup');
+
+        $this->runDispatcher();
+        $this->runDispatcher();
+
+        // Second run must skip the already-created notification AND the
+        // already-sent email so cron retries don't spam recipients.
+        $this->assertEmailCount(1);
+    }
+
+    private function seedDueTask(User $owner, string $title): Task
+    {
+        $task = new Task();
+        $task->setOwner($owner);
+        $task->setTitle($title);
+        $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
+        $task->setReminders(['1h']);
+        $this->entityManager->persist($task);
+        $this->entityManager->flush();
+        return $task;
+    }
+
     private function runDispatcher(): int
     {
         $command = static::getContainer()->get(DispatchTaskRemindersCommand::class);
