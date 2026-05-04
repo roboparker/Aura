@@ -13,6 +13,8 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\CommentRepository;
 use App\State\CommentAuthorProcessor;
+use App\State\CommentDeleteProcessor;
+use App\State\CommentUpdateProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -42,9 +44,11 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user)",
+            processor: CommentUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getTask().getOwner() == user)",
+            processor: CommentDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['comment:read']],
