@@ -8,43 +8,57 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Adds the api_token table backing personal access tokens for MCP and
- * other programmatic clients (#92).
+ * Adds Postgres full-text search columns + GIN indexes to `task` and
+ * `comment` so the search filter can switch from LIKE %q% to ranked
+ * tsvector matching (#87).
+ *
+ * `search_vector` is a STORED generated column — Postgres recomputes it
+ * on every insert/update without app-side bookkeeping. The English
+ * configuration covers the bulk of our content; multilingual support
+ * would need either a per-row config column or a swap to `simple` plus
+ * caller-provided language.
+ *
+ * Title is weighted A and description B so a title match outranks a
+ * description match for the same query, matching what users intuit
+ * when both columns mention the term.
  */
 final class Version20260504090000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Add api_token table for MCP / programmatic auth (#92).';
+        return 'Add tsvector search_vector + GIN index to task and comment (#87).';
     }
 
     public function up(Schema $schema): void
     {
+        // Task: title (A) + description (B). coalesce keeps null
+        // descriptions from poisoning the concat.
         $this->addSql(<<<'SQL'
-            CREATE TABLE api_token (
-                id UUID NOT NULL,
-                user_id UUID NOT NULL,
-                token_hash VARCHAR(64) NOT NULL,
-                name VARCHAR(80) NOT NULL,
-                scopes JSON NOT NULL,
-                last_used_at TIMESTAMP(0) WITH TIME ZONE DEFAULT NULL,
-                expires_at TIMESTAMP(0) WITH TIME ZONE DEFAULT NULL,
-                created_at TIMESTAMP(0) WITH TIME ZONE NOT NULL,
-                PRIMARY KEY(id)
-            )
+            ALTER TABLE task
+            ADD COLUMN search_vector tsvector
+            GENERATED ALWAYS AS (
+                setweight(to_tsvector('english', title), 'A') ||
+                setweight(to_tsvector('english', coalesce(description, '')), 'B')
+            ) STORED
         SQL);
-        $this->addSql('CREATE UNIQUE INDEX uniq_api_token_hash ON api_token (token_hash)');
-        $this->addSql('CREATE INDEX idx_api_token_user ON api_token (user_id)');
-        $this->addSql('CREATE INDEX idx_api_token_hash ON api_token (token_hash)');
+        $this->addSql('CREATE INDEX idx_task_search_vector ON task USING GIN (search_vector)');
+
+        // Comment body searched separately so we can still use a
+        // ranked match (vs. ILIKE) inside the EXISTS subquery in the
+        // task search filter.
         $this->addSql(<<<'SQL'
-            ALTER TABLE api_token
-            ADD CONSTRAINT fk_api_token_user
-            FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE CASCADE
+            ALTER TABLE comment
+            ADD COLUMN search_vector tsvector
+            GENERATED ALWAYS AS (to_tsvector('english', coalesce(body, ''))) STORED
         SQL);
+        $this->addSql('CREATE INDEX idx_comment_search_vector ON comment USING GIN (search_vector)');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP TABLE api_token');
+        $this->addSql('DROP INDEX idx_task_search_vector');
+        $this->addSql('ALTER TABLE task DROP COLUMN search_vector');
+        $this->addSql('DROP INDEX idx_comment_search_vector');
+        $this->addSql('ALTER TABLE comment DROP COLUMN search_vector');
     }
 }
