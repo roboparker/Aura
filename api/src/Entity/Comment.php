@@ -66,6 +66,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'comment')]
 #[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_comment_task_created')]
 #[ORM\Index(columns: ['parent_comment_id'], name: 'idx_comment_parent')]
+// GIN index over the FTS-only generated column. See the Task entity
+// for the matching declaration / migration provenance.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_comment_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
 class Comment
 {
@@ -110,6 +113,15 @@ class Comment
     )]
     #[Groups(['comment:read', 'comment:write'])]
     private string $body = '';
+
+    /**
+     * Postgres-managed full-text search vector over `body`, populated by
+     * a STORED generated column — see Version20260504090000. Mapped here
+     * so DQL can reference `c.searchVector` from the task search filter's
+     * EXISTS subquery; never written from PHP, never serialised.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
 
     /**
      * Self-referencing parent for threaded replies. Nullable for root

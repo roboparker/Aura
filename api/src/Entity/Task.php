@@ -2,11 +2,14 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
+use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use App\Filter\OverdueFilter;
 use App\Filter\TaskSearchFilter;
+use App\Filter\TaskStatusFilter;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -57,14 +60,22 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'assignees' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'assignees' => 'exact', 'tags' => 'exact'])]
+#[ApiFilter(DateFilter::class, properties: ['dueDate'])]
+#[ApiFilter(OrderFilter::class, properties: ['createdOn', 'dueDate', 'title', 'completedOn'], arguments: ['orderParameterName' => 'order'])]
 #[ApiFilter(OverdueFilter::class)]
 #[ApiFilter(TaskSearchFilter::class)]
+#[ApiFilter(TaskStatusFilter::class)]
 #[ORM\Entity(repositoryClass: TaskRepository::class)]
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
 #[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
+// GIN index over the FTS-only generated column. The `gin` flag is the
+// PostgreSQL DBAL platform's hook for emitting `USING GIN`. Declared
+// here (in addition to the migration) so doctrine:schema:validate
+// stops trying to drop it on every CI run.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_task_search_vector', flags: ['gin'])]
 #[ValidAssignees]
 #[ValidRecurrence]
 #[ValidReminders]
@@ -107,6 +118,15 @@ class Task
     #[Groups(['task:read', 'task:write'])]
     #[Gedmo\Versioned]
     private ?string $description = null;
+
+    /**
+     * Postgres-managed full-text search vector (title + description),
+     * populated by a STORED generated column — see Version20260504090000.
+     * Mapped here so DQL can reference `t.searchVector` in the search
+     * filter; never written from PHP, never serialised in API responses.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['task:read'])]
