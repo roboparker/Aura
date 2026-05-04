@@ -1,0 +1,152 @@
+<?php
+
+namespace App\Mcp;
+
+use App\Entity\Comment;
+use App\Entity\CustomFieldDefinition;
+use App\Entity\MediaObject;
+use App\Entity\Project;
+use App\Entity\Tag;
+use App\Entity\Task;
+use App\Entity\User;
+
+/**
+ * Plain-array serialization for the MCP tool responses. We intentionally
+ * don't reuse the API Platform JSON-LD serializer here — its `@id`/`@type`
+ * envelope adds noise the model has to learn around, and tool calls
+ * don't need hypermedia. The shapes below are stable, hand-written
+ * mirrors of the API entities, with relations flattened to ID + label
+ * so the AI can chain calls (`get_task` → `assignee.id` → `assign_task`).
+ */
+final class McpEntitySerializer
+{
+    /**
+     * @return array<string, mixed>
+     */
+    public function task(Task $task): array
+    {
+        return [
+            'id' => (string) $task->getId(),
+            'title' => $task->getTitle(),
+            'description' => $task->getDescription(),
+            'status' => null === $task->getCompletedOn() ? 'open' : 'completed',
+            'completedOn' => $task->getCompletedOn()?->format(\DateTimeInterface::ATOM),
+            'dueDate' => $task->getDueDate()?->format(\DateTimeInterface::ATOM),
+            'createdOn' => $task->getCreatedOn()->format(\DateTimeInterface::ATOM),
+            'recurrenceRule' => $task->getRecurrenceRule(),
+            'reminders' => $task->getReminders(),
+            'owner' => $this->userSummary($task->getOwner()),
+            'project' => null === $task->getProject() ? null : $this->projectSummary($task->getProject()),
+            'assignees' => array_map(
+                fn (User $u) => $this->userSummary($u),
+                $task->getAssignees()->toArray(),
+            ),
+            'tags' => array_map(
+                fn (Tag $t) => ['id' => (string) $t->getId(), 'name' => $t->getName()],
+                $task->getTags()->toArray(),
+            ),
+            'attachments' => array_map(
+                fn (MediaObject $m) => $this->mediaObject($m),
+                $task->getAttachments()->toArray(),
+            ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function project(Project $project, ?int $taskCount = null, ?int $openTaskCount = null): array
+    {
+        return [
+            'id' => (string) $project->getId(),
+            'title' => $project->getTitle(),
+            'description' => $project->getDescription(),
+            'createdOn' => $project->getCreatedOn()->format(\DateTimeInterface::ATOM),
+            'owner' => $this->userSummary($project->getOwner()),
+            'memberCount' => $project->getMembers()->count(),
+            'members' => array_map(
+                fn (User $u) => $this->userSummary($u),
+                $project->getMembers()->toArray(),
+            ),
+            'taskCount' => $taskCount,
+            'openTaskCount' => $openTaskCount,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function comment(Comment $comment): array
+    {
+        return [
+            'id' => (string) $comment->getId(),
+            'taskId' => null === $comment->getTask() ? null : (string) $comment->getTask()->getId(),
+            'parentCommentId' => null === $comment->getParentComment() ? null : (string) $comment->getParentComment()->getId(),
+            'body' => $comment->getBody(),
+            'author' => $this->userSummary($comment->getAuthor()),
+            'createdAt' => $comment->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'updatedAt' => $comment->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mediaObject(MediaObject $media): array
+    {
+        return [
+            'id' => (string) $media->getId(),
+            'name' => $media->getOriginalName(),
+            'mimeType' => $media->getMimeType(),
+            'byteSize' => $media->getByteSize(),
+            'kind' => $media->getKind(),
+            'createdOn' => $media->getCreatedOn()->format(\DateTimeInterface::ATOM),
+            'downloadUrl' => $media->getDownloadUrl(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function customFieldDefinition(CustomFieldDefinition $field): array
+    {
+        return [
+            'id' => (string) $field->getId(),
+            'name' => $field->getName(),
+            'type' => $field->getType(),
+            'options' => $field->getOptions(),
+            'position' => $field->getPosition(),
+            'required' => $field->isRequired(),
+            'projectId' => null === $field->getProject() ? null : (string) $field->getProject()->getId(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function userSummary(?User $user): ?array
+    {
+        if (null === $user) {
+            return null;
+        }
+        return [
+            'id' => (string) $user->getId(),
+            'email' => $user->getEmail(),
+            'name' => trim($user->getGivenName() . ' ' . $user->getFamilyName()),
+        ];
+    }
+
+    /**
+     * Compact project label embedded inside Task responses. The full
+     * member list is omitted to keep the payload tight.
+     *
+     * @return array<string, mixed>
+     */
+    public function projectSummary(Project $project): array
+    {
+        return [
+            'id' => (string) $project->getId(),
+            'title' => $project->getTitle(),
+        ];
+    }
+}

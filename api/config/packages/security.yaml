@@ -12,6 +12,16 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        # MCP / programmatic API: stateless firewall that authenticates the
+        # caller from a personal access token in the Authorization header.
+        # Declared before `main` so its pattern wins on the JSON-RPC route
+        # before json_login or the 2FA listener get a chance to look at it.
+        mcp:
+            pattern: ^/mcp
+            stateless: true
+            provider: app_user_provider
+            custom_authenticators:
+                - App\Security\ApiTokenAuthenticator
         main:
             lazy: true
             stateless: false
@@ -48,6 +58,8 @@ security:
         - { path: ^/me/2fa, roles: ROLE_USER }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
+        - { path: ^/api-tokens, roles: ROLE_USER }
+        - { path: ^/mcp, roles: ROLE_USER }
         - { path: ^/docs, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: PUBLIC_ACCESS }
 
