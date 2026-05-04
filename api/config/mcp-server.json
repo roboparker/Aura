@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "aura": {
+      "url": "https://localhost/mcp",
+      "headers": {
+        "Authorization": "Bearer aura_pat_PASTE_YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}

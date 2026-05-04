@@ -33,6 +33,21 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection }
             - { name: api_platform.doctrine.orm.query_extension.item }
 
+    App\Doctrine\ApiTokenAccessExtension:
+        tags:
+            - { name: api_platform.doctrine.orm.query_extension.collection }
+            - { name: api_platform.doctrine.orm.query_extension.item }
+
+    # MCP tool autoconfiguration: every class implementing McpToolInterface
+    # is tagged so it lands in the tool registry without per-class wiring.
+    _instanceof:
+        App\Mcp\Tool\McpToolInterface:
+            tags: ['app.mcp_tool']
+
+    App\Mcp\McpToolRegistry:
+        arguments:
+            $tools: !tagged_iterator app.mcp_tool
+
     # Replace stof's default actor provider with one that yields the
     # user's IRI (`/users/{uuid}`) instead of `getUserIdentifier()`
     # (= email). The IRI is stable across email changes and lets the
