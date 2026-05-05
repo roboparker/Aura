@@ -34,6 +34,15 @@ interface TagRef {
   color: string;
 }
 
+interface AssigneeRef {
+  "@id": string;
+  id: string;
+  email: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  nickname?: string | null;
+}
+
 interface TaskHit {
   "@id": string;
   id: string;
@@ -60,6 +69,7 @@ interface FilterState {
   dueFrom: string; // yyyy-mm-dd
   dueTo: string;
   project: string; // IRI
+  assignee: string; // IRI
   tags: string[]; // IRIs
   sort: SortKey;
   page: number;
@@ -99,6 +109,7 @@ const SearchPage = () => {
         patch.dueFrom !== undefined ||
         patch.dueTo !== undefined ||
         patch.project !== undefined ||
+        patch.assignee !== undefined ||
         patch.tags !== undefined ||
         patch.sort !== undefined
       ) {
@@ -181,15 +192,19 @@ interface FilterChipsBarProps {
 const FilterChipsBar = ({ filters, onChange }: FilterChipsBarProps) => {
   const [projects, setProjects] = useState<ProjectRef[]>([]);
   const [tags, setTags] = useState<TagRef[]>([]);
+  const [assignees, setAssignees] = useState<AssigneeRef[]>([]);
 
-  // Fetch the filter dropdown sources once. Both endpoints already
-  // scope to the current user, so we don't need any further filtering.
+  // Fetch the filter dropdown sources once. All three endpoints already
+  // scope to the current user (assignable-users = self + project members
+  // across every project I belong to), so we don't need any further
+  // filtering.
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
       fetch(`${ENTRYPOINT}/projects?itemsPerPage=100`, { credentials: "include" }),
       fetch(`${ENTRYPOINT}/tags?itemsPerPage=100`, { credentials: "include" }),
-    ]).then(async ([projectsRes, tagsRes]) => {
+      fetch(`${ENTRYPOINT}/me/assignable-users`, { credentials: "include" }),
+    ]).then(async ([projectsRes, tagsRes, assigneesRes]) => {
       if (cancelled) return;
       if (projectsRes.ok) {
         const data = await projectsRes.json();
@@ -198,6 +213,10 @@ const FilterChipsBar = ({ filters, onChange }: FilterChipsBarProps) => {
       if (tagsRes.ok) {
         const data = await tagsRes.json();
         setTags(data["hydra:member"] ?? data.member ?? []);
+      }
+      if (assigneesRes.ok) {
+        const data = await assigneesRes.json();
+        setAssignees(data["hydra:member"] ?? data.member ?? []);
       }
     });
     return () => {
@@ -242,6 +261,14 @@ const FilterChipsBar = ({ filters, onChange }: FilterChipsBarProps) => {
       clear: () => onChange({ project: "" }),
     });
   }
+  if (filters.assignee) {
+    const assignee = assignees.find((a) => a["@id"] === filters.assignee);
+    activeChips.push({
+      key: "assignee",
+      label: `Assignee: ${assignee ? assigneeLabel(assignee) : "…"}`,
+      clear: () => onChange({ assignee: "" }),
+    });
+  }
   filters.tags.forEach((iri) => {
     const tag = tags.find((t) => t["@id"] === iri);
     activeChips.push({
@@ -270,6 +297,11 @@ const FilterChipsBar = ({ filters, onChange }: FilterChipsBarProps) => {
           value={filters.project}
           options={projects}
           onChange={(project) => onChange({ project })}
+        />
+        <AssigneeDropdown
+          value={filters.assignee}
+          options={assignees}
+          onChange={(assignee) => onChange({ assignee })}
         />
         <SortDropdown value={filters.sort} onChange={(sort) => onChange({ sort })} />
       </div>
@@ -435,6 +467,46 @@ const ProjectDropdown = ({
     </select>
   </div>
 );
+
+const AssigneeDropdown = ({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: AssigneeRef[];
+  onChange: (next: string) => void;
+}) => (
+  <div className="inline-flex items-center gap-1 text-xs">
+    <Label htmlFor="search-assignee" className="text-muted-foreground">
+      Assignee
+    </Label>
+    <select
+      id="search-assignee"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-7 rounded-md border border-input bg-background px-2 text-xs"
+      data-testid="search-assignee"
+    >
+      <option value="">Anyone</option>
+      {options.map((a) => (
+        <option key={a["@id"]} value={a["@id"]}>
+          {assigneeLabel(a)}
+        </option>
+      ))}
+    </select>
+  </div>
+);
+
+const assigneeLabel = (a: AssigneeRef): string => {
+  const nick = a.nickname?.trim();
+  if (nick) return nick;
+  const full = [a.givenName, a.familyName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+  return full || a.email;
+};
 
 const SortDropdown = ({
   value,
@@ -663,6 +735,7 @@ function readFilters(query: Record<string, string | string[] | undefined>): Filt
     dueFrom: stringQ("dueFrom"),
     dueTo: stringQ("dueTo"),
     project: stringQ("project"),
+    assignee: stringQ("assignee"),
     tags: tagList,
     sort: SORT_LABELS[sort] ? sort : "relevance",
     page: Number.isFinite(page) && page > 0 ? page : 1,
@@ -676,6 +749,7 @@ function writeFilters(filters: FilterState): Record<string, string | string[]> {
   if (filters.dueFrom) out.dueFrom = filters.dueFrom;
   if (filters.dueTo) out.dueTo = filters.dueTo;
   if (filters.project) out.project = filters.project;
+  if (filters.assignee) out.assignee = filters.assignee;
   if (filters.tags.length > 0) out.tags = filters.tags;
   if (filters.sort !== "relevance") out.sort = filters.sort;
   if (filters.page > 1) out.page = String(filters.page);
@@ -689,6 +763,9 @@ function buildQuery(filters: FilterState): URLSearchParams {
   if (filters.dueFrom) params.set("dueDate[after]", filters.dueFrom);
   if (filters.dueTo) params.set("dueDate[before]", filters.dueTo);
   if (filters.project) params.set("project", filters.project);
+  // The Task SearchFilter exposes the relation as `assignees` (plural) —
+  // a single value still narrows to tasks where that user is assigned.
+  if (filters.assignee) params.set("assignees", filters.assignee);
   filters.tags.forEach((iri) => params.append("tags[]", iri));
   // Map UI sort to API Platform OrderFilter syntax. Falling back to
   // the filter's relevance ORDER BY when sort is "relevance" — the

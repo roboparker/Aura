@@ -82,4 +82,46 @@ test.describe("Search page + autocomplete", () => {
     await expect(page).not.toHaveURL(/status=/);
     await expect(page.getByTestId("search-result-count")).toContainText("2 results");
   });
+
+  test("assignee filter narrows results to a single user", async ({ page }) => {
+    const email = uniqueEmail("search-assignee");
+    await registerAndSignIn(page, email);
+
+    // Look up the current user's IRI so we can assign the seeded task to
+    // ourselves via the API.
+    const meRes = await page.request.get(`${BASE_URL}/me/assignable-users`);
+    expect(meRes.ok()).toBeTruthy();
+    const meData = await meRes.json();
+    const members = meData["hydra:member"] ?? meData.member ?? [];
+    const self = members.find((m) => m.email === email);
+    expect(self).toBeTruthy();
+
+    const ldHeaders = { "Content-Type": "application/ld+json" };
+    const assigned = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: ldHeaders,
+      data: { title: "Assigned launch plan", assignees: [self["@id"]] },
+    });
+    expect(assigned.ok()).toBeTruthy();
+    const unassigned = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: ldHeaders,
+      data: { title: "Unassigned launch backlog" },
+    });
+    expect(unassigned.ok()).toBeTruthy();
+
+    await page.goto(`${BASE_URL}/search?q=launch`);
+    await expect(page.getByTestId("search-result-count")).toContainText("2 results");
+
+    await page
+      .getByTestId("search-assignee")
+      .selectOption({ value: self["@id"] });
+    await expect(page).toHaveURL(/assignee=/);
+    await expect(page.getByTestId("search-result-count")).toContainText("1 result");
+    await expect(page.getByTestId("search-results")).toContainText("Assigned launch plan");
+    await expect(page.getByTestId("search-results")).not.toContainText("Unassigned launch backlog");
+
+    await expect(page.getByTestId("search-chip-assignee")).toBeVisible();
+    await page.getByTestId("search-chip-assignee").getByRole("button").click();
+    await expect(page).not.toHaveURL(/assignee=/);
+    await expect(page.getByTestId("search-result-count")).toContainText("2 results");
+  });
 });
