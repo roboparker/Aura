@@ -26,6 +26,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'custom_field_value')]
 #[ORM\Index(columns: ['task_id'], name: 'idx_cfv_task')]
 #[ORM\Index(columns: ['definition_id'], name: 'idx_cfv_definition')]
+#[ORM\Index(columns: ['search_vector'], name: 'idx_cfv_search_vector', flags: ['gin'])]
 #[ORM\UniqueConstraint(name: 'uniq_cfv_task_definition', columns: ['task_id', 'definition_id'])]
 class CustomFieldValue
 {
@@ -65,6 +66,16 @@ class CustomFieldValue
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private mixed $value = null;
+
+    /**
+     * Postgres-managed tsvector over the value's text projection
+     * (`value #>> '{}'`), populated by a STORED generated column — see
+     * Version20260505000000. Mapped here so DQL can reference
+     * `cfv.searchVector` from the task search filter's EXISTS subquery;
+     * never written from PHP, never serialised.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
 
     public function getId(): ?Uuid
     {

@@ -6,17 +6,20 @@ use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\Comment;
+use App\Entity\CustomFieldValue;
 use App\Entity\Task;
 use Doctrine\ORM\QueryBuilder;
 
 /**
  * Free-text filter for the `Task` collection: `?search={q}` narrows to
  * tasks whose title/description tsvector matches the query, OR whose
- * comment thread contains a body that matches.
+ * comment thread contains a body that matches, OR whose custom field
+ * values match.
  *
  * Uses Postgres full-text search via the `search_vector` generated
- * columns added in Version20260504090000 (GIN-indexed). Title is
- * weighted A and description B in the task vector, so title matches
+ * columns on `task` and `comment` (Version20260504090000) and on
+ * `custom_field_value` (Version20260505000000), all GIN-indexed. Title
+ * is weighted A and description B in the task vector, so title matches
  * rank above description matches at equal frequencies. When the search
  * param is present, results are ordered by `ts_rank` descending — the
  * filter installs an ORDER BY that the controller's existing default
@@ -63,14 +66,18 @@ final class TaskSearchFilter extends AbstractFilter
         $queryParam = $queryNameGenerator->generateParameterName('searchQuery');
         $rankParam = $queryNameGenerator->generateParameterName('searchRank');
         $commentSubAlias = $queryNameGenerator->generateJoinAlias('searchComment');
+        $cfvSubAlias = $queryNameGenerator->generateJoinAlias('searchCfv');
 
         // websearch_to_tsquery accepts user-typed strings (quoted phrases,
         // OR/`-` operators) without us hand-parsing — and never raises on
-        // invalid syntax the way to_tsquery does. coalesce keeps the OR
-        // expression valid even when one side has no matches.
+        // invalid syntax the way to_tsquery does. The OR chain matches if
+        // any of: title/description, comment body, or custom field value
+        // hits the query.
         $queryBuilder
             ->andWhere(sprintf(
                 "SEARCH_VECTOR_MATCH(%s.searchVector, :%s) = TRUE "
+                . "OR EXISTS (SELECT 1 FROM %s %s WHERE %s.task = %s "
+                . "AND SEARCH_VECTOR_MATCH(%s.searchVector, :%s) = TRUE) "
                 . "OR EXISTS (SELECT 1 FROM %s %s WHERE %s.task = %s "
                 . "AND SEARCH_VECTOR_MATCH(%s.searchVector, :%s) = TRUE)",
                 $rootAlias,
@@ -80,6 +87,12 @@ final class TaskSearchFilter extends AbstractFilter
                 $commentSubAlias,
                 $rootAlias,
                 $commentSubAlias,
+                $queryParam,
+                CustomFieldValue::class,
+                $cfvSubAlias,
+                $cfvSubAlias,
+                $rootAlias,
+                $cfvSubAlias,
                 $queryParam,
             ))
             ->setParameter($queryParam, $trimmed);
@@ -110,7 +123,7 @@ final class TaskSearchFilter extends AbstractFilter
                 'property' => self::PARAMETER,
                 'type' => 'string',
                 'required' => false,
-                'description' => 'Postgres full-text search across task title, description, and comments. Ranked by relevance.',
+                'description' => 'Postgres full-text search across task title, description, comments, and custom field values. Ranked by relevance.',
                 'openapi' => [
                     'example' => 'launch checklist',
                 ],
