@@ -4,6 +4,8 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
+use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -1220,6 +1222,52 @@ class TaskTest extends ApiTestCase
         return $task;
     }
 
+    private function createProject(User $owner, string $title): Project
+    {
+        $project = new Project();
+        $project->setOwner($owner);
+        $project->setTitle($title);
+        $project->addMember($owner);
+        $this->entityManager->persist($project);
+        $this->entityManager->flush();
+        return $project;
+    }
+
+    /**
+     * @param string[]|null $options
+     */
+    private function createCustomFieldDefinition(
+        Project $project,
+        string $name,
+        string $type,
+        ?array $options = null,
+    ): CustomFieldDefinition {
+        $field = new CustomFieldDefinition();
+        $field->setProject($project);
+        $field->setName($name);
+        $field->setType($type);
+        if (null !== $options) {
+            $field->setOptions($options);
+        }
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+        return $field;
+    }
+
+    private function seedCustomFieldValue(
+        Task $task,
+        CustomFieldDefinition $definition,
+        mixed $value,
+    ): CustomFieldValue {
+        $cfv = new CustomFieldValue();
+        $cfv->setTask($task);
+        $cfv->setDefinition($definition);
+        $cfv->setValue($value);
+        $this->entityManager->persist($cfv);
+        $this->entityManager->flush();
+        return $cfv;
+    }
+
     public function testSearchMatchesTitle(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -1388,6 +1436,60 @@ class TaskTest extends ApiTestCase
         // Title weight A > description weight B, so the title hit must
         // come first regardless of insertion order.
         $this->assertSame(['Schema migration plan', 'Random task'], $titles);
+    }
+
+    public function testSearchMatchesTextCustomFieldValue(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backlog');
+        $hit = $this->createTaskInProject($alice, $project, 'Triage');
+        $miss = $this->createTaskInProject($alice, $project, 'Buy groceries');
+        $this->assertNotNull($miss->getId());
+
+        $severity = $this->createCustomFieldDefinition(
+            $project,
+            'Severity',
+            CustomFieldDefinition::TYPE_TEXT,
+        );
+        $this->seedCustomFieldValue($hit, $severity, 'moonshot blocker');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=moonshot');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Triage'], $titles);
+    }
+
+    public function testSearchMatchesDropdownCustomFieldValue(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backlog');
+        $hit = $this->createTaskInProject($alice, $project, 'Login redesign');
+        $this->createTaskInProject($alice, $project, 'Cleanup');
+
+        $stage = $this->createCustomFieldDefinition(
+            $project,
+            'Stage',
+            CustomFieldDefinition::TYPE_DROPDOWN,
+            ['discovery', 'in-review', 'shipped'],
+        );
+        $this->seedCustomFieldValue($hit, $stage, 'in-review');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tasks?search=review');
+
+        $this->assertResponseIsSuccessful();
+        $titles = array_map(
+            fn ($t) => $t['title'],
+            $client->getResponse()->toArray()['member'] ?? [],
+        );
+        $this->assertSame(['Login redesign'], $titles);
     }
 
     public function testStatusFilterOpen(): void
