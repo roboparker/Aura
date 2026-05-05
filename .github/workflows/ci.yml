@@ -72,6 +72,16 @@ jobs:
       -
         name: Doctrine Schema Validator
         run: docker compose exec -T php bin/console -e test doctrine:schema:validate
+      -
+        name: PWA typecheck
+        # Wait for the dev container's `pnpm install` to finish before
+        # invoking tsc — the start-services step only waits for HTTP to
+        # answer, but `pnpm install` runs after that on first boot. Then
+        # run `tsc --noEmit` so type errors fail CI rather than hide
+        # behind Next.js's permissive dev server.
+        run: |
+          docker compose exec -T pwa sh -c 'until [ -d node_modules/typescript ]; do sleep 2; done'
+          docker compose exec -T pwa pnpm typecheck
   lint:
     name: Docker Lint
     runs-on: ubuntu-latest
