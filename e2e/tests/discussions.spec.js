@@ -10,7 +10,7 @@ const {
 const uniqueEmail = () => shared("discussions");
 
 test.describe("Discussions", () => {
-  test("project owner can post, edit, pin, and delete a discussion", async ({
+  test("project owner can post, filter, edit, pin, and delete a discussion", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
@@ -72,9 +72,29 @@ test.describe("Discussions", () => {
     await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
     await expect(discussion.locator("text=Pinned")).toHaveCount(0);
 
+    // Author can edit.
+    await discussion.locator('[data-testid="discussion-edit"]').click();
+    await discussion
+      .locator(`input[id^="edit-title-"]`)
+      .fill("Switch to pnpm (revised)");
+    await fillDescription(page, discussion, "Even faster after benchmarks.", {
+      ariaLabelPrefix: "Edit discussion body",
+    });
+    await discussion.locator('[data-testid="discussion-save-edit"]').click();
+    await expect(
+      page.locator('[data-testid="discussion-item"]', {
+        hasText: "Switch to pnpm (revised)",
+      }),
+    ).toBeVisible();
+
+    // Re-bind to the renamed item — `discussion` was filtered by the old title.
+    const renamed = page.locator('[data-testid="discussion-item"]', {
+      hasText: "Switch to pnpm (revised)",
+    });
+
     // Delete — accept the confirm dialog.
     page.once("dialog", (dialog) => dialog.accept());
-    await discussion.locator('[data-testid="discussion-delete"]').click();
+    await renamed.locator('[data-testid="discussion-delete"]').click();
     await expect(
       page.locator('[data-testid="discussion-item"]', {
         hasText: "Switch to pnpm",
@@ -82,48 +102,8 @@ test.describe("Discussions", () => {
     ).toHaveCount(0);
   });
 
-  test("non-member cannot reach the discussions endpoint via the panel", async ({
-    browser,
-  }) => {
-    // Alice creates a project + discussion; Bob, who is not a member, should
-    // never see the discussion when he visits /projects (the project itself
-    // is hidden by ProjectAccessExtension, so the detail page never loads).
-    const aliceEmail = uniqueEmail();
-    const bobEmail = uniqueEmail();
-    const suffix = Date.now();
-
-    const aliceContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    const alicePage = await aliceContext.newPage();
-    await registerAndSignIn(alicePage, aliceEmail);
-    await alicePage.goto(`${BASE_URL}/projects`);
-    const projectTitle = `Hidden-${suffix}`;
-    await alicePage.fill("#title", projectTitle);
-    await alicePage.click('button[type="submit"]');
-    const aliceItem = alicePage.locator('[data-testid="project-item"]', {
-      hasText: projectTitle,
-    });
-    await aliceItem.locator(`a[href^="/projects/"]`).first().click();
-    await alicePage.click('[data-testid="project-tab-discussions"]');
-    await alicePage.click('[data-testid="discussion-toggle-composer"]');
-    const composer = alicePage.locator('[data-testid="discussion-composer"]');
-    await composer.locator("#discussion-title").fill("Internal-only");
-    await fillDescription(alicePage, composer, "Members only.", {
-      ariaLabelPrefix: "Discussion body",
-    });
-    await composer.locator('[data-testid="discussion-submit"]').click();
-    await expect(
-      alicePage.locator('[data-testid="discussion-item"]', {
-        hasText: "Internal-only",
-      }),
-    ).toBeVisible();
-
-    const bobContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    const bobPage = await bobContext.newPage();
-    await registerAndSignIn(bobPage, bobEmail);
-    await bobPage.goto(`${BASE_URL}/projects`);
-    await expect(bobPage.locator(`text=${projectTitle}`)).toHaveCount(0);
-
-    await aliceContext.close();
-    await bobContext.close();
-  });
 });
+
+// Cross-user project visibility is already covered by `projects.spec.js`;
+// the panel inherits it via `ProjectAccessExtension` and `DiscussionAccessExtension`,
+// both of which have direct PHPUnit coverage in `DiscussionTest`.

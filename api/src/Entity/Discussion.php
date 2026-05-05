@@ -215,6 +215,18 @@ class Discussion
         return $this;
     }
 
+    /**
+     * Symfony's PropertyInfoExtractor derives the property name from the
+     * getter — `isPinned()` would strip the `is` prefix and yield `pinned`,
+     * which doesn't match the writable name `isPinned` (from `setIsPinned`).
+     * The mismatch makes the Serializer drop the field on read. Naming the
+     * read accessor `getIsPinned` keeps both ends aligned on `isPinned`.
+     */
+    public function getIsPinned(): bool
+    {
+        return $this->isPinned;
+    }
+
     public function isPinned(): bool
     {
         return $this->isPinned;
@@ -224,6 +236,11 @@ class Discussion
     {
         $this->isPinned = $isPinned;
         return $this;
+    }
+
+    public function getIsLocked(): bool
+    {
+        return $this->isLocked;
     }
 
     public function isLocked(): bool

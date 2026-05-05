@@ -183,7 +183,10 @@ const DiscussionsPanel = ({
       const res = await fetch(`${ENTRYPOINT}${discussion["@id"]}`, {
         method: "PATCH",
         credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
+        headers: {
+          "Content-Type": "application/merge-patch+json",
+          Accept: "application/ld+json",
+        },
         body: JSON.stringify(patch),
       });
       if (!res.ok) {
