@@ -1,9 +1,9 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Lock, Pencil, Pin, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Lock, Pin, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { displayName } from "@/lib/userDisplay";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import MarkdownView from "@/components/editor/MarkdownView";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ interface Collection<T> {
 }
 
 interface Props {
+  projectId: string;
   projectIri: string;
   currentUserIri: string | null;
   isProjectOwner: boolean;
@@ -51,7 +52,7 @@ const CATEGORIES: { value: DiscussionCategory | "all"; label: string }[] = [
   { value: "q-and-a", label: "Q&A" },
 ];
 
-const CATEGORY_LABEL: Record<DiscussionCategory, string> = {
+export const CATEGORY_LABEL: Record<DiscussionCategory, string> = {
   general: "General",
   ideas: "Ideas",
   announcements: "Announcements",
@@ -60,7 +61,7 @@ const CATEGORY_LABEL: Record<DiscussionCategory, string> = {
 
 const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
-const formatRelative = (iso: string): string => {
+export const formatRelative = (iso: string): string => {
   const ts = new Date(iso).getTime();
   if (Number.isNaN(ts)) return "";
   const diffSec = Math.round((ts - Date.now()) / 1000);
@@ -74,7 +75,7 @@ const formatRelative = (iso: string): string => {
   return RELATIVE.format(Math.round(diffSec / 31536000), "year");
 };
 
-const errorMessage = async (res: Response): Promise<string> => {
+export const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
   return (
     data.detail ||
@@ -85,6 +86,7 @@ const errorMessage = async (res: Response): Promise<string> => {
 };
 
 const DiscussionsPanel = ({
+  projectId,
   projectIri,
   currentUserIri,
   isProjectOwner,
@@ -176,9 +178,7 @@ const DiscussionsPanel = ({
   const patchDiscussion = useCallback(
     async (
       discussion: Discussion,
-      patch: Partial<
-        Pick<Discussion, "title" | "body" | "category" | "isPinned" | "isLocked">
-      >,
+      patch: Partial<Pick<Discussion, "isPinned" | "isLocked">>,
     ): Promise<Discussion> => {
       const res = await fetch(`${ENTRYPOINT}${discussion["@id"]}`, {
         method: "PATCH",
@@ -336,9 +336,10 @@ const DiscussionsPanel = ({
       ) : (
         <ul className="space-y-3" data-testid="discussion-list">
           {filtered.map((d) => (
-            <DiscussionItem
+            <DiscussionRow
               key={d["@id"]}
               discussion={d}
+              projectId={projectId}
               currentUserIri={currentUserIri}
               isProjectOwner={isProjectOwner}
               onPatch={patchDiscussion}
@@ -359,74 +360,32 @@ const sortDiscussions = (list: Discussion[]): Discussion[] =>
     );
   });
 
-interface ItemProps {
+interface RowProps {
   discussion: Discussion;
+  projectId: string;
   currentUserIri: string | null;
   isProjectOwner: boolean;
   onPatch: (
     d: Discussion,
-    patch: Partial<
-      Pick<Discussion, "title" | "body" | "category" | "isPinned" | "isLocked">
-    >,
+    patch: Partial<Pick<Discussion, "isPinned" | "isLocked">>,
   ) => Promise<Discussion>;
   onDelete: (d: Discussion) => Promise<void>;
 }
 
-const DiscussionItem = ({
+const DiscussionRow = ({
   discussion,
+  projectId,
   currentUserIri,
   isProjectOwner,
   onPatch,
   onDelete,
-}: ItemProps) => {
-  const [expanded, setExpanded] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(discussion.title);
-  const [editBody, setEditBody] = useState(discussion.body);
-  const [editCategory, setEditCategory] = useState<DiscussionCategory>(
-    discussion.category,
-  );
-  const [editorKey, setEditorKey] = useState(0);
-  const [savingEdit, setSavingEdit] = useState(false);
+}: RowProps) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isAuthor = currentUserIri === discussion.author["@id"];
-  const canEdit = isAuthor;
   const canDelete = isAuthor || isProjectOwner;
   const canModerate = isProjectOwner;
-
-  const startEdit = () => {
-    setEditTitle(discussion.title);
-    setEditBody(discussion.body);
-    setEditCategory(discussion.category);
-    setEditorKey((k) => k + 1);
-    setEditing(true);
-    setExpanded(true);
-  };
-
-  const cancelEdit = () => {
-    setEditing(false);
-    setError(null);
-  };
-
-  const saveEdit = async () => {
-    if (!editTitle.trim() || !editBody.trim()) return;
-    setSavingEdit(true);
-    setError(null);
-    try {
-      await onPatch(discussion, {
-        title: editTitle.trim(),
-        body: editBody,
-        category: editCategory,
-      });
-      setEditing(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-    } finally {
-      setSavingEdit(false);
-    }
-  };
 
   const togglePin = async () => {
     setBusy(true);
@@ -472,14 +431,13 @@ const DiscussionItem = ({
             <UserAvatar user={discussion.author} size="sm" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setExpanded((v) => !v)}
-                  className="font-semibold text-left hover:underline"
+                <Link
+                  href={`/projects/${projectId}/discussions/${discussion.id}`}
+                  className="font-semibold text-foreground no-underline hover:underline"
                   data-testid="discussion-title"
                 >
                   {discussion.title}
-                </button>
+                </Link>
                 {discussion.isPinned && (
                   <Badge variant="secondary" className="gap-1">
                     <Pin className="h-3 w-3" /> Pinned
@@ -500,78 +458,6 @@ const DiscussionItem = ({
                 {discussion.updatedAt && " · edited"}
               </p>
 
-              {expanded && !editing && (
-                <div className="mt-3">
-                  <MarkdownView source={discussion.body} className="text-sm" />
-                </div>
-              )}
-
-              {editing && (
-                <div className="mt-3 space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`edit-title-${discussion.id}`}>Title</Label>
-                    <Input
-                      id={`edit-title-${discussion.id}`}
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      maxLength={200}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`edit-cat-${discussion.id}`}>
-                      Category
-                    </Label>
-                    <select
-                      id={`edit-cat-${discussion.id}`}
-                      value={editCategory}
-                      onChange={(e) =>
-                        setEditCategory(e.target.value as DiscussionCategory)
-                      }
-                      className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      {(
-                        Object.keys(CATEGORY_LABEL) as DiscussionCategory[]
-                      ).map((cat) => (
-                        <option key={cat} value={cat}>
-                          {CATEGORY_LABEL[cat]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <MarkdownEditor
-                    key={editorKey}
-                    ariaLabel="Edit discussion body"
-                    value={editBody}
-                    onChange={setEditBody}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => void saveEdit()}
-                      disabled={
-                        savingEdit ||
-                        !editTitle.trim() ||
-                        !editBody.trim()
-                      }
-                      data-testid="discussion-save-edit"
-                    >
-                      {savingEdit ? "Saving…" : "Save"}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={cancelEdit}
-                      disabled={savingEdit}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-
               {error && (
                 <p
                   role="alert"
@@ -582,20 +468,8 @@ const DiscussionItem = ({
                 </p>
               )}
 
-              {!editing && (canEdit || canDelete || canModerate) && (
+              {(canModerate || canDelete) && (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {canEdit && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={startEdit}
-                      disabled={busy}
-                      data-testid="discussion-edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                    </Button>
-                  )}
                   {canModerate && (
                     <>
                       <Button
