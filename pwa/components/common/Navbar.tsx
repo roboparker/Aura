@@ -1,10 +1,16 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Menu } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -29,11 +35,9 @@ const NAV_LINKS = [
   { href: "/tags", label: "Tags" },
 ];
 
-// Backend tooling surfaced inside the PWA chrome. These are served by
-// Caddy (FrankenPHP), not Next.js, so they're regular <a> links rather
-// than <Link>s. The API doc browser is public; the Mercure debugger is
-// admin-only.
-const PUBLIC_EXTERNAL_LINKS = [{ href: "/docs", label: "API" }];
+// Backend tooling surfaced inside the PWA chrome. The Mercure debugger
+// is served by Caddy (FrankenPHP), not Next.js, so it's a regular <a>
+// link rather than a <Link>. Admin-only.
 const ADMIN_EXTERNAL_LINKS = [
   { href: "/.well-known/mercure/ui/", label: "Mercure" },
 ];
@@ -53,13 +57,22 @@ const Navbar = () => {
           >
             Aura
           </Link>
-          {PUBLIC_EXTERNAL_LINKS.map(({ href, label }) => (
-            <Button key={href} asChild variant="ghost" size="sm">
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {label}
-              </a>
-            </Button>
-          ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1">
+                Docs
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem asChild>
+                <a href="/docs">API</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dev/components">Components</Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <div className="flex items-center gap-1">
