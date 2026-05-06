@@ -118,7 +118,7 @@ const SearchBar = () => {
             id: hit["@id"],
             title: hit.title,
             description: hit.description,
-            completed: hit.completedOn !== null,
+            completed: Boolean(hit.completedOn),
           })),
         );
         setActiveIndex(-1);

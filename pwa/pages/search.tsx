@@ -628,7 +628,7 @@ const Results = ({ filters, onPageChange }: ResultsProps) => {
 };
 
 const ResultRow = ({ hit, query }: { hit: TaskHit; query: string }) => {
-  const completed = hit.completedOn !== null;
+  const completed = Boolean(hit.completedOn);
   return (
     <li
       id={encodeURIComponent(hit["@id"])}
