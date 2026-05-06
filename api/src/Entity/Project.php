@@ -60,7 +60,7 @@ class Project
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['project:read', 'task:read'])]
+    #[Groups(['project:read', 'task:read', 'discussion:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -71,7 +71,7 @@ class Project
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
-    #[Groups(['project:read', 'project:write', 'task:read'])]
+    #[Groups(['project:read', 'project:write', 'task:read', 'discussion:read'])]
     #[Gedmo\Versioned]
     private string $title = '';
 
