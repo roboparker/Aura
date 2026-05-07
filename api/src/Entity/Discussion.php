@@ -62,6 +62,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'discussion')]
 #[ORM\Index(columns: ['project_id', 'created_at'], name: 'idx_discussion_project_created')]
 #[ORM\Index(columns: ['project_id', 'is_pinned', 'created_at'], name: 'idx_discussion_project_pinned')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_discussion_space')]
 // Mirror the GIN index on `search_vector` from Version20260506010000 so
 // doctrine:schema:validate doesn't try to drop it on every CI run.
 #[ORM\Index(columns: ['search_vector'], name: 'idx_discussion_search_vector', flags: ['gin'])]
@@ -95,6 +96,18 @@ class Discussion
     #[Assert\NotNull(message: 'Project is required.')]
     #[Groups(['discussion:read', 'discussion:write'])]
     private ?Project $project = null;
+
+    /**
+     * The space this discussion lives in (#181). Inherited from the
+     * parent project — kept as a denormalised column so search and
+     * future space-scoped access predicates (PR 2 / #185) can filter
+     * without joining through `project`. Synced by {@see syncSpaceFromProject()}
+     * on PrePersist; never settable on the wire.
+     */
+    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Groups(['discussion:read'])]
+    private ?Space $space = null;
 
     /**
      * Stamped by DiscussionAuthorProcessor on POST; read-only on the
@@ -167,6 +180,21 @@ class Discussion
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * Mirrors the parent project's space onto this discussion before
+     * insert so the denormalised column stays accurate even when the
+     * client doesn't (and shouldn't) supply it. Runs only when no space
+     * is already set, so an explicit move-to-space operation in a
+     * future PR can override the default.
+     */
+    #[ORM\PrePersist]
+    public function syncSpaceFromProject(): void
+    {
+        if (null === $this->space && null !== $this->project) {
+            $this->space = $this->project->getSpace();
+        }
+    }
+
     public function getId(): ?Uuid
     {
         return $this->id;
@@ -180,6 +208,17 @@ class Discussion
     public function setProject(?Project $project): static
     {
         $this->project = $project;
+        return $this;
+    }
+
+    public function getSpace(): ?Space
+    {
+        return $this->space;
+    }
+
+    public function setSpace(?Space $space): static
+    {
+        $this->space = $space;
         return $this;
     }
 

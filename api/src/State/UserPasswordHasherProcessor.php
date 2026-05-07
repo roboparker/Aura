@@ -5,6 +5,8 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
@@ -53,11 +55,42 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         /** @var User $user */
         $user = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
 
+        if ($operation instanceof Post) {
+            // Provision the user's personal space (#181). Created here
+            // rather than in a Doctrine listener so the membership row
+            // and the space land in the same flush as the user — a
+            // signup that fails halfway can't leave an orphan space.
+            $this->createPersonalSpace($user);
+        }
+
         if ($operation instanceof Post && null !== $inviteToken && '' !== $inviteToken) {
             $this->acceptInvite($user, $inviteToken);
         }
 
         return $user;
+    }
+
+    /**
+     * Create the user's personal "Private" space and add them as its
+     * sole admin. The DB enforces "one personal space per user" via a
+     * partial unique index on (created_by_id) WHERE is_personal=true,
+     * so re-running this for the same user would be caught even if a
+     * future code path tried to.
+     */
+    private function createPersonalSpace(User $user): void
+    {
+        $space = (new Space())
+            ->setName(Space::PERSONAL_SPACE_NAME)
+            ->setIsPersonal(true)
+            ->setCreatedBy($user);
+
+        $membership = (new SpaceMembership())
+            ->setUser($user)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($membership);
+
+        $this->em->persist($space);
+        $this->em->flush();
     }
 
     /**

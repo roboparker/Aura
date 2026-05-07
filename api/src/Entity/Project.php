@@ -54,6 +54,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: ProjectRepository::class)]
 #[ORM\Table(name: 'project')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_project_owner')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_project_space')]
 // Mirror the GIN index on `search_vector` from Version20260506010000 so
 // doctrine:schema:validate doesn't try to drop it on every CI run.
 #[ORM\Index(columns: ['search_vector'], name: 'idx_project_search_vector', flags: ['gin'])]
@@ -73,6 +74,21 @@ class Project
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['project:read'])]
     private ?User $owner = null;
+
+    /**
+     * The space this project lives in (#181). Set by ProjectOwnerProcessor
+     * to the creator's personal space when the client doesn't specify
+     * one — keeps the existing PWA, which is unaware of spaces, working
+     * unchanged. Made non-null at the DB level once the migration's
+     * backfill populates every existing row.
+     *
+     * Owner-based access is still in force in PR 1; PR 2 (#185) swaps
+     * the access predicates to scope by space membership.
+     */
+    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Groups(['project:read', 'project:write'])]
+    private ?Space $space = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -158,6 +174,17 @@ class Project
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+        return $this;
+    }
+
+    public function getSpace(): ?Space
+    {
+        return $this->space;
+    }
+
+    public function setSpace(?Space $space): static
+    {
+        $this->space = $space;
         return $this;
     }
 

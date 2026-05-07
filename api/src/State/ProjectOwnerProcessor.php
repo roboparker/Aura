@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Project;
 use App\Entity\User;
+use App\Repository\SpaceRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -26,6 +27,7 @@ final class ProjectOwnerProcessor implements ProcessorInterface
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
         private Security $security,
+        private SpaceRepository $spaceRepository,
     ) {
     }
 
@@ -41,6 +43,14 @@ final class ProjectOwnerProcessor implements ProcessorInterface
 
         $data->setOwner($user);
         $data->addMember($user);
+
+        // PR 1 (#181): default to the creator's personal space when the
+        // client doesn't pick one. Keeps the existing PWA — which has
+        // no concept of spaces yet — working unchanged. PR 4 (#187)
+        // will let clients send an explicit `space` IRI.
+        if (null === $data->getSpace()) {
+            $data->setSpace($this->spaceRepository->findPersonalSpaceFor($user));
+        }
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
     }
