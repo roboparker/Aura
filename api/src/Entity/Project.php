@@ -2,12 +2,14 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Filter\ProjectSearchFilter;
 use App\Repository\ProjectRepository;
 use App\State\ProjectOwnerProcessor;
 use App\Validator\ValidProjectAttachments;
@@ -52,6 +54,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: ProjectRepository::class)]
 #[ORM\Table(name: 'project')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_project_owner')]
+// Mirror the GIN index on `search_vector` from Version20260506010000 so
+// doctrine:schema:validate doesn't try to drop it on every CI run.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_project_search_vector', flags: ['gin'])]
+#[ApiFilter(ProjectSearchFilter::class)]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 #[ValidProjectAttachments]
 class Project
@@ -80,6 +86,15 @@ class Project
     #[Groups(['project:read', 'project:write'])]
     #[Gedmo\Versioned]
     private ?string $description = null;
+
+    /**
+     * Postgres-managed full-text search vector (title + description),
+     * populated by a STORED generated column — see Version20260506010000.
+     * Mapped here so DQL can reference `p.searchVector` in the search
+     * filter; never written from PHP, never serialised in API responses.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['project:read'])]
