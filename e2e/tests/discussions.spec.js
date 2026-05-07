@@ -25,10 +25,12 @@ test.describe("Discussions", () => {
     });
     await expect(projectItem).toBeVisible();
 
-    // Open the project detail page and switch to the Discussions tab.
+    // Open the project detail page and follow the Discussions link to the
+    // dedicated list page.
     await projectItem.locator(`a[href^="/projects/"]`).first().click();
     await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await page.click('[data-testid="project-tab-discussions"]');
+    await page.click('[data-testid="project-discussions-link"]');
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/discussions$/);
 
     // Empty state shows the right copy.
     const panel = page.locator('[data-testid="discussions-panel"]');
@@ -60,41 +62,43 @@ test.describe("Discussions", () => {
     await page.getByRole("tab", { name: "Ideas" }).click();
     await expect(discussion).toBeVisible();
 
-    // Expand to read the body.
-    await discussion.locator('[data-testid="discussion-title"]').click();
-    await expect(
-      discussion.locator("text=Faster installs for everyone."),
-    ).toBeVisible();
-
-    // Owner pin / unpin.
+    // Owner pin / unpin from the list.
     await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
     await expect(discussion.locator("text=Pinned")).toBeVisible();
     await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
     await expect(discussion.locator("text=Pinned")).toHaveCount(0);
 
-    // Author can edit.
-    await discussion.locator('[data-testid="discussion-edit"]').click();
-    await discussion
-      .locator(`input[id^="edit-title-"]`)
+    // Drill into the detail page via the row's title link.
+    await discussion.locator('[data-testid="discussion-title"]').click();
+    await expect(page).toHaveURL(
+      /\/projects\/[a-f0-9-]+\/discussions\/[a-f0-9-]+$/,
+    );
+    const detail = page.locator('[data-testid="discussion-detail"]');
+    await expect(detail).toBeVisible();
+    await expect(
+      detail.locator("text=Faster installs for everyone."),
+    ).toBeVisible();
+
+    // Author edits from the detail page.
+    await detail.locator('[data-testid="discussion-edit"]').click();
+    await detail
+      .locator(`#edit-title`)
       .fill("Switch to pnpm (revised)");
-    await fillDescription(page, discussion, "Even faster after benchmarks.", {
+    await fillDescription(page, detail, "Even faster after benchmarks.", {
       ariaLabelPrefix: "Edit discussion body",
     });
-    await discussion.locator('[data-testid="discussion-save-edit"]').click();
+    await detail.locator('[data-testid="discussion-save-edit"]').click();
     await expect(
-      page.locator('[data-testid="discussion-item"]', {
+      detail.locator('[data-testid="discussion-detail-title"]', {
         hasText: "Switch to pnpm (revised)",
       }),
     ).toBeVisible();
 
-    // Re-bind to the renamed item — `discussion` was filtered by the old title.
-    const renamed = page.locator('[data-testid="discussion-item"]', {
-      hasText: "Switch to pnpm (revised)",
-    });
-
-    // Delete — accept the confirm dialog.
+    // Delete from the detail page — accept the confirm dialog. After delete
+    // we redirect back to the list, where the row should be gone.
     page.once("dialog", (dialog) => dialog.accept());
-    await renamed.locator('[data-testid="discussion-delete"]').click();
+    await detail.locator('[data-testid="discussion-delete"]').click();
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/discussions$/);
     await expect(
       page.locator('[data-testid="discussion-item"]', {
         hasText: "Switch to pnpm",
