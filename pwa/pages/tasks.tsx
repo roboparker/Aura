@@ -1511,15 +1511,27 @@ const Tasks = () => {
     // Optimistic toggle: flip the checkbox immediately so the UI feels
     // responsive and so controlled-input assertions in tests see the new
     // state without waiting for the server round-trip.
-    const previous = tasks;
+    //
+    // setTasks uses the functional form so the optimistic update reads
+    // from React's latest state instead of the closure's `tasks`. With
+    // the closure form, a render happening between the user's click and
+    // the dispatch could leave handleToggle pointing at a stale array,
+    // which would produce a no-op map (`completedOn` already matches
+    // `nextCompletedOn`) and leave Playwright's `uncheck()` thinking the
+    // click did nothing. The previous-snapshot rollback also targets
+    // only this row's `completedOn` field for the same reason — a
+    // wholesale revert would clobber concurrent edits to other rows.
+    const previousCompletedOn = task.completedOn;
     const nextCompletedOn = task.completedOn ? null : new Date().toISOString();
     // Completing a recurring task spawns a fresh occurrence server-side; we
     // need to refetch so that new row appears in the list. Toggling *off*
     // (un-completing) doesn't need a refetch.
     const willSpawnNextOccurrence =
       !task.completedOn && task.recurrenceRule !== null && task.dueDate !== null;
-    setTasks(
-      tasks.map((t) => (t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t)),
+    setTasks((prev) =>
+      prev.map((t) =>
+        t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t,
+      ),
     );
     setError(null);
 
@@ -1537,7 +1549,11 @@ const Tasks = () => {
         await loadData();
       }
     } catch (err) {
-      setTasks(previous);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t["@id"] === task["@id"] ? { ...t, completedOn: previousCompletedOn } : t,
+        ),
+      );
       setError(err instanceof Error ? err.message : "Failed to update task.");
     }
   };

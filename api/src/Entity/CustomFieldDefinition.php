@@ -61,7 +61,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Entity(repositoryClass: CustomFieldDefinitionRepository::class)]
 #[ORM\Table(name: 'custom_field_definition')]
 #[ORM\Index(columns: ['project_id', 'position'], name: 'idx_cfd_project_position')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_cfd_space')]
 #[ORM\UniqueConstraint(name: 'uniq_cfd_project_name', columns: ['project_id', 'name'])]
+#[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(
     fields: ['project', 'name'],
     message: 'A field with this name already exists in the project.',
@@ -102,6 +104,17 @@ class CustomFieldDefinition
     #[Assert\NotNull(message: 'Project is required.')]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private ?Project $project = null;
+
+    /**
+     * The space this definition lives in (#181). Inherited from the
+     * parent project on PrePersist; never settable on the wire. Kept
+     * as a denormalised column so PR 4's space-scoped catalog views
+     * can filter without joining through `project`.
+     */
+    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Groups(['custom_field_definition:read'])]
+    private ?Space $space = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'Field name is required.')]
@@ -162,6 +175,29 @@ class CustomFieldDefinition
     {
         $this->project = $project;
         return $this;
+    }
+
+    public function getSpace(): ?Space
+    {
+        return $this->space;
+    }
+
+    public function setSpace(?Space $space): static
+    {
+        $this->space = $space;
+        return $this;
+    }
+
+    /**
+     * Mirrors the parent project's space onto this definition before
+     * insert. Same pattern as Discussion::syncSpaceFromProject.
+     */
+    #[ORM\PrePersist]
+    public function syncSpaceFromProject(): void
+    {
+        if (null === $this->space && null !== $this->project) {
+            $this->space = $this->project->getSpace();
+        }
     }
 
     public function getName(): string

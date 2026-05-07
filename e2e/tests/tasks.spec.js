@@ -36,19 +36,26 @@ test.describe("Tasks", () => {
       page.locator('[data-testid="new-task-title-input"]'),
     ).toHaveValue("");
 
-    // Complete. Wait for the optimistic-update PATCH to finish before
-    // issuing the next click — without this barrier the in-flight PATCH
-    // races the `uncheck()` and Playwright sees "did not change its
-    // state" intermittently. This was tried in #142, removed in 1de7985,
-    // and is being restored because the underlying race still bites.
+    // Complete. Wait for both the PATCH response AND React to actually
+    // commit the optimistic render before issuing the next click. The
+    // PATCH-only barrier (tried in #142, removed in 1de7985, restored
+    // again here) wasn't enough on its own because the response can
+    // arrive before React has painted the new `checked` state, leaving
+    // Playwright's next `uncheck()` racing the in-flight render and
+    // reporting "Clicking the checkbox did not change its state". The
+    // explicit toBeChecked / not.toBeChecked assertions auto-wait until
+    // the controlled input matches the expected DOM state, which is
+    // the actual sync point we care about.
+    const checkbox = item.locator('input[type="checkbox"]');
     const completeResponse = page.waitForResponse(
       (res) =>
         res.request().method() === "PATCH" &&
         res.url().includes("/tasks/") &&
         res.ok(),
     );
-    await item.locator('input[type="checkbox"]').check();
+    await checkbox.check();
     await completeResponse;
+    await expect(checkbox).toBeChecked();
     await expect(item.locator(`text=${title}`)).toHaveClass(/line-through/);
 
     // Uncomplete
@@ -58,8 +65,9 @@ test.describe("Tasks", () => {
         res.url().includes("/tasks/") &&
         res.ok(),
     );
-    await item.locator('input[type="checkbox"]').uncheck();
+    await checkbox.uncheck();
     await uncompleteResponse;
+    await expect(checkbox).not.toBeChecked();
     await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
