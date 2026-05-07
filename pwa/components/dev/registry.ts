@@ -9,7 +9,8 @@ export type RegistryEntry = {
     | "Editor"
     | "User"
     | "Theme"
-    | "Discussions";
+    | "Discussions"
+    | "Custom fields";
   description: string;
 };
 
@@ -40,5 +41,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "markdown-view", name: "MarkdownView", category: "Editor", description: "Read-only markdown renderer." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
   { slug: "discussions-panel", name: "DiscussionsPanel", category: "Discussions", description: "Project discussion board with list, filter, create, edit, pin/lock." },
+  { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
   { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },
 ];

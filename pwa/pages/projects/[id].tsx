@@ -410,7 +410,17 @@ const ProjectDetail = () => {
                 </CardContent>
               </Card>
 
-              <div className="mb-6 flex justify-end">
+              <div className="mb-6 flex flex-wrap justify-end gap-2">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  data-testid="project-custom-fields-link"
+                >
+                  <Link href={`/projects/${project.id}/custom-fields`}>
+                    Custom fields
+                  </Link>
+                </Button>
                 <Button
                   asChild
                   variant="outline"
