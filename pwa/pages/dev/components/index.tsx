@@ -12,6 +12,8 @@ const categories = [
   "Editor",
   "User",
   "Theme",
+  "Discussions",
+  "Custom fields",
 ] as const;
 
 const ComponentsIndex = () => (
