@@ -124,4 +124,72 @@ test.describe("Search page + autocomplete", () => {
     await expect(page).not.toHaveURL(/assignee=/);
     await expect(page.getByTestId("search-result-count")).toContainText("2 results");
   });
+
+  test("kind tabs switch between tasks, projects, and discussions", async ({
+    page,
+  }) => {
+    const email = uniqueEmail("search-kinds");
+    await registerAndSignIn(page, email);
+
+    const ldHeaders = { "Content-Type": "application/ld+json" };
+    const stamp = Date.now();
+    const projectTitle = `Pinwheel project ${stamp}`;
+    const taskTitle = `Pinwheel task ${stamp}`;
+    const discussionTitle = `Pinwheel discussion ${stamp}`;
+
+    const projectRes = await page.request.post(`${BASE_URL}/projects`, {
+      headers: ldHeaders,
+      data: { title: projectTitle, description: "Spinning the wheel." },
+    });
+    expect(projectRes.ok()).toBeTruthy();
+    const project = await projectRes.json();
+
+    const taskRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: ldHeaders,
+      data: { title: taskTitle },
+    });
+    expect(taskRes.ok()).toBeTruthy();
+
+    const discussionRes = await page.request.post(`${BASE_URL}/discussions`, {
+      headers: ldHeaders,
+      data: {
+        project: project["@id"],
+        title: discussionTitle,
+        body: "Round and round it goes.",
+        category: "general",
+      },
+    });
+    expect(discussionRes.ok()).toBeTruthy();
+
+    await page.goto(`${BASE_URL}/search?q=Pinwheel`);
+    // Default tab is Tasks.
+    await expect(page.getByTestId("search-results")).toContainText(taskTitle);
+    await expect(page.getByTestId("search-results")).not.toContainText(
+      projectTitle,
+    );
+
+    await page.getByTestId("search-kind-projects").click();
+    await expect(page).toHaveURL(/kind=projects/);
+    await expect(page.getByTestId("search-results")).toContainText(projectTitle);
+    await expect(page.getByTestId("search-results")).not.toContainText(
+      taskTitle,
+    );
+
+    await page.getByTestId("search-kind-discussions").click();
+    await expect(page).toHaveURL(/kind=discussions/);
+    await expect(page.getByTestId("search-results")).toContainText(
+      discussionTitle,
+    );
+    // The project chip on the discussion row should mention the host
+    // project so the user can place the thread out of context.
+    await expect(page.getByTestId("search-results")).toContainText(
+      projectTitle,
+    );
+
+    // Switching back to the Tasks tab drops the kind param from the URL
+    // (tasks is the default) and re-shows the task hit.
+    await page.getByTestId("search-kind-tasks").click();
+    await expect(page).not.toHaveURL(/kind=/);
+    await expect(page.getByTestId("search-results")).toContainText(taskTitle);
+  });
 });

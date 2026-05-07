@@ -54,6 +54,41 @@ interface TaskHit {
   tags?: TagRef[];
 }
 
+interface ProjectHit {
+  "@id": string;
+  id: string;
+  title: string;
+  description: string | null;
+  createdOn: string;
+}
+
+interface DiscussionProjectRef {
+  "@id": string;
+  id: string;
+  title: string;
+}
+
+interface DiscussionAuthor {
+  "@id": string;
+  email?: string | null;
+  givenName?: string | null;
+  familyName?: string | null;
+  nickname?: string | null;
+}
+
+interface DiscussionHit {
+  "@id": string;
+  id: string;
+  title: string;
+  body: string;
+  category: string;
+  isPinned: boolean;
+  isLocked: boolean;
+  createdAt: string;
+  project: DiscussionProjectRef;
+  author: DiscussionAuthor;
+}
+
 type Status = "" | "open" | "completed";
 type SortKey =
   | "relevance"
@@ -62,9 +97,11 @@ type SortKey =
   | "dueDate:asc"
   | "dueDate:desc"
   | "title:asc";
+type Kind = "tasks" | "projects" | "discussions";
 
 interface FilterState {
   q: string;
+  kind: Kind;
   status: Status;
   dueFrom: string; // yyyy-mm-dd
   dueTo: string;
@@ -105,6 +142,7 @@ const SearchPage = () => {
       // result set.
       if (
         patch.q !== undefined ||
+        patch.kind !== undefined ||
         patch.status !== undefined ||
         patch.dueFrom !== undefined ||
         patch.dueTo !== undefined ||
@@ -138,8 +176,31 @@ const SearchPage = () => {
       <main className="min-h-screen bg-muted">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           <SearchHeader filters={filters} onChange={replaceFilters} />
-          <FilterChipsBar filters={filters} onChange={replaceFilters} />
-          <Results filters={filters} onPageChange={(page) => replaceFilters({ page })} />
+          <KindTabs
+            value={filters.kind}
+            onChange={(kind) => replaceFilters({ kind })}
+          />
+          {filters.kind === "tasks" && (
+            <FilterChipsBar filters={filters} onChange={replaceFilters} />
+          )}
+          {filters.kind === "tasks" && (
+            <TaskResults
+              filters={filters}
+              onPageChange={(page) => replaceFilters({ page })}
+            />
+          )}
+          {filters.kind === "projects" && (
+            <ProjectResults
+              filters={filters}
+              onPageChange={(page) => replaceFilters({ page })}
+            />
+          )}
+          {filters.kind === "discussions" && (
+            <DiscussionResults
+              filters={filters}
+              onPageChange={(page) => replaceFilters({ page })}
+            />
+          )}
         </div>
       </main>
     </>
@@ -157,7 +218,7 @@ const SearchHeader = ({ filters, onChange }: SearchHeaderProps) => {
 
   return (
     <header className="space-y-3">
-      <h1 className="text-2xl font-bold">Search tasks</h1>
+      <h1 className="text-2xl font-bold">Search</h1>
       <form
         role="search"
         onSubmit={(e) => {
@@ -535,12 +596,52 @@ const SortDropdown = ({
   </div>
 );
 
+const KIND_TABS: { value: Kind; label: string }[] = [
+  { value: "tasks", label: "Tasks" },
+  { value: "projects", label: "Projects" },
+  { value: "discussions", label: "Discussions" },
+];
+
+const KindTabs = ({
+  value,
+  onChange,
+}: {
+  value: Kind;
+  onChange: (next: Kind) => void;
+}) => (
+  <div
+    className="inline-flex rounded-md border bg-background"
+    role="tablist"
+    aria-label="Search across"
+    data-testid="search-kind-tabs"
+  >
+    {KIND_TABS.map((tab) => (
+      <button
+        key={tab.value}
+        type="button"
+        role="tab"
+        aria-selected={value === tab.value}
+        onClick={() => onChange(tab.value)}
+        className={cn(
+          "px-3 py-1 text-sm first:rounded-l-md last:rounded-r-md",
+          value === tab.value
+            ? "bg-primary text-primary-foreground"
+            : "hover:bg-accent",
+        )}
+        data-testid={`search-kind-${tab.value}`}
+      >
+        {tab.label}
+      </button>
+    ))}
+  </div>
+);
+
 interface ResultsProps {
   filters: FilterState;
   onPageChange: (page: number) => void;
 }
 
-const Results = ({ filters, onPageChange }: ResultsProps) => {
+const TaskResults = ({ filters, onPageChange }: ResultsProps) => {
   const [hits, setHits] = useState<TaskHit[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -717,6 +818,247 @@ const SNIPPET_MAX = 200;
 const snippetOf = (s: string): string =>
   s.length > SNIPPET_MAX ? `${s.slice(0, SNIPPET_MAX).trimEnd()}…` : s;
 
+const ProjectResults = ({ filters, onPageChange }: ResultsProps) => {
+  const [hits, setHits] = useState<ProjectHit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (filters.q) params.set("search", filters.q);
+        params.set("page", String(filters.page));
+        params.set("itemsPerPage", String(PAGE_SIZE));
+        const res = await fetch(
+          `${ENTRYPOINT}/projects?${params.toString()}`,
+          {
+            credentials: "include",
+            signal: controller.signal,
+            headers: { Accept: "application/ld+json" },
+          },
+        );
+        if (!res.ok) throw new Error("Search failed.");
+        const data = await res.json();
+        setHits((data["hydra:member"] ?? data.member ?? []) as ProjectHit[]);
+        setTotal(data["hydra:totalItems"] ?? data.totalItems ?? 0);
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Search failed.");
+        setHits([]);
+        setTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [filters.q, filters.page]);
+
+  if (loading && hits.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (hits.length === 0) {
+    return (
+      <div
+        className="rounded-md border bg-background p-8 text-center text-sm text-muted-foreground"
+        data-testid="search-empty"
+      >
+        {filters.q.trim().length === 0
+          ? "Enter a keyword above to search across your projects."
+          : "No projects match your search."}
+      </div>
+    );
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  return (
+    <div className="space-y-3">
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="search-result-count"
+      >
+        {total} result{total === 1 ? "" : "s"}
+      </p>
+      <ul className="space-y-2" data-testid="search-results">
+        {hits.map((hit) => (
+          <li
+            key={hit["@id"]}
+            id={encodeURIComponent(hit["@id"])}
+            data-testid="search-result-row"
+            className="rounded-md border bg-background p-3 transition-colors hover:bg-accent/30 target:ring-2 target:ring-primary"
+          >
+            <Link
+              href={`/projects/${hit.id}`}
+              className="block no-underline"
+            >
+              <div className="text-sm font-medium">
+                {highlightMatches(hit.title, filters.q)}
+              </div>
+              {hit.description && (
+                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                  {highlightMatches(snippetOf(hit.description), filters.q)}
+                </p>
+              )}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {totalPages > 1 && (
+        <Pagination
+          page={filters.page}
+          totalPages={totalPages}
+          onChange={onPageChange}
+        />
+      )}
+    </div>
+  );
+};
+
+const DiscussionResults = ({ filters, onPageChange }: ResultsProps) => {
+  const [hits, setHits] = useState<DiscussionHit[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const params = new URLSearchParams();
+        if (filters.q) params.set("search", filters.q);
+        params.set("page", String(filters.page));
+        params.set("itemsPerPage", String(PAGE_SIZE));
+        const res = await fetch(
+          `${ENTRYPOINT}/discussions?${params.toString()}`,
+          {
+            credentials: "include",
+            signal: controller.signal,
+            headers: { Accept: "application/ld+json" },
+          },
+        );
+        if (!res.ok) throw new Error("Search failed.");
+        const data = await res.json();
+        setHits((data["hydra:member"] ?? data.member ?? []) as DiscussionHit[]);
+        setTotal(data["hydra:totalItems"] ?? data.totalItems ?? 0);
+      } catch (err) {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "Search failed.");
+        setHits([]);
+        setTotal(0);
+      } finally {
+        setLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [filters.q, filters.page]);
+
+  if (loading && hits.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Searching…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (hits.length === 0) {
+    return (
+      <div
+        className="rounded-md border bg-background p-8 text-center text-sm text-muted-foreground"
+        data-testid="search-empty"
+      >
+        {filters.q.trim().length === 0
+          ? "Enter a keyword above to search across your discussions."
+          : "No discussions match your search."}
+      </div>
+    );
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  return (
+    <div className="space-y-3">
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid="search-result-count"
+      >
+        {total} result{total === 1 ? "" : "s"}
+      </p>
+      <ul className="space-y-2" data-testid="search-results">
+        {hits.map((hit) => (
+          <li
+            key={hit["@id"]}
+            id={encodeURIComponent(hit["@id"])}
+            data-testid="search-result-row"
+            className="rounded-md border bg-background p-3 transition-colors hover:bg-accent/30 target:ring-2 target:ring-primary"
+          >
+            <Link
+              href={`/projects/${hit.project.id}/discussions/${hit.id}`}
+              className="block no-underline"
+            >
+              <div className="text-sm font-medium">
+                {highlightMatches(hit.title, filters.q)}
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                {highlightMatches(snippetOf(hit.body), filters.q)}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="text-[10px] py-0">
+                  {hit.project.title}
+                </Badge>
+                {hit.isPinned && (
+                  <Badge variant="secondary" className="text-[10px] py-0">
+                    Pinned
+                  </Badge>
+                )}
+                {hit.isLocked && (
+                  <Badge variant="secondary" className="text-[10px] py-0">
+                    Locked
+                  </Badge>
+                )}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {totalPages > 1 && (
+        <Pagination
+          page={filters.page}
+          totalPages={totalPages}
+          onChange={onPageChange}
+        />
+      )}
+    </div>
+  );
+};
+
 function readFilters(query: Record<string, string | string[] | undefined>): FilterState {
   const stringQ = (key: string): string =>
     typeof query[key] === "string" ? (query[key] as string) : "";
@@ -729,8 +1071,12 @@ function readFilters(query: Record<string, string | string[] | undefined>): Filt
   const status = stringQ("status");
   const sort = (stringQ("sort") || "relevance") as SortKey;
   const page = Number.parseInt(stringQ("page") || "1", 10);
+  const kindRaw = stringQ("kind");
+  const kind: Kind =
+    kindRaw === "projects" || kindRaw === "discussions" ? kindRaw : "tasks";
   return {
     q: stringQ("q"),
+    kind,
     status: status === "open" || status === "completed" ? status : "",
     dueFrom: stringQ("dueFrom"),
     dueTo: stringQ("dueTo"),
@@ -745,13 +1091,19 @@ function readFilters(query: Record<string, string | string[] | undefined>): Filt
 function writeFilters(filters: FilterState): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
   if (filters.q) out.q = filters.q;
-  if (filters.status) out.status = filters.status;
-  if (filters.dueFrom) out.dueFrom = filters.dueFrom;
-  if (filters.dueTo) out.dueTo = filters.dueTo;
-  if (filters.project) out.project = filters.project;
-  if (filters.assignee) out.assignee = filters.assignee;
-  if (filters.tags.length > 0) out.tags = filters.tags;
-  if (filters.sort !== "relevance") out.sort = filters.sort;
+  if (filters.kind !== "tasks") out.kind = filters.kind;
+  // The task-specific filters are meaningless on the project / discussion
+  // tabs; only persist them when we're on the tasks tab so toggling tabs
+  // doesn't carry stale chips into a URL the back button can land on.
+  if (filters.kind === "tasks") {
+    if (filters.status) out.status = filters.status;
+    if (filters.dueFrom) out.dueFrom = filters.dueFrom;
+    if (filters.dueTo) out.dueTo = filters.dueTo;
+    if (filters.project) out.project = filters.project;
+    if (filters.assignee) out.assignee = filters.assignee;
+    if (filters.tags.length > 0) out.tags = filters.tags;
+    if (filters.sort !== "relevance") out.sort = filters.sort;
+  }
   if (filters.page > 1) out.page = String(filters.page);
   return out;
 }

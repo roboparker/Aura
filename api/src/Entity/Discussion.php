@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Filter\DiscussionSearchFilter;
 use App\Repository\DiscussionRepository;
 use App\State\DiscussionAuthorProcessor;
 use Doctrine\ORM\Mapping as ORM;
@@ -56,10 +57,14 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 #[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'category' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'updatedAt'])]
+#[ApiFilter(DiscussionSearchFilter::class)]
 #[ORM\Entity(repositoryClass: DiscussionRepository::class)]
 #[ORM\Table(name: 'discussion')]
 #[ORM\Index(columns: ['project_id', 'created_at'], name: 'idx_discussion_project_created')]
 #[ORM\Index(columns: ['project_id', 'is_pinned', 'created_at'], name: 'idx_discussion_project_pinned')]
+// Mirror the GIN index on `search_vector` from Version20260506010000 so
+// doctrine:schema:validate doesn't try to drop it on every CI run.
+#[ORM\Index(columns: ['search_vector'], name: 'idx_discussion_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
 class Discussion
 {
@@ -117,6 +122,15 @@ class Discussion
     )]
     #[Groups(['discussion:read', 'discussion:write'])]
     private string $body = '';
+
+    /**
+     * Postgres-managed full-text search vector (title + body),
+     * populated by a STORED generated column — see Version20260506010000.
+     * Mapped here so DQL can reference `d.searchVector` in the search
+     * filter; never written from PHP, never serialised in API responses.
+     */
+    #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
+    private ?string $searchVector = null;
 
     #[ORM\Column(length: 16)]
     #[Assert\Choice(
