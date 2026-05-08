@@ -285,41 +285,64 @@ class Space
      * supported — admin role is a per-user property so we can audit
      * "who can delete this space" without a graph traversal. Used by
      * the entity-level security expressions for Patch/Delete.
+     *
+     * Compares by UUID rather than identity so the check works after
+     * an EntityManager::clear() — the membership's User row may be a
+     * different PHP instance than the one the caller is holding.
      */
     public function isAdmin(?User $user): bool
     {
-        if (null === $user) {
-            return false;
-        }
-        foreach ($this->userMemberships as $membership) {
-            if ($membership->getUser() === $user
-                && $membership->getRole() === self::ROLE_ADMIN
-            ) {
-                return true;
-            }
-        }
-        return false;
+        return $this->hasUserAt($user, self::ROLE_ADMIN);
     }
 
     /**
      * True if the user is a member of this space, either directly or
      * transitively via one of their `UserGroup`s. Direct membership is
      * checked first because the common case is a personal space where
-     * group-resolution would be wasted work.
+     * group-resolution would be wasted work. Like {@see isAdmin()},
+     * comparison is UUID-based so detached User objects still match.
      */
     public function hasMember(?User $user): bool
     {
-        if (null === $user) {
+        if (null === $user || null === $user->getId()) {
             return false;
         }
-        foreach ($this->userMemberships as $membership) {
-            if ($membership->getUser() === $user) {
-                return true;
-            }
+        if ($this->hasUserAt($user, null)) {
+            return true;
         }
         foreach ($this->groupMemberships as $groupMembership) {
             $group = $groupMembership->getUserGroup();
-            if (null !== $group && $group->getMembers()->contains($user)) {
+            if (null === $group) {
+                continue;
+            }
+            foreach ($group->getMembers() as $member) {
+                if ($user->getId()->equals($member->getId())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Shared scan for direct user memberships, optionally filtered to
+     * a specific role. Pulled out so {@see isAdmin()} and
+     * {@see hasMember()} stay one-liners.
+     */
+    private function hasUserAt(?User $user, ?string $role): bool
+    {
+        if (null === $user || null === $user->getId()) {
+            return false;
+        }
+        foreach ($this->userMemberships as $membership) {
+            $rowUser = $membership->getUser();
+            if (null === $rowUser || null === $rowUser->getId()) {
+                continue;
+            }
+            if (!$user->getId()->equals($rowUser->getId())) {
+                continue;
+            }
+            if (null === $role || $membership->getRole() === $role) {
                 return true;
             }
         }

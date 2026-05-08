@@ -120,20 +120,16 @@ class TaskAssigneeController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return $task;
         }
-        if ($task->getOwner()?->getId()?->equals($user->getId())) {
-            return $task;
-        }
-        $project = $task->getProject();
-        if ($project instanceof Project && $project->getMembers()->contains($user)) {
+        if ($task->isAccessibleBy($user)) {
             return $task;
         }
         return null;
     }
 
     /**
-     * Mirrors the ValidAssignees rule: a task's owner is always assignable;
-     * for project tasks the project's members are too. Personal tasks (no
-     * project) admit only the owner.
+     * Mirrors the ValidAssignees rule (#185): a task's owner is always
+     * assignable; for project tasks every member of the project's
+     * space is too. Personal tasks (no project) admit only the owner.
      */
     private function isAllowedAssignee(Task $task, User $candidate): bool
     {
@@ -143,11 +139,7 @@ class TaskAssigneeController extends AbstractController
         }
         $project = $task->getProject();
         if ($project instanceof Project) {
-            foreach ($project->getMembers() as $member) {
-                if ($member->getId()?->equals($candidate->getId())) {
-                    return true;
-                }
-            }
+            return isset($project->getEffectiveMembers()[(string) $candidate->getId()]);
         }
         return false;
     }

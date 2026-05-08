@@ -67,20 +67,23 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         //  - the caller owns it (covers personal/standalone tasks),
         //  - the caller is a direct member of the parent project's space,
         //  - the caller is a member via a group attached to that space.
-        // Standalone tasks (project IS NULL) intentionally never match
-        // the space branches, so the OR collapses to "owner only" for
-        // them — keeps the existing personal-task semantics intact.
+        // Standalone tasks (project IS NULL) only match the owner branch.
+        //
+        // DQL doesn't accept chained associations like `task.project.space`
+        // in subqueries, so we left-join through `project` and reference
+        // `tp_access.space` from the joined alias. The LEFT join keeps
+        // standalone tasks visible because their project is NULL — both
+        // EXISTS branches simply fail to match for them.
         $directSubquery = sprintf(
-            'SELECT 1 FROM %s task_access_direct WHERE task_access_direct.space = %s.project.space AND task_access_direct.user = :currentUser',
+            'SELECT 1 FROM %s task_access_direct WHERE task_access_direct.space = tp_access.space AND task_access_direct.user = :currentUser',
             SpaceMembership::class,
-            $rootAlias,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s task_access_group JOIN task_access_group.userGroup task_access_group_obj JOIN task_access_group_obj.members task_access_group_member WHERE task_access_group.space = %s.project.space AND task_access_group_member = :currentUser',
+            'SELECT 1 FROM %s task_access_group JOIN task_access_group.userGroup task_access_group_obj JOIN task_access_group_obj.members task_access_group_member WHERE task_access_group.space = tp_access.space AND task_access_group_member = :currentUser',
             SpaceGroupMembership::class,
-            $rootAlias,
         );
         $queryBuilder
+            ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
             ->andWhere(sprintf(
                 '%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s)',
                 $rootAlias,

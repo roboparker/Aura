@@ -46,7 +46,7 @@ final class ListProjectsTool implements McpToolInterface
 
         $qb = $this->em->getRepository(Project::class)
             ->createQueryBuilder('p')
-            ->innerJoin('p.members', 'm', 'WITH', 'm = :user')
+            ->where(\App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_projects'))
             ->setParameter('user', $user)
             ->orderBy('p.createdOn', 'DESC')
             ->setFirstResult(($page - 1) * $limit)

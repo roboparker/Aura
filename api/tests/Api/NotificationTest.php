@@ -17,6 +17,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class NotificationTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -201,8 +203,8 @@ class NotificationTest extends ApiTestCase
         $project = new \App\Entity\Project();
         $project->setOwner($alice);
         $project->setTitle('Team');
-        $project->addMember($alice);
-        $project->addMember($bob);
+        $this->addProjectMember($project, $alice);
+        $this->addProjectMember($project, $bob);
         $this->entityManager->persist($project);
 
         $task = new Task();

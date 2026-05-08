@@ -41,11 +41,11 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().getOwner() == user or (object.getTask().getProject() !== null and object.getTask().getProject().getMembers().contains(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().isAccessibleBy(user))",
             processor: CommentAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().getOwner() == user or (object.getTask().getProject() !== null and object.getTask().getProject().getMembers().contains(user)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().isAccessibleBy(user))",
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user)",

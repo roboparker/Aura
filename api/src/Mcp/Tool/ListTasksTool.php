@@ -114,16 +114,16 @@ final class ListTasksTool implements McpToolInterface
     }
 
     /**
-     * Tasks visible to the user: owned directly OR attached to a project
-     * the user is a member of. Mirrors {@see TaskOwnerExtension}.
+     * Tasks visible to the user: owned directly OR attached to a
+     * project whose space the user belongs to (#185). Mirrors
+     * {@see TaskOwnerExtension}.
      */
     private function buildBaseQuery(User $user): QueryBuilder
     {
         return $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->leftJoin('t.project', 'p')
-            ->leftJoin('p.members', 'pm', 'WITH', 'pm = :user')
-            ->where('t.owner = :user OR pm IS NOT NULL')
+            ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_tasks'))
             ->setParameter('user', $user);
     }
 }

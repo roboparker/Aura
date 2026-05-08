@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\SpaceGroupMembership;
+use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -35,18 +37,28 @@ final class TaskRepository extends ServiceEntityRepository
 
     /**
      * Tasks the user is allowed to reorder: anything they own directly,
-     * plus tasks attached to a project they're a member of (every project
-     * member can edit project tasks alongside the owner — see Task entity
-     * docs). Mirrors the visibility rule in TaskOwnerExtension.
+     * plus tasks attached to a project whose space they belong to
+     * (#185). Mirrors the visibility rule in TaskOwnerExtension.
      *
      * @return Task[]
      */
     public function findReorderableForUser(User $user): array
     {
+        $directSubquery = sprintf(
+            'SELECT 1 FROM %s reorder_direct WHERE reorder_direct.space = p.space AND reorder_direct.user = :user',
+            SpaceMembership::class,
+        );
+        $groupSubquery = sprintf(
+            'SELECT 1 FROM %s reorder_group JOIN reorder_group.userGroup reorder_group_obj JOIN reorder_group_obj.members reorder_group_member WHERE reorder_group.space = p.space AND reorder_group_member = :user',
+            SpaceGroupMembership::class,
+        );
         return $this->createQueryBuilder('t')
             ->leftJoin('t.project', 'p')
-            ->leftJoin('p.members', 'pm', 'WITH', 'pm = :user')
-            ->where('t.owner = :user OR pm IS NOT NULL')
+            ->where(sprintf(
+                't.owner = :user OR EXISTS(%s) OR EXISTS(%s)',
+                $directSubquery,
+                $groupSubquery,
+            ))
             ->setParameter('user', $user)
             ->getQuery()
             ->getResult();

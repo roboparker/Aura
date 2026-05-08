@@ -11,6 +11,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class CustomFieldDefinitionTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -54,7 +56,7 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project, $bob);
         $this->entityManager->flush();
 
         $client = static::createClient();
@@ -227,7 +229,7 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project, $bob);
         $this->entityManager->flush();
         $field = $this->seedField($project, 'Severity', 'text');
 
@@ -253,7 +255,7 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle($title);
-        $project->addMember($owner);
+        $this->addProjectMember($project, $owner);
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;

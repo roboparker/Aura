@@ -65,18 +65,24 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         $rootAlias = $queryBuilder->getRootAliases()[0];
         // Match if the task owner is the caller, or if the caller is a
         // member of the parent project's space (direct or via group).
-        // Standalone tasks (no project) only match the owner branch —
-        // there's no space to inherit from.
+        // Standalone tasks (no project) only match the owner branch.
+        //
+        // DQL can't follow `ca_task.project.space` in a subquery, so we
+        // left-join through `project` and reference `ca_project.space`
+        // from the joined alias. The LEFT join keeps comments on
+        // standalone tasks visible because the project IS NULL — the
+        // EXISTS branches simply fail to match for them.
         $directSubquery = sprintf(
-            'SELECT 1 FROM %s comment_access_direct WHERE comment_access_direct.space = ca_task.project.space AND comment_access_direct.user = :currentUser',
+            'SELECT 1 FROM %s comment_access_direct WHERE comment_access_direct.space = ca_project.space AND comment_access_direct.user = :currentUser',
             SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s comment_access_group JOIN comment_access_group.userGroup comment_access_group_obj JOIN comment_access_group_obj.members comment_access_group_member WHERE comment_access_group.space = ca_task.project.space AND comment_access_group_member = :currentUser',
+            'SELECT 1 FROM %s comment_access_group JOIN comment_access_group.userGroup comment_access_group_obj JOIN comment_access_group_obj.members comment_access_group_member WHERE comment_access_group.space = ca_project.space AND comment_access_group_member = :currentUser',
             SpaceGroupMembership::class,
         );
         $queryBuilder
             ->innerJoin(sprintf('%s.task', $rootAlias), 'ca_task')
+            ->leftJoin('ca_task.project', 'ca_project')
             ->andWhere(sprintf(
                 'ca_task.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s)',
                 $directSubquery,

@@ -11,6 +11,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class TaskCommentsMercureTokenTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -133,7 +135,7 @@ class TaskCommentsMercureTokenTest extends ApiTestCase
         $project->setOwner($owner);
         $project->setTitle('Shared');
         foreach ($members as $m) {
-            $project->addMember($m);
+            $this->addProjectMember($project, $m);
         }
         $this->entityManager->persist($project);
         $this->entityManager->flush();

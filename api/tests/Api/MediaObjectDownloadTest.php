@@ -13,6 +13,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class MediaObjectDownloadTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
     private FilesystemOperator $storage;
 
@@ -199,9 +201,9 @@ class MediaObjectDownloadTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle('Test project');
-        $project->addMember($owner);
+        $this->addProjectMember($project, $owner);
         foreach ($extraMembers as $m) {
-            $project->addMember($m);
+            $this->addProjectMember($project, $m);
         }
         $this->entityManager->persist($project);
         $this->entityManager->flush();
