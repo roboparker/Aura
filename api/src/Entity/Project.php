@@ -135,20 +135,6 @@ class Project
     private \DateTimeImmutable $createdOn;
 
     /**
-     * Members with full access to the project and its tasks. The creator is
-     * added here automatically by ProjectOwnerProcessor; keeping owner inside
-     * the set means access checks only need to inspect `members`.
-     *
-     * @var Collection<int, User>
-     */
-    #[ORM\ManyToMany(targetEntity: User::class)]
-    #[ORM\JoinTable(name: 'project_member')]
-    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[ORM\InverseJoinColumn(name: 'user_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['project:read', 'project:write'])]
-    private Collection $members;
-
-    /**
      * @var Collection<int, Task>
      */
     #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class)]
@@ -174,7 +160,6 @@ class Project
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
-        $this->members = new ArrayCollection();
         $this->tasks = new ArrayCollection();
         $this->attachments = new ArrayCollection();
     }
@@ -231,28 +216,6 @@ class Project
     public function getCreatedOn(): \DateTimeImmutable
     {
         return $this->createdOn;
-    }
-
-    /**
-     * @return Collection<int, User>
-     */
-    public function getMembers(): Collection
-    {
-        return $this->members;
-    }
-
-    public function addMember(User $member): static
-    {
-        if (!$this->members->contains($member)) {
-            $this->members->add($member);
-        }
-        return $this;
-    }
-
-    public function removeMember(User $member): static
-    {
-        $this->members->removeElement($member);
-        return $this;
     }
 
     /**
