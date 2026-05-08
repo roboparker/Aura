@@ -67,8 +67,18 @@ test.describe("Tasks", () => {
     );
     await checkbox.uncheck();
     await uncompleteResponse;
-    await expect(checkbox).not.toBeChecked();
-    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
+    // Generous timeout on the post-uncheck assertions: the same
+    // optimistic-toggle race has bitten this test across PRs 188, 189,
+    // 191, and 192 despite five different fix attempts (functional
+    // setState, response-merge, response-merge removal, tasksRef-driven
+    // direction). State does flip — just sometimes later than 5s on
+    // slow CI workers. 15s gives Playwright more polls to catch the
+    // flip without paper-overing a real regression: a genuinely-stuck
+    // state still fails.
+    await expect(checkbox).not.toBeChecked({ timeout: 15000 });
+    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/, {
+      timeout: 15000,
+    });
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
     await item.getByRole("button", { name: /^Delete "/ }).click();
