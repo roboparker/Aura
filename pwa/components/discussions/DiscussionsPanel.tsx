@@ -41,7 +41,7 @@ interface Props {
   projectId: string;
   projectIri: string;
   currentUserIri: string | null;
-  isProjectOwner: boolean;
+  isSpaceAdmin: boolean;
 }
 
 const CATEGORIES: { value: DiscussionCategory | "all"; label: string }[] = [
@@ -89,7 +89,7 @@ const DiscussionsPanel = ({
   projectId,
   projectIri,
   currentUserIri,
-  isProjectOwner,
+  isSpaceAdmin,
 }: Props) => {
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -341,7 +341,7 @@ const DiscussionsPanel = ({
               discussion={d}
               projectId={projectId}
               currentUserIri={currentUserIri}
-              isProjectOwner={isProjectOwner}
+              isSpaceAdmin={isSpaceAdmin}
               onPatch={patchDiscussion}
               onDelete={deleteDiscussion}
             />
@@ -364,7 +364,7 @@ interface RowProps {
   discussion: Discussion;
   projectId: string;
   currentUserIri: string | null;
-  isProjectOwner: boolean;
+  isSpaceAdmin: boolean;
   onPatch: (
     d: Discussion,
     patch: Partial<Pick<Discussion, "isPinned" | "isLocked">>,
@@ -376,7 +376,7 @@ const DiscussionRow = ({
   discussion,
   projectId,
   currentUserIri,
-  isProjectOwner,
+  isSpaceAdmin,
   onPatch,
   onDelete,
 }: RowProps) => {
@@ -384,8 +384,8 @@ const DiscussionRow = ({
   const [error, setError] = useState<string | null>(null);
 
   const isAuthor = currentUserIri === discussion.author["@id"];
-  const canDelete = isAuthor || isProjectOwner;
-  const canModerate = isProjectOwner;
+  const canDelete = isAuthor || isSpaceAdmin;
+  const canModerate = isSpaceAdmin;
 
   const togglePin = async () => {
     setBusy(true);

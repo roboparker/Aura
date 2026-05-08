@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { Lock, Pin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { displayName } from "@/lib/userDisplay";
@@ -45,6 +46,7 @@ const FILTERS: { value: DiscussionCategory | "all"; label: string }[] = [
 
 const AllDiscussionsPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
 
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
@@ -62,10 +64,14 @@ const AllDiscussionsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // The DiscussionAccessExtension already scopes results to the
-      // current user's project memberships, so a plain GET /discussions
-      // is exactly what we want here.
-      const res = await fetch(`${ENTRYPOINT}/discussions?itemsPerPage=100`, {
+      // Scope to the active space (#187). The access extension still
+      // caps the result set to spaces the user belongs to, so this
+      // narrows from "everywhere I have access" to "the space I'm
+      // currently looking at" — matching the active-space UX users
+      // see in the navbar switcher.
+      const params = new URLSearchParams({ itemsPerPage: "100" });
+      if (activeSpace) params.set("space", activeSpace["@id"]);
+      const res = await fetch(`${ENTRYPOINT}/discussions?${params.toString()}`, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
@@ -77,7 +83,7 @@ const AllDiscussionsPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeSpace]);
 
   useEffect(() => {
     if (isAuthenticated) void load();

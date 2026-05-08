@@ -4,9 +4,33 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import DiscussionsPanel from "@/components/discussions/DiscussionsPanel";
+import type { Space } from "@/contexts/ActiveSpaceContext";
+
+const projectSpaceIri = (project: { space: string | { "@id": string } }): string =>
+  typeof project.space === "string" ? project.space : project.space["@id"];
+
+/**
+ * Looks up the project's parent space in the user's already-loaded
+ * space list and returns true when the caller holds the admin role
+ * directly. Falls back to false when the project's space isn't in
+ * the list (a stale/cached view, an in-flight refresh) — better to
+ * hide admin controls than to show them speculatively.
+ */
+const isSpaceAdmin = (
+  project: { space: string | { "@id": string } },
+  userId: string,
+  spaces: Space[],
+): boolean => {
+  const iri = projectSpaceIri(project);
+  const space = spaces.find((s) => s["@id"] === iri);
+  return !!space?.userMemberships.some(
+    (m) => m.user.id === userId && m.role === "admin",
+  );
+};
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +46,15 @@ interface Project {
   id: string;
   title: string;
   owner: ProjectMember;
+  // Project's serialization gives us the IRI of the parent space; the
+  // role lookup happens against the user's already-loaded space list
+  // rather than another round-trip.
+  space: string | { "@id": string };
 }
 
 const DiscussionsListPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const projectId = typeof id === "string" ? id : null;
@@ -126,7 +155,7 @@ const DiscussionsListPage = () => {
                 projectId={project.id}
                 projectIri={project["@id"]}
                 currentUserIri={`/users/${user.id}`}
-                isProjectOwner={user.email === project.owner.email}
+                isSpaceAdmin={isSpaceAdmin(project, user.id, spaces)}
               />
             </>
           )}

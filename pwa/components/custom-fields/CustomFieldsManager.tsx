@@ -39,7 +39,7 @@ interface Collection<T> {
 
 interface Props {
   projectIri: string;
-  isProjectOwner: boolean;
+  isSpaceAdmin: boolean;
 }
 
 const TYPE_LABEL: Record<CustomFieldType, string> = {
@@ -73,7 +73,7 @@ const sortByPosition = (
 ): CustomFieldDefinition[] =>
   [...list].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
 
-const CustomFieldsManager = ({ projectIri, isProjectOwner }: Props) => {
+const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -158,11 +158,11 @@ const CustomFieldsManager = ({ projectIri, isProjectOwner }: Props) => {
           <CardContent className="pt-6 space-y-3">
             <p className="text-muted-foreground text-sm">
               No custom fields yet.
-              {isProjectOwner
+              {isSpaceAdmin
                 ? " Add the first one to start collecting structured data on tasks."
-                : " Only the project owner can add fields."}
+                : " Only space admins can add fields."}
             </p>
-            {isProjectOwner && (
+            {isSpaceAdmin && (
               <Button
                 type="button"
                 size="sm"
@@ -210,7 +210,7 @@ const CustomFieldsManager = ({ projectIri, isProjectOwner }: Props) => {
                           </p>
                         )}
                       </div>
-                      {isProjectOwner && (
+                      {isSpaceAdmin && (
                         <div className="flex gap-2">
                           <Button
                             type="button"
@@ -240,7 +240,7 @@ const CustomFieldsManager = ({ projectIri, isProjectOwner }: Props) => {
             )}
           </ul>
 
-          {isProjectOwner && !showComposer && (
+          {isSpaceAdmin && !showComposer && (
             <Button
               type="button"
               size="sm"
@@ -254,7 +254,7 @@ const CustomFieldsManager = ({ projectIri, isProjectOwner }: Props) => {
         </>
       )}
 
-      {isProjectOwner && showComposer && (
+      {isSpaceAdmin && showComposer && (
         <CustomFieldComposer
           projectIri={projectIri}
           initialPosition={nextPosition}
