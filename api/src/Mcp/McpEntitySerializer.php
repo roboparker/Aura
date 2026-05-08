@@ -57,16 +57,20 @@ final class McpEntitySerializer
      */
     public function project(Project $project, ?int $taskCount = null, ?int $openTaskCount = null): array
     {
+        // Members are derived from the parent space (direct + group)
+        // since #185 — `Project::getEffectiveMembers()` returns a
+        // dedupe-keyed map of every user with access to the project.
+        $members = $project->getEffectiveMembers();
         return [
             'id' => (string) $project->getId(),
             'title' => $project->getTitle(),
             'description' => $project->getDescription(),
             'createdOn' => $project->getCreatedOn()->format(\DateTimeInterface::ATOM),
             'owner' => $this->userSummary($project->getOwner()),
-            'memberCount' => $project->getMembers()->count(),
+            'memberCount' => count($members),
             'members' => array_map(
                 fn (User $u) => $this->userSummary($u),
-                $project->getMembers()->toArray(),
+                array_values($members),
             ),
             'taskCount' => $taskCount,
             'openTaskCount' => $openTaskCount,

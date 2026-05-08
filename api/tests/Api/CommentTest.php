@@ -13,6 +13,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class CommentTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -663,7 +665,7 @@ class CommentTest extends ApiTestCase
         $project->setOwner($owner);
         $project->setTitle($title);
         foreach ($members as $member) {
-            $project->addMember($member);
+            $this->addProjectMember($project, $member);
         }
         $this->entityManager->persist($project);
         $this->entityManager->flush();

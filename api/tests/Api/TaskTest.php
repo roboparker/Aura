@@ -14,6 +14,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class TaskTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -706,8 +708,8 @@ class TaskTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($bob);
         $project->setTitle('Shared');
-        $project->addMember($alice);
-        $project->addMember($bob);
+        $this->addProjectMember($project, $alice);
+        $this->addProjectMember($project, $bob);
         $this->entityManager->persist($project);
 
         $shared1 = new Task();
@@ -1169,7 +1171,7 @@ class TaskTest extends ApiTestCase
         $project->setOwner($owner);
         $project->setTitle($title);
         foreach ($members as $member) {
-            $project->addMember($member);
+            $this->addProjectMember($project, $member);
         }
         $this->entityManager->persist($project);
         $this->entityManager->flush();
@@ -1227,7 +1229,7 @@ class TaskTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle($title);
-        $project->addMember($owner);
+        $this->addProjectMember($project, $owner);
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;

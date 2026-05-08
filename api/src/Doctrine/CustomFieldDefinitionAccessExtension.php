@@ -7,15 +7,17 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\CustomFieldDefinition;
+use App\Entity\SpaceGroupMembership;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Scopes CustomFieldDefinition listings and item lookups to projects
- * the current user belongs to. Mirrors CommentAccessExtension and the
- * other per-project read scopes — non-member item GETs return 404
- * rather than 403 so we don't leak existence.
+ * Scopes CustomFieldDefinition queries to spaces the current user
+ * belongs to (#185). Uses the denormalised `cfd.space` FK to avoid
+ * joining through `project`. Non-member item GETs return 404 rather
+ * than 403 so we don't leak existence.
  */
 final class CustomFieldDefinitionAccessExtension implements
     QueryCollectionExtensionInterface,
@@ -60,12 +62,18 @@ final class CustomFieldDefinitionAccessExtension implements
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
-        $projectAlias = 'cfd_project';
-        $memberAlias = 'cfd_project_members';
+        $directSubquery = sprintf(
+            'SELECT 1 FROM %s cfd_access_direct WHERE cfd_access_direct.space = %s.space AND cfd_access_direct.user = :currentUser',
+            SpaceMembership::class,
+            $rootAlias,
+        );
+        $groupSubquery = sprintf(
+            'SELECT 1 FROM %s cfd_access_group JOIN cfd_access_group.userGroup cfd_access_group_obj JOIN cfd_access_group_obj.members cfd_access_group_member WHERE cfd_access_group.space = %s.space AND cfd_access_group_member = :currentUser',
+            SpaceGroupMembership::class,
+            $rootAlias,
+        );
         $queryBuilder
-            ->innerJoin($rootAlias . '.project', $projectAlias)
-            ->innerJoin($projectAlias . '.members', $memberAlias)
-            ->andWhere($memberAlias . ' = :currentUser')
+            ->andWhere(sprintf('(EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
             ->setParameter('currentUser', $user);
     }
 }

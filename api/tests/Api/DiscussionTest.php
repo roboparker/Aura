@@ -11,6 +11,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class DiscussionTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -36,7 +38,7 @@ class DiscussionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project,$bob);
         $this->entityManager->flush();
 
         $client = static::createClient();
@@ -167,7 +169,7 @@ class DiscussionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project,$bob);
         $this->entityManager->flush();
         $aliceDiscussion = $this->seed($alice, $project, 'Original');
 
@@ -185,7 +187,7 @@ class DiscussionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project,$bob);
         $this->entityManager->flush();
         $bobDiscussion = $this->seed($bob, $project, 'Bob post');
 
@@ -216,7 +218,7 @@ class DiscussionTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Backend');
-        $project->addMember($bob);
+        $this->addProjectMember($project,$bob);
         $this->entityManager->flush();
         $bobDiscussion = $this->seed($bob, $project, 'Off-topic');
 
@@ -244,7 +246,7 @@ class DiscussionTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle($title);
-        $project->addMember($owner);
+        $this->addProjectMember($project,$owner);
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;

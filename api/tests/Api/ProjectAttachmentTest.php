@@ -12,6 +12,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class ProjectAttachmentTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
     private FilesystemOperator $storage;
 
@@ -220,7 +222,7 @@ class ProjectAttachmentTest extends ApiTestCase
         $project->setOwner($owner);
         $project->setTitle($title);
         foreach ($members as $member) {
-            $project->addMember($member);
+            $this->addProjectMember($project, $member);
         }
         $this->entityManager->persist($project);
         $this->entityManager->flush();

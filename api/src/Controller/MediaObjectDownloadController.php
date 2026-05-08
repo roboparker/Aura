@@ -142,17 +142,24 @@ class MediaObjectDownloadController extends AbstractController
 
     private function mediaIsAttachedToReadableTask(MediaObject $media, User $user): bool
     {
-        // A task is readable to a non-admin user when they own it OR they're
-        // a member of its project. The exists-clause stops at the first
-        // matching task; we only need one attachment-task pairing to grant
-        // the download.
+        // A task is readable to a non-admin user when they own it OR
+        // they're a member of its project's space (#185). EXISTS
+        // subqueries cover both direct membership and group-inherited
+        // membership; same shape as TaskOwnerExtension.
+        $directSubquery = sprintf(
+            'SELECT 1 FROM %s media_dl_direct WHERE media_dl_direct.space = p.space AND media_dl_direct.user = :user',
+            \App\Entity\SpaceMembership::class,
+        );
+        $groupSubquery = sprintf(
+            'SELECT 1 FROM %s media_dl_group JOIN media_dl_group.userGroup media_dl_group_obj JOIN media_dl_group_obj.members media_dl_group_member WHERE media_dl_group.space = p.space AND media_dl_group_member = :user',
+            \App\Entity\SpaceGroupMembership::class,
+        );
         $count = (int) $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->select('COUNT(t.id)')
             ->leftJoin('t.project', 'p')
-            ->leftJoin('p.members', 'pm')
             ->where(':media MEMBER OF t.attachments')
-            ->andWhere('t.owner = :user OR pm = :user')
+            ->andWhere(sprintf('t.owner = :user OR EXISTS(%s) OR EXISTS(%s)', $directSubquery, $groupSubquery))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)
@@ -176,14 +183,22 @@ class MediaObjectDownloadController extends AbstractController
 
     private function mediaIsAttachedToReadableProject(MediaObject $media, User $user): bool
     {
-        // Any member of a project can read every attachment on it; same
-        // rule as Project::Get's security expression.
+        // Any member of the project's space can read every attachment
+        // on it (#185); same rule as Project::Get's security
+        // expression.
+        $directSubquery = sprintf(
+            'SELECT 1 FROM %s proj_attach_direct WHERE proj_attach_direct.space = p.space AND proj_attach_direct.user = :user',
+            \App\Entity\SpaceMembership::class,
+        );
+        $groupSubquery = sprintf(
+            'SELECT 1 FROM %s proj_attach_group JOIN proj_attach_group.userGroup proj_attach_group_obj JOIN proj_attach_group_obj.members proj_attach_group_member WHERE proj_attach_group.space = p.space AND proj_attach_group_member = :user',
+            \App\Entity\SpaceGroupMembership::class,
+        );
         $count = (int) $this->em->getRepository(Project::class)
             ->createQueryBuilder('p')
             ->select('COUNT(p.id)')
-            ->innerJoin('p.members', 'pm')
             ->where(':media MEMBER OF p.attachments')
-            ->andWhere('pm = :user')
+            ->andWhere(sprintf('EXISTS(%s) OR EXISTS(%s)', $directSubquery, $groupSubquery))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)

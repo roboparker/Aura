@@ -16,6 +16,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 class TaskCustomFieldValueTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -404,7 +406,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle($title);
-        $project->addMember($owner);
+        $this->addProjectMember($project, $owner);
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;

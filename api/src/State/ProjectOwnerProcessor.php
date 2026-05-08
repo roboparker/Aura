@@ -42,15 +42,19 @@ final class ProjectOwnerProcessor implements ProcessorInterface
         }
 
         $data->setOwner($user);
-        $data->addMember($user);
 
-        // PR 1 (#181): default to the creator's personal space when the
-        // client doesn't pick one. Keeps the existing PWA — which has
+        // Default to the creator's personal space when the client
+        // doesn't pick one (#181). Keeps the existing PWA — which has
         // no concept of spaces yet — working unchanged. PR 4 (#187)
         // will let clients send an explicit `space` IRI.
         if (null === $data->getSpace()) {
             $data->setSpace($this->spaceRepository->findPersonalSpaceFor($user));
         }
+        // No project-local membership to set up: access flows from the
+        // user's membership in `data.space` (#185). The personal space
+        // already lists the creator as admin from signup; for shared
+        // spaces, the securityPostDenormalize check ensures the caller
+        // is a member of the chosen space.
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
     }

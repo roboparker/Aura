@@ -127,9 +127,10 @@ final class CommentMentionService
     }
 
     /**
-     * Project members + task owner. Personal tasks (no project) yield
-     * just the owner — useful for self-mention suppression rather than
-     * notification, but the contract stays consistent.
+     * Space members of the parent project + task owner (#185). Personal
+     * tasks (no project) yield just the owner — useful for self-mention
+     * suppression rather than notification, but the contract stays
+     * consistent.
      *
      * @return User[] Keyed by lowercase email-local-part for fast resolution.
      */
@@ -146,7 +147,7 @@ final class CommentMentionService
         }
         $project = $task->getProject();
         if (null !== $project) {
-            foreach ($project->getMembers() as $member) {
+            foreach ($project->getEffectiveMembers() as $member) {
                 $bag[$this->localPart($member)] = $member;
             }
         }

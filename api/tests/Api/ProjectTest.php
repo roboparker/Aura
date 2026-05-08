@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -11,6 +12,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class ProjectTest extends ApiTestCase
 {
+    use SpaceMembershipFixture;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -20,10 +23,14 @@ class ProjectTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
-        // project_member and task.project_id cascade/null via FK, so deleting
-        // the parents is enough to clean state between tests.
+        // task.project_id, space.created_by_id cascade/SET-NULL via FK,
+        // so deleting parents is enough to clean state between tests.
+        // Spaces are deleted last because Project.space FK is non-null
+        // and CASCADEs from Space — deleting projects first lets Space
+        // delete cleanly without dragging unrelated rows.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -56,10 +63,14 @@ class ProjectTest extends ApiTestCase
 
         $project = $this->reloadProjectByTitle('Launch plan');
         $this->assertTrue($user->getId()->equals($project->getOwner()?->getId()));
-        // Creator is auto-added to members so access checks only need to
-        // look at the member set.
-        $this->assertCount(1, $project->getMembers());
-        $this->assertTrue($user->getId()->equals($project->getMembers()->first()->getId()));
+        // Project lands in the creator's personal space (via
+        // ProjectOwnerProcessor's default), and the creator is the
+        // sole admin of that space — so they show up in
+        // getEffectiveMembers without any extra wiring.
+        $this->assertNotNull($project->getSpace());
+        $this->assertCount(1, $project->getEffectiveMembers());
+        $this->assertArrayHasKey((string) $user->getId(), $project->getEffectiveMembers());
+        $this->assertTrue($project->isSpaceAdmin($user));
     }
 
     public function testCreateProjectRequiresTitle(): void
@@ -76,20 +87,46 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testListProjectsOnlyShowsMemberProjects(): void
+    public function testListProjectsOnlyShowsSpaceMemberProjects(): void
     {
+        // After #185 a project's visibility is determined by membership
+        // in its parent space, so the test setup needs three distinct
+        // spaces: Alice's private, Bob's private, and a shared space
+        // that Bob belongs to. Using `createProject(alice, …, [alice, bob])`
+        // would dump everything into Alice's personal space and would
+        // implicitly share Alice's "private" project too.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
 
+        // Alice's solo project lives in her personal space (Bob never
+        // joins it).
         $this->createProject($alice, 'Alice solo', [$alice]);
+
+        // Bob's solo project lives in his personal space.
         $this->createProject($bob, 'Bob solo', [$bob]);
-        $this->createProject($alice, 'Shared', [$alice, $bob]);
+
+        // Shared project: a fresh shared space with both users as
+        // members. Alice creates the project; the helper auto-fills
+        // her personal space, so we re-home it onto the shared space
+        // and make sure Bob is a member.
+        $sharedSpace = (new Space())
+            ->setName('Backend Squad')
+            ->setCreatedBy($alice);
+        $this->entityManager->persist($sharedSpace);
+        $this->entityManager->flush();
+        $this->ensureSpaceMembership($sharedSpace, $alice, Space::ROLE_ADMIN);
+        $this->ensureSpaceMembership($sharedSpace, $bob, Space::ROLE_MEMBER);
+        $sharedProject = $this->createProject($alice, 'Shared', [$alice]);
+        $sharedProject->setSpace($sharedSpace);
+        $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($bob);
         $client->request('GET', '/projects');
 
         $this->assertResponseIsSuccessful();
+        // Bob sees his personal project + the shared one, NOT
+        // Alice's solo project that lives in her private space.
         $this->assertJsonContains(['totalItems' => 2]);
     }
 
@@ -124,8 +161,12 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    public function testMemberCanAddAnotherMember(): void
+    public function testMemberCanAddAnotherMemberViaProjectMembersEndpoint(): void
     {
+        // POST /projects/{id}/members is the existing PWA's seam for
+        // adding a teammate. Under the space model (#185) the controller
+        // grants space membership rather than project membership; the
+        // user shows up in `getEffectiveMembers` immediately.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
@@ -133,32 +174,42 @@ class ProjectTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
-            'json' => [
-                'members' => [
-                    '/users/' . $alice->getId(),
-                    '/users/' . $bob->getId(),
-                    '/users/' . $carol->getId(),
-                ],
-            ],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        $client->request('POST', '/projects/' . $project->getId() . '/members', [
+            'json' => ['email' => 'carol@example.com'],
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
 
-        $this->assertResponseIsSuccessful();
+        $this->assertResponseStatusCodeSame(200);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
-        $this->assertCount(3, $reloaded->getMembers());
+        $this->assertCount(3, $reloaded->getEffectiveMembers());
     }
 
-    public function testMemberCanDeleteProject(): void
+    public function testRegularMemberCannotDeleteProject(): void
     {
+        // Per #185: delete requires the project creator OR a space
+        // admin. Bob is just a regular space member here, so he gets
+        // 403.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
 
         $client = static::createClient();
         $client->loginUser($bob);
+        $client->request('DELETE', '/projects/' . $project->getId());
+
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testProjectCreatorCanDeleteProject(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
         $client->request('DELETE', '/projects/' . $project->getId());
 
         $this->assertResponseStatusCodeSame(204);
@@ -282,6 +333,13 @@ class ProjectTest extends ApiTestCase
     }
 
     /**
+     * Persists a project owned by `$owner` and grants every other
+     * `$members` entry direct membership in the project's space (which
+     * is `$owner`'s personal space by default — set by
+     * ProjectSpaceDefaultListener at PrePersist). The owner is left
+     * out of the membership loop because they're already an admin of
+     * their personal space from signup.
+     *
      * @param User[] $members
      */
     private function createProject(User $owner, string $title, array $members): Project
@@ -289,12 +347,16 @@ class ProjectTest extends ApiTestCase
         $project = new Project();
         $project->setOwner($owner);
         $project->setTitle($title);
-        foreach ($members as $member) {
-            $project->addMember($member);
-        }
 
         $this->entityManager->persist($project);
         $this->entityManager->flush();
+
+        foreach ($members as $member) {
+            if ($member === $owner) {
+                continue;
+            }
+            $this->addProjectMember($project, $member);
+        }
 
         return $project;
     }
