@@ -18,20 +18,13 @@ final class McpAuthorization
 {
     public function canReadTask(Task $task, User $user): bool
     {
-        if ($task->getOwner()?->getId()?->equals($user->getId())) {
-            return true;
-        }
-        $project = $task->getProject();
-        if (null !== $project && $this->isProjectMember($project, $user)) {
-            return true;
-        }
-        return false;
+        return $task->isAccessibleBy($user);
     }
 
     /**
-     * Tasks share read and write rules — every project member can edit a
+     * Tasks share read and write rules — every space member can edit a
      * project task alongside its owner. Mirrors the Patch security
-     * expression on the Task entity.
+     * expression on the Task entity (#185).
      */
     public function canEditTask(Task $task, User $user): bool
     {
@@ -40,21 +33,21 @@ final class McpAuthorization
 
     public function canReadProject(Project $project, User $user): bool
     {
-        return $this->isProjectMember($project, $user);
+        return $project->isAccessibleBy($user);
     }
 
     public function canEditProject(Project $project, User $user): bool
     {
-        return $this->isProjectMember($project, $user);
+        return $project->isAccessibleBy($user);
     }
 
+    /**
+     * Retained as a thin alias so any external callers don't break with
+     * the rename. New code should call `Project::isAccessibleBy()`
+     * directly.
+     */
     public function isProjectMember(Project $project, User $user): bool
     {
-        foreach ($project->getMembers() as $member) {
-            if ($member->getId()?->equals($user->getId())) {
-                return true;
-            }
-        }
-        return false;
+        return $project->isAccessibleBy($user);
     }
 }

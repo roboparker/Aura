@@ -70,18 +70,8 @@ class TaskCommentsMercureTokenController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        if ($task->getOwner()?->getId()?->equals($user->getId())) {
-            return true;
-        }
-        $project = $task->getProject();
-        if (null === $project) {
-            return false;
-        }
-        foreach ($project->getMembers() as $member) {
-            if ($member->getId()?->equals($user->getId())) {
-                return true;
-            }
-        }
-        return false;
+        // Mirrors the Task GET security expression — owner or member of
+        // the parent project's space (#185).
+        return $task->isAccessibleBy($user);
     }
 }

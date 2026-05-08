@@ -31,15 +31,15 @@ final class ValidProjectAttachmentsValidator extends ConstraintValidator
             throw new UnexpectedValueException($value, Project::class);
         }
 
-        // Build the member-id set once. On POST the owner is added inside
-        // ProjectOwnerProcessor *after* validation, so include the current
-        // security user too — without that, the very first attachment
-        // upload would 422 every time.
+        // Build the member-id set from the project's space (#185). On
+        // POST the owner is added to the space inside
+        // ProjectOwnerProcessor *after* validation, so include the
+        // current security user too — without that, the very first
+        // attachment upload during project creation would 422 every
+        // time.
         $memberIds = [];
-        foreach ($value->getMembers() as $member) {
-            if (null !== $member->getId()) {
-                $memberIds[(string) $member->getId()] = true;
-            }
+        foreach ($value->getEffectiveMembers() as $id => $member) {
+            $memberIds[$id] = true;
         }
         $current = $this->security->getUser();
         if ($current instanceof User && null !== $current->getId()) {

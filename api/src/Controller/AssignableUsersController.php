@@ -13,12 +13,13 @@ use Symfony\Component\Serializer\SerializerInterface;
 
 /**
  * Returns every user the caller may legitimately assign to one of their
- * tasks: themselves plus the members of any project they belong to. This
- * matches the ValidAssignees rule on Task — feeding the frontend exactly
- * the candidate set the validator will accept.
+ * tasks: themselves plus everyone in a space they share with the
+ * caller via at least one project (#185). Matches the ValidAssignees
+ * rule on Task — feeds the frontend exactly the candidate set the
+ * validator will accept.
  *
  * The response is intentionally a flat User[] (not paginated) — the set is
- * small (project teammates only) and the picker needs the whole list to
+ * small (space teammates only) and the picker needs the whole list to
  * filter against typeahead input.
  */
 class AssignableUsersController extends AbstractController
@@ -37,17 +38,13 @@ class AssignableUsersController extends AbstractController
         }
 
         $byId = [(string) $user->getId() => $user];
-        $projects = $this->em->getRepository(Project::class)
-            ->createQueryBuilder('p')
-            ->leftJoin('p.members', 'pm')
-            ->addSelect('pm')
-            ->where(':self MEMBER OF p.members')
-            ->setParameter('self', $user)
-            ->getQuery()
-            ->getResult();
+        // The ProjectAccessExtension already scopes "projects the user
+        // can see" to those whose space they belong to, so a plain
+        // findAll here returns exactly the right set.
+        $projects = $this->em->getRepository(Project::class)->findAll();
         foreach ($projects as $project) {
-            foreach ($project->getMembers() as $member) {
-                $byId[(string) $member->getId()] = $member;
+            foreach ($project->getEffectiveMembers() as $id => $member) {
+                $byId[$id] = $member;
             }
         }
 

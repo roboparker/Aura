@@ -106,11 +106,6 @@ class ProjectActivityController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        foreach ($project->getMembers() as $member) {
-            if ($member->getId()?->equals($user->getId())) {
-                return true;
-            }
-        }
-        return false;
+        return $project->isAccessibleBy($user);
     }
 }
