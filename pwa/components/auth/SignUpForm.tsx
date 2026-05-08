@@ -19,6 +19,10 @@ interface SignUpValues {
 interface InviteContext {
   email: string;
   groups: { id: string; title: string; invitedBy: string }[];
+  // `spaces` was added when the space-invite flow shipped (#186); the
+  // backend always returns the array now, but mark optional so older
+  // builds still parse the payload without an exception.
+  spaces?: { id: string; name: string; invitedBy: string; role: string }[];
   expiresAt: string;
 }
 
@@ -136,11 +140,19 @@ const SignUpForm = ({ inviteToken, next }: Props) => {
           <AlertDescription>
             <p className="font-semibold">You&apos;ve been invited to join:</p>
             <ul className="list-disc list-inside mt-1">
+              {invite.spaces?.map((space) => (
+                <li key={`space-${space.id}`} data-testid="invite-context-space">
+                  <span className="font-medium">{space.name}</span>{" "}
+                  <span className="text-primary/80">
+                    (space — invited by {space.invitedBy})
+                  </span>
+                </li>
+              ))}
               {invite.groups.map((group) => (
-                <li key={group.id}>
+                <li key={`group-${group.id}`} data-testid="invite-context-group">
                   <span className="font-medium">{group.title}</span>{" "}
                   <span className="text-primary/80">
-                    (invited by {group.invitedBy})
+                    (group — invited by {group.invitedBy})
                   </span>
                 </li>
               ))}
