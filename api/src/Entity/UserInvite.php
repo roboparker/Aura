@@ -64,6 +64,20 @@ class UserInvite
     )]
     private Collection $groupInvites;
 
+    /**
+     * Per-space rows under this invite (#186). Same shape as
+     * `groupInvites` — one signup, all attached spaces joined.
+     *
+     * @var Collection<int, SpaceInvite>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'userInvite',
+        targetEntity: SpaceInvite::class,
+        cascade: ['persist', 'remove'],
+        orphanRemoval: true,
+    )]
+    private Collection $spaceInvites;
+
     public function __construct(
         string $email,
         string $tokenHash,
@@ -74,6 +88,7 @@ class UserInvite
         $this->expiresAt = $expiresAt;
         $this->createdAt = new \DateTimeImmutable();
         $this->groupInvites = new ArrayCollection();
+        $this->spaceInvites = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -133,5 +148,13 @@ class UserInvite
     public function getGroupInvites(): Collection
     {
         return $this->groupInvites;
+    }
+
+    /**
+     * @return Collection<int, SpaceInvite>
+     */
+    public function getSpaceInvites(): Collection
+    {
+        return $this->spaceInvites;
     }
 }

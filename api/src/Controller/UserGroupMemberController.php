@@ -8,13 +8,11 @@ use App\Entity\UserGroup;
 use App\Entity\UserInvite;
 use App\Repository\GroupInviteRepository;
 use App\Repository\UserInviteRepository;
+use App\Service\InviteMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\Email;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -39,12 +37,8 @@ class UserGroupMemberController extends AbstractController
         private EntityManagerInterface $em,
         private UserInviteRepository $userInviteRepository,
         private GroupInviteRepository $groupInviteRepository,
-        private MailerInterface $mailer,
+        private InviteMailer $inviteMailer,
         private ValidatorInterface $validator,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
     ) {
     }
 
@@ -145,7 +139,7 @@ class UserGroupMemberController extends AbstractController
 
         $this->em->flush();
 
-        $this->sendInviteEmail($invite, $plainToken);
+        $this->inviteMailer->sendSignupLink($invite, $plainToken, self::INVITE_TTL_DAYS);
 
         return $this->json([
             'status' => 'invited',
@@ -153,49 +147,5 @@ class UserGroupMemberController extends AbstractController
             'inviteId' => (string) $invite->getId(),
             'expiresAt' => $invite->getExpiresAt()->format(\DateTimeInterface::ATOM),
         ], 200);
-    }
-
-    private function sendInviteEmail(UserInvite $invite, string $plainToken): void
-    {
-        $signupUrl = sprintf(
-            '%s/signup?invite=%s',
-            rtrim($this->frontendUrl, '/'),
-            $plainToken,
-        );
-        $from = $this->mailerFrom ?: 'no-reply@aura.test';
-
-        // The email lists every group the invitee has been asked to join
-        // under this single invite — one signup, all groups joined.
-        $groupTitles = [];
-        foreach ($invite->getGroupInvites() as $gi) {
-            $groupTitles[] = $gi->getGroup()->getTitle();
-        }
-        $groupsLine = match (count($groupTitles)) {
-            0 => 'an Aura group',
-            1 => sprintf('the "%s" group', $groupTitles[0]),
-            default => sprintf('these groups: %s', implode(', ', array_map(
-                fn (string $t) => sprintf('"%s"', $t),
-                $groupTitles,
-            ))),
-        };
-
-        $email = (new Email())
-            ->from($from)
-            ->to($invite->getEmail())
-            ->subject('You\'ve been invited to join Aura')
-            ->text(sprintf(
-                "Hi,\n\nYou've been invited to join %s on Aura. Create your account to accept:\n\n%s\n\nThis invitation expires in %d days. If you weren't expecting this, you can safely ignore the email.\n\n— Aura",
-                $groupsLine,
-                $signupUrl,
-                self::INVITE_TTL_DAYS,
-            ))
-            ->html(sprintf(
-                '<p>Hi,</p><p>You\'ve been invited to join %1$s on Aura. Create your account to accept:</p><p><a href="%2$s">%2$s</a></p><p>This invitation expires in %3$d days. If you weren\'t expecting this, you can safely ignore the email.</p><p>— Aura</p>',
-                htmlspecialchars($groupsLine),
-                htmlspecialchars($signupUrl),
-                self::INVITE_TTL_DAYS,
-            ));
-
-        $this->mailer->send($email);
     }
 }
