@@ -2,8 +2,9 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -26,6 +27,13 @@ interface Member {
   email: string;
 }
 
+interface SpaceRef {
+  "@id": string;
+  id: string;
+  name: string;
+  isPersonal: boolean;
+}
+
 interface Project {
   "@id": string;
   id: string;
@@ -33,7 +41,15 @@ interface Project {
   description: string | null;
   createdOn: string;
   owner: Member;
+  // Members read-only from the API as a virtual getter; kept here so
+  // the page can render member chips without a follow-up fetch. Mutation
+  // happens via the space (#187) — see the "Manage in space" link
+  // surfaced below.
   members: Member[];
+  // Server returns the parent space embedded under `project:read`;
+  // PWA falls back to looking it up by IRI in the user's space list
+  // for the admin role check.
+  space: string | SpaceRef;
   attachments: Attachment[];
 }
 
@@ -60,8 +76,12 @@ interface Collection<T> {
   "hydra:member"?: T[];
 }
 
+const projectSpaceIri = (project: Project): string =>
+  typeof project.space === "string" ? project.space : project.space["@id"];
+
 const ProjectDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const projectId = typeof id === "string" ? id : null;
@@ -77,11 +97,6 @@ const ProjectDetail = () => {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskEditorKey, setTaskEditorKey] = useState(0);
-
-  // Member add
-  const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [memberError, setMemberError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -182,32 +197,6 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleAddMember = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!project || !newMemberEmail.trim()) return;
-
-    setIsAddingMember(true);
-    setMemberError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/projects/${project.id}/members`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: newMemberEmail.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to add member.");
-      }
-      setNewMemberEmail("");
-      await load();
-    } catch (err) {
-      setMemberError(err instanceof Error ? err.message : "Failed to add member.");
-    } finally {
-      setIsAddingMember(false);
-    }
-  };
-
   const handleAttach = async (mediaObjectIri: string) => {
     if (!project) return;
     const nextIris = [...project.attachments.map((a) => a["@id"]), mediaObjectIri];
@@ -243,44 +232,6 @@ const ProjectDetail = () => {
     }
     const updated: Project = await res.json();
     setProject(updated);
-  };
-
-  const handleRemoveMember = async (member: Member) => {
-    if (!project) return;
-    if (
-      !window.confirm(
-        member.email === user?.email
-          ? "Remove yourself from this project? You'll lose access to its tasks."
-          : `Remove ${member.email} from this project?`,
-      )
-    ) {
-      return;
-    }
-
-    setMemberError(null);
-    try {
-      const remaining = project.members
-        .filter((m) => m["@id"] !== member["@id"])
-        .map((m) => m["@id"]);
-      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({ members: remaining }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || data["hydra:description"] || "Failed to remove member.");
-      }
-      // If you removed yourself you no longer have access; bounce to the list.
-      if (member.email === user?.email) {
-        router.push("/projects");
-        return;
-      }
-      await load();
-    } catch (err) {
-      setMemberError(err instanceof Error ? err.message : "Failed to remove member.");
-    }
   };
 
   if (authLoading || !isAuthenticated) {
@@ -337,52 +288,52 @@ const ProjectDetail = () => {
                     <MarkdownView source={project.description} className="mb-3" />
                   )}
 
-                  <div className="mt-3">
-                    <p className="text-xs text-muted-foreground mb-1">Members</p>
-                    <ul className="flex flex-wrap items-center gap-1" data-testid="member-list">
-                      {project.members.map((member) => (
-                        <li key={member["@id"]} data-testid="member-pill">
+                  <div className="mt-3 space-y-2" data-testid="project-space-info">
+                    {(() => {
+                      const space = spaces.find(
+                        (s) => s["@id"] === projectSpaceIri(project),
+                      );
+                      const spaceLabel =
+                        typeof project.space === "string"
+                          ? null
+                          : project.space.name;
+                      const spaceId =
+                        typeof project.space === "string"
+                          ? project.space.split("/").pop()
+                          : project.space.id;
+                      const isPersonal = space?.isPersonal ?? false;
+                      return (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            Space
+                          </span>
                           <Badge variant="secondary" className="gap-1">
-                            <span>{member.email}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveMember(member)}
-                              aria-label={`Remove ${member.email}`}
-                              className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
+                            {isPersonal && (
+                              <Lock className="h-3 w-3" aria-hidden />
+                            )}
+                            {space?.name ?? spaceLabel ?? "Unknown space"}
                           </Badge>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <form
-                      onSubmit={handleAddMember}
-                      className="mt-2 flex items-center gap-2"
-                      data-testid="add-member-form"
-                    >
-                      <Input
-                        type="email"
-                        value={newMemberEmail}
-                        onChange={(e) => setNewMemberEmail(e.target.value)}
-                        placeholder="member@example.com"
-                        aria-label="New member email"
-                        required
-                        className="flex-1"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={isAddingMember || !newMemberEmail.trim()}
+                          {spaceId && (
+                            <Button asChild variant="link" size="sm" className="h-auto p-0">
+                              <Link href={`/spaces/${spaceId}`}>
+                                Manage members in space
+                              </Link>
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {project.members.length > 0 && (
+                      <ul
+                        className="flex flex-wrap items-center gap-1"
+                        data-testid="member-list"
                       >
-                        {isAddingMember ? "Adding..." : "Add"}
-                      </Button>
-                    </form>
-                    {memberError && (
-                      <p role="alert" className="mt-2 text-sm text-destructive">
-                        {memberError}
-                      </p>
+                        {project.members.map((member) => (
+                          <li key={member["@id"]} data-testid="member-pill">
+                            <Badge variant="outline">{member.email}</Badge>
+                          </li>
+                        ))}
+                      </ul>
                     )}
                   </div>
                 </CardContent>

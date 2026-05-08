@@ -4,9 +4,24 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
+import type { Space } from "@/contexts/ActiveSpaceContext";
+
+const isProjectSpaceAdmin = (
+  project: { space: string | { "@id": string } },
+  userId: string,
+  spaces: Space[],
+): boolean => {
+  const iri =
+    typeof project.space === "string" ? project.space : project.space["@id"];
+  const space = spaces.find((s) => s["@id"] === iri);
+  return !!space?.userMemberships.some(
+    (m) => m.user.id === userId && m.role === "admin",
+  );
+};
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +37,14 @@ interface Project {
   id: string;
   title: string;
   owner: ProjectMember;
+  // Parent-space IRI; resolves against the user's active-space list
+  // for the admin role check below.
+  space: string | { "@id": string };
 }
 
 const CustomFieldsPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const projectId = typeof id === "string" ? id : null;
@@ -120,8 +139,9 @@ const CustomFieldsPage = () => {
                 </Button>
                 <h1 className="text-2xl font-bold">Custom fields</h1>
                 <p className="text-sm text-muted-foreground">
-                  Per-project schema for structured task data. Project members
-                  can see the schema; only the owner can change it.
+                  Per-project schema for structured task data. Anyone in
+                  the space can read the schema; only space admins can
+                  change it.
                 </p>
               </div>
 
@@ -133,7 +153,7 @@ const CustomFieldsPage = () => {
 
               <CustomFieldsManager
                 projectIri={project["@id"]}
-                isProjectOwner={user.email === project.owner.email}
+                isSpaceAdmin={isProjectSpaceAdmin(project, user.id, spaces)}
               />
             </>
           )}

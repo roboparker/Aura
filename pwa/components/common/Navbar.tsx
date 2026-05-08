@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import OverdueBadge from "@/components/tasks/OverdueBadge";
 import SearchBar from "./SearchBar";
+import SpaceSwitcher from "./SpaceSwitcher";
 import ThemeToggle from "./ThemeToggle";
 
 const NAV_LINKS = [
@@ -32,6 +33,7 @@ const NAV_LINKS = [
   { href: "/tasks", label: "Tasks" },
   { href: "/projects", label: "Projects" },
   { href: "/discussions", label: "Discussions" },
+  { href: "/spaces", label: "Spaces" },
   { href: "/groups", label: "Groups" },
   { href: "/tags", label: "Tags" },
 ];
@@ -74,6 +76,7 @@ const Navbar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {isAuthenticated && <SpaceSwitcher />}
         </div>
 
         <div className="flex items-center gap-1">

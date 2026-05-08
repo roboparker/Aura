@@ -62,7 +62,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['discussion:write']],
     order: ['isPinned' => 'DESC', 'createdAt' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'category' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'category' => 'exact', 'space' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'updatedAt'])]
 #[ApiFilter(DiscussionSearchFilter::class)]
 #[ORM\Entity(repositoryClass: DiscussionRepository::class)]

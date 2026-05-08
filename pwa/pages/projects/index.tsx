@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -37,6 +38,7 @@ interface ProjectCollection {
 
 const Projects = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
 
   const [projects, setProjects] = useState<Project[]>([]);
@@ -62,7 +64,14 @@ const Projects = () => {
   const loadProjects = useCallback(async () => {
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/projects`, {
+      // Scope to the active space (#187). Falls back to an unfiltered
+      // GET while the space list is still loading so the page doesn't
+      // flash empty on first paint — the access extension will cap the
+      // result set to spaces the user belongs to either way.
+      const url = activeSpace
+        ? `${ENTRYPOINT}/projects?space=${encodeURIComponent(activeSpace["@id"])}`
+        : `${ENTRYPOINT}/projects`;
+      const res = await fetch(url, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
@@ -76,7 +85,7 @@ const Projects = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeSpace]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -98,6 +107,12 @@ const Projects = () => {
         body: JSON.stringify({
           title: title.trim(),
           description: description.trim() || null,
+          // Pin the new project to the active space (#187). Without
+          // this, ProjectOwnerProcessor still falls back to the
+          // creator's personal space, so visitors who created a
+          // project while their active space was a shared one would
+          // be surprised to find it in their personal space instead.
+          ...(activeSpace ? { space: activeSpace["@id"] } : {}),
         }),
       });
       if (!res.ok) {

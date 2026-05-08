@@ -77,6 +77,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 // doctrine:schema:validate doesn't try to drop it on every CI run.
 #[ORM\Index(columns: ['search_vector'], name: 'idx_project_search_vector', flags: ['gin'])]
 #[ApiFilter(ProjectSearchFilter::class)]
+#[ApiFilter(\ApiPlatform\Doctrine\Orm\Filter\SearchFilter::class, properties: ['space' => 'exact'])]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 #[ValidProjectAttachments]
 class Project
