@@ -1397,32 +1397,34 @@ const Tasks = () => {
     ? router.query.search
     : "";
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (signal?: AbortSignal) => {
     setError(null);
     try {
       // Tasks, tags, the assignable-users universe, and the projects-with-
       // members set all load in parallel — the page needs the projects to
       // know which assignable users are valid for each project task.
+      //
+      // The optional AbortSignal lets callers cancel an in-flight fan-out
+      // when they re-fire (the auth useEffect cleans up an outgoing call
+      // before issuing the next one — see #193). Without that, React 18
+      // strict-mode's mount/cleanup/remount cycle leaves two parallel
+      // loadData calls racing each other; whichever response lands later
+      // can stomp the freshly-applied optimistic state of an in-flight
+      // toggle PATCH with the *pre-PATCH* server snapshot it observed at
+      // request time.
       const tasksUrl = searchQuery.trim().length > 0
         ? `${ENTRYPOINT}/tasks?search=${encodeURIComponent(searchQuery)}`
         : `${ENTRYPOINT}/tasks`;
+      const init = {
+        credentials: "include" as const,
+        headers: { Accept: "application/ld+json" },
+        signal,
+      };
       const [tasksRes, tagsRes, assignablesRes, projectsRes] = await Promise.all([
-        fetch(tasksUrl, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
-        fetch(`${ENTRYPOINT}/tags`, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
-        fetch(`${ENTRYPOINT}/me/assignable-users`, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
-        fetch(`${ENTRYPOINT}/projects`, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
+        fetch(tasksUrl, init),
+        fetch(`${ENTRYPOINT}/tags`, init),
+        fetch(`${ENTRYPOINT}/me/assignable-users`, init),
+        fetch(`${ENTRYPOINT}/projects`, init),
       ]);
       if (!tasksRes.ok) {
         throw new Error("Failed to load tasks.");
@@ -1440,6 +1442,10 @@ const Tasks = () => {
       const tagsData: Collection<Tag> = await tagsRes.json();
       const assignablesData: Collection<AssigneeOption> = await assignablesRes.json();
       const projectsData: Collection<ProjectMembership> = await projectsRes.json();
+      // One last guard against the strict-mode cleanup landing between
+      // the JSON parses and the setStates: if the signal aborted while
+      // we were parsing, drop the responses on the floor.
+      if (signal?.aborted) return;
       setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
       setAssignableUsers(
@@ -1455,9 +1461,16 @@ const Tasks = () => {
       }
       setProjectMembers(projectMap);
     } catch (err) {
+      // AbortError is a normal control-flow signal here, not a failure —
+      // the caller cancelled because the effect is being torn down.
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to load tasks.");
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) {
+        setIsLoading(false);
+      }
     }
   }, [searchQuery]);
 
@@ -1467,11 +1480,23 @@ const Tasks = () => {
   // list) would carry over from the previous route. Re-pin the filter and
   // refetch whenever the page mode flips — this also covers the initial
   // mount once `isAuthenticated` becomes true.
+  //
+  // The cleanup function aborts the in-flight loadData fan-out when the
+  // effect re-runs or the page unmounts (#193). Crucially, that
+  // includes React 18 strict-mode's synthetic mount → cleanup → re-mount
+  // cycle in dev: without this, the strict-mode cleanup is a no-op and
+  // the first loadData's stale response can land mid-toggle and overwrite
+  // the optimistic uncheck with whatever the server had at the time the
+  // fetch was issued — surfacing as the long-running tasks-toggle race
+  // (#193).
   useEffect(() => {
     setAssigneeFilter(isMyTasksPage ? "me" : "all");
     if (isAuthenticated) {
-      loadData();
+      const ctl = new AbortController();
+      void loadData(ctl.signal);
+      return () => ctl.abort();
     }
+    return undefined;
   }, [isMyTasksPage, isAuthenticated, loadData]);
 
   const handleCreate = async (input: NewTaskInput) => {

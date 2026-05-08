@@ -16,24 +16,7 @@ test.describe("Tasks", () => {
     await expect(page).toHaveURL(/\/signin/);
   });
 
-  // FIXME(spaces-pwa): the post-uncheck `expect(checkbox).not.toBeChecked()`
-  // assertion has reproduced an intermittent CI-only race across PRs 188,
-  // 189, 191, and 192. The trace consistently shows `input.checked=true`
-  // for the full polling window after `uncheck()` itself succeeded
-  // (i.e. checked=false at click time). Five different code-side fixes
-  // have not stuck:
-  //   - functional setState form on the optimistic update (#188)
-  //   - explicit toBeChecked / not.toBeChecked sync barriers (#188)
-  //   - merge-server-response after PATCH success (#189/PR3)
-  //   - tasksRef-driven toggle direction so the closure can't be stale (#192)
-  //   - dropping the response merge so the row only re-renders once (#192)
-  //   - increasing the timeout from 5s to 15s as a polling bandage (#192)
-  // The last of those proves state genuinely never flips back on CI —
-  // it's not a polling-cadence issue. Skipping the test with `fixme` so
-  // PR 4 can land while the underlying race is investigated under
-  // dedicated traces. The other tasks tests (reorder, reminders, etc.)
-  // continue to exercise the toggle path implicitly.
-  test.fixme("user can create, complete, and delete a task", async ({ page }) => {
+  test("user can create, complete, and delete a task", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
 
     await page.goto(`${BASE_URL}/tasks`);
@@ -84,18 +67,8 @@ test.describe("Tasks", () => {
     );
     await checkbox.uncheck();
     await uncompleteResponse;
-    // Generous timeout on the post-uncheck assertions: the same
-    // optimistic-toggle race has bitten this test across PRs 188, 189,
-    // 191, and 192 despite five different fix attempts (functional
-    // setState, response-merge, response-merge removal, tasksRef-driven
-    // direction). State does flip — just sometimes later than 5s on
-    // slow CI workers. 15s gives Playwright more polls to catch the
-    // flip without paper-overing a real regression: a genuinely-stuck
-    // state still fails.
-    await expect(checkbox).not.toBeChecked({ timeout: 15000 });
-    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/, {
-      timeout: 15000,
-    });
+    await expect(checkbox).not.toBeChecked();
+    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
     await item.getByRole("button", { name: /^Delete "/ }).click();
