@@ -38,17 +38,24 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isAccessibleBy(user)))",
             processor: DiscussionAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().getMembers().contains(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isAccessibleBy(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().getOwner() == user)",
+            // Edit: author only (#185). Pin/lock are NOT separated at the
+            // operation level — both fields ride this Patch payload — so
+            // a future DiscussionUpdateProcessor will need to enforce
+            // "only space admins may flip isPinned/isLocked" before the
+            // entity is flushed. For now the entity-level expression
+            // gates only "can the caller PATCH at all".
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().isSpaceAdmin(user))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().getOwner() == user)",
+            // Delete: author or space admin (#185).
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().isSpaceAdmin(user))",
         ),
     ],
     normalizationContext: ['groups' => ['discussion:read']],

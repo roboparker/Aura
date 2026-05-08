@@ -22,11 +22,20 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Shared container for tasks. Access is all-or-nothing: every member (the
- * owner included) can read, edit, add members to, and delete the project,
- * and can see/edit every task attached to it regardless of task ownership.
- * The `owner` field records who created the project for display/audit —
- * it does not grant extra privileges beyond what members already have.
+ * Shared container for tasks. Lives inside a {@see Space} (#181), and
+ * access is determined by membership in that space — every space member
+ * can read, edit, and (subject to admin/author rules) delete the
+ * project and its tasks. The `owner` field records who created the
+ * project for display/audit — it does not grant extra privileges
+ * beyond what space membership already provides.
+ *
+ * Per #185:
+ *  - read/list/create: any space member
+ *  - edit: any space member (project metadata is shared state)
+ *  - delete: project creator (owner) or space admin
+ *  - Post requires the caller to be a member of the target space
+ *    (enforced via securityPostDenormalize so the validator runs after
+ *    the IRI denormalises into a Space entity).
  */
 #[ApiResource(
     operations: [
@@ -35,16 +44,25 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
+            // Allow `space === null` so the existing PWA — which doesn't
+            // know about spaces yet — can keep posting projects without
+            // an explicit IRI; ProjectOwnerProcessor will default it to
+            // the caller's personal space (where they're admin) before
+            // persist. When the client DOES pick a space, they must be a
+            // member of it.
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace() === null or object.isAccessibleBy(user))",
+            securityPostDenormalizeMessage: 'You can only create projects in a space you belong to.',
             processor: ProjectOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getMembers().contains(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getMembers().contains(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getMembers().contains(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user))",
+            securityMessage: 'Only the project creator or a space admin can delete a project.',
         ),
     ],
     normalizationContext: ['groups' => ['project:read']],
@@ -265,5 +283,39 @@ class Project
     {
         $this->attachments->removeElement($media);
         return $this;
+    }
+
+    /**
+     * Convenience for security expressions: project access is determined
+     * by the user's membership in the parent space (directly or via
+     * group). Tolerates a transient null space for entities still being
+     * constructed — falls through to "not accessible".
+     */
+    public function isAccessibleBy(?User $user): bool
+    {
+        return null !== $this->space && $this->space->hasMember($user);
+    }
+
+    /**
+     * Convenience for security expressions: admin actions on a project
+     * (e.g. delete, manage members) require the user to be an admin of
+     * the parent space.
+     */
+    public function isSpaceAdmin(?User $user): bool
+    {
+        return null !== $this->space && $this->space->isAdmin($user);
+    }
+
+    /**
+     * Deduplicated list of users with access to this project, derived
+     * from the parent space's direct + group memberships. Used by code
+     * that needs the full member universe (assignee picker, mention
+     * parsing, attachment uploader gate).
+     *
+     * @return array<string, User>
+     */
+    public function getEffectiveMembers(): array
+    {
+        return null === $this->space ? [] : $this->space->getEffectiveUsers();
     }
 }

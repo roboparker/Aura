@@ -7,14 +7,19 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\Project;
+use App\Entity\SpaceGroupMembership;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Project queries so non-admin users only see projects they belong
- * to. Item lookups for non-member projects return 404 rather than 403, which
- * mirrors the existence-hiding behavior of TaskOwnerExtension.
+ * Filters Project queries so non-admin users only see projects in spaces
+ * they belong to (#185). Membership can be direct (`SpaceMembership`)
+ * or transitive via a `UserGroup` linked through `SpaceGroupMembership`.
+ * Item lookups for spaces the user can't reach return 404 rather than
+ * 403, mirroring the existence-hiding behavior of the other access
+ * extensions.
  */
 final class ProjectAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -59,19 +64,22 @@ final class ProjectAccessExtension implements QueryCollectionExtensionInterface,
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
-        // Use an EXISTS subquery rather than a join on the root query. Adding
-        // a join on `members` here — even without addSelect — ends up
-        // partially hydrating the Project's members collection (the join is
-        // reused during result hydration), so a later writer sees a pruned
-        // collection and Doctrine mis-diffs inserts on flush. The subquery
-        // keeps the root query's join graph clean.
-        $subQuery = sprintf(
-            'SELECT 1 FROM %s project_access_probe JOIN project_access_probe.members project_access_member WHERE project_access_probe = %s AND project_access_member = :currentUser',
-            Project::class,
+        // Use EXISTS subqueries rather than joins on the root query so
+        // none of the project's collections are partially hydrated by
+        // the access predicate. Two branches: direct user membership in
+        // the project's space, or transitive membership via a group.
+        $directSubquery = sprintf(
+            'SELECT 1 FROM %s project_access_direct WHERE project_access_direct.space = %s.space AND project_access_direct.user = :currentUser',
+            SpaceMembership::class,
+            $rootAlias,
+        );
+        $groupSubquery = sprintf(
+            'SELECT 1 FROM %s project_access_group JOIN project_access_group.userGroup project_access_group_obj JOIN project_access_group_obj.members project_access_group_member WHERE project_access_group.space = %s.space AND project_access_group_member = :currentUser',
+            SpaceGroupMembership::class,
             $rootAlias,
         );
         $queryBuilder
-            ->andWhere(sprintf('EXISTS(%s)', $subQuery))
+            ->andWhere(sprintf('(EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
             ->setParameter('currentUser', $user);
     }
 }

@@ -40,16 +40,20 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject() !== null and object.getProject().getOwner() == user)",
+            // Write access is space-admin only (#185). Read access for
+            // anyone in the space; the schema is structural and easy to
+            // disrupt for the rest of the project, so we keep mutation
+            // narrow even though every member can post tasks.
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isSpaceAdmin(user)))",
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().getMembers().contains(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isAccessibleBy(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
         ),
     ],
     normalizationContext: ['groups' => ['custom_field_definition:read']],

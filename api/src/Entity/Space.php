@@ -325,4 +325,37 @@ class Space
         }
         return false;
     }
+
+    /**
+     * Deduplicated list of every user with access to this space —
+     * direct members plus every member of every attached group. Used by
+     * controllers / services that need the full universe of users in a
+     * space (assignee picker, mention parsing, attachment uploader
+     * gate). Keys are stringified user UUIDs so callers can quickly
+     * test membership without rebuilding a lookup table.
+     *
+     * @return array<string, User>
+     */
+    public function getEffectiveUsers(): array
+    {
+        $bag = [];
+        foreach ($this->userMemberships as $membership) {
+            $u = $membership->getUser();
+            if (null !== $u && null !== $u->getId()) {
+                $bag[(string) $u->getId()] = $u;
+            }
+        }
+        foreach ($this->groupMemberships as $groupMembership) {
+            $group = $groupMembership->getUserGroup();
+            if (null === $group) {
+                continue;
+            }
+            foreach ($group->getMembers() as $member) {
+                if (null !== $member->getId()) {
+                    $bag[(string) $member->getId()] = $member;
+                }
+            }
+        }
+        return $bag;
+    }
 }

@@ -46,14 +46,14 @@ use Symfony\Component\Validator\Constraints as Assert;
             processor: TaskOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
             processor: TaskUpdateProcessor::class,
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.getProject() !== null and object.getProject().getMembers().contains(user)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
         ),
     ],
     normalizationContext: ['groups' => ['task:read']],
@@ -277,6 +277,23 @@ class Task
     {
         $this->project = $project;
         return $this;
+    }
+
+    /**
+     * Convenience for security expressions and controllers: a task is
+     * readable/editable by its owner, or by any member of the parent
+     * project's space (#185). Standalone tasks (no project) are
+     * owner-only — there's no space to inherit from.
+     */
+    public function isAccessibleBy(?User $user): bool
+    {
+        if (null === $user) {
+            return false;
+        }
+        if (null !== $this->owner && $this->owner === $user) {
+            return true;
+        }
+        return null !== $this->project && $this->project->isAccessibleBy($user);
     }
 
     public function getTitle(): string
