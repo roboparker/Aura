@@ -47,7 +47,10 @@ final class CreateProjectTool implements McpToolInterface
 
         $project = new Project();
         $project->setOwner($user);
-        $project->addMember($user);
+        // Space defaults to the caller's personal space via
+        // ProjectSpaceDefaultListener at PrePersist (#185), where they
+        // already hold the admin role. No project-local member set
+        // exists anymore.
         $project->setTitle($title);
         if (null !== $description) {
             $project->setDescription($description);

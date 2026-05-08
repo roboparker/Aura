@@ -3,6 +3,8 @@
 namespace App\DataFixtures;
 
 use App\Entity\Project;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
@@ -47,12 +49,33 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
             $tags[$title] = $tag;
         }
 
+        // Demo "Launch checklist" lives in a shared space so the admin
+        // login also lands on a non-empty Projects page (#185 — access
+        // is now space-scoped, not project-scoped). Uma is admin, Ada
+        // is a regular member; the space + memberships are created
+        // explicitly here rather than relying on the
+        // ProjectSpaceDefaultListener so the fixture stays
+        // self-documenting about who's in what space.
+        $sharedSpace = (new Space())
+            ->setName('Launch team')
+            ->setCreatedBy($uma);
+        $manager->persist($sharedSpace);
+        $manager->flush();
+
+        $manager->persist((new SpaceMembership())
+            ->setSpace($sharedSpace)
+            ->setUser($uma)
+            ->setRole(Space::ROLE_ADMIN));
+        $manager->persist((new SpaceMembership())
+            ->setSpace($sharedSpace)
+            ->setUser($ada)
+            ->setRole(Space::ROLE_MEMBER));
+
         $project = new Project();
         $project->setOwner($uma);
+        $project->setSpace($sharedSpace);
         $project->setTitle('Launch checklist');
         $project->setDescription("Things to ship before the **soft launch**.\n\n- Marketing site\n- Onboarding flow\n- Billing");
-        $project->addMember($uma);
-        $project->addMember($ada);
         $manager->persist($project);
 
         // [title, description, tagTitles, assignees]. Mix of solo, joint,
