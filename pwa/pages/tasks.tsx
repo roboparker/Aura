@@ -1545,6 +1545,20 @@ const Tasks = () => {
       if (!res.ok) {
         throw new Error("Failed to update task.");
       }
+      // Merge the server's authoritative response back over the row.
+      // The optimistic update above already flipped `completedOn`, but a
+      // concurrent re-render (e.g. one whose closure pre-dates the
+      // optimistic `setTasks`) could otherwise re-derive the row from a
+      // stale `task` reference and pin the checkbox back to its
+      // pre-click state — that's the long-running tasks.spec flake.
+      // Forcing convergence here makes the server the source of truth
+      // for the row's final state.
+      const updated = (await res.json()) as Task;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t["@id"] === task["@id"] ? { ...t, ...updated } : t,
+        ),
+      );
       if (willSpawnNextOccurrence) {
         await loadData();
       }
