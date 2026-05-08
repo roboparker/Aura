@@ -16,24 +16,18 @@ test.describe("Tasks", () => {
     await expect(page).toHaveURL(/\/signin/);
   });
 
-  // FIXME(spaces-pwa): the post-uncheck `expect(checkbox).not.toBeChecked()`
-  // assertion has reproduced an intermittent CI-only race across PRs 188,
-  // 189, 191, and 192. The trace consistently shows `input.checked=true`
-  // for the full polling window after `uncheck()` itself succeeded
-  // (i.e. checked=false at click time). Five different code-side fixes
-  // have not stuck:
-  //   - functional setState form on the optimistic update (#188)
-  //   - explicit toBeChecked / not.toBeChecked sync barriers (#188)
-  //   - merge-server-response after PATCH success (#189/PR3)
-  //   - tasksRef-driven toggle direction so the closure can't be stale (#192)
-  //   - dropping the response merge so the row only re-renders once (#192)
-  //   - increasing the timeout from 5s to 15s as a polling bandage (#192)
-  // The last of those proves state genuinely never flips back on CI —
-  // it's not a polling-cadence issue. Skipping the test with `fixme` so
-  // PR 4 can land while the underlying race is investigated under
-  // dedicated traces. The other tasks tests (reorder, reminders, etc.)
-  // continue to exercise the toggle path implicitly.
-  test.fixme("user can create, complete, and delete a task", async ({ page }) => {
+  test("user can create, complete, and delete a task", async ({ page }) => {
+    // DEBUG(spaces-toggle-race #193): pipe page console messages
+    // tagged by the page-side instrumentation through to test
+    // stdout so the CI log shows the exact setTasks sequence
+    // leading up to the failure.
+    page.on("console", (msg) => {
+      const text = msg.text();
+      if (text.includes("[toggle:") || text.includes("[tasks:")) {
+        // eslint-disable-next-line no-console
+        console.log(`PAGE ${msg.type()}: ${text}`);
+      }
+    });
     await registerAndSignIn(page, uniqueEmail());
 
     await page.goto(`${BASE_URL}/tasks`);

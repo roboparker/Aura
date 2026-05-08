@@ -1351,6 +1351,12 @@ const Tasks = () => {
   const tasksRef = useRef<Task[]>(tasks);
   useEffect(() => {
     tasksRef.current = tasks;
+    console.warn(
+      "[tasks:state-changed] count=",
+      tasks.length,
+      "summary=",
+      tasks.map((t) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
+    );
   }, [tasks]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
@@ -1519,6 +1525,7 @@ const Tasks = () => {
   };
 
   const handleToggle = async (task: Task) => {
+    console.warn("[toggle:start]", task.title, "task.completedOn=", task.completedOn);
     // Optimistic toggle: flip the checkbox immediately so the UI feels
     // responsive and so controlled-input assertions in tests see the new
     // state without waiting for the server round-trip.
@@ -1540,6 +1547,14 @@ const Tasks = () => {
     const nextCompletedOn = current.completedOn
       ? null
       : new Date().toISOString();
+    console.warn(
+      "[toggle:direction] current.completedOn=",
+      current.completedOn,
+      "next=",
+      nextCompletedOn,
+      "ref-len=",
+      tasksRef.current.length,
+    );
     // Completing a recurring task spawns a fresh occurrence server-side; we
     // need to refetch so that new row appears in the list. Toggling *off*
     // (un-completing) doesn't need a refetch.
@@ -1547,11 +1562,16 @@ const Tasks = () => {
       !current.completedOn &&
       current.recurrenceRule !== null &&
       current.dueDate !== null;
-    setTasks((prev) =>
-      prev.map((t) =>
+    setTasks((prev) => {
+      const out = prev.map((t) =>
         t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t,
-      ),
-    );
+      );
+      console.warn(
+        "[toggle:setTasks-optimistic]",
+        out.find((t) => t["@id"] === task["@id"])?.completedOn,
+      );
+      return out;
+    });
     setError(null);
 
     try {
@@ -1561,6 +1581,7 @@ const Tasks = () => {
         headers: { "Content-Type": "application/merge-patch+json" },
         body: JSON.stringify({ completedOn: nextCompletedOn }),
       });
+      console.warn("[toggle:patch-resolved]", res.status, res.ok);
       if (!res.ok) {
         throw new Error("Failed to update task.");
       }
