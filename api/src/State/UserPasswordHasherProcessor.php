@@ -115,6 +115,27 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         foreach ($invite->getGroupInvites() as $groupInvite) {
             $groupInvite->getGroup()->addMember($user);
         }
+        // Space invites attach the new user as a direct SpaceMembership
+        // (#186). Idempotent against the (space, user) unique index in
+        // case a parallel signup flow already created the row — the
+        // duplicate would surface during flush; we filter it out here.
+        foreach ($invite->getSpaceInvites() as $spaceInvite) {
+            $space = $spaceInvite->getSpace();
+            $alreadyMember = false;
+            foreach ($space->getUserMemberships() as $existing) {
+                if ($existing->getUser()?->getId()?->equals($user->getId())) {
+                    $alreadyMember = true;
+                    break;
+                }
+            }
+            if (!$alreadyMember) {
+                $space->addUserMembership(
+                    (new SpaceMembership())
+                        ->setUser($user)
+                        ->setRole($spaceInvite->getRole()),
+                );
+            }
+        }
         $invite->markAccepted();
         $this->em->flush();
     }
