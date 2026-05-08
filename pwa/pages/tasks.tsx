@@ -1341,6 +1341,17 @@ const Tasks = () => {
   const pageTitle = isMyTasksPage ? "My Tasks" : "Tasks";
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Mirror of `tasks` for handlers that need the latest committed
+  // state without relying on closure-captured props. Used by
+  // `handleToggle` to determine the toggle direction from the
+  // freshest data — without this, a row whose closure pre-dates the
+  // last optimistic / response merge can compute the wrong
+  // `nextCompletedOn` and re-pin the checkbox to its prior state
+  // (the long-running tasks.spec flake).
+  const tasksRef = useRef<Task[]>(tasks);
+  useEffect(() => {
+    tasksRef.current = tasks;
+  }, [tasks]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
   // Map of project IRI → set of member IRIs. Used to filter the assignee
@@ -1512,22 +1523,30 @@ const Tasks = () => {
     // responsive and so controlled-input assertions in tests see the new
     // state without waiting for the server round-trip.
     //
-    // setTasks uses the functional form so the optimistic update reads
-    // from React's latest state instead of the closure's `tasks`. With
-    // the closure form, a render happening between the user's click and
-    // the dispatch could leave handleToggle pointing at a stale array,
-    // which would produce a no-op map (`completedOn` already matches
-    // `nextCompletedOn`) and leave Playwright's `uncheck()` thinking the
-    // click did nothing. The previous-snapshot rollback also targets
-    // only this row's `completedOn` field for the same reason — a
-    // wholesale revert would clobber concurrent edits to other rows.
-    const previousCompletedOn = task.completedOn;
-    const nextCompletedOn = task.completedOn ? null : new Date().toISOString();
+    // The toggle direction is read from `tasksRef.current` rather than
+    // the closure's `task` prop. The row's onChange captures whatever
+    // `task` was passed during its last render, so a render that
+    // landed AFTER the row was set up (response merge, parent re-render
+    // for an unrelated piece of state) can leave the closure's
+    // `completedOn` lagging the actual committed state — flipping the
+    // wrong direction and producing a no-op that surfaces as the
+    // long-running tasks.spec flake. The ref always points at the
+    // latest committed state, so `previousCompletedOn` and
+    // `nextCompletedOn` are always derived from the truth React just
+    // rendered.
+    const current =
+      tasksRef.current.find((t) => t["@id"] === task["@id"]) ?? task;
+    const previousCompletedOn = current.completedOn;
+    const nextCompletedOn = current.completedOn
+      ? null
+      : new Date().toISOString();
     // Completing a recurring task spawns a fresh occurrence server-side; we
     // need to refetch so that new row appears in the list. Toggling *off*
     // (un-completing) doesn't need a refetch.
     const willSpawnNextOccurrence =
-      !task.completedOn && task.recurrenceRule !== null && task.dueDate !== null;
+      !current.completedOn &&
+      current.recurrenceRule !== null &&
+      current.dueDate !== null;
     setTasks((prev) =>
       prev.map((t) =>
         t["@id"] === task["@id"] ? { ...t, completedOn: nextCompletedOn } : t,
