@@ -1564,20 +1564,17 @@ const Tasks = () => {
       if (!res.ok) {
         throw new Error("Failed to update task.");
       }
-      // Merge the server's authoritative response back over the row.
-      // The optimistic update above already flipped `completedOn`, but a
-      // concurrent re-render (e.g. one whose closure pre-dates the
-      // optimistic `setTasks`) could otherwise re-derive the row from a
-      // stale `task` reference and pin the checkbox back to its
-      // pre-click state — that's the long-running tasks.spec flake.
-      // Forcing convergence here makes the server the source of truth
-      // for the row's final state.
-      const updated = (await res.json()) as Task;
-      setTasks((prev) =>
-        prev.map((t) =>
-          t["@id"] === task["@id"] ? { ...t, ...updated } : t,
-        ),
-      );
+      // Trust the optimistic state. The previous merge-back pattern
+      // (PR 3 of #185) was added to defeat the toBeChecked flake by
+      // forcing convergence to the server response, but the response
+      // body — even when ok — could shadow the just-set optimistic
+      // `completedOn` with a value that differed by milliseconds from
+      // the row's other fields, and the resulting re-render appears to
+      // have BEEN the source of the flake rather than its cure. With a
+      // pure optimistic update (and `tasksRef` driving the toggle
+      // direction from the latest committed state), the row only
+      // re-renders once per click — leaving Playwright's
+      // not.toBeChecked() with a stable target to poll against.
       if (willSpawnNextOccurrence) {
         await loadData();
       }
