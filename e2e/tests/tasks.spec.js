@@ -23,7 +23,11 @@ test.describe("Tasks", () => {
     // leading up to the failure.
     page.on("console", (msg) => {
       const text = msg.text();
-      if (text.includes("[toggle:") || text.includes("[tasks:")) {
+      if (
+        text.includes("[toggle:") ||
+        text.includes("[tasks:") ||
+        text.includes("[setTasks:")
+      ) {
         // eslint-disable-next-line no-console
         console.log(`PAGE ${msg.type()}: ${text}`);
       }

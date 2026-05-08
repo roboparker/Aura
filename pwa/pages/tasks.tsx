@@ -1446,7 +1446,9 @@ const Tasks = () => {
       const tagsData: Collection<Tag> = await tagsRes.json();
       const assignablesData: Collection<AssigneeOption> = await assignablesRes.json();
       const projectsData: Collection<ProjectMembership> = await projectsRes.json();
-      setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
+      const _loaded = tasksData.member ?? tasksData["hydra:member"] ?? [];
+      console.warn("[setTasks:loadData]", _loaded.map((t: Task) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","));
+      setTasks(_loaded);
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
       setAssignableUsers(
         assignablesData.member ?? assignablesData["hydra:member"] ?? [],
@@ -1514,6 +1516,7 @@ const Tasks = () => {
       // needs (owner, tags, assignees, attachments, position assigned
       // server-side), so a local insert is both faster and resilient.
       const created: Task = await res.json();
+      console.warn("[setTasks:handleCreate]", `${created.title}=${created.completedOn ? "DONE" : "OPEN"}`);
       setTasks((prev) => [created, ...prev]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
@@ -1600,6 +1603,7 @@ const Tasks = () => {
         await loadData();
       }
     } catch (err) {
+      console.warn("[setTasks:toggle-catch] err=", err instanceof Error ? err.message : String(err));
       setTasks((prev) =>
         prev.map((t) =>
           t["@id"] === task["@id"] ? { ...t, completedOn: previousCompletedOn } : t,
@@ -1645,6 +1649,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:title-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update title.");
     }
@@ -1677,6 +1682,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:desc-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update description.");
     }
@@ -1711,6 +1717,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:recurrence-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update recurrence.");
     }
@@ -1738,6 +1745,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:duedate-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update due date.");
     }
@@ -1772,6 +1780,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:reminders-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update reminders.");
     }
@@ -1806,6 +1815,7 @@ const Tasks = () => {
         );
       }
     } catch (err) {
+      console.warn("[setTasks:assignees-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update assignees.");
     }
@@ -1831,6 +1841,7 @@ const Tasks = () => {
         throw new Error("Failed to update tags.");
       }
     } catch (err) {
+      console.warn("[setTasks:tags-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to update tags.");
     }
@@ -1972,6 +1983,7 @@ const Tasks = () => {
         );
       }
       const updated = (await res.json()) as Task;
+      console.warn("[setTasks:attach-media]", `${updated.title}=${updated.completedOn ? "DONE" : "OPEN"}`);
       setTasks((current) =>
         current.map((t) => (t["@id"] === task["@id"] ? updated : t)),
       );
@@ -1994,6 +2006,7 @@ const Tasks = () => {
         throw new Error("Failed to remove attachment.");
       }
       const updated = (await res.json()) as Task;
+      console.warn("[setTasks:detach-media]", `${updated.title}=${updated.completedOn ? "DONE" : "OPEN"}`);
       setTasks((current) =>
         current.map((t) => (t["@id"] === task["@id"] ? updated : t)),
       );
@@ -2071,6 +2084,7 @@ const Tasks = () => {
     const previous = tasks;
     const reordered = arrayMove(tasks, oldIndex, newIndex);
     // Apply optimistically — snappy UX, rolled back below if the server rejects.
+    console.warn("[setTasks:reorder]");
     setTasks(reordered);
     setError(null);
 
@@ -2085,6 +2099,7 @@ const Tasks = () => {
         throw new Error("Failed to save new order.");
       }
     } catch (err) {
+      console.warn("[setTasks:reorder-revert]");
       setTasks(previous);
       setError(err instanceof Error ? err.message : "Failed to save new order.");
     }
