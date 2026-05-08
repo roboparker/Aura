@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import Navbar from "./Navbar";
 
 const Layout = ({
@@ -31,8 +32,10 @@ const Layout = ({
       <QueryClientProvider client={queryClient}>
         <HydrationBoundary state={dehydratedState}>
           <AuthProvider>
-            <Navbar />
-            {children}
+            <ActiveSpaceProvider>
+              <Navbar />
+              {children}
+            </ActiveSpaceProvider>
           </AuthProvider>
         </HydrationBoundary>
       </QueryClientProvider>
