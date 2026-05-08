@@ -53,10 +53,20 @@ class UserInviteController extends AbstractController
                 'invitedBy' => $groupInvite->getInvitedBy()->getEmail(),
             ];
         }
+        $spaces = [];
+        foreach ($invite->getSpaceInvites() as $spaceInvite) {
+            $spaces[] = [
+                'id' => (string) $spaceInvite->getSpace()->getId(),
+                'name' => $spaceInvite->getSpace()->getName(),
+                'invitedBy' => $spaceInvite->getInvitedBy()->getEmail(),
+                'role' => $spaceInvite->getRole(),
+            ];
+        }
 
         return $this->json([
             'email' => $invite->getEmail(),
             'groups' => $groups,
+            'spaces' => $spaces,
             'expiresAt' => $invite->getExpiresAt()->format(\DateTimeInterface::ATOM),
         ]);
     }
