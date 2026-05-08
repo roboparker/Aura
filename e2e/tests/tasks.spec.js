@@ -17,6 +17,13 @@ test.describe("Tasks", () => {
   });
 
   test("user can create, complete, and delete a task", async ({ page }) => {
+    page.on("console", (msg) => {
+      const text = msg.text();
+      if (text.includes("[tasks:") || text.includes("[loadData:")) {
+        // eslint-disable-next-line no-console
+        console.log(`PAGE ${msg.type()}: ${text}`);
+      }
+    });
     await registerAndSignIn(page, uniqueEmail());
 
     await page.goto(`${BASE_URL}/tasks`);

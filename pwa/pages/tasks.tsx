@@ -1341,6 +1341,15 @@ const Tasks = () => {
   const pageTitle = isMyTasksPage ? "My Tasks" : "Tasks";
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  // DEBUG(#193): mirror tasks state through a useEffect for diagnostic
+  // logging. Removed once the race is stable.
+  useEffect(() => {
+    console.warn(
+      "[tasks:state]",
+      tasks.length,
+      tasks.map((t) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
+    );
+  }, [tasks]);
   // Mirror of `tasks` for handlers that need the latest committed
   // state without relying on closure-captured props. Used by
   // `handleToggle` to determine the toggle direction from the
@@ -1445,8 +1454,16 @@ const Tasks = () => {
       // One last guard against the strict-mode cleanup landing between
       // the JSON parses and the setStates: if the signal aborted while
       // we were parsing, drop the responses on the floor.
-      if (signal?.aborted) return;
-      setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
+      if (signal?.aborted) {
+        console.warn("[loadData:aborted-after-parse]");
+        return;
+      }
+      const _loaded = tasksData.member ?? tasksData["hydra:member"] ?? [];
+      console.warn(
+        "[loadData:setTasks]",
+        _loaded.map((t: Task) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
+      );
+      setTasks(_loaded);
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
       setAssignableUsers(
         assignablesData.member ?? assignablesData["hydra:member"] ?? [],
@@ -1493,8 +1510,12 @@ const Tasks = () => {
     setAssigneeFilter(isMyTasksPage ? "me" : "all");
     if (isAuthenticated) {
       const ctl = new AbortController();
+      console.warn("[loadData:effect-mount]");
       void loadData(ctl.signal);
-      return () => ctl.abort();
+      return () => {
+        console.warn("[loadData:effect-cleanup]");
+        ctl.abort();
+      };
     }
     return undefined;
   }, [isMyTasksPage, isAuthenticated, loadData]);
