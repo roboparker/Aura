@@ -281,4 +281,22 @@ class Project
     {
         return null === $this->space ? [] : $this->space->getEffectiveUsers();
     }
+
+    /**
+     * Backward-compatible serialization shim (#185 → PR 4): the
+     * existing PWA reads `project.members` to render member chips
+     * and to check "is the user a member?". The underlying property
+     * is gone (`project_member` was dropped) — this getter projects
+     * the parent space's effective members onto a plain User[] so
+     * the JSON-LD response continues to expose a `members` array.
+     * Will be removed once PR 4 (#187) updates the PWA to read
+     * membership directly from the space.
+     *
+     * @return list<User>
+     */
+    #[Groups(['project:read'])]
+    public function getMembers(): array
+    {
+        return array_values($this->getEffectiveMembers());
+    }
 }
