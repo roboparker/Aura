@@ -110,6 +110,14 @@ const PageDetailView = () => {
   const [postingComment, setPostingComment] = useState(false);
   const [commentError, setCommentError] = useState<string | null>(null);
 
+  // Move-to-space (#182)
+  const [moveTargetIri, setMoveTargetIri] = useState("");
+  const [isMoving, setIsMoving] = useState(false);
+  const [moveMessage, setMoveMessage] = useState<{
+    text: string;
+    kind: "success" | "error";
+  } | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -286,6 +294,45 @@ const PageDetailView = () => {
     setComments((prev) => prev.filter((c) => c["@id"] !== comment["@id"]));
   };
 
+  const handleMove = async () => {
+    if (!page || !moveTargetIri) return;
+    setIsMoving(true);
+    setMoveMessage(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/pages/${encodeURIComponent(page.id)}/move`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ space: moveTargetIri }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to move page.",
+        );
+      }
+      const target = spaces.find((s) => s["@id"] === moveTargetIri);
+      setMoveMessage({
+        text: data.moved
+          ? `Moved to "${target?.name ?? "the selected space"}".`
+          : "Already in that space.",
+        kind: "success",
+      });
+      setMoveTargetIri("");
+      await load();
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to move page.",
+        kind: "error",
+      });
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -420,6 +467,62 @@ const PageDetailView = () => {
                       {page.updatedAt && " · edited"}
                     </span>
                   </div>
+
+                  {/* Move-to-space (#182) — author or space admin only,
+                      since moving cross-space silently clears the parent
+                      FK. Hidden when the user only has one space. */}
+                  {canEdit && spaces.length > 1 && (
+                    <div
+                      className="flex flex-wrap items-center gap-2 mb-4"
+                      data-testid="page-move-form"
+                    >
+                      <Label
+                        htmlFor="page-move-target"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Move to
+                      </Label>
+                      <select
+                        id="page-move-target"
+                        value={moveTargetIri}
+                        onChange={(e) => setMoveTargetIri(e.target.value)}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                        data-testid="page-move-select"
+                      >
+                        <option value="">Pick a space…</option>
+                        {spaces
+                          .filter((s) => s["@id"] !== page.space["@id"])
+                          .map((s) => (
+                            <option key={s["@id"]} value={s["@id"]}>
+                              {s.name}
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleMove}
+                        disabled={!moveTargetIri || isMoving}
+                        data-testid="page-move-submit"
+                      >
+                        {isMoving ? "Moving…" : "Move"}
+                      </Button>
+                      {moveMessage && (
+                        <span
+                          role="alert"
+                          className={
+                            "text-xs " +
+                            (moveMessage.kind === "success"
+                              ? "text-muted-foreground"
+                              : "text-destructive")
+                          }
+                        >
+                          {moveMessage.text}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {page.body.trim() ? (
                     <MarkdownView source={page.body} />
                   ) : (
