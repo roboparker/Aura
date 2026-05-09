@@ -55,12 +55,25 @@ test.describe("Comment @-mentions", () => {
       { data: { email: bobEmail } },
     );
 
-    // Now Alice creates a task in the project and posts a comment that
-    // mentions Bob.
-    await alicePage.goto(`${BASE_URL}/tasks`);
+    // Now Alice creates a task **in the project** and posts a comment
+    // that mentions Bob. The task has to belong to the project for
+    // CommentMentionService to consider Bob a mentionable candidate
+    // (collectMentionableUsers = task owner + project's effective space
+    // members). Inline-creating from `/tasks` makes a personal task,
+    // which silently drops the mention because Bob isn't in scope.
     const taskTitle = `Plan launch ${Date.now()}`;
-    await alicePage.locator('[data-testid="new-task-title-input"]').fill(taskTitle);
-    await alicePage.locator('[data-testid="new-task-title-input"]').press("Enter");
+    const taskCreate = await alicePage.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: {
+        title: taskTitle,
+        project: `/projects/${projectId}`,
+      },
+    });
+    expect(taskCreate.ok(), "task POST should succeed").toBeTruthy();
+
+    // /tasks shows every task the user can see, so the project task
+    // will be in the list even though it wasn't created inline.
+    await alicePage.goto(`${BASE_URL}/tasks`);
 
     const taskItem = alicePage.locator('[data-testid="task-item"]', {
       hasText: taskTitle,
