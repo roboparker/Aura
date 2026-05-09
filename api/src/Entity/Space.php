@@ -87,7 +87,7 @@ class Space
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['space:read'])]
+    #[Groups(['space:read', 'page:read'])]
     private ?Uuid $id = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
@@ -96,7 +96,7 @@ class Space
         max: self::MAX_NAME_LENGTH,
         maxMessage: 'Name cannot be longer than {{ limit }} characters.',
     )]
-    #[Groups(['space:read', 'space:write'])]
+    #[Groups(['space:read', 'space:write', 'page:read'])]
     private string $name = '';
 
     #[ORM\Column(type: 'text', nullable: true)]
