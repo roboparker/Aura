@@ -33,6 +33,7 @@ const NAV_LINKS = [
   { href: "/tasks", label: "Tasks" },
   { href: "/projects", label: "Projects" },
   { href: "/discussions", label: "Discussions" },
+  { href: "/pages", label: "Pages" },
   { href: "/spaces", label: "Spaces" },
   { href: "/groups", label: "Groups" },
   { href: "/tags", label: "Tags" },
