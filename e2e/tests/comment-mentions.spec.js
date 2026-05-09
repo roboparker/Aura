@@ -107,9 +107,9 @@ test.describe("Comment @-mentions", () => {
     // Bob should have one unread mention notification.
     await bobPage.reload();
     await bobPage.locator('[data-testid="notification-bell"]').click();
-    const panel = bobPage.locator('[data-testid="notification-bell-panel"]');
-    await expect(panel).toBeVisible();
-    const item = panel.locator('[data-testid="notification-item"]', {
+    const bellPanel = bobPage.locator('[data-testid="notification-bell-panel"]');
+    await expect(bellPanel).toBeVisible();
+    const item = bellPanel.locator('[data-testid="notification-item"]', {
       hasText: taskTitle,
     });
     await expect(item).toBeVisible();
