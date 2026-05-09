@@ -10,9 +10,16 @@ FROM node_upstream AS base
 
 WORKDIR /srv/app
 
+# Pin pnpm to the version recorded in pwa/package.json's `packageManager`
+# field. Using `pnpm@latest` here would override that pin with whatever
+# was uploaded to npm at CI time — pnpm 11.x in particular requires a
+# `pnpm setup` step to add `/root/.local/share/pnpm/bin` to PATH, and
+# `corepack prepare --activate pnpm@latest` doesn't run it. Result: a
+# rebuild against an unrelated PR fails at this step the next time pnpm
+# ships a major. Pinning explicitly keeps the image reproducible.
 RUN npm install -g corepack@latest && \
     corepack enable && \
-	corepack prepare --activate pnpm@latest && \
+	corepack prepare --activate pnpm@9.1.3 && \
 	pnpm config -g set store-dir /.pnpm-store
 
 # Next.js collects completely anonymous telemetry data about general usage.
