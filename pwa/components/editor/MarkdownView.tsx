@@ -1,5 +1,5 @@
-import { Fragment, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { Children, Fragment, type ReactNode } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 interface MarkdownViewProps {
@@ -52,6 +52,25 @@ const renderMentionsInText = (input: string): ReactNode => {
   );
 };
 
+/**
+ * Walks a children tree from react-markdown and replaces any string leaf
+ * with a mention-aware fragment. react-markdown 10 dropped the `text`
+ * component override that earlier versions had; the only stable seam is
+ * the per-element renderers (`p`, `li`, `em`, …), so we wire each one to
+ * this helper to keep the chip-rendering working.
+ */
+const wrapMentions = (children: ReactNode): ReactNode => {
+  if (typeof children === "string") {
+    return renderMentionsInText(children);
+  }
+  if (Array.isArray(children)) {
+    return Children.map(children, (child, i) => (
+      <Fragment key={i}>{wrapMentions(child)}</Fragment>
+    ));
+  }
+  return children;
+};
+
 // Read-only renderer for stored markdown. react-markdown escapes raw HTML by
 // default (we don't enable rehype-raw), so user input can't inject script tags.
 // Styling lives in globals.css under `.markdown-view` since we don't ship the
@@ -62,15 +81,28 @@ const MarkdownView = ({
   highlightMentions,
 }: MarkdownViewProps) => {
   if (!source) return null;
-  // react-markdown delivers each text leaf as a string child; we walk
-  // it and replace @mention runs with styled spans. Block structure is
-  // preserved because only the leaf renderer is overridden.
-  const components = highlightMentions
+  // react-markdown 10 routes inline text through the parent element's
+  // `children` array, so we override every common inline-bearing element
+  // to chip-wrap their string children. `code` is intentionally absent
+  // — we want `@foo` inside an inline code span to stay literal.
+  const components: Components | undefined = highlightMentions
     ? {
-        text: ({ children }: { children?: ReactNode }) =>
-          typeof children === "string"
-            ? renderMentionsInText(children)
-            : children,
+        p: ({ children }) => <p>{wrapMentions(children)}</p>,
+        li: ({ children }) => <li>{wrapMentions(children)}</li>,
+        em: ({ children }) => <em>{wrapMentions(children)}</em>,
+        strong: ({ children }) => <strong>{wrapMentions(children)}</strong>,
+        del: ({ children }) => <del>{wrapMentions(children)}</del>,
+        h1: ({ children }) => <h1>{wrapMentions(children)}</h1>,
+        h2: ({ children }) => <h2>{wrapMentions(children)}</h2>,
+        h3: ({ children }) => <h3>{wrapMentions(children)}</h3>,
+        h4: ({ children }) => <h4>{wrapMentions(children)}</h4>,
+        h5: ({ children }) => <h5>{wrapMentions(children)}</h5>,
+        h6: ({ children }) => <h6>{wrapMentions(children)}</h6>,
+        td: ({ children }) => <td>{wrapMentions(children)}</td>,
+        th: ({ children }) => <th>{wrapMentions(children)}</th>,
+        blockquote: ({ children }) => (
+          <blockquote>{wrapMentions(children)}</blockquote>
+        ),
       }
     : undefined;
   return (
