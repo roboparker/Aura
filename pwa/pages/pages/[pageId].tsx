@@ -116,21 +116,6 @@ const PageDetailView = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Refetches just the comment thread without flipping `isLoading`.
-  // Posting a comment used to call `load()` which blanked the whole
-  // detail card to "Loading…" mid-flight; on slow CI runners that
-  // race outlived Playwright's 5s default and the new comment never
-  // made it into view before the assertion fired.
-  const refreshComments = useCallback(async (pageIri: string) => {
-    const res = await fetch(
-      `${ENTRYPOINT}/page_comments?page=${encodeURIComponent(pageIri)}&itemsPerPage=100`,
-      { credentials: "include", headers: { Accept: "application/ld+json" } },
-    );
-    if (!res.ok) return;
-    const collection: Collection<PageComment> = await res.json();
-    setComments(collection.member ?? collection["hydra:member"] ?? []);
-  }, []);
-
   const load = useCallback(async () => {
     if (!pid) return;
     setError(null);
@@ -270,8 +255,17 @@ const PageDetailView = () => {
       if (!res.ok) {
         throw new Error(await errorMessage(res));
       }
+      // Optimistic insert from the POST response — same shape as
+      // tasks.tsx's handleCreateComment. Avoids a GET round-trip
+      // racing the assertion (the previous load()/refreshComments
+      // approach was timing out on CI even with isLoading isolated).
+      const created: PageComment = await res.json();
+      setComments((prev) =>
+        prev.some((c) => c["@id"] === created["@id"])
+          ? prev
+          : [...prev, created],
+      );
       setNewComment("");
-      await refreshComments(page["@id"]);
     } catch (err) {
       setCommentError(err instanceof Error ? err.message : "Failed to post.");
     } finally {
