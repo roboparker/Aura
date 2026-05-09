@@ -98,6 +98,14 @@ const ProjectDetail = () => {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskEditorKey, setTaskEditorKey] = useState(0);
 
+  // Move-to-space (#182)
+  const [moveTargetIri, setMoveTargetIri] = useState("");
+  const [isMoving, setIsMoving] = useState(false);
+  const [moveMessage, setMoveMessage] = useState<{
+    text: string;
+    kind: "success" | "error";
+  } | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -234,6 +242,45 @@ const ProjectDetail = () => {
     setProject(updated);
   };
 
+  const handleMove = async () => {
+    if (!project || !moveTargetIri) return;
+    setIsMoving(true);
+    setMoveMessage(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/move`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ space: moveTargetIri }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to move project.",
+        );
+      }
+      const target = spaces.find((s) => s["@id"] === moveTargetIri);
+      setMoveMessage({
+        text: data.moved
+          ? `Moved to "${target?.name ?? "the selected space"}".`
+          : "Already in that space.",
+        kind: "success",
+      });
+      setMoveTargetIri("");
+      await load();
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to move project.",
+        kind: "error",
+      });
+    } finally {
+      setIsMoving(false);
+    }
+  };
+
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -323,6 +370,64 @@ const ProjectDetail = () => {
                         </div>
                       );
                     })()}
+
+                    {/* Move-to-space (#182). Showing every space the
+                        caller belongs to — server enforces the source +
+                        target membership rule, so the dropdown stays
+                        permissive. */}
+                    {spaces.length > 1 && (
+                      <div
+                        className="flex flex-wrap items-center gap-2"
+                        data-testid="project-move-form"
+                      >
+                        <Label
+                          htmlFor="project-move-target"
+                          className="text-xs text-muted-foreground"
+                        >
+                          Move to
+                        </Label>
+                        <select
+                          id="project-move-target"
+                          value={moveTargetIri}
+                          onChange={(e) => setMoveTargetIri(e.target.value)}
+                          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          data-testid="project-move-select"
+                        >
+                          <option value="">Pick a space…</option>
+                          {spaces
+                            .filter((s) => s["@id"] !== projectSpaceIri(project))
+                            .map((s) => (
+                              <option key={s["@id"]} value={s["@id"]}>
+                                {s.name}
+                                {s.isPersonal ? " (Private)" : ""}
+                              </option>
+                            ))}
+                        </select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleMove}
+                          disabled={!moveTargetIri || isMoving}
+                          data-testid="project-move-submit"
+                        >
+                          {isMoving ? "Moving…" : "Move"}
+                        </Button>
+                        {moveMessage && (
+                          <span
+                            role="alert"
+                            className={cn(
+                              "text-xs",
+                              moveMessage.kind === "success"
+                                ? "text-muted-foreground"
+                                : "text-destructive",
+                            )}
+                          >
+                            {moveMessage.text}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {project.members.length > 0 && (
                       <ul
                         className="flex flex-wrap items-center gap-1"
