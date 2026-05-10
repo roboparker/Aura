@@ -2,7 +2,55 @@
 const { test, expect } = require("@playwright/test");
 const { BASE_URL, uniqueEmail } = require("./helpers");
 
+// Stand-in for a route-param value on detail pages. Pages mount and
+// fire their auth check before any data fetch resolves, so the
+// redirect happens whether or not the ID is real.
+const PLACEHOLDER_UUID = "00000000-0000-0000-0000-000000000000";
+
+// Every authed route the PWA exposes (#201). If a new authed page is
+// added without a redirect guard the parameterised test below will
+// fail on it. Pages with route params use PLACEHOLDER_UUID; the auth
+// check runs before any fetch, so a non-existent ID is fine.
+const AUTHED_PATHS = [
+  "/account",
+  "/settings",
+  "/admin",
+  "/my-tasks",
+  "/tasks",
+  "/projects",
+  `/projects/${PLACEHOLDER_UUID}`,
+  `/projects/${PLACEHOLDER_UUID}/custom-fields`,
+  `/projects/${PLACEHOLDER_UUID}/discussions`,
+  `/projects/${PLACEHOLDER_UUID}/discussions/${PLACEHOLDER_UUID}`,
+  "/discussions",
+  "/pages",
+  `/pages/${PLACEHOLDER_UUID}`,
+  "/spaces",
+  `/spaces/${PLACEHOLDER_UUID}`,
+  "/groups",
+  `/groups/${PLACEHOLDER_UUID}`,
+  "/tags",
+  "/search",
+];
+
 test.describe("Auth redirect", () => {
+  for (const path of AUTHED_PATHS) {
+    test(`unauthenticated visit to ${path} redirects to /signin`, async ({
+      page,
+    }) => {
+      await page.goto(`${BASE_URL}${path}`);
+      // Lands on /signin and preserves the original path on ?next so a
+      // subsequent sign-in can bounce the user back. The encoded value
+      // can differ slightly (slashes, query, etc.), so we just check
+      // for the path fragment inside the encoded next param.
+      await expect(page).toHaveURL(/\/signin/);
+      const url = new URL(page.url());
+      const next = url.searchParams.get("next");
+      expect(next, `?next missing for ${path}`).toBeTruthy();
+      expect(next, `?next mismatched for ${path}`).toBe(path);
+    });
+  }
+
   test("unauthenticated visit to a restricted page lands on /signin with ?next, then comes back after login", async ({
     page,
     request,
