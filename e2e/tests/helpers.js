@@ -78,15 +78,23 @@ async function createTaskInline(page, title, options = {}) {
 }
 
 /**
- * Open the right-side "My Account" sheet from the navbar. The trigger
- * is a button (with an aria-label of "Open my account menu") that
- * contains the user's avatar and a hamburger icon. Most authenticated
- * navigation lives inside the sheet, so tests have to open it first.
+ * No-op since the authenticated navigation moved from a triggered
+ * right-side Sheet to a persistent left sidebar (`<aside>` mounted
+ * by Layout). On the desktop viewport Playwright uses, every link
+ * the old "account menu" exposed is already visible without a
+ * click, so callers don't need to open anything. Kept as a function
+ * so the call sites don't have to know about the layout change.
  *
  * @param {import('@playwright/test').Page} page
  */
 async function openAccountMenu(page) {
-  await page.click('button[aria-label="Open my account menu"]');
+  // Sanity-check that the sidebar (or its mobile equivalent) is
+  // mounted, so a missed selector below points at a real bug rather
+  // than a timing issue.
+  await page.locator('[data-testid="app-sidebar"]').first().waitFor({
+    state: "attached",
+    timeout: 5000,
+  });
 }
 
 module.exports = {

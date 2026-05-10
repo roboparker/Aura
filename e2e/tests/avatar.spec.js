@@ -20,8 +20,11 @@ test.describe("Avatar", () => {
       familyName: "Quinn",
     });
 
+    // Avatar now lives in the persistent sidebar header (the old
+    // right-side navbar button is gone). The initials fallback is a
+    // <span> inside that header.
     const avatar = page
-      .locator('button[aria-label="Open my account menu"] span')
+      .locator('[data-testid="sidebar-user-header"] span')
       .first();
     await expect(avatar).toBeVisible();
     await expect(avatar).toHaveText("PQ");
@@ -37,7 +40,7 @@ test.describe("Avatar", () => {
     await page.goto(`${BASE_URL}/account`);
     await page.locator('input[type="file"]').setInputFiles(AVATAR_FIXTURE);
 
-    const avatarImg = page.locator('button[aria-label="Open my account menu"] img');
+    const avatarImg = page.locator('[data-testid="sidebar-user-header"] img');
     await expect(avatarImg).toBeVisible({ timeout: 10000 });
     await expect(avatarImg).toHaveAttribute("src", /\/media\/avatars\/.+\.webp/);
   });

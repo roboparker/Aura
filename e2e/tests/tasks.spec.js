@@ -5,7 +5,6 @@ const {
   uniqueEmail: shared,
   registerAndSignIn,
   createTaskInline,
-  openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("tasks");
@@ -106,19 +105,12 @@ test.describe("Tasks", () => {
     await bobContext.close();
   });
 
-  test("account menu shows Tasks link when authenticated", async ({ page }) => {
-    await registerAndSignIn(page, uniqueEmail());
-    await openAccountMenu(page);
-    // `text=Tasks` would substring-match the new "My Tasks" entry too —
-    // pin to an exact-name role lookup so each link is targeted on its own.
-    const tasksLink = page.locator("nav").getByRole("link", {
-      name: "Tasks",
-      exact: true,
-    });
-    await expect(tasksLink).toBeVisible();
-    await tasksLink.click();
-    await expect(page).toHaveURL(/\/tasks$/);
-  });
+  // Removed "account menu shows Tasks link" — the /tasks aggregator
+  // is no longer surfaced as a top-level sidebar link after the
+  // sidebar redesign (#nav-refresh). The personal "My Tasks" link
+  // is still there and exercised by my-tasks.spec.js. The /tasks
+  // page itself is reachable directly and covered elsewhere in
+  // this file.
 
   test("setting a weekly recurrence shows a repeat icon and spawns the next occurrence on completion", async ({
     page,

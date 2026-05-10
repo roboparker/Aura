@@ -6,7 +6,6 @@ const {
   registerAndSignIn,
   fillDescription,
   createTaskInline,
-  openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("tags");
@@ -174,11 +173,8 @@ test.describe("Tags", () => {
     await bobContext.close();
   });
 
-  test("account menu shows Tags link when authenticated", async ({ page }) => {
-    await registerAndSignIn(page, uniqueEmail());
-    await openAccountMenu(page);
-    await expect(page.locator("nav >> text=Tags")).toBeVisible();
-    await page.locator("nav >> text=Tags").click();
-    await expect(page).toHaveURL(/\/tags/);
-  });
+  // Removed "account menu shows Tags link" — Tags is no longer a
+  // top-level sidebar link after the sidebar redesign
+  // (#nav-refresh). The /tags page is still reachable directly and
+  // covered by the other tests in this file.
 });

@@ -62,9 +62,13 @@ test.describe("Authentication", () => {
     await page.fill("#password", "password123");
     await page.click('button[type="submit"]');
 
-    // Should redirect to account page
+    // Should redirect to account page. The email now appears in two
+    // places after sign-in (sidebar header + main account form), so
+    // scope the assertion to the account page itself.
     await expect(page).toHaveURL(/\/account/);
-    await expect(page.locator(`text=${email}`)).toBeVisible();
+    await expect(
+      page.getByRole("main").getByText(email),
+    ).toBeVisible();
   });
 
   test("sign in with invalid credentials shows error", async ({ page }) => {

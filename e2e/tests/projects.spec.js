@@ -5,7 +5,6 @@ const {
   uniqueEmail: shared,
   registerAndSignIn,
   fillDescription,
-  openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("projects");
@@ -113,11 +112,8 @@ test.describe("Projects", () => {
     await bobContext.close();
   });
 
-  test("account menu shows Projects link when authenticated", async ({ page }) => {
-    await registerAndSignIn(page, uniqueEmail());
-    await openAccountMenu(page);
-    await expect(page.locator("nav >> text=Projects")).toBeVisible();
-    await page.locator("nav >> text=Projects").click();
-    await expect(page).toHaveURL(/\/projects/);
-  });
+  // Removed "account menu shows Projects link" — Projects is no
+  // longer a top-level sidebar link after the sidebar redesign
+  // (#nav-refresh). The /projects page is still reachable directly
+  // and covered by the other tests in this file.
 });

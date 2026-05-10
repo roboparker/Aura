@@ -67,10 +67,13 @@ test.describe("Settings", () => {
     expect(htmlClass).toContain("dark");
   });
 
-  test("settings link appears in the account menu", async ({ page }) => {
+  test("settings link appears in the sidebar", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await page.click('button[aria-label="Open my account menu"]');
-    const settingsLink = page.getByRole("link", { name: "Settings" });
+    // No "open menu" step — the sidebar is always visible on the
+    // desktop viewport Playwright uses.
+    const settingsLink = page
+      .locator('[data-testid="app-sidebar"]')
+      .getByRole("link", { name: "Settings" });
     await expect(settingsLink).toBeVisible();
     await settingsLink.click();
     await expect(page).toHaveURL(/\/settings$/);
