@@ -28,6 +28,22 @@ class UserInviteTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
+    /**
+     * Without this, the EntityManager's PDO connection isn't returned
+     * to Postgres between methods. UserInviteTest has the largest
+     * test count in the suite + creates a fresh `self::createClient()`
+     * inside many of its tests; by the time the full PHPUnit run
+     * lands here, Postgres' default `max_connections=100` is
+     * exhausted and every subsequent connect fails with "too many
+     * clients already" (#209).
+     */
+    protected function tearDown(): void
+    {
+        $this->entityManager->close();
+        self::ensureKernelShutdown();
+        parent::tearDown();
+    }
+
     public function testInvitingExistingUserAddsThemDirectly(): void
     {
         $owner = $this->createUser('alice@example.com');
