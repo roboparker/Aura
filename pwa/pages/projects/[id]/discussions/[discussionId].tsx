@@ -60,6 +60,17 @@ const DiscussionDetailPage = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Move-to-project (#182). Pulls the caller's accessible projects so
+  // the dropdown only lists targets they can actually post in; the
+  // server enforces the same rule.
+  const [accessibleProjects, setAccessibleProjects] = useState<Project[]>([]);
+  const [moveTargetIri, setMoveTargetIri] = useState("");
+  const [isMoving, setIsMoving] = useState(false);
+  const [moveMessage, setMoveMessage] = useState<{
+    text: string;
+    kind: "success" | "error";
+  } | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -71,12 +82,19 @@ const DiscussionDetailPage = () => {
     setError(null);
     setIsLoading(true);
     try {
-      const [projectRes, discussionRes] = await Promise.all([
+      const [projectRes, discussionRes, projectsRes] = await Promise.all([
         fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`, {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
         }),
         fetch(`${ENTRYPOINT}/discussions/${encodeURIComponent(did)}`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+        // Move-target picker needs the user's accessible projects.
+        // The access extension trims this to projects the caller can
+        // read; the server-side move guard re-checks on POST anyway.
+        fetch(`${ENTRYPOINT}/projects?itemsPerPage=100`, {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
         }),
@@ -96,6 +114,13 @@ const DiscussionDetailPage = () => {
       const discussionData: Discussion = await discussionRes.json();
       setProject(projectData);
       setDiscussion(discussionData);
+      if (projectsRes.ok) {
+        const projectsData: { member?: Project[]; "hydra:member"?: Project[] } =
+          await projectsRes.json();
+        setAccessibleProjects(
+          projectsData.member ?? projectsData["hydra:member"] ?? [],
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -206,6 +231,53 @@ const DiscussionDetailPage = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete.");
       setBusy(false);
+    }
+  };
+
+  const handleMove = async () => {
+    if (!discussion || !moveTargetIri) return;
+    setIsMoving(true);
+    setMoveMessage(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/discussions/${encodeURIComponent(discussion.id)}/move`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ project: moveTargetIri }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to move discussion.",
+        );
+      }
+      // The discussion's `project` FK changes, so its canonical URL
+      // changes too — bounce to the new project's discussion detail
+      // path. moveMessage gets a chance to render briefly via the
+      // router transition.
+      const target = accessibleProjects.find((p) => p["@id"] === moveTargetIri);
+      const targetId = target?.id ?? moveTargetIri.split("/").pop();
+      setMoveMessage({
+        text: data.moved
+          ? `Moved to "${target?.title ?? "the selected project"}".`
+          : "Already in that project.",
+        kind: "success",
+      });
+      if (data.moved && targetId) {
+        void router.replace(
+          `/projects/${targetId}/discussions/${discussion.id}`,
+        );
+      }
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to move discussion.",
+        kind: "error",
+      });
+    } finally {
+      setIsMoving(false);
     }
   };
 
@@ -443,6 +515,73 @@ const DiscussionDetailPage = () => {
                         </div>
                       );
                     })()}
+
+                  {/* Move-to-project (#182). Author-or-admin only —
+                      same bar as edit/delete. Hidden when the user
+                      has only the current project (nothing to move
+                      to). The server re-checks target-project
+                      access on POST. */}
+                  {(() => {
+                    const currentUserIri = user ? `/users/${user.id}` : null;
+                    const isAuthor =
+                      currentUserIri === discussion.author["@id"];
+                    const isOwner = user.email === project.owner.email;
+                    const canMove = isAuthor || isOwner;
+                    const otherProjects = accessibleProjects.filter(
+                      (p) => p["@id"] !== project["@id"],
+                    );
+                    if (!canMove || otherProjects.length === 0) return null;
+                    return (
+                      <div
+                        className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t"
+                        data-testid="discussion-move-form"
+                      >
+                        <Label
+                          htmlFor="discussion-move-target"
+                          className="text-xs text-muted-foreground"
+                        >
+                          Move to project
+                        </Label>
+                        <select
+                          id="discussion-move-target"
+                          value={moveTargetIri}
+                          onChange={(e) => setMoveTargetIri(e.target.value)}
+                          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          data-testid="discussion-move-select"
+                        >
+                          <option value="">Pick a project…</option>
+                          {otherProjects.map((p) => (
+                            <option key={p["@id"]} value={p["@id"]}>
+                              {p.title}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleMove()}
+                          disabled={!moveTargetIri || isMoving}
+                          data-testid="discussion-move-submit"
+                        >
+                          {isMoving ? "Moving…" : "Move"}
+                        </Button>
+                        {moveMessage && (
+                          <span
+                            role="alert"
+                            className={
+                              "text-xs " +
+                              (moveMessage.kind === "success"
+                                ? "text-muted-foreground"
+                                : "text-destructive")
+                            }
+                          >
+                            {moveMessage.text}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </>
