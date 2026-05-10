@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
-import { LogOut } from "lucide-react";
+import { Lock, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
@@ -21,14 +22,12 @@ const PERSONAL_NAV_LINKS = [
   { href: "/settings", label: "Settings" },
 ];
 
-const NAV_LINKS = [
-  { href: "/spaces", label: "All Spaces" },
-  { href: "/tasks", label: "Tasks" },
-  { href: "/projects", label: "Projects" },
-  { href: "/discussions", label: "Discussions" },
-  { href: "/pages", label: "Pages" },
-  { href: "/tags", label: "Tags" },
-];
+// The shared section is now a list of accessible spaces (rendered
+// from ActiveSpaceContext at render time, since it's per-user state).
+// "All Spaces" is the only static entry — it's the management
+// surface; each space below is a link to its tabbed detail page
+// (#nav-refresh) which is itself the hub for projects, discussions,
+// pages, and tasks inside that space.
 
 // Backend tooling surfaced inside the PWA chrome. The Mercure debugger
 // is served by Caddy (FrankenPHP), not Next.js, so it's a regular <a>
@@ -53,6 +52,7 @@ interface SidebarNavProps {
  */
 const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { spaces } = useActiveSpace();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
@@ -105,26 +105,61 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
 
         <Separator className="my-2" />
 
-        {NAV_LINKS.map((link) => {
-          const active = router.pathname.startsWith(link.href);
-          return (
-            <span key={link.href}>
-              {wrap(
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "justify-start w-full",
-                    active && "bg-accent text-accent-foreground",
-                  )}
-                >
-                  <Link href={link.href}>{link.label}</Link>
-                </Button>,
+        {/* All Spaces (management) + a flat list of every space the
+            caller belongs to. Each space link goes to the tabbed
+            detail page where the actual content (projects /
+            discussions / pages / tasks) lives. */}
+        <span>
+          {wrap(
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "justify-start w-full",
+                router.pathname === "/spaces" && "bg-accent text-accent-foreground",
               )}
-            </span>
-          );
-        })}
+            >
+              <Link href="/spaces">All Spaces</Link>
+            </Button>,
+          )}
+        </span>
+
+        {spaces.length > 0 && (
+          <ul className="flex flex-col gap-0.5">
+            {spaces.map((s) => {
+              const href = `/spaces/${s.id}`;
+              const active =
+                router.pathname.startsWith("/spaces/") &&
+                router.query.id === s.id;
+              return (
+                <li key={s["@id"]}>
+                  {wrap(
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "justify-start w-full font-normal",
+                        active && "bg-accent text-accent-foreground",
+                      )}
+                    >
+                      <Link href={href} className="flex items-center gap-1.5">
+                        {s.isPersonal && (
+                          <Lock
+                            className="h-3 w-3 shrink-0 text-muted-foreground"
+                            aria-hidden
+                          />
+                        )}
+                        <span className="truncate">{s.name}</span>
+                      </Link>
+                    </Button>,
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
 
         {isAdmin && (
           <>
