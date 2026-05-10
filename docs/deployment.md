@@ -60,6 +60,28 @@ the script.
 
 `.env` is gitignored, so each worktree's values stay local.
 
+### Docker Desktop on Windows: port-forward auto-recovery
+
+Docker Desktop on Windows occasionally stops forwarding traffic from the
+host to the WSL2 distro after sleep/hibernate cycles. Symptom: the
+container's healthcheck (run inside the docker network) keeps reporting
+healthy, but `curl https://localhost` from the host hangs indefinitely
+and the PWA UI sits on "Loading…".
+
+The fix is to restart the affected container so Docker Desktop rebuilds
+the port forward (`docker compose restart php`). To automate this in
+the background, run:
+
+```bash
+scripts/watch-port-forward.sh
+```
+
+The script polls `https://localhost/docs` every 30 seconds and restarts
+the `php` service after 3 consecutive failures. Override defaults via
+env vars (`POLL_INTERVAL`, `FAIL_THRESHOLD`, `WATCH_URL`,
+`WATCH_SERVICE`, `PROBE_TIMEOUT`, `COOLDOWN`). Stop with Ctrl-C; intended
+to run in its own terminal alongside `docker compose up`.
+
 ## Production (Docker Compose)
 
 Use `compose.prod.yaml` with overrides:
