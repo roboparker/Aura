@@ -48,8 +48,8 @@ class ProjectCopyTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
         $project = $this->createProject($alice, 'Template', $source);
-        $this->seedDefinition($project, 'Severity', 'dropdown', ['low', 'med', 'high']);
-        $this->seedDefinition($project, 'Notes', 'text');
+        $this->seedDefinition($project, 'Severity', 'dropdown', ['low', 'med', 'high'], 0);
+        $this->seedDefinition($project, 'Notes', 'text', null, 1);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -215,7 +215,7 @@ class ProjectCopyTest extends ApiTestCase
     /**
      * @param string[]|null $options
      */
-    private function seedDefinition(Project $project, string $name, string $type, ?array $options = null): CustomFieldDefinition
+    private function seedDefinition(Project $project, string $name, string $type, ?array $options = null, int $position = 0): CustomFieldDefinition
     {
         $def = new CustomFieldDefinition();
         $def->setProject($project);
@@ -224,7 +224,7 @@ class ProjectCopyTest extends ApiTestCase
         if (null !== $options) {
             $def->setOptions($options);
         }
-        $def->setPosition(0);
+        $def->setPosition($position);
         $this->entityManager->persist($def);
         $this->entityManager->flush();
         return $def;
