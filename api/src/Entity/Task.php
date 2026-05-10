@@ -60,7 +60,11 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'assignees' => 'exact', 'tags' => 'exact'])]
+// `project.space` lets the space detail page list every task across
+// every project in a space without doing a fan-out fetch over each
+// project. Access scoping still goes through TaskOwnerExtension +
+// SpaceMembershipDql so this can't widen what the caller can see.
+#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'project.space' => 'exact', 'assignees' => 'exact', 'tags' => 'exact'])]
 #[ApiFilter(DateFilter::class, properties: ['dueDate'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdOn', 'dueDate', 'title', 'completedOn'], arguments: ['orderParameterName' => 'order'])]
 #[ApiFilter(OverdueFilter::class)]
