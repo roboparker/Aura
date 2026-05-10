@@ -36,18 +36,20 @@ services:
         protocol: udp
     healthcheck:
       test: curl --insecure --fail https://localhost/docs || exit 1
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 20
       start_period: 60s
-  
+
   pwa:
     image: ${IMAGES_PREFIX:-}app-pwa
     environment:
       NEXT_PUBLIC_ENTRYPOINT: http://php
     healthcheck:
       test: curl -f http://localhost:3000 || exit 1
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 20
       start_period: 60s
 
   mailpit:
@@ -70,8 +72,9 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-app}
     healthcheck:
       test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB:-app}", "-U", "${POSTGRES_USER:-app}"]
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 20
       start_period: 60s
     volumes:
       - database_data:/var/lib/postgresql/data:rw

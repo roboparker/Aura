@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
 
 const Layout = ({
   children,
@@ -34,7 +35,15 @@ const Layout = ({
           <AuthProvider>
             <ActiveSpaceProvider>
               <Navbar />
-              {children}
+              {/* Persistent left sidebar (`md:` and up) when signed
+                  in; the navbar's mobile Sheet handles the small-
+                  screen case. Sidebar renders nothing for
+                  unauthenticated visitors so the marketing/auth
+                  screens keep their original full-width layout. */}
+              <div className="flex">
+                <Sidebar />
+                <div className="flex-1 min-w-0">{children}</div>
+              </div>
             </ActiveSpaceProvider>
           </AuthProvider>
         </HydrationBoundary>
