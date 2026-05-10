@@ -1407,6 +1407,22 @@ const Tasks = () => {
     : "";
 
   const loadData = useCallback(async (signal?: AbortSignal) => {
+    // Snapshot tasks-state identity at the start of the fan-out. If
+    // anything mutates `tasks` between now and when our response lands
+    // (a handleToggle / handleCreate / etc. firing optimistically),
+    // the reference will change and we drop the response on the floor
+    // — otherwise the late server snapshot stomps the user's
+    // optimistic edit back to whatever was committed when the GET was
+    // issued. This is the root cause of the long-running uncheck flake
+    // (#205): debug logs showed two `loadData` responses landing
+    // *after* the optimistic uncomplete, each overwriting tasks state.
+    // AbortController on the effect (#193) catches one source but
+    // can't catch races where the loadData was already past the
+    // signal check, and the trace in #205 shows additional loadData
+    // calls with no matching effect-mount log — covering whatever the
+    // additional source is, this guard makes the responses safe to
+    // arrive late.
+    const tasksSnapshot = tasksRef.current;
     setError(null);
     try {
       // Tasks, tags, the assignable-users universe, and the projects-with-
@@ -1458,12 +1474,21 @@ const Tasks = () => {
         console.warn("[loadData:aborted-after-parse]");
         return;
       }
-      const _loaded = tasksData.member ?? tasksData["hydra:member"] ?? [];
-      console.warn(
-        "[loadData:setTasks]",
-        _loaded.map((t: Task) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
-      );
-      setTasks(_loaded);
+      // Identity guard — see comment at the top of this callback. If a
+      // local mutation slipped in while we were waiting, dropping our
+      // tasks-stomp is the right move; the tag / assignable-user /
+      // project-member lists below are still safe to refresh since
+      // none of them carry optimistic UI state.
+      if (tasksRef.current !== tasksSnapshot) {
+        console.warn("[loadData:stale-snapshot-skipped-setTasks]");
+      } else {
+        const _loaded = tasksData.member ?? tasksData["hydra:member"] ?? [];
+        console.warn(
+          "[loadData:setTasks]",
+          _loaded.map((t: Task) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
+        );
+        setTasks(_loaded);
+      }
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
       setAssignableUsers(
         assignablesData.member ?? assignablesData["hydra:member"] ?? [],
