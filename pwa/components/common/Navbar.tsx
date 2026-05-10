@@ -20,7 +20,6 @@ import NotificationBell from "@/components/notifications/NotificationBell";
 import OverdueBadge from "@/components/tasks/OverdueBadge";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
-import SpaceSwitcher from "./SpaceSwitcher";
 import ThemeToggle from "./ThemeToggle";
 
 const Navbar = () => {
@@ -28,8 +27,8 @@ const Navbar = () => {
 
   return (
     <nav className="border-b bg-background">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-1">
+      <div className="px-4 py-3 flex items-center gap-3">
+        <div className="flex items-center gap-1 shrink-0">
           <Link
             href="/"
             className="font-bold text-lg no-underline text-foreground mr-2"
@@ -52,13 +51,20 @@ const Navbar = () => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          {isAuthenticated && <SpaceSwitcher />}
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* SearchBar stretches into the empty space between the
+            wordmark/Docs group and the right-side action cluster.
+            `max-w-3xl` keeps it from looking comical on very wide
+            viewports. Hidden on small screens via SearchBar's own
+            `hidden sm:block`. */}
+        {isAuthenticated && (
+          <SearchBar className="flex-1 min-w-0 max-w-3xl" />
+        )}
+
+        <div className="flex items-center gap-1 shrink-0 ml-auto">
           {isAuthenticated ? (
             <>
-              <SearchBar />
               <OverdueBadge enabled={isAuthenticated} />
               <NotificationBell enabled={isAuthenticated} />
               <ThemeToggle />

@@ -36,7 +36,16 @@ const DEBOUNCE_MS = 220;
  * back on /search via a deep link. ⌘/Ctrl+K focuses the input from
  * anywhere in the app.
  */
-const SearchBar = () => {
+interface SearchBarProps {
+  /**
+   * Extra classes applied to the outer wrapper. The navbar uses this
+   * to make the bar grow into the empty space between the left
+   * (wordmark) and right (badges / bell / theme) groups.
+   */
+  className?: string;
+}
+
+const SearchBar = ({ className }: SearchBarProps = {}) => {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -177,7 +186,10 @@ const SearchBar = () => {
   const showDropdown = open && trimmedDraft.length > 0;
 
   return (
-    <div ref={containerRef} className="relative hidden sm:block">
+    <div
+      ref={containerRef}
+      className={cn("relative hidden sm:block", className)}
+    >
       <form onSubmit={submit} role="search" aria-label="Search tasks">
         <div className="relative">
           <Search
@@ -195,7 +207,7 @@ const SearchBar = () => {
             onFocus={() => setOpen(true)}
             onKeyDown={onKeyDown}
             placeholder="Search tasks…  ⌘K"
-            className="h-8 w-56 pl-8"
+            className="h-8 w-full pl-8"
             data-testid="navbar-search"
             aria-label="Search tasks"
             aria-autocomplete="list"
@@ -241,7 +253,7 @@ const SearchAutocomplete = ({
   <div
     id="search-autocomplete"
     role="listbox"
-    className="absolute right-0 top-full mt-1 w-80 rounded-md border bg-popover text-popover-foreground shadow-md z-50"
+    className="absolute left-0 right-0 top-full mt-1 min-w-[20rem] rounded-md border bg-popover text-popover-foreground shadow-md z-50"
     data-testid="search-autocomplete"
   >
     {loading && results.length === 0 ? (

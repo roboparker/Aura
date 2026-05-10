@@ -61,7 +61,10 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start gap-3 px-4 pt-4 pb-3">
+      <div
+        className="flex items-start gap-3 px-4 pt-4 pb-3"
+        data-testid="sidebar-user-header"
+      >
         <UserAvatar user={user} size="sm" />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate">{displayName(user)}</p>
