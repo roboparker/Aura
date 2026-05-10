@@ -13,6 +13,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  SpaceDiscussionsList,
+  SpacePagesList,
+  SpaceProjectsList,
+  SpaceTasksList,
+} from "@/components/spaces/SpaceContentTabs";
+
+// Tab keys live in the URL (`?tab=...`) so deep links and the
+// browser back-button work naturally. Unknown values fall back to
+// the Overview tab.
+const TABS = ["overview", "projects", "discussions", "pages", "tasks"] as const;
+type TabKey = (typeof TABS)[number];
+const isTabKey = (v: unknown): v is TabKey =>
+  typeof v === "string" && (TABS as readonly string[]).includes(v);
 
 interface PendingInvite {
   id: string;
@@ -48,6 +63,30 @@ const SpaceDetail = () => {
     text: string;
     kind: "success" | "error";
   } | null>(null);
+
+  // Tab state — driven by `?tab=` so the back button works and deep
+  // links land on the chosen tab. Falls back to overview for missing
+  // or unknown values.
+  const queryTab = router.query.tab;
+  const activeTab: TabKey = isTabKey(queryTab) ? queryTab : "overview";
+  const handleTabChange = (value: string) => {
+    if (!isTabKey(value)) return;
+    const nextTab: TabKey = value;
+    // Carry forward everything except the old `tab` value so a
+    // deep-link with extra search params (e.g. a future ?invite=…)
+    // survives the switch.
+    const nextQuery: Record<string, string | string[]> = {};
+    for (const [k, v] of Object.entries(router.query)) {
+      if (k === "tab" || v === undefined) continue;
+      nextQuery[k] = v as string | string[];
+    }
+    if (nextTab !== "overview") nextQuery.tab = nextTab;
+    void router.replace(
+      { pathname: router.pathname, query: nextQuery },
+      undefined,
+      { shallow: true },
+    );
+  };
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -295,57 +334,73 @@ const SpaceDetail = () => {
                 </Alert>
               )}
 
-              <Card className="mb-6">
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <h1 className="text-2xl font-bold">{space.name}</h1>
-                    <div className="flex gap-1">
-                      {space.isPersonal && <Badge variant="secondary">Private</Badge>}
-                      {isAdmin && !space.isPersonal && (
-                        <Badge variant="secondary">Admin</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {isAdmin && !space.isPersonal ? (
-                    <form onSubmit={handleSaveMeta} className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="space-name">Name</Label>
-                        <Input
-                          id="space-name"
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          maxLength={255}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="space-description">Description</Label>
-                        <Input
-                          id="space-description"
-                          type="text"
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          maxLength={500}
-                        />
-                      </div>
-                      <Button type="submit" size="sm" disabled={isSavingMeta}>
-                        {isSavingMeta ? "Saving…" : "Save"}
-                      </Button>
-                    </form>
-                  ) : (
-                    space.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {space.description}
-                      </p>
-                    )
+              {/* Space header sits OUTSIDE the tab strip — name + role
+                  badges are global context. Edit-metadata moves into
+                  the Overview tab below. */}
+              <div className="flex items-start justify-between gap-2 mb-4">
+                <h1 className="text-2xl font-bold">{space.name}</h1>
+                <div className="flex gap-1">
+                  {space.isPersonal && <Badge variant="secondary">Private</Badge>}
+                  {isAdmin && !space.isPersonal && (
+                    <Badge variant="secondary">Admin</Badge>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
 
-              <Card className="mb-6">
-                <CardContent className="pt-6">
-                  <h2 className="text-lg font-semibold mb-3">Members</h2>
+              <Tabs value={activeTab} onValueChange={handleTabChange}>
+                <TabsList className="mb-4">
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  <TabsTrigger value="projects">Projects</TabsTrigger>
+                  <TabsTrigger value="discussions">Discussions</TabsTrigger>
+                  <TabsTrigger value="pages">Pages</TabsTrigger>
+                  <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview" className="space-y-6 mt-0">
+                  {isAdmin && !space.isPersonal && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <form onSubmit={handleSaveMeta} className="space-y-3">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="space-name">Name</Label>
+                            <Input
+                              id="space-name"
+                              type="text"
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              maxLength={255}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label htmlFor="space-description">Description</Label>
+                            <Input
+                              id="space-description"
+                              type="text"
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              maxLength={500}
+                            />
+                          </div>
+                          <Button type="submit" size="sm" disabled={isSavingMeta}>
+                            {isSavingMeta ? "Saving…" : "Save"}
+                          </Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  )}
+                  {(!isAdmin || space.isPersonal) && space.description && (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <p className="text-sm text-muted-foreground">
+                          {space.description}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h2 className="text-lg font-semibold mb-3">Members</h2>
                   <ul className="flex flex-wrap items-center gap-1 mb-3" data-testid="space-member-list">
                     {space.userMemberships.map((membership) => {
                       const isSelf = membership.user.id === user.id;
@@ -490,6 +545,36 @@ const SpaceDetail = () => {
                   </CardContent>
                 </Card>
               )}
+                </TabsContent>
+
+                <TabsContent value="projects" className="mt-0">
+                  <SpaceProjectsList
+                    spaceIri={space["@id"]}
+                    enabled={activeTab === "projects"}
+                  />
+                </TabsContent>
+
+                <TabsContent value="discussions" className="mt-0">
+                  <SpaceDiscussionsList
+                    spaceIri={space["@id"]}
+                    enabled={activeTab === "discussions"}
+                  />
+                </TabsContent>
+
+                <TabsContent value="pages" className="mt-0">
+                  <SpacePagesList
+                    spaceIri={space["@id"]}
+                    enabled={activeTab === "pages"}
+                  />
+                </TabsContent>
+
+                <TabsContent value="tasks" className="mt-0">
+                  <SpaceTasksList
+                    spaceIri={space["@id"]}
+                    enabled={activeTab === "tasks"}
+                  />
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </div>
