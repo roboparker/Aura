@@ -118,6 +118,10 @@ const PageDetailView = () => {
     kind: "success" | "error";
   } | null>(null);
 
+  // Copy-to-space (#182). Shares the picker with Move; reuses
+  // moveMessage for errors.
+  const [isCopying, setIsCopying] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -333,6 +337,43 @@ const PageDetailView = () => {
     }
   };
 
+  const handleCopy = async () => {
+    if (!page) return;
+    setIsCopying(true);
+    setMoveMessage(null);
+    try {
+      // Empty body = clone into the source's own space; specifying a
+      // target uses the picker's current selection.
+      const body = moveTargetIri ? { space: moveTargetIri } : {};
+      const res = await fetch(
+        `${ENTRYPOINT}/pages/${encodeURIComponent(page.id)}/copy`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to copy page.",
+        );
+      }
+      // Drop the user on the freshly-cloned page.
+      if (data.id) {
+        await router.push(`/pages/${data.id}`);
+      }
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to copy page.",
+        kind: "error",
+      });
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -468,10 +509,12 @@ const PageDetailView = () => {
                     </span>
                   </div>
 
-                  {/* Move-to-space (#182) — author or space admin only,
+                  {/* Move / Copy (#182) — author or space admin only,
                       since moving cross-space silently clears the parent
-                      FK. Hidden when the user only has one space. */}
-                  {canEdit && spaces.length > 1 && (
+                      FK. Move is disabled when there's nowhere else to
+                      go; Copy works with no target (clones into the
+                      current space). */}
+                  {canEdit && (
                     <div
                       className="flex flex-wrap items-center gap-2 mb-4"
                       data-testid="page-move-form"
@@ -503,10 +546,25 @@ const PageDetailView = () => {
                         size="sm"
                         variant="outline"
                         onClick={handleMove}
-                        disabled={!moveTargetIri || isMoving}
+                        disabled={!moveTargetIri || isMoving || isCopying}
                         data-testid="page-move-submit"
                       >
                         {isMoving ? "Moving…" : "Move"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCopy}
+                        disabled={isMoving || isCopying}
+                        data-testid="page-copy-submit"
+                        title={
+                          moveTargetIri
+                            ? "Copy this page into the selected space"
+                            : "Copy this page into its current space"
+                        }
+                      >
+                        {isCopying ? "Copying…" : "Copy"}
                       </Button>
                       {moveMessage && (
                         <span
