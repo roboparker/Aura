@@ -1,0 +1,283 @@
+<?php
+
+namespace App\Tests\Api;
+
+use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Page;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
+use App\Entity\User;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+
+/**
+ * `POST /pages/{id}/copy` — clones a page into a target space (#182).
+ */
+class PageCopyTest extends ApiTestCase
+{
+    use SpaceMembershipFixture;
+
+    private EntityManagerInterface $entityManager;
+
+    protected function setUp(): void
+    {
+        $kernel = self::bootKernel();
+        $this->entityManager = $kernel->getContainer()
+            ->get('doctrine')
+            ->getManager();
+
+        $this->entityManager->createQuery('DELETE FROM App\Entity\PageComment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
+    }
+
+    public function testRequiresAuth(): void
+    {
+        static::createClient()->request('POST', '/pages/' . str_repeat('0', 36) . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testCopiesIntoSourceSpaceByDefault(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $page = $this->seedPage($alice, $source, 'Onboarding', null, 'Welcome to the team.');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $body = $client->getResponse()->toArray();
+        $this->assertSame('Onboarding (copy)', $body['title']);
+        $this->assertSame('/spaces/' . $source->getId(), $body['space']);
+
+        $this->entityManager->clear();
+        $copy = $this->entityManager->getRepository(Page::class)->find($body['id']);
+        $this->assertNotNull($copy);
+        $this->assertSame('Welcome to the team.', $copy->getBody());
+        $this->assertSame((string) $alice->getId(), (string) $copy->getCreatedBy()->getId());
+        // Clone is top-level even if source was top-level — explicit
+        // null on parent so we don't accidentally inherit something
+        // weird from the source row.
+        $this->assertNull($copy->getParent());
+    }
+
+    public function testCopiesIntoExplicitTargetSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $target = $this->createSpace($alice, 'Target');
+        $page = $this->seedPage($alice, $source, 'Spec');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => ['space' => '/spaces/' . $target->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+
+        $this->entityManager->clear();
+        $copy = $this->entityManager->getRepository(Page::class)
+            ->find($client->getResponse()->toArray()['id']);
+        $this->assertSame((string) $target->getId(), (string) $copy->getSpace()->getId());
+    }
+
+    public function testCopyDoesNotDoubleSuffix(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $page = $this->seedPage($alice, $source, 'Notes (copy)');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('Notes (copy)', $client->getResponse()->toArray()['title']);
+    }
+
+    public function testCopyOwnerIsCurrentUserNotSourceCreator(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $source = $this->createSpace($alice, 'Shared');
+        $this->ensureSpaceMembership($source, $bob);
+        $page = $this->seedPage($alice, $source, 'Aliceʼs page');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $copy = $this->entityManager->getRepository(Page::class)
+            ->find($client->getResponse()->toArray()['id']);
+        $this->assertSame((string) $bob->getId(), (string) $copy->getCreatedBy()->getId());
+    }
+
+    public function testCopyDropsParentEvenWithinSameSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $parent = $this->seedPage($alice, $source, 'Parent');
+        $child = $this->seedPage($alice, $source, 'Child', $parent);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $child->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $copy = $this->entityManager->getRepository(Page::class)
+            ->find($client->getResponse()->toArray()['id']);
+        $this->assertNull(
+            $copy->getParent(),
+            'A copy is always top-level — descendants do not transplant in v1.',
+        );
+
+        // Source's parent + child stay intact.
+        $reloadedChild = $this->entityManager->getRepository(Page::class)->find($child->getId());
+        $this->assertSame(
+            (string) $parent->getId(),
+            (string) $reloadedChild->getParent()->getId(),
+        );
+    }
+
+    public function testNonMemberOfSourceGets404(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $stranger = $this->createUser('stranger@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $page = $this->seedPage($alice, $source, 'Hidden');
+
+        $client = static::createClient();
+        $client->loginUser($stranger);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testNonMemberOfTargetGets404(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $this->ensureSpaceMembership($source, $bob);
+        $target = $this->createSpace($alice, 'Target');
+        $page = $this->seedPage($alice, $source, 'Page');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => ['space' => '/spaces/' . $target->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testInvalidSpaceIriGets400(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $page = $this->seedPage($alice, $source, 'Page');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => ['space' => 'not-a-real-iri'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testAcceptsBareUuidAsTarget(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $target = $this->createSpace($alice, 'Target');
+        $page = $this->seedPage($alice, $source, 'Page');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $page->getId() . '/copy', [
+            'json' => ['space' => (string) $target->getId()],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+    }
+
+    private function seedPage(User $author, Space $space, string $title, ?Page $parent = null, string $body = 'Body'): Page
+    {
+        $page = new Page();
+        $page->setSpace($space);
+        $page->setCreatedBy($author);
+        $page->setTitle($title);
+        $page->setBody($body);
+        if (null !== $parent) {
+            $page->setParent($parent);
+        }
+        $this->entityManager->persist($page);
+        $this->entityManager->flush();
+        return $page;
+    }
+
+    private function createSpace(User $owner, string $name): Space
+    {
+        $space = new Space();
+        $space->setName($name);
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+
+        $admin = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($admin);
+        $this->entityManager->persist($admin);
+        $this->entityManager->flush();
+        return $space;
+    }
+
+    /**
+     * @param string[] $roles
+     */
+    private function createUser(string $email, array $roles = ['ROLE_USER']): User
+    {
+        $container = static::getContainer();
+        /** @var UserPasswordHasherInterface $hasher */
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $user = new User();
+        $user->setEmail($email);
+        $user->setRoles($roles);
+        $user->setGivenName('Test');
+        $user->setFamilyName('User');
+        $user->setPersonalizedColor('#0369a1');
+        $user->setPassword($hasher->hashPassword($user, 'password123'));
+
+        $this->entityManager->persist($user);
+        $this->entityManager->flush();
+
+        return $user;
+    }
+}
