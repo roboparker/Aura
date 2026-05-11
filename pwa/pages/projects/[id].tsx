@@ -113,6 +113,9 @@ const ProjectDetail = () => {
   // Opt-in deep-copy: when true, the POST body asks the server to
   // also clone the project's tasks (#182 deep-copy slice).
   const [copyIncludeTasks, setCopyIncludeTasks] = useState(false);
+  // Opt-in deep-copy: also clone the project's discussion threads
+  // (#182 deep-copy slice).
+  const [copyIncludeDiscussions, setCopyIncludeDiscussions] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -296,10 +299,16 @@ const ProjectDetail = () => {
     try {
       // Empty body = clone into the source's own space; specifying a
       // target uses the picker's current selection. The server accepts
-      // both shapes. `includeTasks` is opt-in deep-copy.
-      const body: { space?: string; includeTasks?: boolean } = {};
+      // both shapes. `includeTasks` / `includeDiscussions` are opt-in
+      // deep-copy flags.
+      const body: {
+        space?: string;
+        includeTasks?: boolean;
+        includeDiscussions?: boolean;
+      } = {};
       if (moveTargetIri) body.space = moveTargetIri;
       if (copyIncludeTasks) body.includeTasks = true;
+      if (copyIncludeDiscussions) body.includeDiscussions = true;
       const res = await fetch(
         `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/copy`,
         {
@@ -494,6 +503,21 @@ const ProjectDetail = () => {
                             data-testid="project-copy-include-tasks"
                           />
                           include tasks
+                        </label>
+                        <label
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+                          data-testid="project-copy-include-discussions-label"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={copyIncludeDiscussions}
+                            onChange={(e) =>
+                              setCopyIncludeDiscussions(e.target.checked)
+                            }
+                            className="h-3.5 w-3.5"
+                            data-testid="project-copy-include-discussions"
+                          />
+                          include discussions
                         </label>
                         {moveMessage && (
                           <span
