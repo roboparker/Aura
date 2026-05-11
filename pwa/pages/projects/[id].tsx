@@ -106,6 +106,11 @@ const ProjectDetail = () => {
     kind: "success" | "error";
   } | null>(null);
 
+  // Copy-to-space (#182). Reuses the same target picker but POSTs to
+  // /copy instead of /move. On success we navigate to the new
+  // project's detail page so the user lands on the clone.
+  const [isCopying, setIsCopying] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -281,6 +286,45 @@ const ProjectDetail = () => {
     }
   };
 
+  const handleCopy = async () => {
+    if (!project) return;
+    setIsCopying(true);
+    setMoveMessage(null);
+    try {
+      // Empty body = clone into the source's own space; specifying a
+      // target uses the picker's current selection. The server accepts
+      // both shapes.
+      const body = moveTargetIri ? { space: moveTargetIri } : {};
+      const res = await fetch(
+        `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/copy`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to copy project.",
+        );
+      }
+      // Land the user on the freshly-cloned project so they can rename
+      // it or start filling it in.
+      if (data.id) {
+        await router.push(`/projects/${data.id}`);
+      }
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to copy project.",
+        kind: "error",
+      });
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -371,15 +415,16 @@ const ProjectDetail = () => {
                       );
                     })()}
 
-                    {/* Move-to-space (#182). Showing every space the
-                        caller belongs to — server enforces the source +
-                        target membership rule, so the dropdown stays
-                        permissive. */}
-                    {spaces.length > 1 && (
-                      <div
-                        className="flex flex-wrap items-center gap-2"
-                        data-testid="project-move-form"
-                      >
+                    {/* Move / Copy (#182). Showing every space the
+                        caller belongs to — server enforces the source
+                        + target membership rule. Move is disabled
+                        when there's nowhere else to go; Copy works
+                        with no target (clones into the current
+                        space). */}
+                    <div
+                      className="flex flex-wrap items-center gap-2"
+                      data-testid="project-move-form"
+                    >
                         <Label
                           htmlFor="project-move-target"
                           className="text-xs text-muted-foreground"
@@ -408,10 +453,25 @@ const ProjectDetail = () => {
                           size="sm"
                           variant="outline"
                           onClick={handleMove}
-                          disabled={!moveTargetIri || isMoving}
+                          disabled={!moveTargetIri || isMoving || isCopying}
                           data-testid="project-move-submit"
                         >
                           {isMoving ? "Moving…" : "Move"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCopy}
+                          disabled={isMoving || isCopying}
+                          data-testid="project-copy-submit"
+                          title={
+                            moveTargetIri
+                              ? "Copy this project into the selected space"
+                              : "Copy this project into its current space"
+                          }
+                        >
+                          {isCopying ? "Copying…" : "Copy"}
                         </Button>
                         {moveMessage && (
                           <span
@@ -427,7 +487,6 @@ const ProjectDetail = () => {
                           </span>
                         )}
                       </div>
-                    )}
                     {project.members.length > 0 && (
                       <ul
                         className="flex flex-wrap items-center gap-1"

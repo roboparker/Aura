@@ -65,6 +65,17 @@ services:
   ###> doctrine/doctrine-bundle ###
   database:
     image: postgres:${POSTGRES_VERSION:-16}-alpine
+    # Bump Postgres' default 100-connection cap. PHPUnit runs in a
+    # single process but every test method boots a fresh API Platform
+    # kernel via `static::createClient()`, and the test container
+    # holds its EntityManager + PDO connection open until kernel
+    # shutdown. A full suite run accumulates well past 100 — most
+    # visibly in UserInviteTest, which sits near the end alphabetically
+    # and used to error with "FATAL: too many clients already" (#209).
+    # 300 is comfortable headroom for the current ~436-test suite and
+    # leaves plenty for parallel processes; raise if/when the suite
+    # grows substantially.
+    command: postgres -c max_connections=300
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-app}
       # You should definitely change the password in production
