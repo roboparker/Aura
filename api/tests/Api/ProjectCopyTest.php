@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
+use App\Entity\Discussion;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
@@ -32,6 +33,7 @@ class ProjectCopyTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -344,6 +346,160 @@ class ProjectCopyTest extends ApiTestCase
             ->findBy(['project' => $copyId], ['position' => 'ASC']);
         $titlesByPosition = array_map(fn (Task $t) => $t->getTitle(), $cloned);
         $this->assertSame(['A', 'B', 'C'], $titlesByPosition);
+    }
+
+    public function testIncludeDiscussionsFalseLeavesThreadsOnSourceOnly(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $project = $this->createProject($alice, 'Backend', $source);
+        $this->seedDiscussion($alice, $project, 'Kickoff', 'Welcome');
+        $this->seedDiscussion($alice, $project, 'RFC: API shape', 'Should we…');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(0, $client->getResponse()->toArray()['discussionsCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        $cloneDiscussions = $this->entityManager->getRepository(Discussion::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(0, $cloneDiscussions);
+
+        // Source's threads untouched.
+        $sourceDiscussions = $this->entityManager->getRepository(Discussion::class)
+            ->findBy(['project' => $project]);
+        $this->assertCount(2, $sourceDiscussions);
+    }
+
+    public function testIncludeDiscussionsClonesContentAndCategory(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $project = $this->createProject($alice, 'Backend', $source);
+        $thread = $this->seedDiscussion(
+            $alice,
+            $project,
+            'Naming bikeshed',
+            'Let us argue forever.',
+            Discussion::CATEGORY_IDEAS,
+        );
+        // Source thread is pinned + locked — those should NOT carry
+        // (they're moderation state, not content).
+        $thread->setIsPinned(true);
+        $thread->setIsLocked(true);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => ['includeDiscussions' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(1, $client->getResponse()->toArray()['discussionsCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        /** @var Discussion[] $cloned */
+        $cloned = $this->entityManager->getRepository(Discussion::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(1, $cloned);
+        $this->assertSame('Naming bikeshed', $cloned[0]->getTitle());
+        $this->assertSame('Let us argue forever.', $cloned[0]->getBody());
+        $this->assertSame(Discussion::CATEGORY_IDEAS, $cloned[0]->getCategory());
+        $this->assertFalse($cloned[0]->isPinned(), 'Clone resets pin state.');
+        $this->assertFalse($cloned[0]->isLocked(), 'Clone resets lock state.');
+    }
+
+    public function testIncludeDiscussionsAuthorIsCallerNotSourceAuthor(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $source = $this->createSpace($alice, 'Shared');
+        $this->ensureSpaceMembership($source, $bob);
+        $project = $this->createProject($alice, 'P', $source);
+        $this->seedDiscussion($alice, $project, 'Aliceʼs thread', 'Posted by Alice.');
+
+        // Bob copies — clone's discussion author should be Bob.
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => ['includeDiscussions' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        /** @var Discussion[] $cloned */
+        $cloned = $this->entityManager->getRepository(Discussion::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(1, $cloned);
+        $this->assertSame(
+            (string) $bob->getId(),
+            (string) $cloned[0]->getAuthor()->getId(),
+            'Clone thread author = caller (fresh audit history).',
+        );
+    }
+
+    public function testIncludeDiscussionsCarriesIntoOtherSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $target = $this->createSpace($alice, 'Target');
+        $project = $this->createProject($alice, 'P', $source);
+        $this->seedDiscussion($alice, $project, 'A', 'a');
+        $this->seedDiscussion($alice, $project, 'B', 'b');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => [
+                'space' => '/spaces/' . $target->getId(),
+                'includeDiscussions' => true,
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(2, $client->getResponse()->toArray()['discussionsCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        /** @var Discussion[] $cloned */
+        $cloned = $this->entityManager->getRepository(Discussion::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(2, $cloned);
+        foreach ($cloned as $thread) {
+            $this->assertSame(
+                (string) $target->getId(),
+                (string) $thread->getSpace()->getId(),
+                'Cloned thread\'s denormalised space follows the target project\'s space.',
+            );
+        }
+    }
+
+    private function seedDiscussion(
+        User $author,
+        Project $project,
+        string $title,
+        string $body,
+        string $category = Discussion::CATEGORY_GENERAL,
+    ): Discussion {
+        $discussion = new Discussion();
+        $discussion->setProject($project);
+        $discussion->setAuthor($author);
+        $discussion->setTitle($title);
+        $discussion->setBody($body);
+        $discussion->setCategory($category);
+        $this->entityManager->persist($discussion);
+        $this->entityManager->flush();
+        return $discussion;
     }
 
     /**
