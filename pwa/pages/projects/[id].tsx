@@ -110,6 +110,9 @@ const ProjectDetail = () => {
   // /copy instead of /move. On success we navigate to the new
   // project's detail page so the user lands on the clone.
   const [isCopying, setIsCopying] = useState(false);
+  // Opt-in deep-copy: when true, the POST body asks the server to
+  // also clone the project's tasks (#182 deep-copy slice).
+  const [copyIncludeTasks, setCopyIncludeTasks] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -293,8 +296,10 @@ const ProjectDetail = () => {
     try {
       // Empty body = clone into the source's own space; specifying a
       // target uses the picker's current selection. The server accepts
-      // both shapes.
-      const body = moveTargetIri ? { space: moveTargetIri } : {};
+      // both shapes. `includeTasks` is opt-in deep-copy.
+      const body: { space?: string; includeTasks?: boolean } = {};
+      if (moveTargetIri) body.space = moveTargetIri;
+      if (copyIncludeTasks) body.includeTasks = true;
       const res = await fetch(
         `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/copy`,
         {
@@ -473,6 +478,23 @@ const ProjectDetail = () => {
                         >
                           {isCopying ? "Copying…" : "Copy"}
                         </Button>
+                        {/* Deep-copy opt-in. Hidden until the user
+                            actually intends to copy — Move ignores it. */}
+                        <label
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+                          data-testid="project-copy-include-tasks-label"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={copyIncludeTasks}
+                            onChange={(e) =>
+                              setCopyIncludeTasks(e.target.checked)
+                            }
+                            className="h-3.5 w-3.5"
+                            data-testid="project-copy-include-tasks"
+                          />
+                          include tasks
+                        </label>
                         {moveMessage && (
                           <span
                             role="alert"
