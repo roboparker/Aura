@@ -17,19 +17,22 @@ use Symfony\Component\Uid\Uuid;
  * Deep-clones a page into a target space (#182). Pair to
  * ProjectCopyController.
  *
- * Scope (v1):
+ * Scope:
  *  - Title + body carry over. Title gets a " (copy)" suffix
  *    (idempotent — repeated copies don't pile up "(copy) (copy)").
  *  - Clone's `createdBy` is the current user. Fresh audit history.
- *  - Clone is top-level in the target (no parent). Even when copying
- *    within the same space we drop the parent FK so the clone reads
- *    as "a new doc" rather than a sibling of the source.
- *  - Descendant pages and PageComments are NOT copied. That's a
- *    heavier slice — pages are intentionally hierarchical, and a
- *    recursive subtree clone needs decisions about descendant
- *    ownership / cycle prevention / depth caps that don't have
- *    obvious defaults. Lands in a follow-up if/when the use case
- *    shows up.
+ *  - Clone root is top-level in the target (no parent). Even when
+ *    copying within the same space we drop the parent FK so the
+ *    clone reads as "a new doc" rather than a sibling of the source.
+ *  - PageComments are NOT copied. The cloned page tree starts as a
+ *    fresh thread surface.
+ *  - Descendants: opt-in via `includeDescendants: true` on the
+ *    body. When set, a breadth-first walk clones every descendant
+ *    with a parent that points at the clone of its source parent —
+ *    so the source's hierarchy is mirrored verbatim inside the
+ *    clone. Only the root carries the ' (copy)' suffix; descendants
+ *    keep their original titles (a "(copy)"-on-every-row tree would
+ *    be noisy). Each descendant clone's createdBy is the caller.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults
@@ -92,12 +95,66 @@ class PageCopyController extends AbstractController
         $this->em->persist($copy);
         $this->em->flush();
 
+        // Optional subtree clone (#182 deep-copy). Opt-in via
+        // `includeDescendants: true`. Walks the source subtree
+        // breadth-first, cloning each descendant with a parent that
+        // points at its newly-created ancestor (so the source's
+        // hierarchy is preserved verbatim inside the clone). Only
+        // the root of the clone is top-level in the target; every
+        // other clone has a clone-parent. Title gets the ' (copy)'
+        // suffix only on the root — keeping it on every descendant
+        // would make the rendered tree noisy.
+        $descendantsCloned = 0;
+        if (true === ($payload['includeDescendants'] ?? false)) {
+            $descendantsCloned = $this->cloneDescendants($source, $copy, $target, $user);
+        }
+
+        $this->em->flush();
+
         return $this->json([
             '@id' => '/pages/' . $copy->getId(),
             'id' => (string) $copy->getId(),
             'title' => $copy->getTitle(),
             'space' => '/spaces/' . $target->getId(),
+            'descendantsCloned' => $descendantsCloned,
         ], 201);
+    }
+
+    /**
+     * Breadth-first walk of the source's subtree. Each visited node
+     * becomes a Page clone whose `parent` points at the clone of its
+     * source parent (so the cloned tree mirrors the source's shape).
+     * Returns the count of descendants cloned (excludes the root).
+     */
+    private function cloneDescendants(Page $sourceRoot, Page $cloneRoot, Space $target, User $user): int
+    {
+        $repo = $this->em->getRepository(Page::class);
+        $cloneBySource = [(string) $sourceRoot->getId() => $cloneRoot];
+        $queue = [$sourceRoot];
+        $count = 0;
+
+        while ([] !== $queue) {
+            $node = array_shift($queue);
+            $children = $repo->findBy(['parent' => $node], ['position' => 'ASC']);
+            foreach ($children as $child) {
+                $clonedParent = $cloneBySource[(string) $node->getId()] ?? null;
+                if (null === $clonedParent) {
+                    continue;
+                }
+                $clone = (new Page())
+                    ->setSpace($target)
+                    ->setCreatedBy($user)
+                    ->setTitle($child->getTitle())
+                    ->setBody($child->getBody())
+                    ->setParent($clonedParent)
+                    ->setPosition($child->getPosition());
+                $this->em->persist($clone);
+                $cloneBySource[(string) $child->getId()] = $clone;
+                $queue[] = $child;
+                ++$count;
+            }
+        }
+        return $count;
     }
 
     private function copyTitle(string $sourceTitle): string
