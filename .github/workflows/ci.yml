@@ -206,10 +206,20 @@ jobs:
         # container entrypoint, but fixtures must be loaded explicitly.
         run: docker compose exec -T php bin/console doctrine:fixtures:load --no-interaction
       -
+        # Cache Playwright's npm install across runs — keyed on the
+        # lockfile so a dependency bump invalidates cleanly.
+        name: Cache e2e node_modules
+        uses: actions/cache@v4
+        with:
+          path: e2e/node_modules
+          key: e2e-node-modules-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+      -
         name: Playwright
         # Run chromium only in CI for fast feedback — the full firefox/webkit
-        # matrix is available locally via `npx playwright test`.
-        run: docker run --network host -w /app -v ./e2e:/app --rm --ipc=host -e CI=true mcr.microsoft.com/playwright:v1.59.1-noble /bin/sh -c 'npm i; npx playwright test --project=chromium;'
+        # matrix is available locally via `npx playwright test`. `npm ci`
+        # (not `npm i`) so a stale lockfile fails CI instead of getting
+        # silently upgraded.
+        run: docker run --network host -w /app -v ./e2e:/app --rm --ipc=host -e CI=true mcr.microsoft.com/playwright:v1.59.1-noble /bin/sh -c 'npm ci --prefer-offline --no-audit --fund=false; npx playwright test --project=chromium;'
 
   lint:
     name: Docker Lint
