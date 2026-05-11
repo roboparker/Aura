@@ -71,6 +71,10 @@ const DiscussionDetailPage = () => {
     kind: "success" | "error";
   } | null>(null);
 
+  // Copy-to-project (#182). Shares the picker with Move; reuses
+  // moveMessage for errors.
+  const [isCopying, setIsCopying] = useState(false);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
@@ -278,6 +282,50 @@ const DiscussionDetailPage = () => {
       });
     } finally {
       setIsMoving(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!discussion) return;
+    setIsCopying(true);
+    setMoveMessage(null);
+    try {
+      // Empty body = clone into the source project; specifying a
+      // project uses the picker's current selection. The server
+      // accepts both shapes.
+      const body = moveTargetIri ? { project: moveTargetIri } : {};
+      const res = await fetch(
+        `${ENTRYPOINT}/discussions/${encodeURIComponent(discussion.id)}/copy`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to copy discussion.",
+        );
+      }
+      // Drop the user on the freshly-cloned discussion. The target
+      // project owns it, so we route through that project's
+      // discussion sub-path.
+      const targetProjectIri = data.project as string | undefined;
+      const targetProjectId = targetProjectIri?.split("/").pop();
+      if (data.id && targetProjectId) {
+        await router.push(
+          `/projects/${targetProjectId}/discussions/${data.id}`,
+        );
+      }
+    } catch (err) {
+      setMoveMessage({
+        text: err instanceof Error ? err.message : "Failed to copy discussion.",
+        kind: "error",
+      });
+    } finally {
+      setIsCopying(false);
     }
   };
 
@@ -530,7 +578,12 @@ const DiscussionDetailPage = () => {
                     const otherProjects = accessibleProjects.filter(
                       (p) => p["@id"] !== project["@id"],
                     );
-                    if (!canMove || otherProjects.length === 0) return null;
+                    // Move requires another project; Copy works
+                    // in-place too. Hide the whole row only when
+                    // the caller can't move/copy at all OR there's
+                    // genuinely nothing to do (no other project AND
+                    // no canMove).
+                    if (!canMove) return null;
                     return (
                       <div
                         className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t"
@@ -540,7 +593,7 @@ const DiscussionDetailPage = () => {
                           htmlFor="discussion-move-target"
                           className="text-xs text-muted-foreground"
                         >
-                          Move to project
+                          Move or copy to project
                         </Label>
                         <select
                           id="discussion-move-target"
@@ -561,10 +614,25 @@ const DiscussionDetailPage = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => void handleMove()}
-                          disabled={!moveTargetIri || isMoving}
+                          disabled={!moveTargetIri || isMoving || isCopying}
                           data-testid="discussion-move-submit"
                         >
                           {isMoving ? "Moving…" : "Move"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void handleCopy()}
+                          disabled={isMoving || isCopying}
+                          data-testid="discussion-copy-submit"
+                          title={
+                            moveTargetIri
+                              ? "Copy this discussion into the selected project"
+                              : "Copy this discussion into the current project"
+                          }
+                        >
+                          {isCopying ? "Copying…" : "Copy"}
                         </Button>
                         {moveMessage && (
                           <span
