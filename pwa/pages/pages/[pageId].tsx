@@ -121,6 +121,8 @@ const PageDetailView = () => {
   // Copy-to-space (#182). Shares the picker with Move; reuses
   // moveMessage for errors.
   const [isCopying, setIsCopying] = useState(false);
+  // Opt-in deep-copy: clone the page subtree (#182 deep-copy slice).
+  const [copyIncludeDescendants, setCopyIncludeDescendants] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -344,7 +346,10 @@ const PageDetailView = () => {
     try {
       // Empty body = clone into the source's own space; specifying a
       // target uses the picker's current selection.
-      const body = moveTargetIri ? { space: moveTargetIri } : {};
+      // `includeDescendants` is opt-in deep-copy.
+      const body: { space?: string; includeDescendants?: boolean } = {};
+      if (moveTargetIri) body.space = moveTargetIri;
+      if (copyIncludeDescendants) body.includeDescendants = true;
       const res = await fetch(
         `${ENTRYPOINT}/pages/${encodeURIComponent(page.id)}/copy`,
         {
@@ -566,6 +571,22 @@ const PageDetailView = () => {
                       >
                         {isCopying ? "Copying…" : "Copy"}
                       </Button>
+                      {/* Deep-copy opt-in for Copy. Move ignores it. */}
+                      <label
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+                        data-testid="page-copy-include-descendants-label"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={copyIncludeDescendants}
+                          onChange={(e) =>
+                            setCopyIncludeDescendants(e.target.checked)
+                          }
+                          className="h-3.5 w-3.5"
+                          data-testid="page-copy-include-descendants"
+                        />
+                        include sub-pages
+                      </label>
                       {moveMessage && (
                         <span
                           role="alert"
