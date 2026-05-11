@@ -69,8 +69,8 @@ jobs:
           retention-days: 1
           compression-level: 0
 
-  tests:
-    name: Tests
+  phpunit:
+    name: PHPUnit
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -114,16 +114,66 @@ jobs:
         # tight even before; bumping to 512M leaves headroom as the suite
         # keeps growing.
         run: docker compose exec -T php php -d memory_limit=512M bin/phpunit
+
+  schema:
+    name: Doctrine Schema
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
+      -
+        name: Start services
+        # Skip PWA — schema validation only needs the API + database.
+        run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build php database
+      -
+        name: Create test database
+        run: docker compose exec -T php bin/console -e test doctrine:database:create
+      -
+        name: Run migrations
+        run: docker compose exec -T php bin/console -e test doctrine:migrations:migrate --no-interaction
       -
         name: Doctrine Schema Validator
         run: docker compose exec -T php bin/console -e test doctrine:schema:validate
+
+  typecheck:
+    name: PWA Typecheck
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
+      -
+        name: Start PWA
+        # Typecheck only needs the PWA container with source mounted.
+        run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build pwa
       -
         name: PWA typecheck
         # Wait for the dev container's `pnpm install` to finish before
-        # invoking tsc — the start-services step only waits for HTTP to
-        # answer, but `pnpm install` runs after that on first boot. Then
-        # run `tsc --noEmit` so type errors fail CI rather than hide
-        # behind Next.js's permissive dev server.
+        # invoking tsc — `--wait` only waits for the healthcheck, but
+        # `pnpm install` runs after that on first boot. Then run
+        # `tsc --noEmit` so type errors fail CI rather than hide behind
+        # Next.js's permissive dev server.
         run: |
           docker compose exec -T pwa sh -c 'until [ -d node_modules/typescript ]; do sleep 2; done'
           docker compose exec -T pwa pnpm typecheck
