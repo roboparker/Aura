@@ -227,6 +227,100 @@ class PageCopyTest extends ApiTestCase
         $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
     }
 
+    public function testIncludeDescendantsFalseLeavesSubtreeAlone(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $parent = $this->seedPage($alice, $source, 'Parent');
+        $this->seedPage($alice, $source, 'Child', $parent);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $parent->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(0, $client->getResponse()->toArray()['descendantsCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        $copyChildren = $this->entityManager->getRepository(Page::class)
+            ->findBy(['parent' => $copyId]);
+        $this->assertCount(0, $copyChildren);
+    }
+
+    public function testIncludeDescendantsClonesFullSubtreeMirroringHierarchy(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $root = $this->seedPage($alice, $source, 'Root');
+        $childA = $this->seedPage($alice, $source, 'Child A', $root, 'A body');
+        $childB = $this->seedPage($alice, $source, 'Child B', $root);
+        $grandA = $this->seedPage($alice, $source, 'Grandchild A1', $childA);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $root->getId() . '/copy', [
+            'json' => ['includeDescendants' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(3, $client->getResponse()->toArray()['descendantsCloned']);
+
+        $this->entityManager->clear();
+        $copyRootId = $client->getResponse()->toArray()['id'];
+        $copyRoot = $this->entityManager->getRepository(Page::class)->find($copyRootId);
+        $this->assertNull($copyRoot->getParent(), 'Cloned root stays top-level in the target.');
+        $this->assertSame('Root (copy)', $copyRoot->getTitle());
+
+        $copyChildren = $this->entityManager->getRepository(Page::class)
+            ->findBy(['parent' => $copyRoot], ['title' => 'ASC']);
+        $this->assertCount(2, $copyChildren);
+        $this->assertSame('Child A', $copyChildren[0]->getTitle());
+        $this->assertSame('A body', $copyChildren[0]->getBody());
+        $this->assertNull($copyChildren[0]->getParent()?->getParent(), "Child's parent has no grandparent (it's the cloned root).");
+        $this->assertSame('Child B', $copyChildren[1]->getTitle());
+        // Descendants don't carry the " (copy)" suffix — only the root.
+        $this->assertSame('Grandchild A1', $this->entityManager->getRepository(Page::class)
+            ->findOneBy(['parent' => $copyChildren[0]])->getTitle());
+
+        // Source's subtree still intact.
+        $sourceChildren = $this->entityManager->getRepository(Page::class)
+            ->findBy(['parent' => $root]);
+        $this->assertCount(2, $sourceChildren);
+    }
+
+    public function testIncludeDescendantsCarriesIntoOtherSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $target = $this->createSpace($alice, 'Target');
+        $root = $this->seedPage($alice, $source, 'Root');
+        $this->seedPage($alice, $source, 'Child', $root);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/pages/' . $root->getId() . '/copy', [
+            'json' => ['space' => '/spaces/' . $target->getId(), 'includeDescendants' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $copyRoot = $this->entityManager->getRepository(Page::class)
+            ->find($client->getResponse()->toArray()['id']);
+        $this->assertSame((string) $target->getId(), (string) $copyRoot->getSpace()->getId());
+        $copyChild = $this->entityManager->getRepository(Page::class)
+            ->findOneBy(['parent' => $copyRoot]);
+        $this->assertNotNull($copyChild);
+        $this->assertSame(
+            (string) $target->getId(),
+            (string) $copyChild->getSpace()->getId(),
+            'Descendant clones land in the target space too.',
+        );
+    }
+
     private function seedPage(User $author, Space $space, string $title, ?Page $parent = null, string $body = 'Body'): Page
     {
         $page = new Page();
