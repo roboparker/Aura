@@ -52,7 +52,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.29.0",
-    "@next/eslint-plugin-next": "^16.2.4",
+    "@next/eslint-plugin-next": "^16.2.5",
     "@popperjs/core": "^2.11.8",
     "@types/node": "^25.6.0",
     "@types/react": "^19.2.14",
