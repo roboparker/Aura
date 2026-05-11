@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Space;
+use App\Entity\Tag;
+use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,7 +20,7 @@ use Symfony\Component\Uid\Uuid;
  * Deep-clones a project into a target space (#182). Useful as a
  * "duplicate this project as a template" workflow.
  *
- * Scope (v1):
+ * Scope:
  *  - The project metadata (title, description) carries over. Title gets
  *    a " (copy)" suffix so the source and clone are distinguishable at
  *    a glance.
@@ -28,10 +30,15 @@ use Symfony\Component\Uid\Uuid;
  *    primary thing copy buys you.
  *  - The clone's `createdBy` is the current user — not the source's
  *    owner. Fresh audit history.
- *  - Tasks, discussions, comments, attachments, and tags are NOT
- *    copied. Those carry per-row authorship + conversational state
- *    that doesn't transplant cleanly; copying them lands in a
- *    follow-up slice if/when the use case shows up.
+ *  - Discussions, attachments, and comments are NOT copied (each is
+ *    its own thing with per-row authorship + conversational state).
+ *  - Tasks: opt-in via `includeTasks: true` on the body. When opted in,
+ *    each task is cloned with title + description + dueDate +
+ *    recurrenceRule + position + tags (only tags the caller owns).
+ *    Owner becomes the caller; assignees, reminders, completedOn, and
+ *    custom field values are deliberately dropped — those are
+ *    user-specific state, and CFV would need an old-CFD→new-CFD
+ *    mapping that's a heavier slice on its own.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults
@@ -114,6 +121,44 @@ class ProjectCopyController extends AbstractController
             $this->em->persist($clone);
         }
 
+        // Optional task clone (#182 deep-copy). Opt-in via
+        // `includeTasks: true` so the default copy stays metadata +
+        // schema only. The clone carries forward the structural
+        // bits of each task — title, description, due date,
+        // recurrence rule, position — and reuses tags the COPIER
+        // owns (tags are user-scoped; carrying over a tag the
+        // copier doesn't own would attach a foreign row to their
+        // task). User-specific state (owner, assignees, reminders,
+        // completedOn) and custom field values are deliberately
+        // dropped: assignees / reminders are per-individual,
+        // completedOn would lie about the clone's history, and CFV
+        // would need an old-CFD→new-CFD mapping that's a heavier
+        // slice in its own right.
+        $tasksCloned = 0;
+        if (true === ($payload['includeTasks'] ?? false)) {
+            $sourceTasks = $this->em->getRepository(Task::class)
+                ->findBy(['project' => $source], ['position' => 'ASC']);
+            foreach ($sourceTasks as $sourceTask) {
+                $cloneTask = (new Task())
+                    ->setOwner($user)
+                    ->setProject($copy)
+                    ->setTitle($sourceTask->getTitle())
+                    ->setDescription($sourceTask->getDescription())
+                    ->setDueDate($sourceTask->getDueDate())
+                    ->setRecurrenceRule($sourceTask->getRecurrenceRule())
+                    ->setPosition($sourceTask->getPosition());
+                foreach ($sourceTask->getTags() as $tag) {
+                    if ($tag instanceof Tag
+                        && $tag->getOwner()?->getId()?->equals($user->getId())
+                    ) {
+                        $cloneTask->addTag($tag);
+                    }
+                }
+                $this->em->persist($cloneTask);
+                ++$tasksCloned;
+            }
+        }
+
         $this->em->flush();
 
         return $this->json([
@@ -121,6 +166,7 @@ class ProjectCopyController extends AbstractController
             'id' => (string) $copy->getId(),
             'title' => $copy->getTitle(),
             'space' => '/spaces/' . $target->getId(),
+            'tasksCloned' => $tasksCloned,
         ], 201);
     }
 

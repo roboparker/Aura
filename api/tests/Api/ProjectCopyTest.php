@@ -7,6 +7,8 @@ use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\Tag;
+use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -28,6 +30,8 @@ class ProjectCopyTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -212,6 +216,136 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
     }
 
+    public function testIncludeTasksFalseLeavesTasksOnSourceOnly(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $project = $this->createProject($alice, 'Backend', $source);
+        $this->seedTask($alice, $project, 'Buy milk', 0);
+        $this->seedTask($alice, $project, 'Buy eggs', 1);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(0, $client->getResponse()->toArray()['tasksCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        $copyTasks = $this->entityManager->getRepository(Task::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(0, $copyTasks);
+    }
+
+    public function testIncludeTasksClonesStructuralFields(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $project = $this->createProject($alice, 'Backend', $source);
+        $dueDate = new \DateTimeImmutable('2026-12-01T00:00:00Z');
+        $task = $this->seedTask($alice, $project, 'Plan launch', 0);
+        $task->setDescription('Quarterly');
+        $task->setDueDate($dueDate);
+        $task->setRecurrenceRule(['freq' => 'weekly']);
+        $task->setCompletedOn(new \DateTimeImmutable());
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => ['includeTasks' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(1, $client->getResponse()->toArray()['tasksCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        /** @var Task[] $cloned */
+        $cloned = $this->entityManager->getRepository(Task::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(1, $cloned);
+        $this->assertSame('Plan launch', $cloned[0]->getTitle());
+        $this->assertSame('Quarterly', $cloned[0]->getDescription());
+        $this->assertEquals($dueDate, $cloned[0]->getDueDate());
+        $this->assertSame(['freq' => 'weekly'], $cloned[0]->getRecurrenceRule());
+        $this->assertNull(
+            $cloned[0]->getCompletedOn(),
+            'Clone should be open even if the source was completed.',
+        );
+        $this->assertSame(
+            (string) $alice->getId(),
+            (string) $cloned[0]->getOwner()->getId(),
+            'Clone task owner = caller (template metaphor).',
+        );
+    }
+
+    public function testIncludeTasksCarriesOnlyTagsOwnedByCaller(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $source = $this->createSpace($alice, 'Shared');
+        $this->ensureSpaceMembership($source, $bob);
+        $project = $this->createProject($alice, 'P', $source);
+        $aliceTag = $this->seedTag($alice, 'alice-tag');
+        $bobTag = $this->seedTag($bob, 'bob-tag');
+        $task = $this->seedTask($alice, $project, 'Tagged task', 0);
+        $task->addTag($aliceTag);
+        $task->addTag($bobTag);
+        $this->entityManager->flush();
+
+        // Alice copies — both tags belong to her view of the task, but
+        // bob-tag isn't hers, so the clone only keeps alice-tag.
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => ['includeTasks' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        /** @var Task[] $cloned */
+        $cloned = $this->entityManager->getRepository(Task::class)
+            ->findBy(['project' => $copyId]);
+        $this->assertCount(1, $cloned);
+        $tagTitles = array_map(
+            fn (Tag $t) => $t->getTitle(),
+            $cloned[0]->getTags()->toArray(),
+        );
+        $this->assertSame(['alice-tag'], array_values($tagTitles));
+    }
+
+    public function testIncludeTasksPreservesPositionOrder(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $source = $this->createSpace($alice, 'Source');
+        $project = $this->createProject($alice, 'P', $source);
+        $this->seedTask($alice, $project, 'C', 2);
+        $this->seedTask($alice, $project, 'A', 0);
+        $this->seedTask($alice, $project, 'B', 1);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+            'json' => ['includeTasks' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(3, $client->getResponse()->toArray()['tasksCloned']);
+
+        $this->entityManager->clear();
+        $copyId = $client->getResponse()->toArray()['id'];
+        $cloned = $this->entityManager->getRepository(Task::class)
+            ->findBy(['project' => $copyId], ['position' => 'ASC']);
+        $titlesByPosition = array_map(fn (Task $t) => $t->getTitle(), $cloned);
+        $this->assertSame(['A', 'B', 'C'], $titlesByPosition);
+    }
+
     /**
      * @param string[]|null $options
      */
@@ -228,6 +362,29 @@ class ProjectCopyTest extends ApiTestCase
         $this->entityManager->persist($def);
         $this->entityManager->flush();
         return $def;
+    }
+
+    private function seedTask(User $owner, Project $project, string $title, int $position = 0): Task
+    {
+        $task = new Task();
+        $task->setOwner($owner);
+        $task->setProject($project);
+        $task->setTitle($title);
+        $task->setPosition($position);
+        $this->entityManager->persist($task);
+        $this->entityManager->flush();
+        return $task;
+    }
+
+    private function seedTag(User $owner, string $title): Tag
+    {
+        $tag = new Tag();
+        $tag->setOwner($owner);
+        $tag->setTitle($title);
+        $tag->setColor('#0369a1');
+        $this->entityManager->persist($tag);
+        $this->entityManager->flush();
+        return $tag;
     }
 
     private function createProject(User $owner, string $title, Space $space): Project
