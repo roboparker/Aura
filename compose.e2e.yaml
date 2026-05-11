@@ -1,0 +1,43 @@
+# E2E override: dev API (fixtures + bin/console available), prod PWA build.
+#
+# Used in place of compose.override.yaml for E2E runs. `next dev` compiles
+# routes on first hit, which races Playwright's URL assertions under load;
+# the standalone prod build serves pre-compiled routes and removes that
+# class of flake entirely (and is meaningfully faster end-to-end).
+services:
+  php:
+    build:
+      context: ./api
+      target: frankenphp_dev
+    volumes:
+      - ./api:/app
+      - /app/var
+      - api_vendor:/app/vendor
+      - ./api/frankenphp/Caddyfile:/etc/frankenphp/Caddyfile:ro
+      - ./api/frankenphp/conf.d/20-app.dev.ini:/usr/local/etc/php/app.conf.d/20-app.dev.ini:ro
+    environment:
+      FRANKENPHP_WORKER_CONFIG: watch
+      MERCURE_EXTRA_DIRECTIVES: demo
+      XDEBUG_MODE: "off"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    tty: true
+
+  pwa:
+    # Distinct image name from the dev-target `app-pwa` so both can be
+    # baked, saved, and loaded side-by-side in a single CI artifact.
+    image: ${IMAGES_PREFIX:-}app-pwa-prod
+    build:
+      context: ./pwa
+      target: prod
+
+###> doctrine/doctrine-bundle ###
+  database:
+    ports:
+      - target: 5432
+        published: ${POSTGRES_PORT:-5432}
+        protocol: tcp
+###< doctrine/doctrine-bundle ###
+
+volumes:
+  api_vendor:
