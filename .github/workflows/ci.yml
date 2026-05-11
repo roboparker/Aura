@@ -15,8 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  tests:
-    name: Tests
+  build:
+    name: Build images
     runs-on: ubuntu-latest
     steps:
       -
@@ -26,7 +26,7 @@ jobs:
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       -
-        name: Build Docker images
+        name: Build dev stack (app-php, app-pwa)
         uses: docker/bake-action@v6
         with:
           pull: true
@@ -38,12 +38,57 @@ jobs:
             php.cache-from=type=gha,scope=php-${{github.ref}}
             php.cache-from=type=gha,scope=php-refs/heads/main
             php.cache-to=type=gha,scope=php-${{github.ref}},mode=max
-            pwa.cache-from=type=gha,scope=pwa-${{github.ref}}
-            pwa.cache-from=type=gha,scope=pwa-refs/heads/main
-            pwa.cache-to=type=gha,scope=pwa-${{github.ref}},mode=max
+            pwa.cache-from=type=gha,scope=pwa-dev-${{github.ref}}
+            pwa.cache-from=type=gha,scope=pwa-dev-refs/heads/main
+            pwa.cache-to=type=gha,scope=pwa-dev-${{github.ref}},mode=max
+      -
+        name: Build E2E stack (app-pwa-prod)
+        uses: docker/bake-action@v6
+        with:
+          load: true
+          files: |
+            compose.yaml
+            compose.e2e.yaml
+          set: |
+            php.cache-from=type=gha,scope=php-${{github.ref}}
+            php.cache-from=type=gha,scope=php-refs/heads/main
+            pwa.cache-from=type=gha,scope=pwa-prod-${{github.ref}}
+            pwa.cache-from=type=gha,scope=pwa-prod-refs/heads/main
+            pwa.cache-to=type=gha,scope=pwa-prod-${{github.ref}},mode=max
+      -
+        # Save all three images in one tarball, gzipped to keep upload
+        # under ~500MB. `docker load` understands the gzip stream.
+        name: Save images
+        run: docker save app-php app-pwa app-pwa-prod | gzip > /tmp/images.tar.gz
+      -
+        name: Upload images artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp/images.tar.gz
+          retention-days: 1
+          compression-level: 0
+
+  tests:
+    name: Tests
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
       -
         name: Start services
-        run: docker compose up --wait --no-build
+        run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build
       -
         name: Check HTTP reachability
         run: curl -v --fail-with-body http://localhost
@@ -82,6 +127,40 @@ jobs:
         run: |
           docker compose exec -T pwa sh -c 'until [ -d node_modules/typescript ]; do sleep 2; done'
           docker compose exec -T pwa pnpm typecheck
+
+  e2e:
+    name: E2E
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
+      -
+        name: Start services
+        run: docker compose -f compose.yaml -f compose.e2e.yaml up --wait --no-build
+      -
+        name: Load fixtures
+        # Fixture users (admin@aura.test / user@aura.test) are required by
+        # several auth and admin E2E tests. Migrations run via the PHP
+        # container entrypoint, but fixtures must be loaded explicitly.
+        run: docker compose exec -T php bin/console doctrine:fixtures:load --no-interaction
+      -
+        name: Playwright
+        # Run chromium only in CI for fast feedback — the full firefox/webkit
+        # matrix is available locally via `npx playwright test`.
+        run: docker run --network host -w /app -v ./e2e:/app --rm --ipc=host -e CI=true mcr.microsoft.com/playwright:v1.59.1-noble /bin/sh -c 'npm i; npx playwright test --project=chromium;'
+
   lint:
     name: Docker Lint
     runs-on: ubuntu-latest

@@ -24,6 +24,9 @@ services:
     tty: true
 
   pwa:
+    # Distinct image name from the dev-target `app-pwa` so both can be
+    # baked, saved, and loaded side-by-side in a single CI artifact.
+    image: ${IMAGES_PREFIX:-}app-pwa-prod
     build:
       context: ./pwa
       target: prod
