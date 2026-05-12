@@ -90,10 +90,6 @@ jobs:
         name: Start services
         run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build
       -
-        name: Dump container logs on failure
-        if: failure()
-        run: docker compose -f compose.yaml -f compose.override.yaml logs --no-color
-      -
         name: Check HTTP reachability
         run: curl -v --fail-with-body http://localhost
       -
