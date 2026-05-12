@@ -38,22 +38,24 @@ final class Version20260512000000 extends AbstractMigration
         $this->addSql('ALTER INDEX idx_comment_parent RENAME TO idx_task_comment_parent');
         $this->addSql('ALTER INDEX idx_comment_search_vector RENAME TO idx_task_comment_search_vector');
         // Doctrine-hashed indexes on task_id / author_id (rehashed against
-        // the new table name).
-        $this->addSql('ALTER INDEX "IDX_9474526C8DB60186" RENAME TO "IDX_8B9578868DB60186"');
-        $this->addSql('ALTER INDEX "IDX_9474526CF675F31B" RENAME TO "IDX_8B957886F675F31B"');
+        // the new table name). Names are intentionally unquoted so Postgres
+        // case-folds them to lowercase, matching how the original CREATE
+        // INDEX (also unquoted) stored them in the catalog.
+        $this->addSql('ALTER INDEX IDX_9474526C8DB60186 RENAME TO IDX_8B9578868DB60186');
+        $this->addSql('ALTER INDEX IDX_9474526CF675F31B RENAME TO IDX_8B957886F675F31B');
         // FK constraints — task_id, author_id, parent_comment_id.
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_9474526C8DB60186" TO "FK_8B9578868DB60186"');
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_9474526CF675F31B" TO "FK_8B957886F675F31B"');
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_9474526CBF2AF943" TO "FK_8B957886BF2AF943"');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_9474526C8DB60186 TO FK_8B9578868DB60186');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_9474526CF675F31B TO FK_8B957886F675F31B');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_9474526CBF2AF943 TO FK_8B957886BF2AF943');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_8B957886BF2AF943" TO "FK_9474526CBF2AF943"');
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_8B957886F675F31B" TO "FK_9474526CF675F31B"');
-        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT "FK_8B9578868DB60186" TO "FK_9474526C8DB60186"');
-        $this->addSql('ALTER INDEX "IDX_8B957886F675F31B" RENAME TO "IDX_9474526CF675F31B"');
-        $this->addSql('ALTER INDEX "IDX_8B9578868DB60186" RENAME TO "IDX_9474526C8DB60186"');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_8B957886BF2AF943 TO FK_9474526CBF2AF943');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_8B957886F675F31B TO FK_9474526CF675F31B');
+        $this->addSql('ALTER TABLE task_comment RENAME CONSTRAINT FK_8B9578868DB60186 TO FK_9474526C8DB60186');
+        $this->addSql('ALTER INDEX IDX_8B957886F675F31B RENAME TO IDX_9474526CF675F31B');
+        $this->addSql('ALTER INDEX IDX_8B9578868DB60186 RENAME TO IDX_9474526C8DB60186');
         $this->addSql('ALTER INDEX idx_task_comment_search_vector RENAME TO idx_comment_search_vector');
         $this->addSql('ALTER INDEX idx_task_comment_parent RENAME TO idx_comment_parent');
         $this->addSql('ALTER INDEX idx_task_comment_task_created RENAME TO idx_comment_task_created');
