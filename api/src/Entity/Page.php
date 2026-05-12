@@ -34,7 +34,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  *    the self-FK `ON DELETE CASCADE`)
  *
  * Comments live in their own `PageComment` entity rather than
- * piggy-backing on the existing `Comment` (which is task-only) — see
+ * piggy-backing on the existing `TaskComment` (which is task-only) — see
  * the issue's discussion of "polymorphic vs separate". A separate
  * table keeps this PR self-contained and lets either side evolve
  * independently.

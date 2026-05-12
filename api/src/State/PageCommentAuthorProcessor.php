@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
  * Stamps the author on a new {@see PageComment} (#183). Same shape
- * as {@see CommentAuthorProcessor} for task comments — read-only on
+ * as {@see TaskCommentAuthorProcessor} for task comments — read-only on
  * the wire, set here once on POST.
  *
  * @implements ProcessorInterface<PageComment, PageComment>

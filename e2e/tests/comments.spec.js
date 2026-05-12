@@ -135,7 +135,7 @@ test.describe("Task comments", () => {
     const task = await taskRes.json();
 
     // Bob posts a comment via API.
-    const commentRes = await bob.request.post(`${BASE_URL}/comments`, {
+    const commentRes = await bob.request.post(`${BASE_URL}/task_comments`, {
       headers: { "Content-Type": "application/ld+json" },
       data: { task: task["@id"], body: "Bob's note." },
     });

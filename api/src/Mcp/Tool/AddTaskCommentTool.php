@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -11,7 +11,7 @@ use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
 use Doctrine\ORM\EntityManagerInterface;
 
-final class AddCommentTool implements McpToolInterface
+final class AddTaskCommentTool implements McpToolInterface
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -23,7 +23,7 @@ final class AddCommentTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'add_comment';
+        return 'add_task_comment';
     }
 
     public function getDescription(): string
@@ -55,13 +55,13 @@ final class AddCommentTool implements McpToolInterface
             throw McpException::notFound(sprintf('Task %s', $taskId));
         }
 
-        $comment = new Comment();
+        $comment = new TaskComment();
         $comment->setTask($task);
         $comment->setAuthor($user);
         $comment->setBody($body);
 
         if (null !== $parentId = $this->input->optionalUuid('parentCommentId', $arguments['parentCommentId'] ?? null)) {
-            $parent = $this->em->getRepository(Comment::class)->find($parentId);
+            $parent = $this->em->getRepository(TaskComment::class)->find($parentId);
             if (null === $parent) {
                 throw McpException::notFound(sprintf('Parent comment %s', $parentId));
             }

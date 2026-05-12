@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -34,7 +34,7 @@ class McpTest extends ApiTestCase
         $this->entityManager = $kernel->getContainer()->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -99,7 +99,7 @@ class McpTest extends ApiTestCase
             'create_task', 'get_task', 'update_task', 'delete_task', 'list_tasks', 'search_tasks',
             'create_project', 'get_project', 'update_project', 'delete_project', 'list_projects',
             'assign_task', 'unassign_task', 'get_my_tasks',
-            'add_comment', 'list_comments',
+            'add_task_comment', 'list_task_comments',
             'upload_file', 'list_files', 'download_file',
             'get_custom_fields',
         ] as $expected) {
@@ -201,7 +201,7 @@ class McpTest extends ApiTestCase
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'add_comment',
+            'name' => 'add_task_comment',
             'arguments' => ['taskId' => (string) $task->getId(), 'body' => 'Looks good!'],
         ]);
         $this->assertFalse($body['result']['isError']);

@@ -2,7 +2,7 @@
 
 namespace App\Service;
 
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Notification;
 use App\Entity\User;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -21,7 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * mention to an existing comment notifies only the new recipient,
  * never re-pings the previously mentioned ones.
  */
-final class CommentMentionService
+final class TaskCommentMentionService
 {
     /**
      * Matches `@token` where token is a non-whitespace run that looks
@@ -66,7 +66,7 @@ final class CommentMentionService
      * was either unknown, the comment author themselves (no self-pings),
      * or already notified.
      */
-    public function dispatchMentions(Comment $comment): int
+    public function dispatchMentions(TaskComment $comment): int
     {
         $body = $comment->getBody();
         $tokens = $this->extractMentions($body);
@@ -134,7 +134,7 @@ final class CommentMentionService
      *
      * @return User[] Keyed by lowercase email-local-part for fast resolution.
      */
-    private function collectMentionableUsers(Comment $comment): array
+    private function collectMentionableUsers(TaskComment $comment): array
     {
         $task = $comment->getTask();
         if (null === $task) {
@@ -169,7 +169,7 @@ final class CommentMentionService
         return false === $at ? $email : substr($email, 0, $at);
     }
 
-    private function alreadyNotified(User $recipient, Comment $comment): bool
+    private function alreadyNotified(User $recipient, TaskComment $comment): bool
     {
         return null !== $this->em->getRepository(Notification::class)->findOneBy([
             'recipient' => $recipient,

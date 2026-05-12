@@ -5,7 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\CustomFieldValue;
 use App\Entity\Task;
 use Doctrine\ORM\QueryBuilder;
@@ -82,7 +82,7 @@ final class TaskSearchFilter extends AbstractFilter
                 . "AND SEARCH_VECTOR_MATCH(%s.searchVector, :%s) = TRUE)",
                 $rootAlias,
                 $queryParam,
-                Comment::class,
+                TaskComment::class,
                 $commentSubAlias,
                 $commentSubAlias,
                 $rootAlias,

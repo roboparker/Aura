@@ -21,7 +21,7 @@ class TaskCommentsMercureTokenTest extends ApiTestCase
         $container = static::getContainer();
         $this->entityManager = $container->get('doctrine')->getManager();
 
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();

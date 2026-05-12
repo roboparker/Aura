@@ -4,32 +4,32 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\Comment;
-use App\Service\CommentMercurePublisher;
+use App\Entity\TaskComment;
+use App\Service\TaskCommentMercurePublisher;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Wraps the default ORM remove processor on `DELETE /comments/{id}`.
+ * Wraps the default ORM remove processor on `DELETE /task_comments/{id}`.
  * The publish has to happen *before* the SQL delete so the entity still
  * has its id and parent task — after `process()` returns the in-memory
  * object's id is gone and the doctrine listener has already detached it.
  *
- * @implements ProcessorInterface<Comment, void|Comment>
+ * @implements ProcessorInterface<TaskComment, void|TaskComment>
  */
-final class CommentDeleteProcessor implements ProcessorInterface
+final class TaskCommentDeleteProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<Comment, void|Comment> $removeProcessor
+     * @param ProcessorInterface<TaskComment, void|TaskComment> $removeProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
         private ProcessorInterface $removeProcessor,
-        private CommentMercurePublisher $publisher,
+        private TaskCommentMercurePublisher $publisher,
     ) {
     }
 
     /**
-     * @param Comment $data
+     * @param TaskComment $data
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {

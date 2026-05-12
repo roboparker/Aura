@@ -98,7 +98,7 @@ class CustomFieldDefinition
     private ?Uuid $id = null;
 
     /**
-     * Bare IRI on the read side — same shape as Comment.parentComment.
+     * Bare IRI on the read side — same shape as TaskComment.parentComment.
      * Embedding the whole project would balloon the list payload for a
      * project with many members.
      */

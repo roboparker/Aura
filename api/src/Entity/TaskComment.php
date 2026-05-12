@@ -12,10 +12,10 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Repository\CommentRepository;
-use App\State\CommentAuthorProcessor;
-use App\State\CommentDeleteProcessor;
-use App\State\CommentUpdateProcessor;
+use App\Repository\TaskCommentRepository;
+use App\State\TaskCommentAuthorProcessor;
+use App\State\TaskCommentDeleteProcessor;
+use App\State\TaskCommentUpdateProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -42,35 +42,35 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         new Post(
             security: "is_granted('ROLE_USER')",
             securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().isAccessibleBy(user))",
-            processor: CommentAuthorProcessor::class,
+            processor: TaskCommentAuthorProcessor::class,
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getTask().isAccessibleBy(user))",
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user)",
-            processor: CommentUpdateProcessor::class,
+            processor: TaskCommentUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getTask().getOwner() == user)",
-            processor: CommentDeleteProcessor::class,
+            processor: TaskCommentDeleteProcessor::class,
         ),
     ],
-    normalizationContext: ['groups' => ['comment:read']],
-    denormalizationContext: ['groups' => ['comment:write']],
+    normalizationContext: ['groups' => ['task_comment:read']],
+    denormalizationContext: ['groups' => ['task_comment:write']],
     order: ['createdAt' => 'ASC'],
 )]
 #[ApiFilter(SearchFilter::class, properties: ['task' => 'exact', 'parentComment' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt'], arguments: ['orderParameterName' => 'order'])]
-#[ORM\Entity(repositoryClass: CommentRepository::class)]
-#[ORM\Table(name: 'comment')]
-#[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_comment_task_created')]
-#[ORM\Index(columns: ['parent_comment_id'], name: 'idx_comment_parent')]
+#[ORM\Entity(repositoryClass: TaskCommentRepository::class)]
+#[ORM\Table(name: 'task_comment')]
+#[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_task_comment_task_created')]
+#[ORM\Index(columns: ['parent_comment_id'], name: 'idx_task_comment_parent')]
 // GIN index over the FTS-only generated column. See the Task entity
 // for the matching declaration / migration provenance.
-#[ORM\Index(columns: ['search_vector'], name: 'idx_comment_search_vector', flags: ['gin'])]
+#[ORM\Index(columns: ['search_vector'], name: 'idx_task_comment_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
-class Comment
+class TaskComment
 {
     public const MAX_BODY_LENGTH = 10_000;
 
@@ -86,23 +86,23 @@ class Comment
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['comment:read'])]
+    #[Groups(['task_comment:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: Task::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Task is required.')]
-    #[Groups(['comment:read', 'comment:write'])]
+    #[Groups(['task_comment:read', 'task_comment:write'])]
     private ?Task $task = null;
 
     /**
-     * Author is set server-side by CommentAuthorProcessor on POST; the
+     * Author is set server-side by TaskCommentAuthorProcessor on POST; the
      * setter exists so PATCH can no-op the field, but the serializer
      * group keeps it read-only over the wire.
      */
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['comment:read'])]
+    #[Groups(['task_comment:read'])]
     private ?User $author = null;
 
     #[ORM\Column(type: 'text')]
@@ -111,7 +111,7 @@ class Comment
         max: self::MAX_BODY_LENGTH,
         maxMessage: 'Comment cannot be longer than {{ limit }} characters.',
     )]
-    #[Groups(['comment:read', 'comment:write'])]
+    #[Groups(['task_comment:read', 'task_comment:write'])]
     private string $body = '';
 
     /**
@@ -135,17 +135,17 @@ class Comment
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'replies')]
     #[ORM\JoinColumn(name: 'parent_comment_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
-    #[Groups(['comment:read', 'comment:write'])]
-    private ?Comment $parentComment = null;
+    #[Groups(['task_comment:read', 'task_comment:write'])]
+    private ?TaskComment $parentComment = null;
 
     /**
-     * @var \Doctrine\Common\Collections\Collection<int, Comment>
+     * @var \Doctrine\Common\Collections\Collection<int, TaskComment>
      */
     #[ORM\OneToMany(mappedBy: 'parentComment', targetEntity: self::class)]
     private \Doctrine\Common\Collections\Collection $replies;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['comment:read'])]
+    #[Groups(['task_comment:read'])]
     private \DateTimeImmutable $createdAt;
 
     /**
@@ -153,7 +153,7 @@ class Comment
      * render an "(edited)" affordance without diffing payloads.
      */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['comment:read'])]
+    #[Groups(['task_comment:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
@@ -216,12 +216,12 @@ class Comment
         return $this->updatedAt;
     }
 
-    public function getParentComment(): ?Comment
+    public function getParentComment(): ?TaskComment
     {
         return $this->parentComment;
     }
 
-    public function setParentComment(?Comment $parentComment): static
+    public function setParentComment(?TaskComment $parentComment): static
     {
         $this->parentComment = $parentComment;
         return $this;

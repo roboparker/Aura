@@ -20,8 +20,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Comment on a {@see Page} (#183). Mirrors the existing task-side
- * {@see Comment} shape (author, body, createdAt, updatedAt) but lives
- * in its own table — the task `Comment` row carries a hard-required
+ * {@see TaskComment} shape (author, body, createdAt, updatedAt) but lives
+ * in its own table — the task `TaskComment` row carries a hard-required
  * `task` FK that doesn't make sense for pages, and refactoring it to
  * be polymorphic would balloon the diff well past PR 4 of the spaces
  * stack.

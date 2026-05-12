@@ -13,7 +13,7 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 /**
  * Stamps the current user on a freshly-created PushSubscription before
  * persisting. Same trust model as TaskOwnerProcessor and
- * CommentAuthorProcessor — user is pulled from the security token, not
+ * TaskCommentAuthorProcessor — user is pulled from the security token, not
  * the request payload, so a client can't register a subscription on
  * someone else's behalf.
  *

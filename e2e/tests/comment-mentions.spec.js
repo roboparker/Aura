@@ -57,7 +57,7 @@ test.describe("Comment @-mentions", () => {
 
     // Now Alice creates a task **in the project** and posts a comment
     // that mentions Bob. The task has to belong to the project for
-    // CommentMentionService to consider Bob a mentionable candidate
+    // TaskCommentMentionService to consider Bob a mentionable candidate
     // (collectMentionableUsers = task owner + project's effective space
     // members). Inline-creating from `/tasks` makes a personal task,
     // which silently drops the mention because Bob isn't in scope.
@@ -94,12 +94,12 @@ test.describe("Comment @-mentions", () => {
     await editor.click();
     await alicePage.keyboard.type(commentText);
 
-    // Capture the POST /comments request body so we can verify the
+    // Capture the POST /task_comments request body so we can verify the
     // markdown that BlockNote emitted.
     const [postRequest] = await Promise.all([
       alicePage.waitForRequest(
         (req) =>
-          req.method() === "POST" && req.url().endsWith("/comments"),
+          req.method() === "POST" && req.url().endsWith("/task_comments"),
       ),
       panel.locator('[data-testid="comment-submit"]').click(),
     ]);

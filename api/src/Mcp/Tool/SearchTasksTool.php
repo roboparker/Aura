@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
@@ -57,7 +57,7 @@ final class SearchTasksTool implements McpToolInterface
         $qb = $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->leftJoin('t.project', 'p')
-            ->leftJoin(Comment::class, 'c', 'WITH', 'c.task = t')
+            ->leftJoin(TaskComment::class, 'c', 'WITH', 'c.task = t')
             ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'search_tasks'))
             ->andWhere('LOWER(t.title) LIKE :q OR LOWER(t.description) LIKE :q OR LOWER(c.body) LIKE :q')
             ->setParameter('user', $user)

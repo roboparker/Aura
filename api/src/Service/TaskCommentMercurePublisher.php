@@ -2,7 +2,7 @@
 
 namespace App\Service;
 
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Task;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
@@ -21,7 +21,7 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
  * downstream of this service can subscribe without proving they can read
  * the parent task.
  */
-final class CommentMercurePublisher
+final class TaskCommentMercurePublisher
 {
     public function __construct(
         private HubInterface $hub,
@@ -29,12 +29,12 @@ final class CommentMercurePublisher
     ) {
     }
 
-    public function publishCreated(Comment $comment): void
+    public function publishCreated(TaskComment $comment): void
     {
         $this->publish('create', $comment, $this->serializeComment($comment));
     }
 
-    public function publishUpdated(Comment $comment): void
+    public function publishUpdated(TaskComment $comment): void
     {
         $this->publish('update', $comment, $this->serializeComment($comment));
     }
@@ -44,7 +44,7 @@ final class CommentMercurePublisher
      * comment it's already gone, so we send just the IRI + parent task IRI.
      * The frontend uses the IRI to drop the row from local state.
      */
-    public function publishDeleted(Comment $comment): void
+    public function publishDeleted(TaskComment $comment): void
     {
         $task = $comment->getTask();
         if (null === $task || null === $task->getId() || null === $comment->getId()) {
@@ -52,7 +52,7 @@ final class CommentMercurePublisher
         }
         $payload = [
             'type' => 'delete',
-            'id' => '/comments/' . $comment->getId(),
+            'id' => '/task_comments/' . $comment->getId(),
             'task' => '/tasks/' . $task->getId(),
         ];
         $this->dispatch($task, $payload);
@@ -61,7 +61,7 @@ final class CommentMercurePublisher
     /**
      * @param array<string, mixed> $serialized
      */
-    private function publish(string $type, Comment $comment, array $serialized): void
+    private function publish(string $type, TaskComment $comment, array $serialized): void
     {
         $task = $comment->getTask();
         if (null === $task || null === $task->getId()) {
@@ -85,10 +85,10 @@ final class CommentMercurePublisher
     /**
      * @return array<string, mixed>
      */
-    private function serializeComment(Comment $comment): array
+    private function serializeComment(TaskComment $comment): array
     {
         /** @var array<string, mixed> $data */
-        $data = $this->normalizer->normalize($comment, 'jsonld', ['groups' => ['comment:read']]);
+        $data = $this->normalizer->normalize($comment, 'jsonld', ['groups' => ['task_comment:read']]);
         return $data;
     }
 }

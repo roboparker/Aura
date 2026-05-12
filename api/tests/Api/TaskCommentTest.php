@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Notification;
 use App\Entity\Project;
 use App\Entity\Task;
@@ -24,11 +24,11 @@ class CommentTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
-        // Notifications hold FKs to both Comment and Task (mention rows
+        // Notifications hold FKs to both TaskComment and Task (mention rows
         // and reminder rows respectively); wipe them first so the bulk
         // entity deletes below don't trip on orphans.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -36,7 +36,7 @@ class CommentTest extends ApiTestCase
 
     public function testListRequiresAuth(): void
     {
-        static::createClient()->request('GET', '/comments');
+        static::createClient()->request('GET', '/task_comments');
         $this->assertResponseStatusCodeSame(401);
     }
 
@@ -47,7 +47,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Started looking at registrars.',
@@ -57,12 +57,12 @@ class CommentTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $this->assertJsonContains([
-            '@type' => 'Comment',
+            '@type' => 'TaskComment',
             'body' => 'Started looking at registrars.',
         ]);
 
         // Author was stamped server-side.
-        $reloaded = $this->entityManager->getRepository(Comment::class)
+        $reloaded = $this->entityManager->getRepository(TaskComment::class)
             ->findOneBy(['body' => 'Started looking at registrars.']);
         $this->assertNotNull($reloaded);
         $this->assertTrue($alice->getId()->equals($reloaded->getAuthor()?->getId()));
@@ -76,7 +76,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Pretending to be Bob.',
@@ -86,7 +86,7 @@ class CommentTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(201);
-        $reloaded = $this->entityManager->getRepository(Comment::class)
+        $reloaded = $this->entityManager->getRepository(TaskComment::class)
             ->findOneBy(['body' => 'Pretending to be Bob.']);
         $this->assertTrue($alice->getId()->equals($reloaded->getAuthor()?->getId()));
     }
@@ -99,7 +99,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $bobsTask->getId(),
                 'body' => 'Sneaky.',
@@ -119,7 +119,7 @@ class CommentTest extends ApiTestCase
         $this->assertSame(
             0,
             (int) $this->entityManager->createQuery(
-                'SELECT COUNT(c) FROM App\Entity\Comment c WHERE c.task = :task',
+                'SELECT COUNT(c) FROM App\Entity\TaskComment c WHERE c.task = :task',
             )->setParameter('task', $bobsTask)->getSingleScalarResult(),
         );
     }
@@ -133,7 +133,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Drafting the announcement.',
@@ -156,7 +156,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/comments');
+        $client->request('GET', '/task_comments');
 
         $this->assertResponseIsSuccessful();
         $bodies = array_map(
@@ -174,7 +174,7 @@ class CommentTest extends ApiTestCase
         $first = $this->seedComment($alice, $task, 'First');
         $first->getId(); // touch
         // Use direct setters so the test isn't sleeping for ordering.
-        $second = new Comment();
+        $second = new TaskComment();
         $second->setTask($task);
         $second->setAuthor($alice);
         $second->setBody('Second');
@@ -186,7 +186,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/comments?task=/tasks/' . $task->getId());
+        $client->request('GET', '/task_comments?task=/tasks/' . $task->getId());
 
         $this->assertResponseIsSuccessful();
         $bodies = array_map(
@@ -204,14 +204,14 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/comments/' . $comment->getId(), [
+        $client->request('PATCH', '/task_comments/' . $comment->getId(), [
             'json' => ['body' => 'Edited'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
-        $reloaded = $this->entityManager->getRepository(Comment::class)->find($comment->getId());
+        $reloaded = $this->entityManager->getRepository(TaskComment::class)->find($comment->getId());
         $this->assertSame('Edited', $reloaded->getBody());
         $this->assertNotNull($reloaded->getUpdatedAt(), 'updatedAt should be stamped on edit.');
     }
@@ -226,7 +226,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/comments/' . $bobsComment->getId(), [
+        $client->request('PATCH', '/task_comments/' . $bobsComment->getId(), [
             'json' => ['body' => 'Alice editing!'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -242,7 +242,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/comments/' . $comment->getId());
+        $client->request('DELETE', '/task_comments/' . $comment->getId());
 
         $this->assertResponseStatusCodeSame(204);
     }
@@ -259,7 +259,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/comments/' . $bobsComment->getId());
+        $client->request('DELETE', '/task_comments/' . $bobsComment->getId());
 
         $this->assertResponseStatusCodeSame(204);
     }
@@ -274,7 +274,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('DELETE', '/comments/' . $aliceComment->getId());
+        $client->request('DELETE', '/task_comments/' . $aliceComment->getId());
 
         $this->assertResponseStatusCodeSame(403);
     }
@@ -288,7 +288,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/comments/' . $bobsComment->getId());
+        $client->request('GET', '/task_comments/' . $bobsComment->getId());
 
         // Extension scopes the query, so cross-task lookups return 404.
         $this->assertResponseStatusCodeSame(404);
@@ -301,7 +301,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => '',
@@ -320,10 +320,10 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
-                'parentComment' => '/comments/' . $root->getId(),
+                'parentComment' => '/task_comments/' . $root->getId(),
                 'body' => 'A reply',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -331,9 +331,9 @@ class CommentTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $this->assertJsonContains([
-            '@type' => 'Comment',
+            '@type' => 'TaskComment',
             'body' => 'A reply',
-            'parentComment' => '/comments/' . $root->getId(),
+            'parentComment' => '/task_comments/' . $root->getId(),
         ]);
     }
 
@@ -346,10 +346,10 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $taskB->getId(),
-                'parentComment' => '/comments/' . $rootOnA->getId(),
+                'parentComment' => '/task_comments/' . $rootOnA->getId(),
                 'body' => 'Wrong task',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -368,10 +368,10 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
-                'parentComment' => '/comments/' . $depth3->getId(),
+                'parentComment' => '/task_comments/' . $depth3->getId(),
                 'body' => 'too deep',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -389,11 +389,11 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/comments/' . $root->getId());
+        $client->request('DELETE', '/task_comments/' . $root->getId());
         $this->assertResponseStatusCodeSame(204);
 
         $this->entityManager->clear();
-        $stillThere = $this->entityManager->getRepository(Comment::class)->find($reply->getId());
+        $stillThere = $this->entityManager->getRepository(TaskComment::class)->find($reply->getId());
         $this->assertNull($stillThere, 'Reply should be removed when its parent is deleted.');
     }
 
@@ -408,7 +408,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/comments?parentComment=/comments/' . $root->getId());
+        $client->request('GET', '/task_comments?parentComment=/task_comments/' . $root->getId());
 
         $this->assertResponseIsSuccessful();
         $bodies = array_map(
@@ -426,10 +426,10 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
-                'body' => str_repeat('x', Comment::MAX_BODY_LENGTH + 1),
+                'body' => str_repeat('x', TaskComment::MAX_BODY_LENGTH + 1),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -446,7 +446,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Heads up @bob — can you review?',
@@ -475,14 +475,14 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'cc @charlie',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
-        // Comment itself still posts — unknown @ tokens are plain text,
+        // TaskComment itself still posts — unknown @ tokens are plain text,
         // not validation errors.
         $this->assertResponseStatusCodeSame(201);
         $this->assertNotNull($charlie->getId());
@@ -502,7 +502,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Reminding @alice (me)',
@@ -527,7 +527,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Hey @bob',
@@ -561,7 +561,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => 'Hey @bob',
@@ -596,7 +596,7 @@ class CommentTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/comments', [
+        $client->request('POST', '/task_comments', [
             'json' => [
                 'task' => '/tasks/' . $task->getId(),
                 'body' => '@bob @BOB @bob — please look',
@@ -612,9 +612,9 @@ class CommentTest extends ApiTestCase
         );
     }
 
-    private function seedComment(User $author, Task $task, string $body): Comment
+    private function seedComment(User $author, Task $task, string $body): TaskComment
     {
-        $c = new Comment();
+        $c = new TaskComment();
         $c->setAuthor($author);
         $c->setTask($task);
         $c->setBody($body);
@@ -623,9 +623,9 @@ class CommentTest extends ApiTestCase
         return $c;
     }
 
-    private function seedReply(User $author, Task $task, Comment $parent, string $body): Comment
+    private function seedReply(User $author, Task $task, TaskComment $parent, string $body): TaskComment
     {
-        $c = new Comment();
+        $c = new TaskComment();
         $c->setAuthor($author);
         $c->setTask($task);
         $c->setParentComment($parent);
