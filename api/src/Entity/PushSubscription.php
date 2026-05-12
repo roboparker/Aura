@@ -63,7 +63,7 @@ class PushSubscription
 
     /**
      * Stamped server-side by PushSubscriptionOwnerProcessor — never
-     * trusted from the request payload, same pattern as Comment.author
+     * trusted from the request payload, same pattern as TaskComment.author
      * and Task.owner.
      */
     #[ORM\ManyToOne(targetEntity: User::class)]

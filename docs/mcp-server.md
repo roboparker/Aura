@@ -52,7 +52,7 @@ The response includes a one-shot `plainToken` field — copy it; subsequent `GET
 | Task        | `create_task`, `get_task`, `update_task`, `delete_task`, `list_tasks`, `search_tasks` |
 | Project     | `create_project`, `get_project`, `update_project`, `delete_project`, `list_projects` |
 | Assignment  | `assign_task`, `unassign_task`, `get_my_tasks`                                 |
-| Comment     | `add_comment`, `list_comments`                                                 |
+| TaskComment | `add_task_comment`, `list_task_comments`                                       |
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
 

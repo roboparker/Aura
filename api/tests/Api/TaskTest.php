@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
@@ -25,11 +25,11 @@ class TaskTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
-        // Notification + Comment hold FKs to Task; clear them first so
+        // Notification + TaskComment hold FKs to Task; clear them first so
         // the bulk Task delete below doesn't fail when search-fixture
         // comments are still around from a previous test class.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -1315,7 +1315,7 @@ class TaskTest extends ApiTestCase
         $task = $this->createTask($alice, 'Misc');
         $other = $this->createTask($alice, 'Other');
 
-        $comment = new Comment();
+        $comment = new TaskComment();
         $comment->setTask($task);
         $comment->setAuthor($alice);
         $comment->setBody('We discussed the moonshot rollout in standup.');

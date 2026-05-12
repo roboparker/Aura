@@ -4,35 +4,35 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\Comment;
-use App\Service\CommentMentionService;
-use App\Service\CommentMercurePublisher;
+use App\Entity\TaskComment;
+use App\Service\TaskCommentMentionService;
+use App\Service\TaskCommentMercurePublisher;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Wraps the default ORM persist processor on `PATCH /comments/{id}` so we
+ * Wraps the default ORM persist processor on `PATCH /task_comments/{id}` so we
  * can publish the edit to Mercure subscribers after the row has been
  * flushed. Same pattern as TaskUpdateProcessor.
  *
- * @implements ProcessorInterface<Comment, Comment>
+ * @implements ProcessorInterface<TaskComment, TaskComment>
  */
-final class CommentUpdateProcessor implements ProcessorInterface
+final class TaskCommentUpdateProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<Comment, Comment> $persistProcessor
+     * @param ProcessorInterface<TaskComment, TaskComment> $persistProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private CommentMercurePublisher $publisher,
-        private CommentMentionService $mentions,
+        private TaskCommentMercurePublisher $publisher,
+        private TaskCommentMentionService $mentions,
     ) {
     }
 
     /**
-     * @param Comment $data
+     * @param TaskComment $data
      */
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Comment
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): TaskComment
     {
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
         // Edits can introduce new @mentions; the (recipient, comment)

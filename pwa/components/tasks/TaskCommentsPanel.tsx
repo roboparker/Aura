@@ -7,11 +7,11 @@ import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
-export interface Comment {
+export interface TaskComment {
   "@id": string;
   id: string;
   body: string;
-  // The API serializes Comment.author as the embedded user shape so we can
+  // The API serializes TaskComment.author as the embedded user shape so we can
   // render the avatar without a second fetch per comment.
   author: AvatarUser & { "@id": string; id: string };
   // IRI of the parent comment when this is a threaded reply, null at root.
@@ -21,7 +21,7 @@ export interface Comment {
 }
 
 /**
- * Mirrors the server's `Comment::MAX_DEPTH`. Replies are blocked once a
+ * Mirrors the server's `TaskComment.MAX_DEPTH`. Replies are blocked once a
  * comment sits at this depth so the API stays in sync with the UI.
  */
 const MAX_DEPTH = 3;
@@ -33,10 +33,10 @@ const MAX_DEPTH = 3;
  */
 const COLLAPSE_AFTER = 3;
 
-interface CommentsPanelProps {
+interface TaskCommentsPanelProps {
   taskTitle: string;
   /** Already-loaded comments for this task. Sorted oldest-first by the API. */
-  comments: Comment[];
+  comments: TaskComment[];
   /** True while the parent is awaiting the initial comments fetch. */
   isLoading: boolean;
   /** Author check uses this — null means an admin-viewing-someone-else case
@@ -47,8 +47,8 @@ interface CommentsPanelProps {
   isTaskOwner: boolean;
   /** `parentIri` is null for top-level posts and a comment IRI for replies. */
   onCreate: (body: string, parentIri: string | null) => Promise<void>;
-  onEdit: (comment: Comment, body: string) => Promise<void>;
-  onDelete: (comment: Comment) => Promise<void>;
+  onEdit: (comment: TaskComment, body: string) => Promise<void>;
+  onDelete: (comment: TaskComment) => Promise<void>;
 }
 
 const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
@@ -66,9 +66,9 @@ const formatRelative = (iso: string): string => {
   return RELATIVE.format(Math.round(diffSec / 31536000), "year");
 };
 
-interface CommentNode {
-  comment: Comment;
-  children: CommentNode[];
+interface TaskCommentNode {
+  comment: TaskComment;
+  children: TaskCommentNode[];
 }
 
 /**
@@ -76,12 +76,12 @@ interface CommentNode {
  * happen briefly while a Mercure delete event races a list reload) get
  * promoted to roots so they don't disappear from the UI.
  */
-const buildThreadTree = (comments: Comment[]): CommentNode[] => {
-  const nodes = new Map<string, CommentNode>();
+const buildThreadTree = (comments: TaskComment[]): TaskCommentNode[] => {
+  const nodes = new Map<string, TaskCommentNode>();
   for (const c of comments) {
     nodes.set(c["@id"], { comment: c, children: [] });
   }
-  const roots: CommentNode[] = [];
+  const roots: TaskCommentNode[] = [];
   nodes.forEach((node) => {
     const parentIri = node.comment.parentComment;
     if (parentIri && nodes.has(parentIri)) {
@@ -93,7 +93,7 @@ const buildThreadTree = (comments: Comment[]): CommentNode[] => {
   return roots;
 };
 
-const CommentsPanel = ({
+const TaskCommentsPanel = ({
   taskTitle,
   comments,
   isLoading,
@@ -102,7 +102,7 @@ const CommentsPanel = ({
   onCreate,
   onEdit,
   onDelete,
-}: CommentsPanelProps) => {
+}: TaskCommentsPanelProps) => {
   const [draft, setDraft] = useState("");
   const [draftKey, setDraftKey] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -196,14 +196,14 @@ const CommentsPanel = ({
 };
 
 interface CommentBranchProps {
-  node: CommentNode;
+  node: TaskCommentNode;
   /** 1 for root comments, 2/3 for nested replies. Capped at MAX_DEPTH. */
   depth: number;
   currentUserIri: string | null;
   isTaskOwner: boolean;
   onCreate: (body: string, parentIri: string | null) => Promise<void>;
-  onEdit: (comment: Comment, body: string) => Promise<void>;
-  onDelete: (comment: Comment) => Promise<void>;
+  onEdit: (comment: TaskComment, body: string) => Promise<void>;
+  onDelete: (comment: TaskComment) => Promise<void>;
 }
 
 // Renders one comment plus its (recursively rendered) children. Indent
@@ -279,7 +279,7 @@ const CommentBranch = ({
 };
 
 interface CommentRowProps {
-  comment: Comment;
+  comment: TaskComment;
   depth: number;
   canEdit: boolean;
   canDelete: boolean;
@@ -511,4 +511,4 @@ const CommentRow = ({
   );
 };
 
-export default CommentsPanel;
+export default TaskCommentsPanel;

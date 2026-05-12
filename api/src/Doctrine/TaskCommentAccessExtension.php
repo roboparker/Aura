@@ -6,7 +6,7 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\SpaceGroupMembership;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -14,13 +14,13 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Comment queries to those whose parent task the current user can
+ * Filters TaskComment queries to those whose parent task the current user can
  * read — mirrors TaskOwnerExtension by joining through `comment.task` and
  * accepting either task ownership or membership in the project's space
  * (#185). Applied to both collection and item queries so cross-task
  * lookups return 404 instead of leaking the row's existence.
  */
-final class CommentAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
+final class TaskCommentAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
     public function __construct(private Security $security)
     {
@@ -49,7 +49,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
 
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
-        if (Comment::class !== $resourceClass) {
+        if (TaskComment::class !== $resourceClass) {
             return;
         }
 

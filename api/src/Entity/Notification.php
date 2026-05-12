@@ -101,17 +101,17 @@ class Notification
     private ?string $reminderOffset = null;
 
     /**
-     * Comment that triggered this notification — only set for
+     * TaskComment that triggered this notification — only set for
      * `task_mention` rows. Together with `recipient` it forms a unique
      * key so editing a comment can't re-fire mentions to the same user.
      * The bare IRI is exposed under `notification:read` so the PWA can
      * deep-link to the comment without an extra fetch.
      */
     #[\ApiPlatform\Metadata\ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Comment::class)]
+    #[ORM\ManyToOne(targetEntity: TaskComment::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['notification:read'])]
-    private ?Comment $comment = null;
+    private ?TaskComment $comment = null;
 
     /**
      * Set by NotificationUpdateProcessor when the user marks the row read.
@@ -249,12 +249,12 @@ class Notification
         return $this;
     }
 
-    public function getComment(): ?Comment
+    public function getComment(): ?TaskComment
     {
         return $this->comment;
     }
 
-    public function setComment(?Comment $comment): static
+    public function setComment(?TaskComment $comment): static
     {
         $this->comment = $comment;
         return $this;

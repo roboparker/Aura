@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Comment;
+use App\Entity\TaskComment;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -12,7 +12,7 @@ use App\Mcp\McpInputHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 
-final class ListCommentsTool implements McpToolInterface
+final class ListTaskCommentsTool implements McpToolInterface
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -24,7 +24,7 @@ final class ListCommentsTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'list_comments';
+        return 'list_task_comments';
     }
 
     public function getDescription(): string
@@ -56,7 +56,7 @@ final class ListCommentsTool implements McpToolInterface
 
         ['page' => $page, 'limit' => $limit] = $this->input->pagination($arguments);
 
-        $qb = $this->em->getRepository(Comment::class)
+        $qb = $this->em->getRepository(TaskComment::class)
             ->createQueryBuilder('c')
             ->where('c.task = :task')
             ->setParameter('task', $task)
@@ -67,7 +67,7 @@ final class ListCommentsTool implements McpToolInterface
         $paginator = new Paginator($qb->getQuery(), fetchJoinCollection: false);
         $items = [];
         foreach ($paginator as $comment) {
-            /** @var Comment $comment */
+            /** @var TaskComment $comment */
             $items[] = $this->serializer->comment($comment);
         }
 

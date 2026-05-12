@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
  * Stamps the current user as the discussion author before persisting,
- * matching the trust model used by CommentAuthorProcessor and
+ * matching the trust model used by TaskCommentAuthorProcessor and
  * TaskOwnerProcessor — the field is set server-side rather than
  * trusted from the request payload.
  *

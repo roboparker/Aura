@@ -19,7 +19,7 @@ export type CommentLiveEvent =
   | { type: "create" | "update"; comment: { "@id": string; [key: string]: unknown } }
   | { type: "delete"; id: string; task: string };
 
-export const useCommentLiveUpdates = (
+export const useTaskCommentLiveUpdates = (
   taskId: string | null,
   enabled: boolean,
   onEvent: (event: CommentLiveEvent) => void,
