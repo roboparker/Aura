@@ -91,6 +91,9 @@ docker compose up -d
 ```
 Linked worktrees get ports in the 20000+ range; the main checkout keeps default ports. See `docs/deployment.md` for details.
 
+### Docker Desktop port flaps (Windows)
+Docker Desktop occasionally stops forwarding host → WSL2 ports after sleep/hibernate; containers stay healthy but `https://localhost` hangs from the host. Run `scripts/watch-port-forward.sh` in a side terminal — it polls the host URL and restarts the `php` container when the forward dies, which rebuilds the bridge. Tunables via env vars (`WATCH_URL`, `WATCH_SERVICE`, `POLL_INTERVAL`, `FAIL_THRESHOLD`, `PROBE_TIMEOUT`, `COOLDOWN`); see the script header.
+
 ### API Development
 ```bash
 cd api

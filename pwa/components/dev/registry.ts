@@ -9,6 +9,7 @@ export type RegistryEntry = {
     | "Editor"
     | "User"
     | "Theme"
+    | "Layout"
     | "Discussions"
     | "Custom fields";
   description: string;
@@ -40,6 +41,12 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "markdown-editor", name: "MarkdownEditor", category: "Editor", description: "BlockNote-backed WYSIWYG markdown editor." },
   { slug: "markdown-view", name: "MarkdownView", category: "Editor", description: "Read-only markdown renderer." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
+  { slug: "layout", name: "Layout", category: "Layout", description: "App-shell wrapper: providers + persistent Navbar and Sidebar." },
+  { slug: "navbar", name: "Navbar", category: "Layout", description: "Top app bar with wordmark, search, badges, theme toggle, and mobile sheet." },
+  { slug: "sidebar", name: "Sidebar", category: "Layout", description: "Persistent left navigation column (md and up, authenticated only)." },
+  { slug: "sidebar-nav", name: "SidebarNav", category: "Layout", description: "Shared nav contents used by the persistent sidebar and the mobile sheet." },
+  { slug: "search-bar", name: "SearchBar", category: "Layout", description: "Navbar task search with debounced autocomplete and ⌘K focus." },
+  { slug: "space-switcher", name: "SpaceSwitcher", category: "Layout", description: "Active-space dropdown that persists the choice via ActiveSpaceContext." },
   { slug: "discussions-panel", name: "DiscussionsPanel", category: "Discussions", description: "Project discussion board with list, filter, create, edit, pin/lock." },
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
   { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },

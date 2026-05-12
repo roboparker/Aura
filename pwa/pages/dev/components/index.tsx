@@ -12,6 +12,7 @@ const categories = [
   "Editor",
   "User",
   "Theme",
+  "Layout",
   "Discussions",
   "Custom fields",
 ] as const;
