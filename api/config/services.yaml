@@ -38,15 +38,23 @@ services:
             - { name: api_platform.doctrine.orm.query_extension.collection }
             - { name: api_platform.doctrine.orm.query_extension.item }
 
-    # MCP tool autoconfiguration: every class implementing McpToolInterface
-    # is tagged so it lands in the tool registry without per-class wiring.
+    # MCP tool + custom-field-type autoconfiguration: every class
+    # implementing the respective interface is tagged so it lands in its
+    # registry without per-class wiring. Adding a new MCP tool or a new
+    # custom-field-type strategy is then a one-file change.
     _instanceof:
         App\Mcp\Tool\McpToolInterface:
             tags: ['app.mcp_tool']
+        App\CustomField\Type\CustomFieldTypeInterface:
+            tags: ['app.custom_field_type']
 
     App\Mcp\McpToolRegistry:
         arguments:
             $tools: !tagged_iterator app.mcp_tool
+
+    App\CustomField\CustomFieldTypeRegistry:
+        arguments:
+            $types: !tagged_iterator app.custom_field_type
 
     # Replace stof's default actor provider with one that yields the
     # user's IRI (`/users/{uuid}`) instead of `getUserIdentifier()`
