@@ -28,6 +28,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['definition_id'], name: 'idx_cfv_definition')]
 #[ORM\Index(columns: ['search_vector'], name: 'idx_cfv_search_vector', flags: ['gin'])]
 #[ORM\UniqueConstraint(name: 'uniq_cfv_task_definition', columns: ['task_id', 'definition_id'])]
+#[ORM\HasLifecycleCallbacks]
 class CustomFieldValue
 {
     #[ORM\Id]
@@ -58,21 +59,40 @@ class CustomFieldValue
     private ?CustomFieldDefinition $definition = null;
 
     /**
-     * Type-erased scalar. Stored as JSON so a single column can hold any
-     * of the five supported types; null is a deliberate "no value" for
-     * an optional field. See {@see App\Validator\ValidCustomFieldValues}
-     * for per-type shape rules.
+     * Type-erased scalar (or list). Stored as JSON so a single column
+     * can hold any kind/subtype the strategy registry supports — string
+     * for text/url/dropdown, int|float for numeric, ISO date string for
+     * date, bool for boolean, `{amount, currency}` for money,
+     * `{user|task|page|discussion: "/iri/..."}` for references, and the
+     * list-of-any-of-the-above shape when `config.multi=true`. Null is
+     * a deliberate "no value" for a nullable field. Shape validation
+     * lives in {@see App\Validator\ValidCustomFieldValues}.
      */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private mixed $value = null;
 
     /**
-     * Postgres-managed tsvector over the value's text projection
-     * (`value #>> '{}'`), populated by a STORED generated column — see
-     * Version20260505000000. Mapped here so DQL can reference
-     * `cfv.searchVector` from the task search filter's EXISTS subquery;
-     * never written from PHP, never serialised.
+     * Plain-text projection of `value` for the FTS index. Written by the
+     * type strategies on persist — references dereference the target's
+     * display label, dates render as `Y-m-d`, money renders the amount
+     * + currency, references emit the target's name so FTS hits work
+     * against user-facing strings rather than UUIDs. Null/empty means
+     * the value contributes nothing searchable.
+     *
+     * The Postgres-managed `search_vector` column is generated from this
+     * (see Version20260513000000) so DQL can keep referencing
+     * `cfv.searchVector` unchanged.
+     */
+    #[ORM\Column(name: 'value_search', type: 'text', nullable: true)]
+    private ?string $valueSearch = null;
+
+    /**
+     * Postgres-managed tsvector projection of {@see $valueSearch},
+     * populated by a STORED generated column — see Version20260513000000.
+     * Mapped here so DQL can reference `cfv.searchVector` from the task
+     * search filter's EXISTS subquery; never written from PHP, never
+     * serialised.
      */
     #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
     private ?string $searchVector = null;
@@ -113,5 +133,52 @@ class CustomFieldValue
     {
         $this->value = $value;
         return $this;
+    }
+
+    public function getValueSearch(): ?string
+    {
+        return $this->valueSearch;
+    }
+
+    public function setValueSearch(?string $valueSearch): static
+    {
+        $this->valueSearch = $valueSearch;
+        return $this;
+    }
+
+    /**
+     * Transition shim: populates `value_search` from the raw scalar
+     * value so the FTS index keeps producing useful tokens until the
+     * type strategies take over the projection in the next commit.
+     * Mirrors what the old `value #>> '{}'` STORED column expression
+     * did — strings emit themselves, numbers/bools/dates render via
+     * their JSON-string form. Lists (multi-value future) and complex
+     * values (money, references) need strategy awareness and won't be
+     * served by this fallback; the strategies commit replaces this.
+     */
+    #[ORM\PrePersist]
+    #[ORM\PreUpdate]
+    public function projectValueSearch(): void
+    {
+        $this->valueSearch = self::flattenValueForSearch($this->value);
+    }
+
+    private static function flattenValueForSearch(mixed $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+        if (is_string($value)) {
+            return '' === $value ? null : $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        // Complex shapes (lists, money, refs) need strategy awareness;
+        // skip the fallback and let the strategies commit handle them.
+        return null;
     }
 }
