@@ -249,6 +249,9 @@ class UserTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(403);
     }
 
+    /**
+     * @param list<string> $roles
+     */
     private function createTestUser(string $email, string $plainPassword, array $roles = ['ROLE_USER']): User
     {
         $container = static::getContainer();

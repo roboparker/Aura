@@ -14,6 +14,8 @@ use Gedmo\Loggable\Entity\Repository\LogEntryRepository;
  * and we don't need to map Gedmo's vendor namespace separately. The
  * legacy `array` column type on `data` is aliased to JSON in
  * `config/packages/doctrine.yaml` (DBAL 4 dropped the original).
+ *
+ * @extends AbstractLogEntry<object>
  */
 #[ORM\Entity(repositoryClass: LogEntryRepository::class)]
 #[ORM\Table(name: 'ext_log_entries')]

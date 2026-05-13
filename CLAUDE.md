@@ -105,7 +105,7 @@ bin/phpunit                           # Run tests
 ```
 
 ### Static analysis (PHPStan)
-PHPStan runs against `api/src` and `api/tests` at **level 5** as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); pre-existing violations are deferred via [api/phpstan-baseline.neon](api/phpstan-baseline.neon) so CI only fails on *new* errors.
+PHPStan runs against `api/src` and `api/tests` at **level 6** as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); the baseline is currently empty — every error fails CI. If you ever need to defer a fix, regenerate [api/phpstan-baseline.neon](api/phpstan-baseline.neon) with `docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon`.
 
 Extensions wired up:
 - `phpstan/phpstan-symfony` — service-id / config-resolver awareness via `var/cache/test/App_KernelTestDebugContainer.xml`, console application loaded from [api/tests/phpstan/console-application.php](api/tests/phpstan/console-application.php).
