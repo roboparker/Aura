@@ -72,7 +72,8 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
             }
 
             $defProject = $definition->getProject();
-            if (null === $project || null === $defProject
+            if (
+                null === $project || null === $defProject
                 || (string) $defProject->getId() !== (string) $project->getId()
             ) {
                 $this->context->buildViolation($constraint->messageWrongProject)

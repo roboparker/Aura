@@ -95,14 +95,16 @@ class McpTest extends ApiTestCase
         $body = $this->callMcp($client, $plain, 'tools/list');
 
         $names = array_column($body['result']['tools'], 'name');
-        foreach ([
+        foreach (
+            [
             'create_task', 'get_task', 'update_task', 'delete_task', 'list_tasks', 'search_tasks',
             'create_project', 'get_project', 'update_project', 'delete_project', 'list_projects',
             'assign_task', 'unassign_task', 'get_my_tasks',
             'add_task_comment', 'list_task_comments',
             'upload_file', 'list_files', 'download_file',
             'get_custom_fields',
-        ] as $expected) {
+            ] as $expected
+        ) {
             $this->assertContains($expected, $names, sprintf('Missing tool "%s"', $expected));
         }
     }

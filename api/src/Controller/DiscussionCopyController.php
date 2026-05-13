@@ -42,7 +42,8 @@ class DiscussionCopyController extends AbstractController
             return $this->json(['error' => 'Discussion not found.'], 404);
         }
         $sourceSpace = $source->getSpace();
-        if (!$this->isGranted('ROLE_ADMIN')
+        if (
+            !$this->isGranted('ROLE_ADMIN')
             && (null === $sourceSpace || !$sourceSpace->hasMember($user))
         ) {
             return $this->json(['error' => 'Discussion not found.'], 404);

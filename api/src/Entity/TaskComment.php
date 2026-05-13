@@ -259,7 +259,8 @@ class TaskComment
             return;
         }
 
-        if ($this->task !== null
+        if (
+            $this->task !== null
             && $parent->getTask() !== null
             && !$this->task->getId()?->equals($parent->getTask()->getId())
         ) {

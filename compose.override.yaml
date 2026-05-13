@@ -24,6 +24,37 @@ services:
       - host.docker.internal:host-gateway
     tty: true
 
+  # Static-analysis tools run against the dev `app-php` image (built by
+  # the existing `php` service) so they inherit the same PHP extensions
+  # the app needs at runtime (pdo_pgsql, intl, gd) — phpstan-doctrine's
+  # objectManagerLoader boots a real `test` kernel and needs them. Shares
+  # the `api_vendor` volume so the same composer install is reused.
+  # `profiles: ["tools"]` keeps these out of normal `docker compose up`.
+  phpstan:
+    image: app-php
+    profiles: ["tools"]
+    working_dir: /app
+    mem_limit: 8g
+    volumes:
+      - ./api:/app
+      - api_vendor:/app/vendor
+    environment:
+      APP_ENV: test
+      XDEBUG_MODE: "off"
+    entrypoint: ["php", "-d", "xdebug.mode=off", "vendor/bin/phpstan"]
+    command: ["analyse", "--memory-limit=4G"]
+
+  phpcs:
+    image: app-php
+    profiles: ["tools"]
+    working_dir: /app
+    volumes:
+      - ./api:/app
+      - api_vendor:/app/vendor
+    environment:
+      XDEBUG_MODE: "off"
+    entrypoint: ["php", "-d", "xdebug.mode=off", "vendor/bin/phpcs"]
+
   pwa:
     build:
       context: ./pwa

@@ -195,8 +195,10 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $body = json_decode($client->getResponse()->getContent(false), true);
         $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $body['recoveryCodes']);
-        $this->assertEmpty(array_intersect($original, $body['recoveryCodes']),
-            'Old recovery codes should not appear in the regenerated set.');
+        $this->assertEmpty(
+            array_intersect($original, $body['recoveryCodes']),
+            'Old recovery codes should not appear in the regenerated set.'
+        );
     }
 
     // --- Helpers ---

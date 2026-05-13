@@ -1,0 +1,45 @@
+# Pre-existing PHPStan violations as of the level-5 rollout. Regenerate
+# with `docker compose run --rm phpstan analyse --generate-baseline` after
+# clearing a batch. Anything new fails CI; baselined errors do not.
+
+parameters:
+    ignoreErrors:
+        # Doctrine populates entity IDs at flush — phpstan sees the
+        # Symfony\Component\Uid\Uuid|null property type but no assignment
+        # in our code. Same shape for every UUID-id entity.
+        -
+            message: '#Property App\\Entity\\[A-Za-z]+::\$id \(Symfony\\Component\\Uid\\Uuid\|null\) is never assigned Symfony\\Component\\Uid\\Uuid so it can be removed from the property type\.#'
+            paths:
+                - src/Entity/*.php
+
+        # search_vector is a Postgres STORED GENERATED column — Doctrine
+        # never writes it, phpstan can't know. Same for `searchVector`.
+        -
+            message: '#Property App\\Entity\\[A-Za-z]+::\$searchVector .* (is never assigned|is never read, only written)#'
+            paths:
+                - src/Entity/*.php
+
+        # API Platform's FilterInterface::getDescription() return shape is
+        # narrower in their docblock than what real filters return. Every
+        # filter we ship trips this. Tracked upstream.
+        -
+            message: '#Method App\\Filter\\[A-Za-z]+::getDescription\(\) should return array.*but returns array#'
+            paths:
+                - src/Filter/*.php
+
+        # Symfony Validator's Constraint::getTargets() is declared as
+        # array<self::CLASS_CONSTRAINT|self::PROPERTY_CONSTRAINT>, but
+        # phpstan flags the concrete return value in our subclasses as
+        # never-returning the alternative target.
+        -
+            message: "#Method App\\\\Validator\\\\[A-Za-z]+::getTargets\\(\\) never returns (.*) so it can be removed from the return type\\.#"
+            paths:
+                - src/Validator/*.php
+
+        # PHP 8.4 deprecated implicit-nullable params. Two leftover spots
+        # in entity helpers; trivial to fix in a follow-up.
+        -
+            message: '#Deprecated in PHP 8\.4: Parameter \#1 \$now \(DateTimeImmutable\) is implicitly nullable via default value null\.#'
+            paths:
+                - src/Entity/PasswordResetToken.php
+                - src/Entity/UserInvite.php

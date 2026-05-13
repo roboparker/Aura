@@ -111,8 +111,10 @@ class ProjectCopyController extends AbstractController
         // syncSpaceFromProject only fires when space is null at
         // PrePersist; we set it explicitly here to mirror the existing
         // create paths.
-        foreach ($this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $source]) as $sourceDefinition) {
+        foreach (
+            $this->em->getRepository(CustomFieldDefinition::class)
+            ->findBy(['project' => $source]) as $sourceDefinition
+        ) {
             $clone = (new CustomFieldDefinition())
                 ->setProject($copy)
                 ->setSpace($target)
@@ -153,7 +155,8 @@ class ProjectCopyController extends AbstractController
                     ->setRecurrenceRule($sourceTask->getRecurrenceRule())
                     ->setPosition($sourceTask->getPosition());
                 foreach ($sourceTask->getTags() as $tag) {
-                    if ($tag instanceof Tag
+                    if (
+                        $tag instanceof Tag
                         && $tag->getOwner()?->getId()?->equals($user->getId())
                     ) {
                         $cloneTask->addTag($tag);
