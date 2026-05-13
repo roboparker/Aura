@@ -27,7 +27,7 @@ class PageMoveTest extends ApiTestCase
             ->get('doctrine')
             ->getManager();
 
-        $this->entityManager->createQuery('DELETE FROM App\Entity\PageComment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();

@@ -33,12 +33,15 @@ test.describe("Pages", () => {
     ).toHaveText(title);
     await expect(page.locator("text=No content yet")).toBeVisible();
 
-    // Add a comment from the page detail.
-    await page.fill("#new-page-comment", "Looks good to me.");
-    await page.click('button[type="submit"]:has-text("Post comment")');
-    const comments = page.locator('[data-testid="page-comments"]');
+    // Add a comment from the page detail. Pages now use the shared
+    // CommentsPanel (#228) — same selectors as the task surface.
+    const comments = page.locator('[data-testid="comments-panel"]');
+    const editor = comments.locator('[contenteditable="true"]').first();
+    await editor.click();
+    await page.keyboard.type("Looks good to me.");
+    await comments.locator('[data-testid="comment-submit"]').click();
     await expect(
-      comments.locator('[data-testid="page-comment"]', {
+      comments.locator('[data-testid="comment-item"]', {
         hasText: "Looks good to me.",
       }),
     ).toBeVisible();

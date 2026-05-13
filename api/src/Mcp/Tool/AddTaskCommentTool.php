@@ -2,13 +2,14 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
+use App\Service\CommentMentionService;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class AddTaskCommentTool implements McpToolInterface
@@ -18,6 +19,7 @@ final class AddTaskCommentTool implements McpToolInterface
         private McpAuthorization $authz,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private CommentMentionService $mentions,
     ) {
     }
 
@@ -28,7 +30,7 @@ final class AddTaskCommentTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Add a Markdown comment to a task. Optionally pass parentCommentId to reply to an existing comment in the same task.';
+        return 'Add a Markdown comment to a task. Threads are flat — every comment is a top-level entry, ordered chronologically.';
     }
 
     public function getInputSchema(): array
@@ -37,8 +39,7 @@ final class AddTaskCommentTool implements McpToolInterface
             'type' => 'object',
             'properties' => [
                 'taskId' => ['type' => 'string'],
-                'body' => ['type' => 'string', 'description' => 'Markdown body (max 10000 chars).'],
-                'parentCommentId' => ['type' => 'string', 'description' => 'Optional reply target. Must belong to the same task.'],
+                'body' => ['type' => 'string', 'description' => 'Markdown body (max 50000 chars).'],
             ],
             'required' => ['taskId', 'body'],
             'additionalProperties' => false,
@@ -55,22 +56,18 @@ final class AddTaskCommentTool implements McpToolInterface
             throw McpException::notFound(sprintf('Task %s', $taskId));
         }
 
-        $comment = new TaskComment();
+        $comment = new Comment();
         $comment->setTask($task);
         $comment->setAuthor($user);
         $comment->setBody($body);
 
-        if (null !== $parentId = $this->input->optionalUuid('parentCommentId', $arguments['parentCommentId'] ?? null)) {
-            $parent = $this->em->getRepository(TaskComment::class)->find($parentId);
-            if (null === $parent) {
-                throw McpException::notFound(sprintf('Parent comment %s', $parentId));
-            }
-            $comment->setParentComment($parent);
-        }
-
         $this->input->assertValid($comment);
         $this->em->persist($comment);
         $this->em->flush();
+
+        // `@mention` tokens fire notifications post-persist — same
+        // path as the HTTP `POST /comments` flow.
+        $this->mentions->dispatchMentions($comment);
 
         return $this->serializer->comment($comment);
     }

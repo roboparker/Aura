@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -29,7 +29,7 @@ final class ListTaskCommentsTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List comments on a task in chronological order, paginated. Replies are included as flat entries with parentCommentId set so the caller can reconstruct the tree.';
+        return 'List comments on a task in chronological order, paginated. Comments are flat — no reply tree — and ordered by createdAt ascending.';
     }
 
     public function getInputSchema(): array
@@ -56,7 +56,7 @@ final class ListTaskCommentsTool implements McpToolInterface
 
         ['page' => $page, 'limit' => $limit] = $this->input->pagination($arguments);
 
-        $qb = $this->em->getRepository(TaskComment::class)
+        $qb = $this->em->getRepository(Comment::class)
             ->createQueryBuilder('c')
             ->where('c.task = :task')
             ->setParameter('task', $task)
@@ -67,7 +67,7 @@ final class ListTaskCommentsTool implements McpToolInterface
         $paginator = new Paginator($qb->getQuery(), fetchJoinCollection: false);
         $items = [];
         foreach ($paginator as $comment) {
-            /** @var TaskComment $comment */
+            /** @var Comment $comment */
             $items[] = $this->serializer->comment($comment);
         }
 

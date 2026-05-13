@@ -57,7 +57,20 @@ use Symfony\Component\Uid\Uuid;
 class Notification
 {
     public const TYPE_TASK_REMINDER = 'task_reminder';
-    public const TYPE_TASK_MENTION = 'task_mention';
+    /**
+     * @-mention notification — fires when an `@<handle>` token in a
+     * {@see Comment} body resolves to a user the comment author
+     * isn't (#228). Replaces the pre-unification `task_mention` type;
+     * the migration backfills existing rows.
+     */
+    public const TYPE_MENTION = 'mention';
+    /**
+     * @deprecated Use {@see self::TYPE_MENTION}. Kept as a class
+     *             constant alias so tests / external code referencing
+     *             the old name still compile. Will be removed after
+     *             one release.
+     */
+    public const TYPE_TASK_MENTION = self::TYPE_MENTION;
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -101,17 +114,17 @@ class Notification
     private ?string $reminderOffset = null;
 
     /**
-     * TaskComment that triggered this notification — only set for
-     * `task_mention` rows. Together with `recipient` it forms a unique
-     * key so editing a comment can't re-fire mentions to the same user.
-     * The bare IRI is exposed under `notification:read` so the PWA can
-     * deep-link to the comment without an extra fetch.
+     * Comment that triggered this notification — only set for
+     * `mention` rows. Together with `recipient` it forms a unique key
+     * so editing a comment can't re-fire mentions to the same user.
+     * The bare IRI is exposed under `notification:read` so the PWA
+     * can deep-link to the comment without an extra fetch.
      */
     #[\ApiPlatform\Metadata\ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: TaskComment::class)]
+    #[ORM\ManyToOne(targetEntity: Comment::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['notification:read'])]
-    private ?TaskComment $comment = null;
+    private ?Comment $comment = null;
 
     /**
      * Set by NotificationUpdateProcessor when the user marks the row read.
@@ -249,12 +262,12 @@ class Notification
         return $this;
     }
 
-    public function getComment(): ?TaskComment
+    public function getComment(): ?Comment
     {
         return $this->comment;
     }
 
-    public function setComment(?TaskComment $comment): static
+    public function setComment(?Comment $comment): static
     {
         $this->comment = $comment;
         return $this;

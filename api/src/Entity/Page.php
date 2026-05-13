@@ -33,11 +33,11 @@ use Symfony\Component\Validator\Constraints as Assert;
  *  - delete: page author OR space admin (cascades to descendants via
  *    the self-FK `ON DELETE CASCADE`)
  *
- * Comments live in their own `PageComment` entity rather than
- * piggy-backing on the existing `TaskComment` (which is task-only) — see
- * the issue's discussion of "polymorphic vs separate". A separate
- * table keeps this PR self-contained and lets either side evolve
- * independently.
+ * Comments live in the unified {@see Comment} entity (#228) with
+ * `commentable_type='page'`. Each page exposes its comments via the
+ * `comments` inverse mapping below for cascade-delete and template
+ * convenience; clients fetch the thread by querying
+ * `GET /comments?page=/pages/<uuid>` ordered by `createdAt ASC`.
  */
 #[ApiResource(
     operations: [
@@ -176,9 +176,9 @@ class Page
     private ?\DateTimeImmutable $updatedAt = null;
 
     /**
-     * @var Collection<int, PageComment>
+     * @var Collection<int, Comment>
      */
-    #[ORM\OneToMany(mappedBy: 'page', targetEntity: PageComment::class, cascade: ['remove'])]
+    #[ORM\OneToMany(mappedBy: 'page', targetEntity: Comment::class, cascade: ['remove'])]
     private Collection $comments;
 
     public function __construct()
@@ -275,7 +275,7 @@ class Page
     }
 
     /**
-     * @return Collection<int, PageComment>
+     * @return Collection<int, Comment>
      */
     public function getComments(): Collection
     {

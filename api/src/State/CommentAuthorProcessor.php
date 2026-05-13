@@ -4,40 +4,40 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\User;
-use App\Service\TaskCommentMentionService;
-use App\Service\TaskCommentMercurePublisher;
+use App\Service\CommentMentionService;
+use App\Service\CommentMercurePublisher;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
- * Stamps the comment with the currently authenticated user before persisting,
- * then notifies Mercure subscribers of the new comment so collaborators see
- * it without reloading. Author is never trusted from the request payload —
- * same pattern as TaskOwnerProcessor.
+ * Stamps the comment with the currently authenticated user before
+ * persisting, then notifies Mercure subscribers and dispatches
+ * `@mention` notifications. Author is never trusted from the request
+ * payload — same pattern as TaskOwnerProcessor.
  *
- * @implements ProcessorInterface<TaskComment, TaskComment>
+ * @implements ProcessorInterface<Comment, Comment>
  */
-final class TaskCommentAuthorProcessor implements ProcessorInterface
+final class CommentAuthorProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<TaskComment, TaskComment> $persistProcessor
+     * @param ProcessorInterface<Comment, Comment> $persistProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
         private Security $security,
-        private TaskCommentMercurePublisher $publisher,
-        private TaskCommentMentionService $mentions,
+        private CommentMercurePublisher $publisher,
+        private CommentMentionService $mentions,
     ) {
     }
 
     /**
-     * @param TaskComment $data
+     * @param Comment $data
      */
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): TaskComment
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Comment
     {
         $user = $this->security->getUser();
         if (!$user instanceof User) {
