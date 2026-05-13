@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Task;
 use Doctrine\ORM\QueryBuilder;
 
@@ -60,9 +61,13 @@ final class TaskStatusFilter extends AbstractFilter
                 'type' => 'string',
                 'required' => false,
                 'description' => 'Filter tasks by status: "open" (not yet completed) or "completed".',
-                'openapi' => [
-                    'enum' => ['open', 'completed'],
-                ],
+                // enum lives on the parameter's schema, not as a sibling
+                // attribute, so it has to ride along inside `schema`.
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    schema: ['type' => 'string', 'enum' => ['open', 'completed']],
+                ),
             ],
         ];
     }

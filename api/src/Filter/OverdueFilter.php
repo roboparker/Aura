@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Task;
 use Doctrine\ORM\QueryBuilder;
 
@@ -60,10 +61,12 @@ final class OverdueFilter extends AbstractFilter
                 'type' => 'bool',
                 'required' => false,
                 'description' => 'When true, restricts the collection to overdue tasks (incomplete with a past due date).',
-                'openapi' => [
-                    'example' => true,
-                    'allowEmptyValue' => false,
-                ],
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    allowEmptyValue: false,
+                    example: true,
+                ),
             ],
         ];
     }

@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Page;
 use Doctrine\ORM\QueryBuilder;
 
@@ -87,9 +88,11 @@ final class PageSearchFilter extends AbstractFilter
                 'type' => 'string',
                 'required' => false,
                 'description' => 'Postgres full-text search across page title and body. Ranked by relevance.',
-                'openapi' => [
-                    'example' => 'onboarding',
-                ],
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    example: 'onboarding',
+                ),
             ],
         ];
     }

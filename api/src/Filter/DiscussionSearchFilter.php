@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Discussion;
 use Doctrine\ORM\QueryBuilder;
 
@@ -89,9 +90,11 @@ final class DiscussionSearchFilter extends AbstractFilter
                 'type' => 'string',
                 'required' => false,
                 'description' => 'Postgres full-text search across discussion title and body. Pinned threads first, then ranked by relevance.',
-                'openapi' => [
-                    'example' => 'pricing question',
-                ],
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    example: 'pricing question',
+                ),
             ],
         ];
     }
