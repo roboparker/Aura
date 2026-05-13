@@ -60,7 +60,10 @@ class TwoFactorTest extends ApiTestCase
         $secret = json_decode($client->getResponse()->getContent(false), true)['secret'];
 
         $reloaded = $this->reloadUser('v@example.com');
-        $code = TOTP::createFromSecret($reloaded->getDecryptedTotpSecret())->now();
+        $totpSecret = $reloaded->getDecryptedTotpSecret();
+        self::assertNotNull($totpSecret);
+        self::assertNotSame('', $totpSecret);
+        $code = TOTP::createFromSecret($totpSecret)->now();
 
         $client->request('POST', '/me/2fa/verify', ['json' => ['code' => $code]]);
 
@@ -130,7 +133,10 @@ class TwoFactorTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(401);
 
-        $code = TOTP::createFromSecret($this->reloadUser('tfa@example.com')->getDecryptedTotpSecret())->now();
+        $totpSecret = $this->reloadUser('tfa@example.com')->getDecryptedTotpSecret();
+        self::assertNotNull($totpSecret);
+        self::assertNotSame('', $totpSecret);
+        $code = TOTP::createFromSecret($totpSecret)->now();
 
         $client->request('POST', '/auth/2fa-check', ['json' => ['code' => $code]]);
 

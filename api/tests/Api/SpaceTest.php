@@ -58,7 +58,8 @@ class SpaceTest extends ApiTestCase
         // Creator is admin; no other memberships.
         $this->assertCount(1, $personal->getUserMemberships());
         $membership = $personal->getUserMemberships()->first();
-        $this->assertTrue($alice->getId()->equals($membership->getUser()?->getId()));
+        self::assertNotFalse($membership);
+        $this->assertTrue($alice->getId()?->equals($membership->getUser()?->getId()));
         $this->assertSame(Space::ROLE_ADMIN, $membership->getRole());
     }
 
@@ -124,7 +125,9 @@ class SpaceTest extends ApiTestCase
         $this->assertFalse($space->getIsPersonal());
         $this->assertTrue($alice->getId()->equals($space->getCreatedBy()?->getId()));
         $this->assertCount(1, $space->getUserMemberships());
-        $this->assertSame(Space::ROLE_ADMIN, $space->getUserMemberships()->first()->getRole());
+        $firstMembership = $space->getUserMemberships()->first();
+        self::assertNotFalse($firstMembership);
+        $this->assertSame(Space::ROLE_ADMIN, $firstMembership->getRole());
     }
 
     public function testIsPersonalIgnoredOnCreate(): void

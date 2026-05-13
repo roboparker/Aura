@@ -182,8 +182,11 @@ class TagTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(1, $reloaded->getTags());
-        $this->assertSame('Writing', $reloaded->getTags()->first()->getTitle());
+        $firstTag = $reloaded->getTags()->first();
+        self::assertNotFalse($firstTag);
+        $this->assertSame('Writing', $firstTag->getTitle());
     }
 
     public function testRemoveTagFromTaskViaPatch(): void
@@ -206,8 +209,11 @@ class TagTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(1, $reloaded->getTags());
-        $this->assertSame('Keep', $reloaded->getTags()->first()->getTitle());
+        $firstTag = $reloaded->getTags()->first();
+        self::assertNotFalse($firstTag);
+        $this->assertSame('Keep', $firstTag->getTitle());
     }
 
     public function testCannotAttachOtherUsersTag(): void
