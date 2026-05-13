@@ -17,7 +17,7 @@ class PasswordTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         // Clean tables before each test
         $this->entityManager->createQuery('DELETE FROM App\Entity\PasswordResetToken')->execute();
@@ -282,7 +282,7 @@ class PasswordTest extends ApiTestCase
 
     private function reloadUser(string $email): User
     {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em = static::getContainer()->get('doctrine')->getManager();
         $em->clear();
         $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
         $this->assertNotNull($user, sprintf('User %s should exist', $email));

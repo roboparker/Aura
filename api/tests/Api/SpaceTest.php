@@ -17,7 +17,7 @@ class SpaceTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         // Wipe in dependency order so FK cascades fire cleanly. Spaces
         // cascade their memberships; users cascade everything else.

@@ -68,7 +68,7 @@ class PushSubscription
      */
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private User $user;
+    private ?User $user = null;
 
     #[ORM\Column(type: 'text', unique: true)]
     #[Assert\NotBlank(message: 'Subscription endpoint is required.')]
@@ -111,12 +111,12 @@ class PushSubscription
         return $this->id;
     }
 
-    public function getUser(): User
+    public function getUser(): ?User
     {
         return $this->user;
     }
 
-    public function setUser(User $user): static
+    public function setUser(?User $user): static
     {
         $this->user = $user;
         return $this;

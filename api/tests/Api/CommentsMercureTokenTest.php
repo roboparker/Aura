@@ -19,7 +19,7 @@ class CommentsMercureTokenTest extends ApiTestCase
     {
         self::bootKernel();
         $container = static::getContainer();
-        $this->entityManager = $container->get(EntityManagerInterface::class);
+        $this->entityManager = $container->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();

@@ -108,12 +108,12 @@ class CustomFieldDefinition
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Project is required.')]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
-    private Project $project;
+    private ?Project $project = null;
 
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['custom_field_definition:read'])]
-    private Space $space;
+    private ?Space $space = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'Field name is required.')]
@@ -206,23 +206,23 @@ class CustomFieldDefinition
         return $this->id;
     }
 
-    public function getProject(): Project
+    public function getProject(): ?Project
     {
         return $this->project;
     }
 
-    public function setProject(Project $project): static
+    public function setProject(?Project $project): static
     {
         $this->project = $project;
         return $this;
     }
 
-    public function getSpace(): Space
+    public function getSpace(): ?Space
     {
         return $this->space;
     }
 
-    public function setSpace(Space $space): static
+    public function setSpace(?Space $space): static
     {
         $this->space = $space;
         return $this;

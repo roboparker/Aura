@@ -72,7 +72,7 @@ class ApiToken
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private User $user;
+    private ?User $user = null;
 
     /**
      * sha256 of the full plaintext (including the `aura_pat_` prefix).
@@ -139,12 +139,12 @@ class ApiToken
         return $this->id;
     }
 
-    public function getUser(): User
+    public function getUser(): ?User
     {
         return $this->user;
     }
 
-    public function setUser(User $user): static
+    public function setUser(?User $user): static
     {
         $this->user = $user;
         return $this;

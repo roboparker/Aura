@@ -27,7 +27,7 @@ class ProjectCopyTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();

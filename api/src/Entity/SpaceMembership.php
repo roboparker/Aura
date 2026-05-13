@@ -31,12 +31,12 @@ class SpaceMembership
 
     #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'userMemberships')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private Space $space;
+    private ?Space $space = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['space:read'])]
-    private User $user;
+    private ?User $user = null;
 
     #[ORM\Column(length: 16, options: ['default' => Space::ROLE_MEMBER])]
     #[Assert\Choice(
@@ -60,23 +60,23 @@ class SpaceMembership
         return $this->id;
     }
 
-    public function getSpace(): Space
+    public function getSpace(): ?Space
     {
         return $this->space;
     }
 
-    public function setSpace(Space $space): static
+    public function setSpace(?Space $space): static
     {
         $this->space = $space;
         return $this;
     }
 
-    public function getUser(): User
+    public function getUser(): ?User
     {
         return $this->user;
     }
 
-    public function setUser(User $user): static
+    public function setUser(?User $user): static
     {
         $this->user = $user;
         return $this;

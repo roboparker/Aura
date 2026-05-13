@@ -16,7 +16,7 @@ class EmailChangeTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\EmailChangeRequest')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -115,7 +115,7 @@ class EmailChangeTest extends ApiTestCase
         ]);
         $this->assertResponseIsSuccessful();
 
-        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em = static::getContainer()->get('doctrine')->getManager();
         $em->clear();
         $requests = $em->getRepository(EmailChangeRequest::class)->findBy(
             ['cancelledAt' => null, 'confirmedAt' => null],
@@ -218,7 +218,7 @@ class EmailChangeTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
 
         // Pull the revert token straight out of the just-stamped row.
-        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em = static::getContainer()->get('doctrine')->getManager();
         $em->clear();
         $stored = $em->getRepository(EmailChangeRequest::class)->findOneBy([]);
         $this->assertNotNull($stored);
@@ -308,7 +308,7 @@ class EmailChangeTest extends ApiTestCase
 
     private function reloadUser(string $email): User
     {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em = static::getContainer()->get('doctrine')->getManager();
         $em->clear();
         $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
         $this->assertNotNull($user, sprintf('User %s should exist', $email));

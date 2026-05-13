@@ -66,7 +66,7 @@ class MediaObject
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private User $owner;
+    private ?User $owner = null;
 
     #[ORM\Column(length: 32)]
     #[Groups(['media_object:read', 'task:read', 'space:read'])]
@@ -102,12 +102,12 @@ class MediaObject
         return $this->id;
     }
 
-    public function getOwner(): User
+    public function getOwner(): ?User
     {
         return $this->owner;
     }
 
-    public function setOwner(User $owner): static
+    public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
         return $this;

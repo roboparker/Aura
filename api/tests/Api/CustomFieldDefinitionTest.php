@@ -19,7 +19,7 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();

@@ -94,7 +94,7 @@ class Discussion
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Space is required.')]
     #[Groups(['discussion:read', 'discussion:write'])]
-    private Space $space;
+    private ?Space $space = null;
 
     /**
      * Stamped by DiscussionAuthorProcessor on POST; read-only on the
@@ -103,7 +103,7 @@ class Discussion
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['discussion:read'])]
-    private User $author;
+    private ?User $author = null;
 
     #[ORM\Column(length: self::MAX_TITLE_LENGTH)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -172,23 +172,23 @@ class Discussion
         return $this->id;
     }
 
-    public function getSpace(): Space
+    public function getSpace(): ?Space
     {
         return $this->space;
     }
 
-    public function setSpace(Space $space): static
+    public function setSpace(?Space $space): static
     {
         $this->space = $space;
         return $this;
     }
 
-    public function getAuthor(): User
+    public function getAuthor(): ?User
     {
         return $this->author;
     }
 
-    public function setAuthor(User $author): static
+    public function setAuthor(?User $author): static
     {
         $this->author = $author;
         return $this;

@@ -27,7 +27,7 @@ class SpaceInviteTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();

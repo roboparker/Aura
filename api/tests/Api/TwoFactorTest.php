@@ -16,7 +16,7 @@ class TwoFactorTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->em = $kernel->getContainer()->get(EntityManagerInterface::class);
+        $this->em = $kernel->getContainer()->get('doctrine')->getManager();
         $this->em->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -234,7 +234,7 @@ class TwoFactorTest extends ApiTestCase
 
     private function reloadUser(string $email): User
     {
-        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $em = static::getContainer()->get('doctrine')->getManager();
         $em->clear();
         $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
         $this->assertNotNull($user);

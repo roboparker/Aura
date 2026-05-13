@@ -22,7 +22,7 @@ class TaskTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         // Notification + Comment hold FKs to Task; clear them first so
         // the bulk Task delete below doesn't fail when search-fixture
@@ -74,7 +74,7 @@ class TaskTest extends ApiTestCase
         // Owner was set server-side regardless of any supplied value; completedOn
         // is omitted from the JSON-LD response when null, so verify via the entity.
         $task = $this->reloadTaskByTitle('Buy milk');
-        $this->assertTrue($user->getId()->equals($task->getOwner()->getId()));
+        $this->assertTrue($user->getId()?->equals($task->getOwner()?->getId()));
         $this->assertNull($task->getCompletedOn());
     }
 
@@ -97,7 +97,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $task = $this->reloadTaskByTitle('Sneaky task');
-        $this->assertTrue($alice->getId()->equals($task->getOwner()->getId()), 'Owner must be overwritten by the processor.');
+        $this->assertTrue($alice->getId()?->equals($task->getOwner()?->getId()), 'Owner must be overwritten by the processor.');
     }
 
     public function testCreateTaskRequiresTitle(): void

@@ -129,7 +129,7 @@ class Comment
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['comment:read'])]
-    private User $author;
+    private ?User $author = null;
 
     #[ORM\Column(type: 'text')]
     #[Assert\NotBlank(message: 'Comment body is required.')]
@@ -240,12 +240,12 @@ class Comment
         return $this->task ?? $this->page;
     }
 
-    public function getAuthor(): User
+    public function getAuthor(): ?User
     {
         return $this->author;
     }
 
-    public function setAuthor(User $author): static
+    public function setAuthor(?User $author): static
     {
         $this->author = $author;
         return $this;

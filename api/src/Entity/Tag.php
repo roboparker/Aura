@@ -55,7 +55,7 @@ class Tag
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['tag:read'])]
-    private User $owner;
+    private ?User $owner = null;
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -100,12 +100,12 @@ class Tag
         return $this->id;
     }
 
-    public function getOwner(): User
+    public function getOwner(): ?User
     {
         return $this->owner;
     }
 
-    public function setOwner(User $owner): static
+    public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
         return $this;

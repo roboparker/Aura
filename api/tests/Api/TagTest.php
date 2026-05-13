@@ -17,7 +17,7 @@ class TagTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         // task_tag rows are cleared automatically via FK cascade when Tasks
         // and Tags are deleted, so no explicit DELETE for the join table.

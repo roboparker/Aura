@@ -16,7 +16,7 @@ class UserTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         // Clean user table before each test
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();

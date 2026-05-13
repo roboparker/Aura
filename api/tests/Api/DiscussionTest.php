@@ -20,7 +20,7 @@ class DiscussionTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -60,7 +60,7 @@ class DiscussionTest extends ApiTestCase
         $this->assertNotNull($row);
         $this->assertSame(
             (string) $bob->getId(),
-            (string) $row->getAuthor()->getId(),
+            (string) $row->getAuthor()?->getId(),
         );
     }
 

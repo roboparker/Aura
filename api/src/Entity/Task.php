@@ -98,7 +98,7 @@ class Task
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['task:read'])]
-    private User $owner;
+    private ?User $owner = null;
 
     /**
      * Optional project the task belongs to. When set, every project member
@@ -261,12 +261,12 @@ class Task
         return $this->id;
     }
 
-    public function getOwner(): User
+    public function getOwner(): ?User
     {
         return $this->owner;
     }
 
-    public function setOwner(User $owner): static
+    public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
         return $this;
@@ -486,10 +486,11 @@ class Task
 
     public function removeCustomFieldValue(CustomFieldValue $value): static
     {
-        // orphanRemoval: true on the customFieldValues mapping deletes the
-        // row on flush — no need to null out the back-reference (which would
-        // also violate the now-non-nullable CustomFieldValue::$task type).
-        $this->customFieldValues->removeElement($value);
+        if ($this->customFieldValues->removeElement($value)) {
+            if ($value->getTask() === $this) {
+                $value->setTask(null);
+            }
+        }
         return $this;
     }
 }

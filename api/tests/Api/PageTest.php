@@ -25,7 +25,7 @@ class PageTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get(EntityManagerInterface::class);
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
@@ -62,7 +62,7 @@ class PageTest extends ApiTestCase
         $row = $this->entityManager->getRepository(Page::class)
             ->findOneBy(['title' => 'Onboarding']);
         $this->assertNotNull($row);
-        $this->assertSame((string) $bob->getId(), (string) $row->getCreatedBy()->getId());
+        $this->assertSame((string) $bob->getId(), (string) $row->getCreatedBy()?->getId());
     }
 
     public function testNonMemberCannotCreate(): void
