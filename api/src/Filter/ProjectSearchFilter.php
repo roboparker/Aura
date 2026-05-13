@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Project;
 use Doctrine\ORM\QueryBuilder;
 
@@ -88,9 +89,11 @@ final class ProjectSearchFilter extends AbstractFilter
                 'type' => 'string',
                 'required' => false,
                 'description' => 'Postgres full-text search across project title and description. Ranked by relevance.',
-                'openapi' => [
-                    'example' => 'launch checklist',
-                ],
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    example: 'launch checklist',
+                ),
             ],
         ];
     }

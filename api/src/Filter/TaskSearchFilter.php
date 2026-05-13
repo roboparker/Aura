@@ -5,6 +5,7 @@ namespace App\Filter;
 use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
+use ApiPlatform\OpenApi\Model\Parameter;
 use App\Entity\Comment;
 use App\Entity\CustomFieldValue;
 use App\Entity\Task;
@@ -124,9 +125,11 @@ final class TaskSearchFilter extends AbstractFilter
                 'type' => 'string',
                 'required' => false,
                 'description' => 'Postgres full-text search across task title, description, comments, and custom field values. Ranked by relevance.',
-                'openapi' => [
-                    'example' => 'launch checklist',
-                ],
+                'openapi' => new Parameter(
+                    name: self::PARAMETER,
+                    in: 'query',
+                    example: 'launch checklist',
+                ),
             ],
         ];
     }

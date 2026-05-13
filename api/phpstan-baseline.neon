@@ -4,15 +4,6 @@
 
 parameters:
     ignoreErrors:
-        # API Platform's FilterInterface::getDescription() return shape
-        # narrows `openapi` to `ApiPlatform\OpenApi\Model\Parameter`, but
-        # the runtime accepts a plain array. Switching every filter to
-        # Parameter objects is a bigger lift than this PR.
-        -
-            message: '#Method App\\Filter\\[A-Za-z]+::getDescription\(\) should return array.*but returns array#'
-            paths:
-                - src/Filter/*.php
-
         # Doctrine relationship properties typed `?Foo` on the PHP side
         # while the JoinColumn is `nullable: false`. Tightening the PHP
         # type breaks runtime initialisation paths that build entities
