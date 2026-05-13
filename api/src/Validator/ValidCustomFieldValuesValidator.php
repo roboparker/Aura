@@ -2,6 +2,7 @@
 
 namespace App\Validator;
 
+use App\CustomField\CustomFieldTypeRegistry;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
@@ -12,10 +13,23 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
+/**
+ * Polices the embedded `customFieldValues` collection on a Task. The
+ * big per-type `match` block this used to run is gone — the registry
+ * looks up the strategy for each (kind, subtype) pair and the
+ * strategy owns the rules. Adding a new kind is a one-class change
+ * (drop a strategy implementing {@see App\CustomField\Type\CustomFieldTypeInterface}).
+ *
+ * Top-level invariants still live here because they cross multiple
+ * CFVs / the parent task: project-scope, duplicate-definition
+ * detection, and required-field enforcement.
+ */
 final class ValidCustomFieldValuesValidator extends ConstraintValidator
 {
-    public function __construct(private EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly CustomFieldTypeRegistry $registry,
+    ) {
     }
 
     public function validate(mixed $value, Constraint $constraint): void
@@ -23,11 +37,9 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         if (!$constraint instanceof ValidCustomFieldValues) {
             throw new UnexpectedTypeException($constraint, ValidCustomFieldValues::class);
         }
-
         if (null === $value) {
             return;
         }
-
         if (!$value instanceof Task) {
             throw new UnexpectedValueException($value, Task::class);
         }
@@ -36,8 +48,8 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         $project = $value->getProject();
 
         // A task without a project can't have custom values — every
-        // definition is project-scoped. We only flag this when the
-        // client actually sent values; bare projectless tasks are fine.
+        // definition is project-scoped. Only flag this when the client
+        // actually sent values; bare projectless tasks are fine.
         if (count($values) > 0 && null === $project) {
             $this->context->buildViolation($constraint->messageNoProject)
                 ->atPath('customFieldValues')
@@ -81,21 +93,15 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
             $seenDefinitionIds[$defId] = true;
             $providedDefinitionIds[$defId] = $cfv;
 
-            $this->validateScalar($cfv, $definition, $constraint, $index);
+            $this->dispatchToStrategy($cfv, $definition, $constraint, $index);
         }
 
-        // Required-field enforcement: every definition flagged required
-        // for the task's project must be present with a non-empty value.
-        // Run only if the client actually engaged with custom fields
-        // (i.e. sent any value or this is a fresh task with definitions
-        // in scope) so a partial PATCH that doesn't touch fields stays
-        // green when nothing changed.
         if (null !== $project && null !== $project->getId()) {
             $this->enforceRequired($project, $providedDefinitionIds, $constraint);
         }
     }
 
-    private function validateScalar(
+    private function dispatchToStrategy(
         CustomFieldValue $cfv,
         CustomFieldDefinition $definition,
         ValidCustomFieldValues $constraint,
@@ -103,35 +109,33 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
     ): void {
         $raw = $cfv->getValue();
         if (null === $raw) {
-            return; // Required-ness handled separately; null is fine here.
+            // Required-ness handled separately; null is fine here.
+            return;
         }
 
-        $type = $definition->getType();
-        $valid = match ($type) {
-            CustomFieldDefinition::TYPE_TEXT => is_string($raw),
-            CustomFieldDefinition::TYPE_NUMBER => is_int($raw) || is_float($raw),
-            CustomFieldDefinition::TYPE_DATE => is_string($raw) && false !== \DateTimeImmutable::createFromFormat('!Y-m-d', $raw),
-            CustomFieldDefinition::TYPE_DROPDOWN => is_string($raw) && in_array($raw, $definition->getOptions() ?? [], true),
-            CustomFieldDefinition::TYPE_CHECKBOX => is_bool($raw),
-            default => false,
-        };
-
-        if (!$valid) {
-            // Dropdown failures fall into two buckets: wrong shape (not
-            // a string at all) and wrong choice (string but not in the
-            // options list). The latter has its own message so the API
-            // tells the user what actually went wrong.
-            if (CustomFieldDefinition::TYPE_DROPDOWN === $type && is_string($raw)) {
-                $this->context->buildViolation($constraint->messageNotInOptions)
-                    ->setParameter('{{ name }}', $definition->getName())
-                    ->atPath(sprintf('customFieldValues[%d].value', $index))
-                    ->addViolation();
-                return;
-            }
-            $this->context->buildViolation($constraint->messageWrongType)
+        $key = $definition->getTypeKey();
+        if (!$this->registry->has($key)) {
+            $this->context->buildViolation($constraint->messageUnknownType)
                 ->setParameter('{{ name }}', $definition->getName())
-                ->setParameter('{{ type }}', $type)
+                ->setParameter('{{ key }}', $key)
                 ->atPath(sprintf('customFieldValues[%d].value', $index))
+                ->addViolation();
+            return;
+        }
+
+        $strategy = $this->registry->get($key);
+        foreach ($strategy->validateValue($raw, $definition->getConfig(), $definition) as $violation) {
+            $path = sprintf('customFieldValues[%d].value', $index);
+            if ('' !== $violation->path) {
+                // TypeViolation paths are relative — element index
+                // (`[i]`) or sub-property (`.amount`). Concatenate
+                // directly: the leading bracket / dot is part of the
+                // strategy's emitted path.
+                $path .= $violation->path;
+            }
+            $this->context->buildViolation($violation->message)
+                ->setParameters($violation->parameters)
+                ->atPath($path)
                 ->addViolation();
         }
     }
@@ -145,7 +149,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         ValidCustomFieldValues $constraint,
     ): void {
         $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project, 'required' => true]);
+            ->findBy(['project' => $project, 'nullable' => false]);
 
         foreach ($definitions as $definition) {
             $defId = (string) $definition->getId();

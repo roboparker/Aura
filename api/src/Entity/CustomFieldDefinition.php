@@ -13,39 +13,34 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\CustomField\CustomFieldKind;
-use App\CustomField\Footer\FooterKind;
 use App\Repository\CustomFieldDefinitionRepository;
+use App\Validator\ValidCustomFieldDefinition;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
- * Per-project custom field definition (#84). Each project can declare
- * its own set of fields tasks render dynamically. PR #227 widened the
- * shape from a flat 5-type enum to a (kind, subtype, config) triple
- * backed by a strategy registry so adding new kinds is one class drop.
+ * Per-project custom field definition. Widened in #227 from the flat
+ * 5-type enum to a (kind, subtype, config) triple backed by a strategy
+ * registry — see {@see App\CustomField\Type\CustomFieldTypeInterface}.
  *
- * Storage shape (after migration Version20260513000000):
+ * Storage shape:
  *   - `kind`     — top-level family (boolean|text|numeric|date|select|reference)
  *   - `subtype`  — specialisation within the kind (e.g. `money` under `numeric`)
  *   - `config`   — per-kind config payload (options, min/max, currency, multi, …)
  *   - `footer`   — optional `{kind, label?}` aggregation descriptor
  *   - `nullable` — whether a missing value is legal for this field
  *
+ * Per-kind config + footer validation runs through
+ * {@see ValidCustomFieldDefinition} (class-level constraint), which
+ * dispatches into the strategy. Per-value validation lives on Task's
+ * {@see App\Validator\ValidCustomFieldValues}.
+ *
  * Read access mirrors the parent project's space (any space member).
  * Write access is space-admin only — the field schema is structural
- * and easy to disrupt, so we keep mutation narrow even though every
- * member can post tasks.
- *
- * Legacy `getType()` / `getOptions()` / `setType()` / `setOptions()`
- * accessors are kept as derived transition shims (NOT mapped to DB
- * columns) so the existing validator, MCP serializer, ProjectCopy
- * controller, and tests continue working between this commit and the
- * later validator-rewrite commit. They MUST be removed once the
- * downstream call sites have been ported.
+ * and easy to disrupt for the rest of the project.
  */
 #[ApiResource(
     shortName: 'CustomFieldDefinition',
@@ -55,10 +50,6 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            // Write access is space-admin only (#185). Read access for
-            // anyone in the space; the schema is structural and easy to
-            // disrupt for the rest of the project, so we keep mutation
-            // narrow even though every member can post tasks.
             securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isSpaceAdmin(user)))",
         ),
         new Get(
@@ -87,26 +78,21 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     fields: ['project', 'name'],
     message: 'A field with this name already exists in the project.',
 )]
+#[ValidCustomFieldDefinition]
 class CustomFieldDefinition
 {
     /**
-     * Legacy flat-type constants kept for the transition window so the
-     * pre-strategy validator + tests still compile. Each maps to a
-     * (kind, subtype) pair via {@see legacyTypeToKindSubtype()}.
+     * Legacy flat-type constants from the pre-#227 enum. The columns
+     * are gone, but tests and the migration backfill still spell field
+     * shapes using these labels. Kept as a translation table for
+     * {@see setType()} / {@see fromLegacyType()}; do not introduce new
+     * call sites.
      */
     public const TYPE_TEXT = 'text';
     public const TYPE_NUMBER = 'number';
     public const TYPE_DATE = 'date';
     public const TYPE_DROPDOWN = 'dropdown';
     public const TYPE_CHECKBOX = 'checkbox';
-
-    public const ALLOWED_TYPES = [
-        self::TYPE_TEXT,
-        self::TYPE_NUMBER,
-        self::TYPE_DATE,
-        self::TYPE_DROPDOWN,
-        self::TYPE_CHECKBOX,
-    ];
 
     public const MAX_NAME_LENGTH = 80;
 
@@ -117,11 +103,6 @@ class CustomFieldDefinition
     #[Groups(['custom_field_definition:read'])]
     private ?Uuid $id = null;
 
-    /**
-     * Bare IRI on the read side — same shape as TaskComment.parentComment.
-     * Embedding the whole project would balloon the list payload for a
-     * project with many members.
-     */
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: Project::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -129,12 +110,6 @@ class CustomFieldDefinition
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private ?Project $project = null;
 
-    /**
-     * The space this definition lives in (#181). Inherited from the
-     * parent project on PrePersist; never settable on the wire. Kept
-     * as a denormalised column so PR 4's space-scoped catalog views
-     * can filter without joining through `project`.
-     */
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['custom_field_definition:read'])]
@@ -150,8 +125,7 @@ class CustomFieldDefinition
     private string $name = '';
 
     /**
-     * Top-level family — one of {@see CustomFieldKind}'s values. Identifies
-     * which strategy family owns this field's editor + validation.
+     * Top-level family — one of {@see CustomFieldKind}'s values.
      */
     #[ORM\Column(length: 16)]
     #[Assert\Choice(
@@ -162,9 +136,8 @@ class CustomFieldDefinition
     private string $kind = CustomFieldKind::TEXT->value;
 
     /**
-     * Specialisation within the kind (e.g. `money` under `numeric`,
-     * `single` vs `multi` under `select`). The (kind, subtype) pair is
-     * the registry lookup key for the concrete strategy.
+     * Specialisation within the kind. The (kind, subtype) pair is the
+     * registry lookup key for the concrete strategy.
      */
     #[ORM\Column(length: 24)]
     #[Assert\NotBlank(message: 'Subtype is required.')]
@@ -173,13 +146,9 @@ class CustomFieldDefinition
     private string $subtype = 'text';
 
     /**
-     * Per-kind configuration payload. Shape is owned by the strategy:
-     *   - numeric: `{min?, max?, decimalPlaces?, currency?, multi}`
-     *   - text:    `{minLength?, maxLength?, pattern?, multi}`
-     *   - select:  `{options: [{key, label, color?}], multi}`
-     *   - date:    `{min?, max?, multi}`
-     *   - reference: `{multi}`
-     *   - boolean: `{}`
+     * Per-kind configuration payload. Shape is owned by the strategy
+     * for the (kind, subtype) pair — see CustomFieldTypeInterface
+     * docblock.
      *
      * @var array<string, mixed>
      */
@@ -188,9 +157,10 @@ class CustomFieldDefinition
     private array $config = [];
 
     /**
-     * Optional footer aggregation descriptor `{kind, label?}`. Null means
-     * no footer row shown for this field; non-null kind must be in
-     * {@see FooterKind} and supported by the strategy.
+     * Optional footer aggregation descriptor `{kind, label?}`. Null
+     * means no footer row for this field; the kind, when present,
+     * must be one supported by the strategy (enforced in
+     * {@see ValidCustomFieldDefinition}).
      *
      * @var array{kind: string, label?: string}|null
      */
@@ -199,12 +169,8 @@ class CustomFieldDefinition
     private ?array $footer = null;
 
     /**
-     * Whether a missing or null value is acceptable for this field. The
-     * inverse of the legacy `required` flag — kept under the new name
-     * for clearer semantics ("can this value be null?"). The legacy
-     * `required` column is preserved for backwards-compat and kept in
-     * sync via {@see syncRequiredFromNullable()}; the validator-rewrite
-     * commit will collapse the two.
+     * Whether a missing or null value is acceptable for this field.
+     * `false` means the task validator enforces presence at save time.
      */
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
@@ -216,13 +182,14 @@ class CustomFieldDefinition
     private int $position = 0;
 
     /**
-     * Legacy required flag. Mirrors `!nullable`; both columns are kept
-     * during the transition window so older code paths that read
-     * `required` (validator, MCP serializer) keep working. The
-     * validator-rewrite commit will drop this in favour of `nullable`.
+     * Legacy `required` column — kept as a denormalised mirror of
+     * `!nullable` for downstream consumers (Doctrine repository
+     * findBy queries against `required`, audit log diffs) that
+     * pre-date the column rename. Wire surface is `nullable` only;
+     * a follow-up migration can drop this column once nothing
+     * reads it.
      */
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private bool $required = false;
 
     #[ORM\Column(type: 'datetime_immutable')]
@@ -261,10 +228,6 @@ class CustomFieldDefinition
         return $this;
     }
 
-    /**
-     * Mirrors the parent project's space onto this definition before
-     * insert. Same pattern as Discussion::syncSpaceFromProject.
-     */
     #[ORM\PrePersist]
     public function syncSpaceFromProject(): void
     {
@@ -275,9 +238,8 @@ class CustomFieldDefinition
 
     /**
      * Keeps the legacy `required` column aligned with `nullable` on
-     * every write. Only the new column is the source of truth from
-     * the strategies' perspective, but downstream readers that haven't
-     * migrated yet still inspect `required`.
+     * every write so any downstream reader still inspecting the old
+     * column sees the right value.
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
@@ -387,7 +349,7 @@ class CustomFieldDefinition
 
     public function isRequired(): bool
     {
-        return $this->required;
+        return !$this->nullable;
     }
 
     public function setRequired(bool $required): static
@@ -403,85 +365,36 @@ class CustomFieldDefinition
     }
 
     /**
-     * Transition shim: derives the legacy flat type from the new
-     * (kind, subtype) pair. Removed once the validator + MCP serializer
-     * + ProjectCopy controller migrate to the strategy registry.
+     * Translation helper for callers (mostly tests + the migration
+     * backfill) that still speak the pre-#227 flat type names. Maps
+     * the legacy label to the (kind, subtype) pair on the new model
+     * and leaves a sane default config in place. Not part of the API
+     * write surface — the canonical wire shape is `{kind, subtype,
+     * config}`.
      */
-    #[Groups(['custom_field_definition:read'])]
-    public function getType(): string
-    {
-        return match (true) {
-            CustomFieldKind::TEXT->value === $this->kind => self::TYPE_TEXT,
-            CustomFieldKind::NUMERIC->value === $this->kind => self::TYPE_NUMBER,
-            CustomFieldKind::DATE->value === $this->kind => self::TYPE_DATE,
-            CustomFieldKind::SELECT->value === $this->kind => self::TYPE_DROPDOWN,
-            CustomFieldKind::BOOLEAN->value === $this->kind => self::TYPE_CHECKBOX,
-            // Reference is new in #227 — no legacy mapping. Return the
-            // kind verbatim so legacy readers fail loud rather than
-            // silently mis-classify a reference as text.
-            default => $this->kind,
-        };
-    }
-
-    /**
-     * Transition shim: accepts the legacy flat type and maps it to
-     * (kind, subtype) on the new columns. Preserves the test + API
-     * payload shape `{type: 'dropdown', options: [...]}` until the
-     * validator rewrite + PWA rewrite cuts everything over.
-     */
-    #[Groups(['custom_field_definition:write'])]
     public function setType(string $type): static
     {
         [$kind, $subtype] = self::legacyTypeToKindSubtype($type);
         $this->kind = $kind;
         $this->subtype = $subtype;
-
-        // Carry forward the multi flag where the strategy will need it.
-        // Select is the only kind whose multi-ness is baked into the
-        // subtype (single vs multi); for everything else we default to
-        // single and let `config.multi` toggle later.
-        if (CustomFieldKind::SELECT->value !== $kind) {
+        if (CustomFieldKind::SELECT->value === $kind) {
+            $this->config['multi'] = $this->config['multi'] ?? false;
+        } elseif (CustomFieldKind::BOOLEAN->value === $kind) {
+            $this->config = [];
+        } else {
             $this->config['multi'] = $this->config['multi'] ?? false;
         }
         return $this;
     }
 
     /**
-     * Transition shim: returns the legacy flat-string options list for
-     * dropdown fields, derived from the new structured `config.options`
-     * objects. Non-dropdowns get null to match the old contract.
-     *
-     * @return array<int, string>|null
-     */
-    #[Groups(['custom_field_definition:read'])]
-    public function getOptions(): ?array
-    {
-        if (CustomFieldKind::SELECT->value !== $this->kind) {
-            return null;
-        }
-        $options = $this->config['options'] ?? null;
-        if (!is_array($options) || [] === $options) {
-            return null;
-        }
-        $labels = [];
-        foreach ($options as $entry) {
-            if (is_array($entry) && isset($entry['label']) && is_string($entry['label'])) {
-                $labels[] = $entry['label'];
-            } elseif (is_string($entry)) {
-                $labels[] = $entry;
-            }
-        }
-        return [] === $labels ? null : $labels;
-    }
-
-    /**
-     * Transition shim: accepts the legacy flat options array and
-     * upgrades it to the structured `config.options` shape
-     * `[{key, label}, ...]`. Null/empty clears the options key.
+     * Translation helper paired with {@see setType()}: takes the
+     * pre-#227 flat `string[]` options shape and upgrades it to the
+     * structured `config.options` form (`[{key, label}, ...]`) the
+     * select strategies expect. Null/empty clears the options key.
      *
      * @param array<int, string>|null $options
      */
-    #[Groups(['custom_field_definition:write'])]
     public function setOptions(?array $options): static
     {
         if (null === $options || [] === $options) {
@@ -504,10 +417,6 @@ class CustomFieldDefinition
     }
 
     /**
-     * Maps a legacy flat type string to its `(kind, subtype)` equivalent.
-     * Unknown inputs return `(kind, kind)` so a typo'd `setType('foo')`
-     * still produces a deterministic shape the validator can reject.
-     *
      * @return array{0: string, 1: string}
      */
     private static function legacyTypeToKindSubtype(string $type): array
@@ -520,73 +429,5 @@ class CustomFieldDefinition
             self::TYPE_CHECKBOX => [CustomFieldKind::BOOLEAN->value, 'boolean'],
             default => [$type, $type],
         };
-    }
-
-    /**
-     * Cross-field validation: dropdown fields must declare at least one
-     * non-empty option; non-dropdown fields must not declare any. The
-     * Choice constraint above already handles the type allow-list, so
-     * we only police the `options` shape here.
-     *
-     * Operates on the legacy projection so the existing CFD test suite
-     * (which still POSTs `{type, options}` payloads) keeps the same
-     * behaviour through this commit. The validator-rewrite commit
-     * replaces this with a strategy-dispatched `validateConfig()` pass.
-     */
-    #[Assert\Callback]
-    public function validateOptions(ExecutionContextInterface $context): void
-    {
-        // Inspect `config.options` directly rather than going through the
-        // legacy `getOptions()` projection — the projection short-circuits
-        // to null for non-dropdown kinds, which would hide the "options
-        // posted on a text field" case the legacy contract rejects.
-        $rawOptions = $this->config['options'] ?? null;
-        $hasOptions = is_array($rawOptions) && [] !== $rawOptions;
-
-        if (self::TYPE_DROPDOWN !== $this->getType()) {
-            if ($hasOptions) {
-                $context->buildViolation('Only dropdown fields can declare options.')
-                    ->atPath('options')
-                    ->addViolation();
-            }
-            return;
-        }
-
-        $cleaned = array_values(array_filter(
-            array_map(static fn ($v) => is_string($v) ? trim($v) : '', $this->getOptions() ?? []),
-            static fn (string $v) => '' !== $v,
-        ));
-        if (count($cleaned) < 1) {
-            $context->buildViolation('Dropdown fields require at least one option.')
-                ->atPath('options')
-                ->addViolation();
-            return;
-        }
-        if (count($cleaned) !== count(array_unique($cleaned))) {
-            $context->buildViolation('Dropdown options must be unique.')
-                ->atPath('options')
-                ->addViolation();
-        }
-    }
-
-    /**
-     * Footer descriptor sanity check: when present, `kind` must be a
-     * known {@see FooterKind} value. Per-strategy "is this aggregation
-     * supported for this kind?" gating lands with the footer endpoint
-     * commit.
-     */
-    #[Assert\Callback]
-    public function validateFooter(ExecutionContextInterface $context): void
-    {
-        if (null === $this->footer) {
-            return;
-        }
-        $kind = $this->footer['kind'] ?? null;
-        if (!is_string($kind) || !in_array($kind, FooterKind::values(), true)) {
-            $context->buildViolation('Footer kind must be one of: {{ choices }}.')
-                ->setParameter('{{ choices }}', implode(', ', FooterKind::values()))
-                ->atPath('footer.kind')
-                ->addViolation();
-        }
     }
 }

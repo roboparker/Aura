@@ -117,10 +117,12 @@ final class McpEntitySerializer
         return [
             'id' => (string) $field->getId(),
             'name' => $field->getName(),
-            'type' => $field->getType(),
-            'options' => $field->getOptions(),
+            'kind' => $field->getKind(),
+            'subtype' => $field->getSubtype(),
+            'config' => $field->getConfig(),
+            'footer' => $field->getFooter(),
+            'nullable' => $field->isNullable(),
             'position' => $field->getPosition(),
-            'required' => $field->isRequired(),
             'projectId' => null === $field->getProject() ? null : (string) $field->getProject()->getId(),
         ];
     }

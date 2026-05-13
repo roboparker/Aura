@@ -28,7 +28,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['definition_id'], name: 'idx_cfv_definition')]
 #[ORM\Index(columns: ['search_vector'], name: 'idx_cfv_search_vector', flags: ['gin'])]
 #[ORM\UniqueConstraint(name: 'uniq_cfv_task_definition', columns: ['task_id', 'definition_id'])]
-#[ORM\HasLifecycleCallbacks]
 class CustomFieldValue
 {
     #[ORM\Id]
@@ -144,41 +143,5 @@ class CustomFieldValue
     {
         $this->valueSearch = $valueSearch;
         return $this;
-    }
-
-    /**
-     * Transition shim: populates `value_search` from the raw scalar
-     * value so the FTS index keeps producing useful tokens until the
-     * type strategies take over the projection in the next commit.
-     * Mirrors what the old `value #>> '{}'` STORED column expression
-     * did — strings emit themselves, numbers/bools/dates render via
-     * their JSON-string form. Lists (multi-value future) and complex
-     * values (money, references) need strategy awareness and won't be
-     * served by this fallback; the strategies commit replaces this.
-     */
-    #[ORM\PrePersist]
-    #[ORM\PreUpdate]
-    public function projectValueSearch(): void
-    {
-        $this->valueSearch = self::flattenValueForSearch($this->value);
-    }
-
-    private static function flattenValueForSearch(mixed $value): ?string
-    {
-        if (null === $value) {
-            return null;
-        }
-        if (is_string($value)) {
-            return '' === $value ? null : $value;
-        }
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
-        if (is_int($value) || is_float($value)) {
-            return (string) $value;
-        }
-        // Complex shapes (lists, money, refs) need strategy awareness;
-        // skip the fallback and let the strategies commit handle them.
-        return null;
     }
 }

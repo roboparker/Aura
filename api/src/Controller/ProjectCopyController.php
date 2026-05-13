@@ -122,10 +122,12 @@ class ProjectCopyController extends AbstractController
                 ->setProject($copy)
                 ->setSpace($target)
                 ->setName($sourceDefinition->getName())
-                ->setType($sourceDefinition->getType())
-                ->setOptions($sourceDefinition->getOptions())
+                ->setKind($sourceDefinition->getKind())
+                ->setSubtype($sourceDefinition->getSubtype())
+                ->setConfig($sourceDefinition->getConfig())
+                ->setFooter($sourceDefinition->getFooter())
                 ->setPosition($sourceDefinition->getPosition())
-                ->setRequired($sourceDefinition->isRequired());
+                ->setNullable($sourceDefinition->isNullable());
             $this->em->persist($clone);
         }
 

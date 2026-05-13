@@ -28,7 +28,7 @@ final class GetCustomFieldsTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List custom field definitions for a project, ordered by position. Returns each field\'s name, type (text/number/date/dropdown/checkbox), options, and required flag.';
+        return 'List custom field definitions for a project, ordered by position. Returns each field\'s name, kind/subtype (boolean.boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page,discussion}), config, optional footer aggregation descriptor, and nullable flag.';
     }
 
     public function getInputSchema(): array
