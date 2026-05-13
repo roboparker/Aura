@@ -27,8 +27,7 @@ class ProjectCopyTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
@@ -252,7 +251,7 @@ class ProjectCopyTest extends ApiTestCase
         $task = $this->seedTask($alice, $project, 'Plan launch', 0);
         $task->setDescription('Quarterly');
         $task->setDueDate($dueDate);
-        $task->setRecurrenceRule(['freq' => 'weekly']);
+        $task->setRecurrenceRule(['frequency' => 'weekly', 'interval' => 1]);
         $task->setCompletedOn(new \DateTimeImmutable());
         $this->entityManager->flush();
 
@@ -274,7 +273,7 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertSame('Plan launch', $cloned[0]->getTitle());
         $this->assertSame('Quarterly', $cloned[0]->getDescription());
         $this->assertEquals($dueDate, $cloned[0]->getDueDate());
-        $this->assertSame(['freq' => 'weekly'], $cloned[0]->getRecurrenceRule());
+        $this->assertSame(['frequency' => 'weekly', 'interval' => 1], $cloned[0]->getRecurrenceRule());
         $this->assertNull(
             $cloned[0]->getCompletedOn(),
             'Clone should be open even if the source was completed.',

@@ -18,8 +18,7 @@ class UserInviteTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         // Order matters — group_invite -> user_invite -> user_group -> user.
         $this->entityManager->createQuery('DELETE FROM App\Entity\GroupInvite')->execute();

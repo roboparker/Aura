@@ -25,8 +25,7 @@ class NotificationTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         // Wipe the join tables before the entity tables so Postgres doesn't
         // bail on residual FK rows from a previous test class.

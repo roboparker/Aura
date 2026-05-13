@@ -91,7 +91,7 @@ interface CustomFieldTypeInterface
      * shows a footer (e.g. text, references). Numeric kinds expose
      * sum/avg/min/max; everything supports count-of-non-null.
      *
-     * @return list<value-of<\App\CustomField\Footer\FooterKind::CASES>>
+     * @return list<value-of<\App\CustomField\Footer\FooterKind>>
      */
     public function supportedAggregations(): array;
 }

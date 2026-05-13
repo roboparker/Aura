@@ -11,6 +11,8 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Shared test helpers for the space-based access model (#185).
  *
+ * @property EntityManagerInterface $entityManager
+ *
  * Tests that previously called `$project->addMember($user)` to widen
  * project access now go through space membership. The personal space
  * created on User signup is the default home for projects, so the
@@ -84,11 +86,10 @@ trait SpaceMembershipFixture
 
     private function entityManagerForFixture(): EntityManagerInterface
     {
-        if (!property_exists($this, 'entityManager') || !$this->entityManager instanceof EntityManagerInterface) {
-            throw new \LogicException(
-                'SpaceMembershipFixture requires the test class to expose an `$entityManager` property.',
-            );
-        }
+        // Consumers are required (via the @property declaration above) to
+        // expose a typed `$entityManager` property. Phpstan trusts that
+        // declaration; if a real consumer forgets to set it the EM call
+        // below will fail with a typed-property uninitialized error.
         return $this->entityManager;
     }
 }

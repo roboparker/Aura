@@ -75,7 +75,7 @@ class McpController extends AbstractController
 
         $payload = $this->decode($request);
         if (null === $payload) {
-            return $this->jsonRpcError(null, -32700, 'Parse error.');
+            return new JsonResponse($this->jsonRpcError(null, -32700, 'Parse error.'));
         }
 
         // JSON-RPC 2.0 batch — array of envelopes. Run each in-order;
@@ -231,7 +231,11 @@ class McpController extends AbstractController
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Decodes the request body. Returns a single JSON-RPC envelope as a
+     * string-keyed array, a batch as a list of envelopes, or null on
+     * empty/invalid input.
+     *
+     * @return array<string, mixed>|list<array<string, mixed>>|null
      */
     private function decode(Request $request): ?array
     {

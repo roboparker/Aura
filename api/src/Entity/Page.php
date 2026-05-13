@@ -105,7 +105,7 @@ class Page
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Space is required.')]
     #[Groups(['page:read', 'page:write'])]
-    private ?Space $space = null;
+    private Space $space;
 
     /**
      * Optional parent page. Self-FK forms the tree; cascade-on-delete
@@ -126,7 +126,7 @@ class Page
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['page:read'])]
-    private ?User $createdBy = null;
+    private User $createdBy;
 
     #[ORM\Column(length: self::MAX_TITLE_LENGTH)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -198,12 +198,12 @@ class Page
         return $this->id;
     }
 
-    public function getSpace(): ?Space
+    public function getSpace(): Space
     {
         return $this->space;
     }
 
-    public function setSpace(?Space $space): static
+    public function setSpace(Space $space): static
     {
         $this->space = $space;
         return $this;
@@ -220,12 +220,12 @@ class Page
         return $this;
     }
 
-    public function getCreatedBy(): ?User
+    public function getCreatedBy(): User
     {
         return $this->createdBy;
     }
 
-    public function setCreatedBy(?User $createdBy): static
+    public function setCreatedBy(User $createdBy): static
     {
         $this->createdBy = $createdBy;
         return $this;

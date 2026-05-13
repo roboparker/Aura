@@ -15,8 +15,7 @@ class UserPreferencesTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -53,7 +52,7 @@ class UserPreferencesTest extends ApiTestCase
         $body = $client->getResponse()->toArray();
         $this->assertSame('dark', $body['theme']);
         // Other keys untouched.
-        $this->assertSame(true, $body['emailNotificationsEnabled']);
+        $this->assertTrue($body['emailNotificationsEnabled']);
         $this->assertSame('realtime', $body['notificationFrequency']);
     }
 
@@ -75,7 +74,7 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $body = $client->getResponse()->toArray();
         $this->assertSame('light', $body['theme']);
-        $this->assertSame(true, $body['pushNotificationsEnabled']);
+        $this->assertTrue($body['pushNotificationsEnabled']);
         $this->assertSame('daily', $body['notificationFrequency']);
     }
 

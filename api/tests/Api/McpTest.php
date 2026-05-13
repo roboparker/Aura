@@ -31,7 +31,7 @@ class McpTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()->get('doctrine')->getManager();
+        $this->entityManager = $kernel->getContainer()->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
@@ -281,7 +281,7 @@ class McpTest extends ApiTestCase
         $this->callMcp($client, $plain, 'tools/list');
 
         // Re-fetch via the kernel's EM so we don't see a stale managed copy.
-        $repo = static::getContainer()->get('doctrine')->getManager()->getRepository(ApiToken::class);
+        $repo = static::getContainer()->get(EntityManagerInterface::class)->getRepository(ApiToken::class);
         $token = $repo->findOneBy(['name' => 'Tracked']);
         $this->assertNotNull($token);
         $this->assertNotNull($token->getLastUsedAt());

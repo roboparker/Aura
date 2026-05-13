@@ -25,7 +25,7 @@ class ActivityHistoryTest extends ApiTestCase
     {
         self::bootKernel();
         $container = static::getContainer();
-        $this->entityManager = $container->get('doctrine')->getManager();
+        $this->entityManager = $container->get(EntityManagerInterface::class);
 
         // Wipe in dependency order. ext_log_entries has no FK so we
         // truncate it via DQL last to keep cross-test runs clean.

@@ -34,7 +34,7 @@ class AvatarColorServiceTest extends TestCase
     public function testPaletteHasAtLeastSixteenDistinctColors(): void
     {
         $this->assertGreaterThanOrEqual(16, count(AvatarColorService::PALETTE));
-        $this->assertSame(count(AvatarColorService::PALETTE), count(array_unique(AvatarColorService::PALETTE)));
+        $this->assertCount(count(AvatarColorService::PALETTE), array_unique(AvatarColorService::PALETTE));
     }
 
     private static function contrastAgainstWhite(string $hex): float

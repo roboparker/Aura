@@ -52,8 +52,8 @@ final class ValidCustomFieldDefinitionValidator extends ConstraintValidator
 
         $footer = $value->getFooter();
         if (null !== $footer) {
-            $footerKind = is_string($footer['kind'] ?? null) ? $footer['kind'] : null;
-            if (null !== $footerKind && !in_array($footerKind, $strategy->supportedAggregations(), true)) {
+            $footerKind = $footer['kind'];
+            if (!in_array($footerKind, $strategy->supportedAggregations(), true)) {
                 $this->context->buildViolation($constraint->messageUnsupportedFooter)
                     ->setParameter('{{ kind }}', $footerKind)
                     ->setParameter('{{ type }}', $key)

@@ -43,7 +43,7 @@ class CustomFieldValue
      */
     #[ORM\ManyToOne(targetEntity: Task::class, inversedBy: 'customFieldValues')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private ?Task $task = null;
+    private Task $task;
 
     /**
      * Bare IRI on read — embedding the full definition would balloon
@@ -55,7 +55,7 @@ class CustomFieldValue
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Custom field definition is required.')]
     #[Groups(['task:read', 'task:write'])]
-    private ?CustomFieldDefinition $definition = null;
+    private CustomFieldDefinition $definition;
 
     /**
      * Type-erased scalar (or list). Stored as JSON so a single column
@@ -101,23 +101,23 @@ class CustomFieldValue
         return $this->id;
     }
 
-    public function getTask(): ?Task
+    public function getTask(): Task
     {
         return $this->task;
     }
 
-    public function setTask(?Task $task): static
+    public function setTask(Task $task): static
     {
         $this->task = $task;
         return $this;
     }
 
-    public function getDefinition(): ?CustomFieldDefinition
+    public function getDefinition(): CustomFieldDefinition
     {
         return $this->definition;
     }
 
-    public function setDefinition(?CustomFieldDefinition $definition): static
+    public function setDefinition(CustomFieldDefinition $definition): static
     {
         $this->definition = $definition;
         return $this;

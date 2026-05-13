@@ -16,8 +16,7 @@ class UserGroupTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();

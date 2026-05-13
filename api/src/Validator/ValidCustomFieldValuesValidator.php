@@ -61,19 +61,10 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         $providedDefinitionIds = [];
 
         foreach ($values as $index => $cfv) {
-            if (!$cfv instanceof CustomFieldValue) {
-                continue;
-            }
             $definition = $cfv->getDefinition();
-            if (null === $definition) {
-                // The NotNull constraint on the property will surface
-                // the missing definition; nothing more to check.
-                continue;
-            }
-
             $defProject = $definition->getProject();
             if (
-                null === $project || null === $defProject
+                null === $project
                 || (string) $defProject->getId() !== (string) $project->getId()
             ) {
                 $this->context->buildViolation($constraint->messageWrongProject)

@@ -24,7 +24,7 @@ final class ValidCustomFieldDefinition extends Constraint
     public string $messageUnknownType = 'Unknown custom-field type "{{ key }}".';
     public string $messageUnsupportedFooter = 'Footer kind "{{ kind }}" is not supported by {{ type }}.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

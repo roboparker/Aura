@@ -24,8 +24,7 @@ class DiscussionCopyTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();

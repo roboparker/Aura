@@ -24,8 +24,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         // Order matters: values FK to task + definition; definitions FK
         // to project. Clear from leaves to roots.

@@ -168,10 +168,9 @@ class PageCopyController extends AbstractController
         if (mb_strlen($combined) <= Page::MAX_TITLE_LENGTH) {
             return $combined;
         }
+        // $suffix is a literal ' (copy)' (7 chars), so MAX_TITLE_LENGTH -
+        // strlen($suffix) is always positive — no need for a fallback branch.
         $room = Page::MAX_TITLE_LENGTH - mb_strlen($suffix);
-        if ($room <= 0) {
-            return mb_substr($sourceTitle, 0, Page::MAX_TITLE_LENGTH);
-        }
         return mb_substr($sourceTitle, 0, $room) . $suffix;
     }
 

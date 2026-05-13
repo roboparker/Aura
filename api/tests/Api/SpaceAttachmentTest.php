@@ -20,7 +20,7 @@ class SpaceAttachmentTest extends ApiTestCase
     {
         self::bootKernel();
         $container = static::getContainer();
-        $this->entityManager = $container->get('doctrine')->getManager();
+        $this->entityManager = $container->get(EntityManagerInterface::class);
         $this->storage = $container->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
@@ -255,6 +255,8 @@ class SpaceAttachmentTest extends ApiTestCase
     {
         $id = $space->getId();
         $this->entityManager->clear();
-        $space = $this->entityManager->getRepository(Space::class)->find($id);
+        $reloaded = $this->entityManager->getRepository(Space::class)->find($id);
+        self::assertNotNull($reloaded, 'Reloaded space disappeared between clear() and find().');
+        $space = $reloaded;
     }
 }

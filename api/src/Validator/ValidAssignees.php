@@ -15,7 +15,7 @@ final class ValidAssignees extends Constraint
 {
     public string $messageNotAllowed = 'Assignees must be the task owner or a member of its project.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

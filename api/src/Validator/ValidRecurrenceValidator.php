@@ -31,10 +31,7 @@ final class ValidRecurrenceValidator extends ConstraintValidator
             return;
         }
 
-        $hasShape = isset($rule['frequency'], $rule['interval'])
-            && is_string($rule['frequency'])
-            && in_array($rule['frequency'], self::ALLOWED_FREQUENCIES, true)
-            && is_int($rule['interval'])
+        $hasShape = in_array($rule['frequency'], self::ALLOWED_FREQUENCIES, true)
             && $rule['interval'] >= 1;
 
         if (!$hasShape) {

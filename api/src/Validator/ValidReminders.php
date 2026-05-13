@@ -24,7 +24,7 @@ final class ValidReminders extends Constraint
     public string $messageInvalidOffset = 'Reminder offsets must be one of: 15m, 1h, 1d.';
     public string $messageDuplicate = 'Reminder offsets must not contain duplicates.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

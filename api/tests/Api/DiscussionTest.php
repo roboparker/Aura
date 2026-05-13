@@ -20,8 +20,7 @@ class DiscussionTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -61,7 +60,7 @@ class DiscussionTest extends ApiTestCase
         $this->assertNotNull($row);
         $this->assertSame(
             (string) $bob->getId(),
-            (string) $row->getAuthor()?->getId(),
+            (string) $row->getAuthor()->getId(),
         );
     }
 
@@ -160,8 +159,9 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Discussion::class)->find($disc->getId());
-        $this->assertSame('Edited', $reloaded?->getTitle());
-        $this->assertNotNull($reloaded?->getUpdatedAt());
+        $this->assertNotNull($reloaded);
+        $this->assertSame('Edited', $reloaded->getTitle());
+        $this->assertNotNull($reloaded->getUpdatedAt());
     }
 
     public function testNonAuthorMemberCannotEdit(): void

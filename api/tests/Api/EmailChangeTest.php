@@ -16,8 +16,7 @@ class EmailChangeTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\EmailChangeRequest')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -116,7 +115,7 @@ class EmailChangeTest extends ApiTestCase
         ]);
         $this->assertResponseIsSuccessful();
 
-        $em = static::getContainer()->get('doctrine')->getManager();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
         $em->clear();
         $requests = $em->getRepository(EmailChangeRequest::class)->findBy(
             ['cancelledAt' => null, 'confirmedAt' => null],
@@ -219,7 +218,7 @@ class EmailChangeTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
 
         // Pull the revert token straight out of the just-stamped row.
-        $em = static::getContainer()->get('doctrine')->getManager();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
         $em->clear();
         $stored = $em->getRepository(EmailChangeRequest::class)->findOneBy([]);
         $this->assertNotNull($stored);
@@ -227,7 +226,8 @@ class EmailChangeTest extends ApiTestCase
 
         // The plain token is in the notice email body.
         $email = $this->getMailerMessage(0);
-        if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', $email->getTextBody(), $m)) {
+        self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $email);
+        if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', (string) $email->getTextBody(), $m)) {
             $this->fail('Revert email did not contain a revert link.');
         }
         $plainRevertToken = $m[1];
@@ -308,7 +308,7 @@ class EmailChangeTest extends ApiTestCase
 
     private function reloadUser(string $email): User
     {
-        $em = static::getContainer()->get('doctrine')->getManager();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
         $em->clear();
         $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
         $this->assertNotNull($user, sprintf('User %s should exist', $email));

@@ -136,7 +136,7 @@ class UserInvite
         $this->acceptedAt = new \DateTimeImmutable();
     }
 
-    public function isPending(\DateTimeImmutable $now = null): bool
+    public function isPending(?\DateTimeImmutable $now = null): bool
     {
         $now ??= new \DateTimeImmutable();
         return null === $this->acceptedAt && $this->expiresAt > $now;

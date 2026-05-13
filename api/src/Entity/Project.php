@@ -90,7 +90,7 @@ class Project
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['project:read'])]
-    private ?User $owner = null;
+    private User $owner;
 
     /**
      * The space this project lives in (#181). Set by ProjectOwnerProcessor
@@ -105,7 +105,7 @@ class Project
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['project:read', 'project:write'])]
-    private ?Space $space = null;
+    private Space $space;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -150,23 +150,23 @@ class Project
         return $this->id;
     }
 
-    public function getOwner(): ?User
+    public function getOwner(): User
     {
         return $this->owner;
     }
 
-    public function setOwner(?User $owner): static
+    public function setOwner(User $owner): static
     {
         $this->owner = $owner;
         return $this;
     }
 
-    public function getSpace(): ?Space
+    public function getSpace(): Space
     {
         return $this->space;
     }
 
-    public function setSpace(?Space $space): static
+    public function setSpace(Space $space): static
     {
         $this->space = $space;
         return $this;

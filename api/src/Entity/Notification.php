@@ -81,7 +81,7 @@ class Notification
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private ?User $recipient = null;
+    private User $recipient;
 
     #[ORM\Column(length: 50)]
     #[Groups(['notification:read'])]
@@ -159,12 +159,12 @@ class Notification
         return $this->id;
     }
 
-    public function getRecipient(): ?User
+    public function getRecipient(): User
     {
         return $this->recipient;
     }
 
-    public function setRecipient(?User $recipient): static
+    public function setRecipient(User $recipient): static
     {
         $this->recipient = $recipient;
         return $this;

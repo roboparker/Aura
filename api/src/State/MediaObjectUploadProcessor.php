@@ -44,14 +44,17 @@ final class MediaObjectUploadProcessor implements ProcessorInterface
         }
 
         $request = $this->requestStack->getCurrentRequest();
-        $file = $request?->files->get('file');
+        if (null === $request) {
+            throw new BadRequestHttpException('No HTTP request in scope.');
+        }
+        $file = $request->files->get('file');
         if (!$file instanceof UploadedFile) {
             throw new BadRequestHttpException('A "file" form field is required.');
         }
 
         // `kind` selects the upload pipeline. Defaults to avatar so existing
         // PWA callers (which don't send `kind`) keep their current behaviour.
-        $kind = $request?->request->get('kind');
+        $kind = $request->request->get('kind');
         return match ($kind) {
             MediaObject::KIND_ATTACHMENT => $this->imageUploadService->uploadAttachment($file, $user),
             null, '', MediaObject::KIND_AVATAR => $this->imageUploadService->uploadAvatar($file, $user),

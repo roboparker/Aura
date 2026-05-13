@@ -22,8 +22,7 @@ class TaskTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get(EntityManagerInterface::class);
 
         // Notification + Comment hold FKs to Task; clear them first so
         // the bulk Task delete below doesn't fail when search-fixture
@@ -75,8 +74,7 @@ class TaskTest extends ApiTestCase
         // Owner was set server-side regardless of any supplied value; completedOn
         // is omitted from the JSON-LD response when null, so verify via the entity.
         $task = $this->reloadTaskByTitle('Buy milk');
-        $this->assertTrue($user->getId()->equals($task->getOwner()?->getId()));
-        $this->assertNotNull($task->getCreatedOn());
+        $this->assertTrue($user->getId()->equals($task->getOwner()->getId()));
         $this->assertNull($task->getCompletedOn());
     }
 
@@ -99,7 +97,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $task = $this->reloadTaskByTitle('Sneaky task');
-        $this->assertTrue($alice->getId()->equals($task->getOwner()?->getId()), 'Owner must be overwritten by the processor.');
+        $this->assertTrue($alice->getId()->equals($task->getOwner()->getId()), 'Owner must be overwritten by the processor.');
     }
 
     public function testCreateTaskRequiresTitle(): void
@@ -855,7 +853,9 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
         $task = $this->reloadTaskByTitle('Solo task');
         $this->assertCount(1, $task->getAssignees());
-        $this->assertTrue($alice->getId()->equals($task->getAssignees()->first()?->getId()));
+        $first = $task->getAssignees()->first();
+        self::assertNotFalse($first);
+        $this->assertTrue($alice->getId()->equals($first->getId()));
     }
 
     public function testCreateTaskRejectsNonProjectMemberAssignee(): void
@@ -964,8 +964,11 @@ class TaskTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(1, $reloaded->getAssignees());
-        $this->assertTrue($bob->getId()->equals($reloaded->getAssignees()->first()?->getId()));
+        $first = $reloaded->getAssignees()->first();
+        self::assertNotFalse($first);
+        $this->assertTrue($bob->getId()->equals($first->getId()));
     }
 
     public function testAddAssigneeEndpointRejectsDuplicate(): void

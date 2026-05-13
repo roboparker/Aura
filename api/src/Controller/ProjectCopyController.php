@@ -155,10 +155,7 @@ class ProjectCopyController extends AbstractController
                     ->setRecurrenceRule($sourceTask->getRecurrenceRule())
                     ->setPosition($sourceTask->getPosition());
                 foreach ($sourceTask->getTags() as $tag) {
-                    if (
-                        $tag instanceof Tag
-                        && $tag->getOwner()?->getId()?->equals($user->getId())
-                    ) {
+                    if ($tag->getOwner()->getId()?->equals($user->getId())) {
                         $cloneTask->addTag($tag);
                     }
                 }
@@ -196,10 +193,9 @@ class ProjectCopyController extends AbstractController
         if (mb_strlen($combined) <= self::TITLE_MAX) {
             return $combined;
         }
+        // $suffix is a literal ' (copy)' (7 chars), so TITLE_MAX -
+        // strlen($suffix) is always positive — no need for a fallback branch.
         $room = self::TITLE_MAX - mb_strlen($suffix);
-        if ($room <= 0) {
-            return mb_substr($sourceTitle, 0, self::TITLE_MAX);
-        }
         return mb_substr($sourceTitle, 0, $room) . $suffix;
     }
 
