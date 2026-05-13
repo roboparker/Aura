@@ -4,16 +4,15 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemOperator;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class ProjectAttachmentTest extends ApiTestCase
+class SpaceAttachmentTest extends ApiTestCase
 {
-    use SpaceMembershipFixture;
-
     private EntityManagerInterface $entityManager;
     private FilesystemOperator $storage;
 
@@ -27,26 +26,24 @@ class ProjectAttachmentTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testOwnerCanAttachOwnUpload(): void
+    public function testAdminCanAttachOwnUpload(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch plan', [$alice]);
+        $space = $this->createSpace($alice, 'Launch plan');
         $media = $this->createMediaObject($alice);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
-        // Project response embeds the MediaObject normalised under
-        // `attachments` — verify both the kind reaches the client and the
-        // gated download URL is returned.
         $this->assertJsonContains([
             'attachments' => [
                 [
@@ -58,40 +55,40 @@ class ProjectAttachmentTest extends ApiTestCase
         ]);
     }
 
-    public function testMemberCanAttachOwnUpload(): void
+    public function testMemberUploadCannotBeAttachedByAdmin(): void
     {
-        // Project member (not owner) uploads a file and attaches it. The
-        // looser ValidProjectAttachments rule lets any member contribute.
-        $owner = $this->createUser('owner@example.com');
+        // Looser-than-task rule: every member of the space may attach
+        // anything *they* uploaded, but not (in v1) someone else's
+        // upload. Admin patching with a non-admin member's upload
+        // works because the member is in the space.
+        $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
-        $project = $this->createProject($owner, 'Shared', [$owner, $member]);
+        $space = $this->createSpace($admin, 'Shared');
+        $this->addMember($space, $member);
         $media = $this->createMediaObject($member);
 
         $client = static::createClient();
-        $client->loginUser($member);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->loginUser($admin);
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
-        $this->reloadProject($project);
-        $this->assertCount(1, $project->getAttachments());
+        $this->reloadSpace($space);
+        $this->assertCount(1, $space->getAttachments());
     }
 
     public function testStrangerUploadCannotBeAttached(): void
     {
-        // The PATCH succeeds at the auth layer (the caller is a member) but
-        // ValidProjectAttachments rejects the IRI — the underlying
-        // MediaObject's owner isn't on the project.
-        $owner = $this->createUser('owner@example.com');
+        $admin = $this->createUser('admin@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($owner, 'Private', [$owner]);
+        $space = $this->createSpace($admin, 'Private');
         $media = $this->createMediaObject($stranger);
 
         $client = static::createClient();
-        $client->loginUser($owner);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->loginUser($admin);
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -99,34 +96,35 @@ class ProjectAttachmentTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testNonMemberCannotPatchProject(): void
+    public function testNonAdminCannotPatchSpace(): void
     {
-        $owner = $this->createUser('owner@example.com');
-        $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($owner, 'Private', [$owner]);
-        $media = $this->createMediaObject($stranger);
+        // Space PATCH is admin-only — only admins can edit the
+        // attachments collection.
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSpace($admin, 'Shared');
+        $this->addMember($space, $member);
+        $media = $this->createMediaObject($member);
 
         $client = static::createClient();
-        $client->loginUser($stranger);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->loginUser($member);
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
-        // Project security expression rejects non-members before validation
-        // runs. 404 (not 403) per the same rule the GET uses.
-        $this->assertResponseStatusCodeSame(404);
+        $this->assertResponseStatusCodeSame(403);
     }
 
     public function testAvatarKindCannotBeAttached(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch', [$alice]);
+        $space = $this->createSpace($alice, 'Launch');
         $avatar = $this->createMediaObject($alice, MediaObject::KIND_AVATAR);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => ['/media-objects/' . $avatar->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -134,16 +132,14 @@ class ProjectAttachmentTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testProjectMemberCanDownloadAttachment(): void
+    public function testSpaceMemberCanDownloadAttachment(): void
     {
-        // Cross-cuts MediaObjectDownloadController: attaching to a project
-        // should grant download access to every member, even ones who
-        // didn't upload it themselves.
-        $owner = $this->createUser('owner@example.com');
+        $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
-        $project = $this->createProject($owner, 'Shared', [$owner, $member]);
-        $media = $this->createMediaObject($owner);
-        $project->addAttachment($media);
+        $space = $this->createSpace($admin, 'Shared');
+        $this->addMember($space, $member);
+        $media = $this->createMediaObject($admin);
+        $space->addAttachment($media);
         $this->entityManager->flush();
 
         $client = static::createClient();
@@ -153,36 +149,33 @@ class ProjectAttachmentTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    public function testStrangerCannotDownloadProjectAttachment(): void
+    public function testStrangerCannotDownloadSpaceAttachment(): void
     {
-        $owner = $this->createUser('owner@example.com');
+        $admin = $this->createUser('admin@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($owner, 'Private', [$owner]);
-        $media = $this->createMediaObject($owner);
-        $project->addAttachment($media);
+        $space = $this->createSpace($admin, 'Private');
+        $media = $this->createMediaObject($admin);
+        $space->addAttachment($media);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($stranger);
         $client->request('GET', '/media-objects/' . $media->getId() . '/download');
 
-        // Same rule as task attachments: 404 not 403, no enumeration.
         $this->assertResponseStatusCodeSame(404);
     }
 
     public function testDetachKeepsMediaObjectRow(): void
     {
-        // Removing an attachment from the join table must not delete the
-        // underlying MediaObject — orphan cleanup is a separate ticket.
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch', [$alice]);
+        $space = $this->createSpace($alice, 'Launch');
         $media = $this->createMediaObject($alice);
-        $project->addAttachment($media);
+        $space->addAttachment($media);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/spaces/' . $space->getId(), [
             'json' => ['attachments' => []],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -191,14 +184,14 @@ class ProjectAttachmentTest extends ApiTestCase
         $this->entityManager->clear();
         $reloadedMedia = $this->entityManager->getRepository(MediaObject::class)->find($media->getId());
         $this->assertNotNull($reloadedMedia, 'Detach must not delete the MediaObject row.');
-        $reloadedProject = $this->entityManager->getRepository(Project::class)->find($project->getId());
-        $this->assertCount(0, $reloadedProject->getAttachments());
+        $reloadedSpace = $this->entityManager->getRepository(Space::class)->find($space->getId());
+        $this->assertCount(0, $reloadedSpace->getAttachments());
     }
 
     private function createMediaObject(User $owner, string $kind = MediaObject::KIND_ATTACHMENT): MediaObject
     {
-        $bytes = 'PROJECT-FILE';
-        $path = 'attachments/proj-test-' . bin2hex(random_bytes(4)) . '-spec.pdf';
+        $bytes = 'SPACE-FILE';
+        $path = 'attachments/space-test-' . bin2hex(random_bytes(4)) . '-spec.pdf';
         $this->storage->write($path, $bytes);
 
         $media = new MediaObject();
@@ -213,20 +206,29 @@ class ProjectAttachmentTest extends ApiTestCase
         return $media;
     }
 
-    /**
-     * @param User[] $members
-     */
-    private function createProject(User $owner, string $title, array $members): Project
+    private function createSpace(User $admin, string $name): Space
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
-        }
-        $this->entityManager->persist($project);
+        $space = new Space();
+        $space->setName($name);
+        $space->setCreatedBy($admin);
+        $this->entityManager->persist($space);
+        $membership = (new SpaceMembership())
+            ->setUser($admin)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($membership);
+        $this->entityManager->persist($membership);
         $this->entityManager->flush();
-        return $project;
+        return $space;
+    }
+
+    private function addMember(Space $space, User $user, string $role = Space::ROLE_MEMBER): void
+    {
+        $membership = (new SpaceMembership())
+            ->setUser($user)
+            ->setRole($role);
+        $space->addUserMembership($membership);
+        $this->entityManager->persist($membership);
+        $this->entityManager->flush();
     }
 
     private function createUser(string $email): User
@@ -249,10 +251,10 @@ class ProjectAttachmentTest extends ApiTestCase
         return $user;
     }
 
-    private function reloadProject(Project &$project): void
+    private function reloadSpace(Space &$space): void
     {
-        $id = $project->getId();
+        $id = $space->getId();
         $this->entityManager->clear();
-        $project = $this->entityManager->getRepository(Project::class)->find($id);
+        $space = $this->entityManager->getRepository(Space::class)->find($id);
     }
 }

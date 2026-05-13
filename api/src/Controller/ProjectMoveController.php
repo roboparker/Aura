@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\User;
@@ -95,13 +94,11 @@ class ProjectMoveController extends AbstractController
         $project->setSpace($target);
 
         // Re-stamp child entities that cache the parent space on insert
-        // (PrePersist `syncSpaceFromProject`). Without this their cached
-        // space drifts out of sync with the project's, breaking access
-        // extensions and search filters.
-        foreach ($this->em->getRepository(Discussion::class)
-            ->findBy(['project' => $project]) as $discussion) {
-            $discussion->setSpace($target);
-        }
+        // (`CustomFieldDefinition::syncSpaceFromProject`). Without this
+        // their cached space drifts out of sync with the project's,
+        // breaking access extensions and search filters. Discussions
+        // live on the space directly (no project link) and stay in
+        // their source space — they aren't carried by the move.
         foreach ($this->em->getRepository(CustomFieldDefinition::class)
             ->findBy(['project' => $project]) as $definition) {
             $definition->setSpace($target);

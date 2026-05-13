@@ -11,9 +11,6 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
-import AttachmentsPanel, {
-  type Attachment,
-} from "@/components/tasks/AttachmentsPanel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -51,7 +48,6 @@ interface Project {
   // PWA falls back to looking it up by IRI in the user's space list
   // for the admin role check.
   space: string | SpaceRef;
-  attachments: Attachment[];
 }
 
 interface Tag {
@@ -81,7 +77,7 @@ const projectSpaceIri = (project: Project): string =>
   typeof project.space === "string" ? project.space : project.space["@id"];
 
 const ProjectDetail = () => {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
@@ -114,9 +110,6 @@ const ProjectDetail = () => {
   // Opt-in deep-copy: when true, the POST body asks the server to
   // also clone the project's tasks (#182 deep-copy slice).
   const [copyIncludeTasks, setCopyIncludeTasks] = useState(false);
-  // Opt-in deep-copy: also clone the project's discussion threads
-  // (#182 deep-copy slice).
-  const [copyIncludeDiscussions, setCopyIncludeDiscussions] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -217,43 +210,6 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleAttach = async (mediaObjectIri: string) => {
-    if (!project) return;
-    const nextIris = [...project.attachments.map((a) => a["@id"]), mediaObjectIri];
-    const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/merge-patch+json" },
-      body: JSON.stringify({ attachments: nextIris }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(
-        data.detail || data["hydra:description"] || "Failed to attach file.",
-      );
-    }
-    const updated: Project = await res.json();
-    setProject(updated);
-  };
-
-  const handleDetach = async (attachment: Attachment) => {
-    if (!project) return;
-    const nextIris = project.attachments
-      .filter((a) => a["@id"] !== attachment["@id"])
-      .map((a) => a["@id"]);
-    const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-      method: "PATCH",
-      credentials: "include",
-      headers: { "Content-Type": "application/merge-patch+json" },
-      body: JSON.stringify({ attachments: nextIris }),
-    });
-    if (!res.ok) {
-      throw new Error("Failed to remove attachment.");
-    }
-    const updated: Project = await res.json();
-    setProject(updated);
-  };
-
   const handleMove = async () => {
     if (!project || !moveTargetIri) return;
     setIsMoving(true);
@@ -300,16 +256,14 @@ const ProjectDetail = () => {
     try {
       // Empty body = clone into the source's own space; specifying a
       // target uses the picker's current selection. The server accepts
-      // both shapes. `includeTasks` / `includeDiscussions` are opt-in
-      // deep-copy flags.
+      // both shapes. `includeTasks` is the only opt-in deep-copy flag —
+      // discussions live at the space level and are never carried.
       const body: {
         space?: string;
         includeTasks?: boolean;
-        includeDiscussions?: boolean;
       } = {};
       if (moveTargetIri) body.space = moveTargetIri;
       if (copyIncludeTasks) body.includeTasks = true;
-      if (copyIncludeDiscussions) body.includeDiscussions = true;
       const res = await fetch(
         `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/copy`,
         {
@@ -505,21 +459,6 @@ const ProjectDetail = () => {
                           />
                           include tasks
                         </label>
-                        <label
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
-                          data-testid="project-copy-include-discussions-label"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={copyIncludeDiscussions}
-                            onChange={(e) =>
-                              setCopyIncludeDiscussions(e.target.checked)
-                            }
-                            className="h-3.5 w-3.5"
-                            data-testid="project-copy-include-discussions"
-                          />
-                          include discussions
-                        </label>
                         {moveMessage && (
                           <span
                             role="alert"
@@ -556,22 +495,6 @@ const ProjectDetail = () => {
                 </Alert>
               )}
 
-              <Card className="mb-6" data-testid="project-attachments">
-                <CardContent className="pt-6">
-                  <h2 className="text-lg font-semibold mb-3">Attachments</h2>
-                  <AttachmentsPanel
-                    taskTitle={project.title}
-                    attachments={project.attachments ?? []}
-                    // Mirrors the task-attachment affordance: only the
-                    // project owner gets the delete button. Members can
-                    // still upload via the drop zone.
-                    canDeleteAll={user?.email === project.owner.email}
-                    onAttach={handleAttach}
-                    onDetach={handleDetach}
-                  />
-                </CardContent>
-              </Card>
-
               <div className="mb-6 flex flex-wrap justify-end gap-2">
                 <Button
                   asChild
@@ -581,16 +504,6 @@ const ProjectDetail = () => {
                 >
                   <Link href={`/projects/${project.id}/custom-fields`}>
                     Custom fields
-                  </Link>
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  data-testid="project-discussions-link"
-                >
-                  <Link href={`/projects/${project.id}/discussions`}>
-                    Discussions
                   </Link>
                 </Button>
               </div>

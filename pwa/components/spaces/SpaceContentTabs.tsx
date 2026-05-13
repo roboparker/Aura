@@ -170,7 +170,6 @@ interface DiscussionRow {
   isLocked: boolean;
   createdAt: string;
   updatedAt: string | null;
-  project: { id: string; title: string };
   author: { id: string; email: string };
 }
 
@@ -215,7 +214,7 @@ export const SpaceDiscussionsList = ({
             <CardContent className="pt-4 pb-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  href={`/projects/${d.project.id}/discussions/${d.id}`}
+                  href={`/discussions/${d.id}`}
                   className="font-semibold text-foreground no-underline hover:underline"
                 >
                   {d.title}
@@ -227,13 +226,6 @@ export const SpaceDiscussionsList = ({
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                <Link
-                  href={`/projects/${d.project.id}`}
-                  className="hover:underline"
-                >
-                  {d.project.title}
-                </Link>
-                {" · "}
                 {d.author?.email} · {formatRelative(d.createdAt)}
               </p>
             </CardContent>

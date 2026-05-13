@@ -14,6 +14,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AttachmentsPanel, {
+  type Attachment,
+} from "@/components/tasks/AttachmentsPanel";
 import {
   SpaceDiscussionsList,
   SpacePagesList,
@@ -24,7 +27,7 @@ import {
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
 // the Overview tab.
-const TABS = ["overview", "projects", "discussions", "pages", "tasks"] as const;
+const TABS = ["overview", "projects", "discussions", "pages", "tasks", "files"] as const;
 type TabKey = (typeof TABS)[number];
 const isTabKey = (v: unknown): v is TabKey =>
   typeof v === "string" && (TABS as readonly string[]).includes(v);
@@ -63,6 +66,43 @@ const SpaceDetail = () => {
     text: string;
     kind: "success" | "error";
   } | null>(null);
+
+  const handleAttach = async (mediaObjectIri: string) => {
+    if (!space) return;
+    const current = (space.attachments ?? []).map((a) => a["@id"]);
+    const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ attachments: [...current, mediaObjectIri] }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.detail || data["hydra:description"] || "Failed to attach file.",
+      );
+    }
+    const updated: Space = await res.json();
+    setSpace(updated);
+  };
+
+  const handleDetach = async (attachment: Attachment) => {
+    if (!space) return;
+    const nextIris = (space.attachments ?? [])
+      .filter((a) => a["@id"] !== attachment["@id"])
+      .map((a) => a["@id"]);
+    const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ attachments: nextIris }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to remove attachment.");
+    }
+    const updated: Space = await res.json();
+    setSpace(updated);
+  };
 
   // Tab state — driven by `?tab=` so the back button works and deep
   // links land on the chosen tab. Falls back to overview for missing
@@ -354,6 +394,7 @@ const SpaceDetail = () => {
                   <TabsTrigger value="discussions">Discussions</TabsTrigger>
                   <TabsTrigger value="pages">Pages</TabsTrigger>
                   <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                  <TabsTrigger value="files">Files</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6 mt-0">
@@ -573,6 +614,23 @@ const SpaceDetail = () => {
                     spaceIri={space["@id"]}
                     enabled={activeTab === "tasks"}
                   />
+                </TabsContent>
+
+                <TabsContent value="files" className="mt-0">
+                  <Card data-testid="space-attachments">
+                    <CardContent className="pt-6">
+                      <AttachmentsPanel
+                        taskTitle={space.name}
+                        attachments={space.attachments ?? []}
+                        // Only admins can edit the space; non-admins
+                        // hit the same `Patch` security expression
+                        // that powers metadata edits.
+                        canDeleteAll={isAdmin}
+                        onAttach={handleAttach}
+                        onDetach={handleDetach}
+                      />
+                    </CardContent>
+                  </Card>
                 </TabsContent>
               </Tabs>
             </>

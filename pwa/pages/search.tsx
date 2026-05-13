@@ -62,12 +62,6 @@ interface ProjectHit {
   createdOn: string;
 }
 
-interface DiscussionProjectRef {
-  "@id": string;
-  id: string;
-  title: string;
-}
-
 interface DiscussionAuthor {
   "@id": string;
   email?: string | null;
@@ -85,7 +79,6 @@ interface DiscussionHit {
   isPinned: boolean;
   isLocked: boolean;
   createdAt: string;
-  project: DiscussionProjectRef;
   author: DiscussionAuthor;
 }
 
@@ -1020,7 +1013,7 @@ const DiscussionResults = ({ filters, onPageChange }: ResultsProps) => {
             className="rounded-md border bg-background p-3 transition-colors hover:bg-accent/30 target:ring-2 target:ring-primary"
           >
             <Link
-              href={`/projects/${hit.project.id}/discussions/${hit.id}`}
+              href={`/discussions/${hit.id}`}
               className="block no-underline"
             >
               <div className="text-sm font-medium">
@@ -1030,9 +1023,6 @@ const DiscussionResults = ({ filters, onPageChange }: ResultsProps) => {
                 {highlightMatches(snippetOf(hit.body), filters.q)}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline" className="text-[10px] py-0">
-                  {hit.project.title}
-                </Badge>
                 {hit.isPinned && (
                   <Badge variant="secondary" className="text-[10px] py-0">
                     Pinned
