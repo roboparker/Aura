@@ -51,10 +51,12 @@ class UserGroupTest extends ApiTestCase
         ]);
 
         $group = $this->reloadGroupByTitle('Backend team');
-        $this->assertTrue($user->getId()->equals($group->getOwner()?->getId()));
+        $this->assertTrue($user->getId()?->equals($group->getOwner()?->getId()));
         // Creator is auto-added to the member set on create.
         $this->assertCount(1, $group->getMembers());
-        $this->assertTrue($user->getId()->equals($group->getMembers()->first()->getId()));
+        $firstMember = $group->getMembers()->first();
+        self::assertNotFalse($firstMember);
+        $this->assertTrue($user->getId()?->equals($firstMember->getId()));
     }
 
     public function testCreateGroupRequiresTitle(): void

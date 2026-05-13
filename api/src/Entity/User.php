@@ -308,6 +308,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
 
     public function getUserIdentifier(): string
     {
+        // The Email + NotBlank validators guarantee a non-empty value by
+        // the time a User is persisted; assert here so the
+        // UserInterface's non-empty-string return contract is satisfied
+        // even when phpstan can't see through the validation pipeline.
+        assert('' !== $this->email);
         return $this->email;
     }
 

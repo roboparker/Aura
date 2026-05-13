@@ -29,7 +29,7 @@ class MediaObjectTest extends ApiTestCase
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
-            foreach (glob($this->tempDir . '/*') as $file) {
+            foreach (glob($this->tempDir . '/*') ?: [] as $file) {
                 @unlink($file);
             }
             @rmdir($this->tempDir);
@@ -132,7 +132,10 @@ class MediaObjectTest extends ApiTestCase
         $path = $this->tempDir . '/sample.png';
         // 128x128 PNG is large enough for the 256 cover() to exercise real processing.
         $image = imagecreatetruecolor(128, 128);
-        imagefill($image, 0, 0, imagecolorallocate($image, 200, 100, 50));
+        self::assertNotFalse($image);
+        $color = imagecolorallocate($image, 200, 100, 50);
+        self::assertNotFalse($color);
+        imagefill($image, 0, 0, $color);
         imagepng($image, $path);
         imagedestroy($image);
 

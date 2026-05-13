@@ -40,14 +40,18 @@ class AvatarColorServiceTest extends TestCase
     private static function contrastAgainstWhite(string $hex): float
     {
         $rgb = sscanf($hex, '#%02x%02x%02x');
+        self::assertIsArray($rgb);
         [$r, $g, $b] = array_map(self::channelLuminance(...), $rgb);
         $luminance = 0.2126 * $r + 0.7152 * $g + 0.0722 * $b;
         return (1.0 + 0.05) / ($luminance + 0.05);
     }
 
-    private static function channelLuminance(int $channel): float
+    private static function channelLuminance(?int $channel): float
     {
-        $c = $channel / 255.0;
+        // Palette hex strings are well-formed (#RRGGBB) so sscanf always
+        // returns three ints — but its signature is `?int` per phpstan's
+        // strict typing, so handle null defensively for completeness.
+        $c = ($channel ?? 0) / 255.0;
         return $c <= 0.03928 ? $c / 12.92 : (($c + 0.055) / 1.055) ** 2.4;
     }
 }

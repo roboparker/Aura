@@ -133,9 +133,11 @@ class SpaceInviteTest extends ApiTestCase
             ->findOneBy(['email' => 'newcomer@example.com']);
         $this->assertNotNull($invite, 'A UserInvite row should have been created.');
         $this->assertCount(1, $invite->getSpaceInvites());
+        $firstInvite = $invite->getSpaceInvites()->first();
+        self::assertNotFalse($firstInvite);
         $this->assertSame(
             (string) $space->getId(),
-            (string) $invite->getSpaceInvites()->first()->getSpace()->getId(),
+            (string) $firstInvite->getSpace()->getId(),
         );
         $this->assertNull($invite->getAcceptedAt());
     }
@@ -195,6 +197,7 @@ class SpaceInviteTest extends ApiTestCase
         $space = $this->getSharedSpace($admin);
         $invite = $this->seedInvite($admin, $space, 'pending@example.com');
         $spaceInvite = $invite->getSpaceInvites()->first();
+        self::assertNotFalse($spaceInvite);
 
         $client = static::createClient();
         $client->loginUser($admin);

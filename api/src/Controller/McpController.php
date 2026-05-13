@@ -91,6 +91,9 @@ class McpController extends AbstractController
             return new JsonResponse($responses);
         }
 
+        // phpstan can't narrow array_is_list()'s false branch back to
+        // the string-keyed half of the union, so re-state the shape.
+        /** @var array<string, mixed> $payload */
         $response = $this->dispatch($payload, $request, $user);
         if (null === $response) {
             // Notification — no response body, but HTTP 202 is the
