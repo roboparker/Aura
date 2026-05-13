@@ -50,7 +50,9 @@ class UserPreferencesTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('dark', $body['theme']);
         // Other keys untouched.
         $this->assertTrue($body['emailNotificationsEnabled']);
@@ -73,7 +75,9 @@ class UserPreferencesTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('light', $body['theme']);
         $this->assertTrue($body['pushNotificationsEnabled']);
         $this->assertSame('daily', $body['notificationFrequency']);
@@ -94,7 +98,9 @@ class UserPreferencesTest extends ApiTestCase
         // Fresh request — value survives a roundtrip through the database.
         $client->request('GET', '/me/preferences');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('dark', $body['theme']);
     }
 
@@ -182,7 +188,9 @@ class UserPreferencesTest extends ApiTestCase
         $client->request('GET', '/api/me');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertArrayHasKey('preferences', $body);
         $this->assertSame('dark', $body['preferences']['theme']);
     }

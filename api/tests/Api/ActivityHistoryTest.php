@@ -53,7 +53,9 @@ class ActivityHistoryTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $created = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $created = $response->toArray();
         $taskId = $created['id'];
 
         // Mutate a versioned field so an UPDATE row joins the CREATE row.
@@ -66,7 +68,9 @@ class ActivityHistoryTest extends ApiTestCase
         // Activity feed contains both, newest first.
         $client->request('GET', '/tasks/' . $taskId . '/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $this->assertSame(2, $body['totalItems']);
         $this->assertCount(2, $body['items']);
@@ -118,7 +122,9 @@ class ActivityHistoryTest extends ApiTestCase
         $client->loginUser($member);
         $client->request('GET', '/projects/' . $project->getId() . '/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertGreaterThanOrEqual(2, $body['totalItems']);
 
         $classes = array_column($body['items'], 'objectClass');
@@ -159,7 +165,9 @@ class ActivityHistoryTest extends ApiTestCase
             'json' => ['title' => 'Pageable'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
-        $taskId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $taskId = $response->toArray()['id'];
 
         // Generate enough log rows to exercise pagination — five
         // updates → six total entries (one create + five updates).
@@ -172,7 +180,9 @@ class ActivityHistoryTest extends ApiTestCase
 
         $client->request('GET', '/tasks/' . $taskId . '/activity?page=1&itemsPerPage=2');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame(6, $body['totalItems']);
         $this->assertCount(2, $body['items']);
         $this->assertSame('Pageable v5', $body['items'][0]['data']['title']);

@@ -36,7 +36,9 @@ class CommentsMercureTokenTest extends ApiTestCase
 
         $client = static::createClient();
         $client->request('GET', '/tasks/' . $task->getId() . '/comments/mercure-token');
-        $this->assertNotSame(200, $client->getResponse()->getStatusCode());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertNotSame(200, $response->getStatusCode());
     }
 
     public function testTaskOwnerGetsTokenAndCookie(): void
@@ -57,7 +59,9 @@ class CommentsMercureTokenTest extends ApiTestCase
         // Symfony Mercure listener after the controller stages it. The
         // ApiPlatform test Response wrapper hides headers/cookies, so we
         // unwrap to the underlying HttpFoundation response.
-        $cookies = $client->getResponse()->getKernelResponse()->headers->getCookies();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $cookies = $response->getKernelResponse()->headers->getCookies();
         $names = array_map(static fn ($c) => $c->getName(), $cookies);
         $this->assertContains('mercureAuthorization', $names, 'Subscriber cookie must be set on the response.');
     }

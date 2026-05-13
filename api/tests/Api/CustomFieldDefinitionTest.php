@@ -104,9 +104,11 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/custom_field_definitions');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $names = array_map(
             fn ($c) => $c['name'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['A1'], $names);
     }
@@ -207,8 +209,12 @@ class CustomFieldDefinitionTest extends ApiTestCase
         ]);
         // Either 409 (Doctrine unique violation surfaced as Conflict) or
         // 422 (validator-driven) — both signal the duplicate.
-        $this->assertGreaterThanOrEqual(400, $client->getResponse()->getStatusCode());
-        $this->assertLessThan(500, $client->getResponse()->getStatusCode());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertGreaterThanOrEqual(400, $response->getStatusCode());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertLessThan(500, $response->getStatusCode());
     }
 
     public function testOwnerCanDelete(): void

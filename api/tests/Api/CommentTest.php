@@ -159,9 +159,11 @@ class CommentTest extends ApiTestCase
         $client->request('GET', '/comments');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $bodies = array_map(
             fn ($c) => $c['body'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['My note.'], $bodies);
     }
@@ -189,9 +191,11 @@ class CommentTest extends ApiTestCase
         $client->request('GET', '/comments?task=/tasks/' . $task->getId());
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $bodies = array_map(
             fn ($c) => $c['body'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['First', 'Second'], $bodies);
     }
@@ -428,7 +432,9 @@ class CommentTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $created = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $created = $response->toArray();
 
         // Edit keeps the same mention — must NOT create a second notification.
         $client->request('PATCH', $created['@id'], [
@@ -461,7 +467,9 @@ class CommentTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
-        $created = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $created = $response->toArray();
 
         $client->request('PATCH', $created['@id'], [
             'json' => ['body' => 'Hey @bob and @carol'],

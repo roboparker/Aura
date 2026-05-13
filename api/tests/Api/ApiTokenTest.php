@@ -35,7 +35,9 @@ class ApiTokenTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(201);
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('Local CLI', $body['name']);
         $this->assertArrayHasKey('plainToken', $body);
         $this->assertStringStartsWith(ApiToken::PLAINTEXT_PREFIX, $body['plainToken']);
@@ -59,7 +61,9 @@ class ApiTokenTest extends ApiTestCase
         $client->request('GET', '/api-tokens');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $names = array_column($body['member'] ?? [], 'name');
         $this->assertSame(['Alice CLI'], $names);
     }

@@ -58,7 +58,9 @@ class PageMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
 
         $this->entityManager->clear();
         $repo = $this->entityManager->getRepository(Page::class);
@@ -181,7 +183,9 @@ class PageMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertFalse($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertFalse($response->toArray()['moved']);
     }
 
     public function testAcceptsBareUuidAsTarget(): void
@@ -198,7 +202,9 @@ class PageMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
     }
 
     private function seedPage(User $author, Space $space, string $title, ?Page $parent = null): Page

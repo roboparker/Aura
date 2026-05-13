@@ -186,7 +186,9 @@ class SpaceInviteTest extends ApiTestCase
         $client->loginUser($admin);
         $client->request('GET', '/spaces/' . $space->getId() . '/invites');
         $this->assertResponseIsSuccessful();
-        $payload = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $payload = $response->toArray();
         $this->assertCount(1, $payload['invites']);
         $this->assertSame('pending@example.com', $payload['invites'][0]['email']);
     }
@@ -225,7 +227,9 @@ class SpaceInviteTest extends ApiTestCase
         $client = static::createClient();
         $client->request('GET', '/invites/' . $plainToken);
         $this->assertResponseIsSuccessful();
-        $payload = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $payload = $response->toArray();
         $this->assertSame('pending@example.com', $payload['email']);
         $this->assertCount(1, $payload['spaces']);
         $this->assertSame((string) $space->getId(), $payload['spaces'][0]['id']);

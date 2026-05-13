@@ -248,7 +248,9 @@ class TagTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/tasks');
         $this->assertResponseIsSuccessful();
-        $response = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $response = $response->toArray();
 
         $this->assertCount(1, $response['member']);
         $this->assertCount(1, $response['member'][0]['tags']);

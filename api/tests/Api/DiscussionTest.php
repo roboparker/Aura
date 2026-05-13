@@ -120,9 +120,11 @@ class DiscussionTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/discussions');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($d) => $d['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['A1'], $titles);
     }
@@ -138,9 +140,11 @@ class DiscussionTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/discussions?category=ideas');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($d) => $d['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Idea one'], $titles);
     }

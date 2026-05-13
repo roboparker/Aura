@@ -56,7 +56,9 @@ class DiscussionCopyTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('Welcome (copy)', $body['title']);
         $this->assertSame('/spaces/' . $source->getId(), $body['space']);
 
@@ -85,7 +87,9 @@ class DiscussionCopyTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('/spaces/' . $target->getId(), $body['space']);
     }
 
@@ -102,7 +106,9 @@ class DiscussionCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('Notes (copy)', $client->getResponse()->toArray()['title']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('Notes (copy)', $response->toArray()['title']);
     }
 
     public function testCopyAuthorIsCurrentUserNotSourceAuthor(): void
@@ -122,8 +128,10 @@ class DiscussionCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Discussion::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertSame((string) $bob->getId(), (string) $copy->getAuthor()->getId());
     }
 
@@ -145,8 +153,10 @@ class DiscussionCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Discussion::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertFalse($copy->getIsPinned());
         $this->assertFalse($copy->getIsLocked());
 
@@ -218,7 +228,9 @@ class DiscussionCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('/spaces/' . $target->getId(), $response->toArray()['space']);
     }
 
     private function seedDiscussion(

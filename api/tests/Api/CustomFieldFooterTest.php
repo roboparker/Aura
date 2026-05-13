@@ -60,7 +60,9 @@ class CustomFieldFooterTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
-        $this->assertSame(['footers' => []], $client->getResponse()->toArray());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(['footers' => []], $response->toArray());
     }
 
     public function testNumericSumOverAllTasks(): void
@@ -78,7 +80,9 @@ class CustomFieldFooterTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertCount(1, $body['footers']);
         $this->assertSame('sum', $body['footers'][0]['kind']);
         $this->assertSame('Estimate', $body['footers'][0]['name']);
@@ -105,7 +109,9 @@ class CustomFieldFooterTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $byName = array_column($body['footers'], null, 'name');
         $this->assertSame(1, $byName['Owner']['value']);
         $this->assertEqualsCanonicalizing(6, $byName['Hours']['value']);
@@ -129,12 +135,16 @@ class CustomFieldFooterTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?status=open');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertEqualsCanonicalizing(8, $body['footers'][0]['value']);
 
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?status=completed');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertEqualsCanonicalizing(7, $body['footers'][0]['value']);
     }
 
@@ -151,7 +161,9 @@ class CustomFieldFooterTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame(['amount' => 3500, 'currency' => 'USD'], $body['footers'][0]['value']);
     }
 

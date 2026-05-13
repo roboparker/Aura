@@ -56,7 +56,9 @@ class DiscussionMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Discussion::class)->find($discussion->getId());
@@ -142,7 +144,9 @@ class DiscussionMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertFalse($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertFalse($response->toArray()['moved']);
     }
 
     public function testAcceptsBareUuidAsTarget(): void
@@ -159,7 +163,9 @@ class DiscussionMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
     }
 
     private function seedDiscussion(User $author, Space $space, string $title): Discussion
