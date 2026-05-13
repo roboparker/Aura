@@ -144,11 +144,15 @@ jobs:
         run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build php database
       -
         # phpstan-symfony's containerXmlPath + phpstan-doctrine's
-        # objectManagerLoader both read the test container's compiled XML
-        # and need a bootable kernel. Warm the test cache so the file
-        # exists at the path phpstan.dist.neon points to.
+        # objectManagerLoader both read the test container's compiled XML.
+        # We warm via the `phpstan` service (not `php`) because the `php`
+        # service mounts `/app/var` as an anonymous volume — cache files
+        # written there don't escape into the bind mount the phpstan
+        # service reads from. Running the warmup inside the phpstan
+        # service writes to /app/var via the ./api:/app bind mount, so
+        # the subsequent analysis step sees the compiled container XML.
         name: Warm test cache
-        run: docker compose exec -T -e XDEBUG_MODE=off php php -d xdebug.mode=off bin/console -e test cache:warmup
+        run: docker compose -f compose.yaml -f compose.override.yaml run --rm --entrypoint=php phpstan -d xdebug.mode=off bin/console -e test cache:warmup
       -
         name: Run PHPStan
         # PHPStan exits 0 even when parallel workers crash (the "Result
