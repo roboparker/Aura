@@ -16,7 +16,9 @@ class TwoFactorTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->em = $kernel->getContainer()->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->em = $em;
         $this->em->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 

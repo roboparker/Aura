@@ -23,8 +23,9 @@ class DiscussionCopyTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();

@@ -18,8 +18,9 @@ class TaskAttachmentTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         // Wipe in dependency-safe order; the join table is cleaned up via
         // the FK cascades when its sides go.

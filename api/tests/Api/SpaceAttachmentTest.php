@@ -20,7 +20,9 @@ class SpaceAttachmentTest extends ApiTestCase
     {
         self::bootKernel();
         $container = static::getContainer();
-        $this->entityManager = $container->get('doctrine')->getManager();
+        $em = $container->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
         $this->storage = $container->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
