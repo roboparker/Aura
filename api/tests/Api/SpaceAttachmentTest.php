@@ -255,6 +255,8 @@ class SpaceAttachmentTest extends ApiTestCase
     {
         $id = $space->getId();
         $this->entityManager->clear();
-        $space = $this->entityManager->getRepository(Space::class)->find($id);
+        $reloaded = $this->entityManager->getRepository(Space::class)->find($id);
+        self::assertNotNull($reloaded, 'Reloaded space disappeared between clear() and find().');
+        $space = $reloaded;
     }
 }

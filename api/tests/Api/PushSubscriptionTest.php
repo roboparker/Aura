@@ -16,8 +16,7 @@ class PushSubscriptionTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\PushSubscription')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -69,8 +68,7 @@ class PushSubscriptionTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->getContent();
-        $this->assertIsString($body);
+        $body = (string) $client->getResponse()->getContent();
         $this->assertStringNotContainsString('SECRET-PUBKEY', $body);
         $this->assertStringNotContainsString('SECRET-AUTH', $body);
     }

@@ -18,7 +18,7 @@ final class ValidRecurrence extends Constraint
     public string $messageRequiresDueDate = 'A recurrence rule requires a due date.';
     public string $messageInvalidShape = 'Recurrence rule must be {"frequency": daily|weekly|monthly|yearly, "interval": positive integer}.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

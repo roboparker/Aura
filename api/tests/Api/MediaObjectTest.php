@@ -32,6 +32,7 @@ class MediaObjectTest extends ApiTestCase
             }
             @rmdir($this->tempDir);
         }
+        parent::tearDown();
     }
 
     public function testUnauthenticatedUploadRejected(): void

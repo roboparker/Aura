@@ -37,7 +37,7 @@ final class ValidRemindersValidator extends ConstraintValidator
         }
 
         foreach ($reminders as $offset) {
-            if (!is_string($offset) || !in_array($offset, ValidReminders::ALLOWED_OFFSETS, true)) {
+            if (!in_array($offset, ValidReminders::ALLOWED_OFFSETS, true)) {
                 $this->context->buildViolation($constraint->messageInvalidOffset)
                     ->atPath('reminders')
                     ->addViolation();

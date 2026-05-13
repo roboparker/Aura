@@ -42,7 +42,7 @@ final class McpEntitySerializer
                 $task->getAssignees()->toArray(),
             ),
             'tags' => array_map(
-                fn (Tag $t) => ['id' => (string) $t->getId(), 'name' => $t->getName()],
+                fn (Tag $t) => ['id' => (string) $t->getId(), 'name' => $t->getTitle()],
                 $task->getTags()->toArray(),
             ),
             'attachments' => array_map(

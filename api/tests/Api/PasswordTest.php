@@ -17,8 +17,7 @@ class PasswordTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get('doctrine')->getManager();
 
         // Clean tables before each test
         $this->entityManager->createQuery('DELETE FROM App\Entity\PasswordResetToken')->execute();

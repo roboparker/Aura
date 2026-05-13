@@ -183,7 +183,7 @@ class ApiToken
     {
         $this->scopes = array_values(array_unique(array_filter(
             $scopes,
-            static fn ($v) => is_string($v) && '' !== $v,
+            static fn (string $v) => '' !== $v,
         )));
         return $this;
     }

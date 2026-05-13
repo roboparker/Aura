@@ -71,7 +71,7 @@ class PasswordResetToken
         $this->usedAt = new \DateTimeImmutable();
     }
 
-    public function isValid(\DateTimeImmutable $now = null): bool
+    public function isValid(?\DateTimeImmutable $now = null): bool
     {
         $now ??= new \DateTimeImmutable();
         return null === $this->usedAt && $this->expiresAt > $now;

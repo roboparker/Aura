@@ -208,7 +208,7 @@ final class CommentMentionService
 
     private function displayName(User $user): string
     {
-        $name = trim(($user->getGivenName() ?? '') . ' ' . ($user->getFamilyName() ?? ''));
+        $name = trim($user->getGivenName() . ' ' . $user->getFamilyName());
         return '' !== $name ? $name : $user->getEmail();
     }
 

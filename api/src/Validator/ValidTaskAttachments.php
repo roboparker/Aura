@@ -18,7 +18,7 @@ final class ValidTaskAttachments extends Constraint
     public string $messageNotOwner = 'You can only attach files you uploaded yourself.';
     public string $messageWrongKind = 'Only attachment-kind media can be attached to a task.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

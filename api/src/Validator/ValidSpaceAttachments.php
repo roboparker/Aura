@@ -18,7 +18,7 @@ final class ValidSpaceAttachments extends Constraint
     public string $messageNotMember = 'You can only attach files uploaded by a space member.';
     public string $messageWrongKind = 'Only attachment-kind media can be attached to a space.';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

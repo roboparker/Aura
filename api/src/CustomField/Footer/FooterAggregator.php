@@ -59,8 +59,8 @@ final class FooterAggregator
             if (null === $footer) {
                 continue;
             }
-            $aggKind = $footer['kind'] ?? null;
-            if (!is_string($aggKind) || !in_array($aggKind, FooterKind::values(), true)) {
+            $aggKind = $footer['kind'];
+            if (!in_array($aggKind, FooterKind::values(), true)) {
                 continue;
             }
 
@@ -74,7 +74,7 @@ final class FooterAggregator
             $rows[] = [
                 'definition' => $definition,
                 'kind' => $aggKind,
-                'label' => isset($footer['label']) && is_string($footer['label']) ? $footer['label'] : null,
+                'label' => $footer['label'] ?? null,
                 'value' => $this->compute($definition, $aggKind, $taskIds),
             ];
         }
@@ -238,6 +238,6 @@ final class FooterAggregator
     private function bindUuids(array $taskIds): array
     {
         $placeholders = implode(',', array_fill(0, count($taskIds), '?'));
-        return [$placeholders, array_values($taskIds)];
+        return [$placeholders, $taskIds];
     }
 }

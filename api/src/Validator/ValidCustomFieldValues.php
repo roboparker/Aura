@@ -34,7 +34,7 @@ final class ValidCustomFieldValues extends Constraint
     public string $messageRequired = 'Custom field "{{ name }}" is required.';
     public string $messageUnknownType = 'Custom field "{{ name }}" has an unknown type "{{ key }}".';
 
-    public function getTargets(): string|array
+    public function getTargets(): string
     {
         return self::CLASS_CONSTRAINT;
     }

@@ -25,8 +25,7 @@ class ProjectMoveTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -58,7 +57,7 @@ class ProjectMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertSame(true, $client->getResponse()->toArray()['moved']);
+        $this->assertTrue($client->getResponse()->toArray()['moved']);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());

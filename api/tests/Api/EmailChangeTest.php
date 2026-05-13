@@ -16,8 +16,7 @@ class EmailChangeTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\EmailChangeRequest')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -227,7 +226,8 @@ class EmailChangeTest extends ApiTestCase
 
         // The plain token is in the notice email body.
         $email = $this->getMailerMessage(0);
-        if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', $email->getTextBody(), $m)) {
+        self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $email);
+        if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', (string) $email->getTextBody(), $m)) {
             $this->fail('Revert email did not contain a revert link.');
         }
         $plainRevertToken = $m[1];

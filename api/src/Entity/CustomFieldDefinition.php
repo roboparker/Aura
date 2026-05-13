@@ -403,9 +403,6 @@ class CustomFieldDefinition
         }
         $structured = [];
         foreach ($options as $value) {
-            if (!is_string($value)) {
-                continue;
-            }
             $trimmed = trim($value);
             if ('' === $trimmed) {
                 continue;

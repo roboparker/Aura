@@ -24,8 +24,7 @@ class DiscussionMoveTest extends ApiTestCase
     {
         $kernel = self::bootKernel();
         $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')
-            ->getManager();
+            ->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -56,7 +55,7 @@ class DiscussionMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertSame(true, $client->getResponse()->toArray()['moved']);
+        $this->assertTrue($client->getResponse()->toArray()['moved']);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Discussion::class)->find($discussion->getId());
