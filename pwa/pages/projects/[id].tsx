@@ -10,6 +10,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import ActivityPanel from "@/components/activity/ActivityPanel";
+import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import AttachmentsPanel, {
   type Attachment,
 } from "@/components/tasks/AttachmentsPanel";
@@ -693,6 +694,7 @@ const ProjectDetail = () => {
                   ))}
                 </ul>
               )}
+              <CustomFieldFooterRow projectId={project.id} />
               </div>
 
               <div className="mt-6">
