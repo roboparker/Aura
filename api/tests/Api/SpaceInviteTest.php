@@ -90,6 +90,7 @@ class SpaceInviteTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Space::class)->find($space->getId());
+        $this->assertNotNull($reloaded);
         $this->assertTrue($reloaded->hasMember($bob));
     }
 
@@ -260,13 +261,15 @@ class SpaceInviteTest extends ApiTestCase
             ->findOneBy(['email' => 'newcomer@example.com']);
         $this->assertNotNull($newcomer);
         $reloadedSpace = $this->entityManager->getRepository(Space::class)->find($space->getId());
+        $this->assertNotNull($reloadedSpace);
         $this->assertTrue(
             $reloadedSpace->hasMember($newcomer),
             'Signup with the invite token should attach the new user to the space.',
         );
 
         $reloadedInvite = $this->entityManager->getRepository(UserInvite::class)->find($invite->getId());
-        $this->assertNotNull($reloadedInvite?->getAcceptedAt());
+        $this->assertNotNull($reloadedInvite);
+        $this->assertNotNull($reloadedInvite->getAcceptedAt());
     }
 
     public function testSignupWithMismatchedEmailDoesNotAttach(): void
@@ -292,7 +295,9 @@ class SpaceInviteTest extends ApiTestCase
         $this->entityManager->clear();
         $imposter = $this->entityManager->getRepository(User::class)
             ->findOneBy(['email' => 'imposter@example.com']);
+        $this->assertNotNull($imposter);
         $reloadedSpace = $this->entityManager->getRepository(Space::class)->find($space->getId());
+        $this->assertNotNull($reloadedSpace);
         $this->assertFalse($reloadedSpace->hasMember($imposter));
     }
 

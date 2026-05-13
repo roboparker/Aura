@@ -62,7 +62,8 @@ class DiscussionMoveTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Discussion::class)->find($discussion->getId());
-        $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()->getId());
+        $this->assertNotNull($reloaded);
+        $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()?->getId());
     }
 
     public function testNonMemberOfSourceGets404(): void

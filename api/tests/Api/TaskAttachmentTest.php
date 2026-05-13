@@ -186,6 +186,7 @@ class TaskAttachmentTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(0, $reloaded->getAttachments());
     }
 

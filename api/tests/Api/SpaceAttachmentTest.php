@@ -187,6 +187,7 @@ class SpaceAttachmentTest extends ApiTestCase
         $reloadedMedia = $this->entityManager->getRepository(MediaObject::class)->find($media->getId());
         $this->assertNotNull($reloadedMedia, 'Detach must not delete the MediaObject row.');
         $reloadedSpace = $this->entityManager->getRepository(Space::class)->find($space->getId());
+        $this->assertNotNull($reloadedSpace);
         $this->assertCount(0, $reloadedSpace->getAttachments());
     }
 

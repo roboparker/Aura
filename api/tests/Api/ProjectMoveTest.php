@@ -64,14 +64,15 @@ class ProjectMoveTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
-        $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()->getId());
+        $this->assertNotNull($reloaded);
+        $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()?->getId());
 
         // CFDs follow the project into the new space. Discussions
         // live in the space directly and are unaffected by project
         // moves.
         $defs = $this->entityManager->getRepository(CustomFieldDefinition::class)->findBy(['project' => $reloaded]);
         $this->assertCount(1, $defs);
-        $this->assertSame((string) $target->getId(), (string) $defs[0]->getSpace()->getId());
+        $this->assertSame((string) $target->getId(), (string) $defs[0]->getSpace()?->getId());
     }
 
     public function testNonMemberOfSourceGets404(): void

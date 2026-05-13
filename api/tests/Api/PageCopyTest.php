@@ -65,7 +65,7 @@ class PageCopyTest extends ApiTestCase
         $copy = $this->entityManager->getRepository(Page::class)->find($body['id']);
         $this->assertNotNull($copy);
         $this->assertSame('Welcome to the team.', $copy->getBody());
-        $this->assertSame((string) $alice->getId(), (string) $copy->getCreatedBy()->getId());
+        $this->assertSame((string) $alice->getId(), (string) $copy->getCreatedBy()?->getId());
         // Clone is top-level even if source was top-level — explicit
         // null on parent so we don't accidentally inherit something
         // weird from the source row.
@@ -95,7 +95,8 @@ class PageCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
             ->find($response->toArray()['id']);
-        $this->assertSame((string) $target->getId(), (string) $copy->getSpace()->getId());
+        $this->assertNotNull($copy);
+        $this->assertSame((string) $target->getId(), (string) $copy->getSpace()?->getId());
     }
 
     public function testCopyDoesNotDoubleSuffix(): void
@@ -137,7 +138,8 @@ class PageCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
             ->find($response->toArray()['id']);
-        $this->assertSame((string) $bob->getId(), (string) $copy->getCreatedBy()->getId());
+        $this->assertNotNull($copy);
+        $this->assertSame((string) $bob->getId(), (string) $copy->getCreatedBy()?->getId());
     }
 
     public function testCopyDropsParentEvenWithinSameSpace(): void
@@ -160,6 +162,7 @@ class PageCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
             ->find($response->toArray()['id']);
+        $this->assertNotNull($copy);
         $this->assertNull(
             $copy->getParent(),
             'A copy is always top-level — descendants do not transplant in v1.',
@@ -167,9 +170,10 @@ class PageCopyTest extends ApiTestCase
 
         // Source's parent + child stay intact.
         $reloadedChild = $this->entityManager->getRepository(Page::class)->find($child->getId());
+        $this->assertNotNull($reloadedChild);
         $this->assertSame(
             (string) $parent->getId(),
-            (string) $reloadedChild->getParent()->getId(),
+            (string) $reloadedChild->getParent()?->getId(),
         );
     }
 
@@ -293,6 +297,7 @@ class PageCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copyRootId = $response->toArray()['id'];
         $copyRoot = $this->entityManager->getRepository(Page::class)->find($copyRootId);
+        $this->assertNotNull($copyRoot);
         $this->assertNull($copyRoot->getParent(), 'Cloned root stays top-level in the target.');
         $this->assertSame('Root (copy)', $copyRoot->getTitle());
 
@@ -305,7 +310,7 @@ class PageCopyTest extends ApiTestCase
         $this->assertSame('Child B', $copyChildren[1]->getTitle());
         // Descendants don't carry the " (copy)" suffix — only the root.
         $this->assertSame('Grandchild A1', $this->entityManager->getRepository(Page::class)
-            ->findOneBy(['parent' => $copyChildren[0]])->getTitle());
+            ->findOneBy(['parent' => $copyChildren[0]])?->getTitle());
 
         // Source's subtree still intact.
         $sourceChildren = $this->entityManager->getRepository(Page::class)
@@ -334,13 +339,14 @@ class PageCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copyRoot = $this->entityManager->getRepository(Page::class)
             ->find($response->toArray()['id']);
-        $this->assertSame((string) $target->getId(), (string) $copyRoot->getSpace()->getId());
+        $this->assertNotNull($copyRoot);
+        $this->assertSame((string) $target->getId(), (string) $copyRoot->getSpace()?->getId());
         $copyChild = $this->entityManager->getRepository(Page::class)
             ->findOneBy(['parent' => $copyRoot]);
         $this->assertNotNull($copyChild);
         $this->assertSame(
             (string) $target->getId(),
-            (string) $copyChild->getSpace()->getId(),
+            (string) $copyChild->getSpace()?->getId(),
             'Descendant clones land in the target space too.',
         );
     }

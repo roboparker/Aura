@@ -48,6 +48,7 @@ class EmailChangeTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->assertEmailCount(1);
         $email = $this->getMailerMessage(0);
+        self::assertNotNull($email);
         $this->assertEmailHeaderSame($email, 'To', 'new@example.com');
         $this->assertEmailTextBodyContains($email, '/confirm-email-change?token=');
 
@@ -143,6 +144,7 @@ class EmailChangeTest extends ApiTestCase
 
         $this->assertEmailCount(1);
         $email = $this->getMailerMessage(0);
+        self::assertNotNull($email);
         $this->assertEmailHeaderSame($email, 'To', 'old@example.com');
         $this->assertEmailTextBodyContains($email, '/revert-email-change?token=');
         $this->assertEmailTextBodyContains($email, '/forgot-password');
@@ -227,6 +229,7 @@ class EmailChangeTest extends ApiTestCase
 
         // The plain token is in the notice email body.
         $email = $this->getMailerMessage(0);
+        self::assertNotNull($email);
         self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $email);
         if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', (string) $email->getTextBody(), $m)) {
             $this->fail('Revert email did not contain a revert link.');

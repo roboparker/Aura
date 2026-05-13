@@ -99,7 +99,8 @@ class NotificationTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Notification::class)->find($note->getId());
-        $this->assertNotNull($reloaded?->getReadAt());
+        $this->assertNotNull($reloaded);
+        $this->assertNotNull($reloaded->getReadAt());
     }
 
     public function testCannotPatchOtherUsersNotification(): void
@@ -227,7 +228,7 @@ class NotificationTest extends ApiTestCase
         $rows = $this->entityManager->getRepository(Notification::class)->findAll();
         // Owner (alice) + assignee (bob) — 2 rows.
         $this->assertCount(2, $rows);
-        $emails = array_map(fn ($n) => $n->getRecipient()->getEmail(), $rows);
+        $emails = array_map(fn ($n) => $n->getRecipient()?->getEmail(), $rows);
         sort($emails);
         $this->assertSame(['alice@example.com', 'bob@example.com'], $emails);
     }
@@ -241,6 +242,7 @@ class NotificationTest extends ApiTestCase
 
         $this->assertEmailCount(1);
         $message = $this->getMailerMessage(0);
+        self::assertNotNull($message);
         $this->assertEmailHeaderSame($message, 'To', 'alice@example.com');
         $this->assertEmailHeaderSame($message, 'Subject', 'Reminder: Standup');
         $this->assertEmailHtmlBodyContains($message, 'Standup');
@@ -413,6 +415,7 @@ class NotificationTest extends ApiTestCase
         // One email containing both items.
         $this->assertEmailCount(1);
         $msg = $this->getMailerMessage(0);
+        self::assertNotNull($msg);
         $this->assertEmailHeaderSame($msg, 'To', 'alice@example.com');
         $this->assertEmailHeaderSame($msg, 'Subject', 'Hourly digest: 2 notifications waiting');
         $this->assertEmailHtmlBodyContains($msg, 'First');
@@ -497,6 +500,7 @@ class NotificationTest extends ApiTestCase
 
         $this->assertEmailCount(1);
         $msg = $this->getMailerMessage(0);
+        self::assertNotNull($msg);
         $this->assertEmailHeaderSame($msg, 'To', 'alice@example.com');
     }
 

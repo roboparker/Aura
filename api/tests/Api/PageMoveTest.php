@@ -66,9 +66,10 @@ class PageMoveTest extends ApiTestCase
         $repo = $this->entityManager->getRepository(Page::class);
         foreach ([$root, $child, $grandchild] as $original) {
             $reloaded = $repo->find($original->getId());
+            $this->assertNotNull($reloaded);
             $this->assertSame(
                 (string) $target->getId(),
-                (string) $reloaded->getSpace()->getId(),
+                (string) $reloaded->getSpace()?->getId(),
                 "Page '{$original->getTitle()}' should follow the move.",
             );
         }
@@ -92,6 +93,7 @@ class PageMoveTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Page::class)->find($movable->getId());
+        $this->assertNotNull($reloaded);
         $this->assertNull(
             $reloaded->getParent(),
             'Moving across spaces must clear the cross-space parent FK.',
@@ -99,9 +101,10 @@ class PageMoveTest extends ApiTestCase
 
         // The parent stays in the source space, untouched.
         $reloadedParent = $this->entityManager->getRepository(Page::class)->find($parent->getId());
+        $this->assertNotNull($reloadedParent);
         $this->assertSame(
             (string) $source->getId(),
-            (string) $reloadedParent->getSpace()->getId(),
+            (string) $reloadedParent->getSpace()?->getId(),
         );
     }
 

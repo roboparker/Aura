@@ -51,7 +51,6 @@ class SpaceTest extends ApiTestCase
         $personal = $this->entityManager
             ->getRepository(Space::class)
             ->findOneBy(['createdBy' => $alice, 'isPersonal' => true]);
-
         $this->assertNotNull($personal, 'Signup should provision a personal space.');
         $this->assertSame(Space::PERSONAL_SPACE_NAME, $personal->getName());
         $this->assertTrue($personal->getIsPersonal());
@@ -87,6 +86,7 @@ class SpaceTest extends ApiTestCase
         $alicePersonal = $this->entityManager
             ->getRepository(Space::class)
             ->findOneBy(['createdBy' => $alice, 'isPersonal' => true]);
+        $this->assertNotNull($alicePersonal);
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -123,7 +123,7 @@ class SpaceTest extends ApiTestCase
             ->findOneBy(['name' => 'Backend team']);
         $this->assertNotNull($space);
         $this->assertFalse($space->getIsPersonal());
-        $this->assertTrue($alice->getId()->equals($space->getCreatedBy()?->getId()));
+        $this->assertTrue($alice->getId()?->equals($space->getCreatedBy()?->getId()));
         $this->assertCount(1, $space->getUserMemberships());
         $firstMembership = $space->getUserMemberships()->first();
         self::assertNotFalse($firstMembership);
@@ -201,6 +201,7 @@ class SpaceTest extends ApiTestCase
         $personal = $this->entityManager
             ->getRepository(Space::class)
             ->findOneBy(['createdBy' => $alice, 'isPersonal' => true]);
+        $this->assertNotNull($personal);
 
         $client = static::createClient();
         $client->loginUser($alice);

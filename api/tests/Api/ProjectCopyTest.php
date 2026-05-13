@@ -73,8 +73,8 @@ class ProjectCopyTest extends ApiTestCase
         $copyId = $body['id'];
         $copy = $this->entityManager->getRepository(Project::class)->find($copyId);
         $this->assertNotNull($copy);
-        $this->assertSame((string) $source->getId(), (string) $copy->getSpace()->getId());
-        $this->assertSame((string) $alice->getId(), (string) $copy->getOwner()->getId());
+        $this->assertSame((string) $source->getId(), (string) $copy->getSpace()?->getId());
+        $this->assertSame((string) $alice->getId(), (string) $copy->getOwner()?->getId());
 
         // CFDs cloned with same shape, attached to the new project.
         $defs = $this->entityManager->getRepository(CustomFieldDefinition::class)
@@ -116,7 +116,8 @@ class ProjectCopyTest extends ApiTestCase
 
         $this->entityManager->clear();
         $copy = $this->entityManager->getRepository(Project::class)->find($body['id']);
-        $this->assertSame((string) $target->getId(), (string) $copy->getSpace()->getId());
+        $this->assertNotNull($copy);
+        $this->assertSame((string) $target->getId(), (string) $copy->getSpace()?->getId());
     }
 
     public function testCopyDoesNotDoubleSuffix(): void
@@ -158,7 +159,8 @@ class ProjectCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Project::class)
             ->find($response->toArray()['id']);
-        $this->assertSame((string) $bob->getId(), (string) $copy->getOwner()->getId());
+        $this->assertNotNull($copy);
+        $this->assertSame((string) $bob->getId(), (string) $copy->getOwner()?->getId());
     }
 
     public function testNonMemberOfSourceGets404(): void
@@ -299,7 +301,7 @@ class ProjectCopyTest extends ApiTestCase
         );
         $this->assertSame(
             (string) $alice->getId(),
-            (string) $cloned[0]->getOwner()->getId(),
+            (string) $cloned[0]->getOwner()?->getId(),
             'Clone task owner = caller (template metaphor).',
         );
     }

@@ -62,7 +62,7 @@ class ProjectTest extends ApiTestCase
         ]);
 
         $project = $this->reloadProjectByTitle('Launch plan');
-        $this->assertTrue($user->getId()->equals($project->getOwner()?->getId()));
+        $this->assertTrue($user->getId()?->equals($project->getOwner()?->getId()));
         // Project lands in the creator's personal space (via
         // ProjectOwnerProcessor's default), and the creator is the
         // sole admin of that space — so they show up in
@@ -183,6 +183,7 @@ class ProjectTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(3, $reloaded->getEffectiveMembers());
     }
 
@@ -270,6 +271,7 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertSame('Edited by Bob', $reloaded->getTitle());
     }
 
@@ -292,8 +294,10 @@ class ProjectTest extends ApiTestCase
 
         $this->entityManager->clear();
         $task = $this->entityManager->getRepository(Task::class)->findOneBy(['title' => 'In the project']);
-        $this->assertNotNull($task->getProject());
-        $this->assertTrue($project->getId()->equals($task->getProject()->getId()));
+        $this->assertNotNull($task);
+        $taskProject = $task->getProject();
+        $this->assertNotNull($taskProject);
+        $this->assertTrue($project->getId()?->equals($taskProject->getId()));
     }
 
     public function testPersonalTasksStillOwnerScopedForCreator(): void

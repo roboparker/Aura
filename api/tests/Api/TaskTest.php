@@ -653,9 +653,9 @@ class TaskTest extends ApiTestCase
 
         $this->entityManager->clear();
         $repo = $this->entityManager->getRepository(Task::class);
-        $this->assertSame(0, $repo->findOneBy(['title' => 'C'])->getPosition());
-        $this->assertSame(1, $repo->findOneBy(['title' => 'A'])->getPosition());
-        $this->assertSame(2, $repo->findOneBy(['title' => 'B'])->getPosition());
+        $this->assertSame(0, $repo->findOneBy(['title' => 'C'])?->getPosition());
+        $this->assertSame(1, $repo->findOneBy(['title' => 'A'])?->getPosition());
+        $this->assertSame(2, $repo->findOneBy(['title' => 'B'])?->getPosition());
     }
 
     public function testReorderReflectsInCollectionOrder(): void
@@ -746,9 +746,9 @@ class TaskTest extends ApiTestCase
 
         $this->entityManager->clear();
         $repo = $this->entityManager->getRepository(Task::class);
-        $this->assertSame(0, $repo->findOneBy(['title' => 'Shared 2'])->getPosition());
-        $this->assertSame(1, $repo->findOneBy(['title' => 'Alice personal'])->getPosition());
-        $this->assertSame(2, $repo->findOneBy(['title' => 'Shared 1'])->getPosition());
+        $this->assertSame(0, $repo->findOneBy(['title' => 'Shared 2'])?->getPosition());
+        $this->assertSame(1, $repo->findOneBy(['title' => 'Alice personal'])?->getPosition());
+        $this->assertSame(2, $repo->findOneBy(['title' => 'Shared 1'])?->getPosition());
     }
 
     public function testReorderSilentlySkipsNonOwnedIris(): void
@@ -780,10 +780,10 @@ class TaskTest extends ApiTestCase
 
         $this->entityManager->clear();
         $repo = $this->entityManager->getRepository(Task::class);
-        $this->assertSame(0, $repo->findOneBy(['title' => 'Alice only'])->getPosition());
+        $this->assertSame(0, $repo->findOneBy(['title' => 'Alice only'])?->getPosition());
         $this->assertSame(
             $bobsOriginalPosition,
-            $repo->findOneBy(['title' => 'Bob owns this'])->getPosition(),
+            $repo->findOneBy(['title' => 'Bob owns this'])?->getPosition(),
             "Bob's task position must not change when Alice reorders.",
         );
     }
@@ -858,7 +858,7 @@ class TaskTest extends ApiTestCase
         $this->assertCount(1, $task->getAssignees());
         $first = $task->getAssignees()->first();
         self::assertNotFalse($first);
-        $this->assertTrue($alice->getId()->equals($first->getId()));
+        $this->assertTrue($alice->getId()?->equals($first->getId()));
     }
 
     public function testCreateTaskRejectsNonProjectMemberAssignee(): void
@@ -902,6 +902,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(2, $reloaded->getAssignees());
     }
 
@@ -973,7 +974,7 @@ class TaskTest extends ApiTestCase
         $this->assertCount(1, $reloaded->getAssignees());
         $first = $reloaded->getAssignees()->first();
         self::assertNotFalse($first);
-        $this->assertTrue($bob->getId()->equals($first->getId()));
+        $this->assertTrue($bob->getId()?->equals($first->getId()));
     }
 
     public function testAddAssigneeEndpointRejectsDuplicate(): void
@@ -1029,6 +1030,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(204);
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Task::class)->find($task->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(0, $reloaded->getAssignees());
     }
 

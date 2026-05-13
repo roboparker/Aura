@@ -65,7 +65,7 @@ class CommentTest extends ApiTestCase
         $reloaded = $this->entityManager->getRepository(Comment::class)
             ->findOneBy(['body' => 'Started looking at registrars.']);
         $this->assertNotNull($reloaded);
-        $this->assertTrue($alice->getId()->equals($reloaded->getAuthor()?->getId()));
+        $this->assertTrue($alice->getId()?->equals($reloaded->getAuthor()?->getId()));
     }
 
     public function testCreateRejectsClientSuppliedAuthor(): void
@@ -88,7 +88,8 @@ class CommentTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
         $reloaded = $this->entityManager->getRepository(Comment::class)
             ->findOneBy(['body' => 'Pretending to be Bob.']);
-        $this->assertTrue($alice->getId()->equals($reloaded->getAuthor()?->getId()));
+        $this->assertNotNull($reloaded);
+        $this->assertTrue($alice->getId()?->equals($reloaded->getAuthor()?->getId()));
     }
 
     public function testCannotCommentOnOtherUsersPersonalTask(): void
@@ -216,6 +217,7 @@ class CommentTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Comment::class)->find($comment->getId());
+        $this->assertNotNull($reloaded);
         $this->assertSame('Edited', $reloaded->getBody());
         $this->assertNotNull($reloaded->getUpdatedAt(), 'updatedAt should be stamped on edit.');
     }

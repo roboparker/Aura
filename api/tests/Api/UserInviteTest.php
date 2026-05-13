@@ -62,6 +62,7 @@ class UserInviteTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(2, $reloaded->getMembers());
     }
 
@@ -87,7 +88,7 @@ class UserInviteTest extends ApiTestCase
 
         $groupInvites = $this->entityManager->getRepository(GroupInvite::class)->findAll();
         $this->assertCount(1, $groupInvites);
-        $this->assertTrue($group->getId()->equals($groupInvites[0]->getGroup()->getId()));
+        $this->assertTrue($group->getId()?->equals($groupInvites[0]->getGroup()->getId()));
     }
 
     public function testInvitingSameEmailToSecondGroupAttachesAdditionalGroupInvite(): void
@@ -309,11 +310,14 @@ class UserInviteTest extends ApiTestCase
         $this->assertNotNull($newUser);
 
         $reloadedA = $this->entityManager->getRepository(UserGroup::class)->find($groupA->getId());
+        $this->assertNotNull($reloadedA);
         $reloadedB = $this->entityManager->getRepository(UserGroup::class)->find($groupB->getId());
+        $this->assertNotNull($reloadedB);
         $this->assertCount(2, $reloadedA->getMembers());
         $this->assertCount(2, $reloadedB->getMembers());
 
         $invite = $this->entityManager->getRepository(UserInvite::class)->findOneBy(['email' => 'newcomer@example.com']);
+        $this->assertNotNull($invite);
         $this->assertNotNull($invite->getAcceptedAt());
     }
 
@@ -340,9 +344,11 @@ class UserInviteTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(1, $reloaded->getMembers());
 
         $invite = $this->entityManager->getRepository(UserInvite::class)->findOneBy(['email' => 'invited@example.com']);
+        $this->assertNotNull($invite);
         $this->assertNull($invite->getAcceptedAt());
     }
 
@@ -367,9 +373,11 @@ class UserInviteTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
         // Group membership unchanged — invite still pending until used.
         $this->assertCount(1, $reloaded->getMembers());
         $invite = $this->entityManager->getRepository(UserInvite::class)->findOneBy(['email' => 'newcomer@example.com']);
+        $this->assertNotNull($invite);
         $this->assertNull($invite->getAcceptedAt());
     }
 
