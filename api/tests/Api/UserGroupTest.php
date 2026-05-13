@@ -56,7 +56,7 @@ class UserGroupTest extends ApiTestCase
         $this->assertCount(1, $group->getMembers());
         $firstMember = $group->getMembers()->first();
         self::assertNotFalse($firstMember);
-        $this->assertTrue($user->getId()?->equals($firstMember->getId()));
+        $this->assertTrue($user->getId()->equals($firstMember->getId()));
     }
 
     public function testCreateGroupRequiresTitle(): void
