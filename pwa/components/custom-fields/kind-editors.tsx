@@ -116,7 +116,11 @@ export const defaultConfigFor = (
     return { currency: "USD" };
   }
   if (kind === "select") {
-    return { multi: subtype === "multi", options: [] };
+    // Seed the options list with one empty row so the composer
+    // surfaces an editable input as soon as the kind is picked.
+    // Replicates the old dropdown-on-pick UX so users (and the e2e
+    // spec) don't have to click "Add option" before typing.
+    return { multi: subtype === "multi", options: [{ key: "", label: "" }] };
   }
   return { multi: false };
 };
