@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -107,8 +107,8 @@ class MediaObjectDownloadController extends AbstractController
 
     /**
      * The caller may download the MediaObject if they own it OR if at least
-     * one task or project they can read attaches it. Mirrors the Task and
-     * Project GET security expressions.
+     * one task or space they belong to attaches it. Mirrors the Task and
+     * Space GET security expressions.
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
@@ -116,15 +116,11 @@ class MediaObjectDownloadController extends AbstractController
             return true;
         }
         if ($this->isGranted('ROLE_ADMIN')) {
-            // Admins can read any task or project, so by transitivity any
-            // attachment surfaced by either. Avatars don't reach here
-            // (avatar-kind media never gets attached), so the broad allow
-            // is limited to legitimately attached files.
             return $this->mediaIsAttachedToAnyTask($media)
-                || $this->mediaIsAttachedToAnyProject($media);
+                || $this->mediaIsAttachedToAnySpace($media);
         }
         return $this->mediaIsAttachedToReadableTask($media, $user)
-            || $this->mediaIsAttachedToReadableProject($media, $user);
+            || $this->mediaIsAttachedToReadableSpace($media, $user);
     }
 
     private function mediaIsAttachedToAnyTask(MediaObject $media): bool
@@ -168,12 +164,12 @@ class MediaObjectDownloadController extends AbstractController
         return $count > 0;
     }
 
-    private function mediaIsAttachedToAnyProject(MediaObject $media): bool
+    private function mediaIsAttachedToAnySpace(MediaObject $media): bool
     {
-        $count = (int) $this->em->getRepository(Project::class)
-            ->createQueryBuilder('p')
-            ->select('COUNT(p.id)')
-            ->where(':media MEMBER OF p.attachments')
+        $count = (int) $this->em->getRepository(Space::class)
+            ->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where(':media MEMBER OF s.attachments')
             ->setParameter('media', $media)
             ->setMaxResults(1)
             ->getQuery()
@@ -181,23 +177,23 @@ class MediaObjectDownloadController extends AbstractController
         return $count > 0;
     }
 
-    private function mediaIsAttachedToReadableProject(MediaObject $media, User $user): bool
+    private function mediaIsAttachedToReadableSpace(MediaObject $media, User $user): bool
     {
-        // Any member of the project's space can read every attachment
-        // on it (#185); same rule as Project::Get's security
+        // Any member of the space (direct or via group) can read its
+        // attachments — same rule as the space's read security
         // expression.
         $directSubquery = sprintf(
-            'SELECT 1 FROM %s proj_attach_direct WHERE proj_attach_direct.space = p.space AND proj_attach_direct.user = :user',
+            'SELECT 1 FROM %s space_attach_direct WHERE space_attach_direct.space = s AND space_attach_direct.user = :user',
             \App\Entity\SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s proj_attach_group JOIN proj_attach_group.userGroup proj_attach_group_obj JOIN proj_attach_group_obj.members proj_attach_group_member WHERE proj_attach_group.space = p.space AND proj_attach_group_member = :user',
+            'SELECT 1 FROM %s space_attach_group JOIN space_attach_group.userGroup space_attach_group_obj JOIN space_attach_group_obj.members space_attach_group_member WHERE space_attach_group.space = s AND space_attach_group_member = :user',
             \App\Entity\SpaceGroupMembership::class,
         );
-        $count = (int) $this->em->getRepository(Project::class)
-            ->createQueryBuilder('p')
-            ->select('COUNT(p.id)')
-            ->where(':media MEMBER OF p.attachments')
+        $count = (int) $this->em->getRepository(Space::class)
+            ->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where(':media MEMBER OF s.attachments')
             ->andWhere(sprintf('EXISTS(%s) OR EXISTS(%s)', $directSubquery, $groupSubquery))
             ->setParameter('media', $media)
             ->setParameter('user', $user)

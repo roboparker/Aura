@@ -3,7 +3,7 @@
 namespace App\Mcp\Tool;
 
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpException;
@@ -30,7 +30,7 @@ final class DownloadFileTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Fetch the bytes of an attachment as base64. The caller must be able to read at least one task or project that uses the file (mirrors GET /media-objects/{id}/download).';
+        return 'Fetch the bytes of an attachment as base64. The caller must be able to read at least one task or space that uses the file (mirrors GET /media-objects/{id}/download).';
     }
 
     public function getInputSchema(): array
@@ -75,7 +75,7 @@ final class DownloadFileTool implements McpToolInterface
 
     /**
      * Mirrors {@see \App\Controller\MediaObjectDownloadController::canAccess()} —
-     * caller is the uploader, OR at least one task/project they can read
+     * caller is the uploader, OR at least one task/space they belong to
      * attaches the media.
      */
     private function canAccess(MediaObject $media, User $user): bool
@@ -99,16 +99,27 @@ final class DownloadFileTool implements McpToolInterface
             return true;
         }
 
-        $projectHit = (int) $this->em->getRepository(Project::class)
-            ->createQueryBuilder('p')
-            ->select('COUNT(p.id)')
-            ->where(':media MEMBER OF p.attachments')
-            ->andWhere(\App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'mcp_dl_project'))
+        $direct = sprintf(
+            'SELECT 1 FROM %s mcp_dl_space_direct WHERE mcp_dl_space_direct.space = s AND mcp_dl_space_direct.user = :user',
+            \App\Entity\SpaceMembership::class,
+        );
+        $group = sprintf(
+            'SELECT 1 FROM %s mcp_dl_space_grp '
+            . 'JOIN mcp_dl_space_grp.userGroup mcp_dl_space_grp_obj '
+            . 'JOIN mcp_dl_space_grp_obj.members mcp_dl_space_grp_member '
+            . 'WHERE mcp_dl_space_grp.space = s AND mcp_dl_space_grp_member = :user',
+            \App\Entity\SpaceGroupMembership::class,
+        );
+        $spaceHit = (int) $this->em->getRepository(Space::class)
+            ->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where(':media MEMBER OF s.attachments')
+            ->andWhere(sprintf('EXISTS(%s) OR EXISTS(%s)', $direct, $group))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)
             ->getQuery()
             ->getSingleScalarResult();
-        return $projectHit > 0;
+        return $spaceHit > 0;
     }
 }

@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Lock, Pencil, Pin, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
@@ -24,28 +25,26 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-interface ProjectMember {
-  "@id": string;
-  id: string;
-  email: string;
-}
+// The detail endpoint serializes the parent space as an IRI string; the
+// admin lookup happens against the user's already-loaded space list so
+// no extra fetch is needed.
+type SpaceRef = string | { "@id": string };
+type DiscussionDetail = Discussion & { space: SpaceRef };
 
-interface Project {
-  "@id": string;
-  id: string;
-  title: string;
-  owner: ProjectMember;
-}
+const spaceIriOf = (d: DiscussionDetail): string =>
+  typeof d.space === "string" ? d.space : d.space["@id"];
+
+const findSpace = (spaces: Space[], iri: string): Space | undefined =>
+  spaces.find((s) => s["@id"] === iri);
 
 const DiscussionDetailPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { spaces } = useActiveSpace();
   const router = useRouter();
-  const { id, discussionId } = router.query;
-  const projectId = typeof id === "string" ? id : null;
-  const did = typeof discussionId === "string" ? discussionId : null;
+  const { id } = router.query;
+  const did = typeof id === "string" ? id : null;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [discussion, setDiscussion] = useState<Discussion | null>(null);
+  const [discussion, setDiscussion] = useState<DiscussionDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,20 +59,14 @@ const DiscussionDetailPage = () => {
   const [editError, setEditError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Move-to-project (#182). Pulls the caller's accessible projects so
-  // the dropdown only lists targets they can actually post in; the
-  // server enforces the same rule.
-  const [accessibleProjects, setAccessibleProjects] = useState<Project[]>([]);
+  // Move / Copy — to any space the caller belongs to.
   const [moveTargetIri, setMoveTargetIri] = useState("");
   const [isMoving, setIsMoving] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
   const [moveMessage, setMoveMessage] = useState<{
     text: string;
     kind: "success" | "error";
   } | null>(null);
-
-  // Copy-to-project (#182). Shares the picker with Move; reuses
-  // moveMessage for errors.
-  const [isCopying, setIsCopying] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -82,59 +75,34 @@ const DiscussionDetailPage = () => {
   }, [authLoading, isAuthenticated, router]);
 
   const load = useCallback(async () => {
-    if (!projectId || !did) return;
+    if (!did) return;
     setError(null);
     setIsLoading(true);
     try {
-      const [projectRes, discussionRes, projectsRes] = await Promise.all([
-        fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`, {
+      const res = await fetch(
+        `${ENTRYPOINT}/discussions/${encodeURIComponent(did)}`,
+        {
           credentials: "include",
           headers: { Accept: "application/ld+json" },
-        }),
-        fetch(`${ENTRYPOINT}/discussions/${encodeURIComponent(did)}`, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
-        // Move-target picker needs the user's accessible projects.
-        // The access extension trims this to projects the caller can
-        // read; the server-side move guard re-checks on POST anyway.
-        fetch(`${ENTRYPOINT}/projects?itemsPerPage=100`, {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        }),
-      ]);
-      if (
-        projectRes.status === 404 ||
-        projectRes.status === 403 ||
-        discussionRes.status === 404 ||
-        discussionRes.status === 403
-      ) {
+        },
+      );
+      if (res.status === 404 || res.status === 403) {
         setNotFound(true);
         return;
       }
-      if (!projectRes.ok) throw new Error("Failed to load project.");
-      if (!discussionRes.ok) throw new Error("Failed to load discussion.");
-      const projectData: Project = await projectRes.json();
-      const discussionData: Discussion = await discussionRes.json();
-      setProject(projectData);
-      setDiscussion(discussionData);
-      if (projectsRes.ok) {
-        const projectsData: { member?: Project[]; "hydra:member"?: Project[] } =
-          await projectsRes.json();
-        setAccessibleProjects(
-          projectsData.member ?? projectsData["hydra:member"] ?? [],
-        );
-      }
+      if (!res.ok) throw new Error("Failed to load discussion.");
+      const data: DiscussionDetail = await res.json();
+      setDiscussion(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, did]);
+  }, [did]);
 
   useEffect(() => {
-    if (isAuthenticated && projectId && did) void load();
-  }, [isAuthenticated, projectId, did, load]);
+    if (isAuthenticated && did) void load();
+  }, [isAuthenticated, did, load]);
 
   const startEdit = () => {
     if (!discussion) return;
@@ -155,7 +123,7 @@ const DiscussionDetailPage = () => {
     body: Partial<
       Pick<Discussion, "title" | "body" | "category" | "isPinned" | "isLocked">
     >,
-  ): Promise<Discussion | null> => {
+  ): Promise<DiscussionDetail | null> => {
     if (!discussion) return null;
     const res = await fetch(`${ENTRYPOINT}${discussion["@id"]}`, {
       method: "PATCH",
@@ -169,7 +137,7 @@ const DiscussionDetailPage = () => {
     if (!res.ok) {
       throw new Error(await errorMessage(res));
     }
-    const updated: Discussion = await res.json();
+    const updated: DiscussionDetail = await res.json();
     setDiscussion(updated);
     return updated;
   };
@@ -221,7 +189,7 @@ const DiscussionDetailPage = () => {
   };
 
   const remove = async () => {
-    if (!discussion || !project) return;
+    if (!discussion) return;
     if (!window.confirm(`Delete discussion "${discussion.title}"?`)) return;
     setBusy(true);
     setError(null);
@@ -231,7 +199,7 @@ const DiscussionDetailPage = () => {
         credentials: "include",
       });
       if (!res.ok) throw new Error(await errorMessage(res));
-      void router.replace(`/projects/${project.id}/discussions`);
+      void router.replace("/discussions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete.");
       setBusy(false);
@@ -249,7 +217,7 @@ const DiscussionDetailPage = () => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ project: moveTargetIri }),
+          body: JSON.stringify({ space: moveTargetIri }),
         },
       );
       const data = await res.json().catch(() => ({}));
@@ -258,23 +226,14 @@ const DiscussionDetailPage = () => {
           data.detail || data.error || data["hydra:description"] || "Failed to move discussion.",
         );
       }
-      // The discussion's `project` FK changes, so its canonical URL
-      // changes too — bounce to the new project's discussion detail
-      // path. moveMessage gets a chance to render briefly via the
-      // router transition.
-      const target = accessibleProjects.find((p) => p["@id"] === moveTargetIri);
-      const targetId = target?.id ?? moveTargetIri.split("/").pop();
+      const target = findSpace(spaces, moveTargetIri);
       setMoveMessage({
         text: data.moved
-          ? `Moved to "${target?.title ?? "the selected project"}".`
-          : "Already in that project.",
+          ? `Moved to "${target?.name ?? "the selected space"}".`
+          : "Already in that space.",
         kind: "success",
       });
-      if (data.moved && targetId) {
-        void router.replace(
-          `/projects/${targetId}/discussions/${discussion.id}`,
-        );
-      }
+      await load();
     } catch (err) {
       setMoveMessage({
         text: err instanceof Error ? err.message : "Failed to move discussion.",
@@ -290,10 +249,7 @@ const DiscussionDetailPage = () => {
     setIsCopying(true);
     setMoveMessage(null);
     try {
-      // Empty body = clone into the source project; specifying a
-      // project uses the picker's current selection. The server
-      // accepts both shapes.
-      const body = moveTargetIri ? { project: moveTargetIri } : {};
+      const body = moveTargetIri ? { space: moveTargetIri } : {};
       const res = await fetch(
         `${ENTRYPOINT}/discussions/${encodeURIComponent(discussion.id)}/copy`,
         {
@@ -309,15 +265,8 @@ const DiscussionDetailPage = () => {
           data.detail || data.error || data["hydra:description"] || "Failed to copy discussion.",
         );
       }
-      // Drop the user on the freshly-cloned discussion. The target
-      // project owns it, so we route through that project's
-      // discussion sub-path.
-      const targetProjectIri = data.project as string | undefined;
-      const targetProjectId = targetProjectIri?.split("/").pop();
-      if (data.id && targetProjectId) {
-        await router.push(
-          `/projects/${targetProjectId}/discussions/${data.id}`,
-        );
+      if (data.id) {
+        await router.push(`/discussions/${data.id}`);
       }
     } catch (err) {
       setMoveMessage({
@@ -337,6 +286,21 @@ const DiscussionDetailPage = () => {
     );
   }
 
+  const currentUserIri = `/users/${user.id}`;
+  const space = discussion ? findSpace(spaces, spaceIriOf(discussion)) : undefined;
+  const isAuthor =
+    !!discussion && currentUserIri === discussion.author["@id"];
+  const isSpaceAdmin = !!space?.userMemberships.some(
+    (m) => m.user.id === user.id && m.role === "admin",
+  );
+  const canEdit = isAuthor;
+  const canDelete = isAuthor || isSpaceAdmin;
+  const canModerate = isSpaceAdmin;
+  const canMove = isAuthor || isSpaceAdmin;
+  const otherSpaces = discussion
+    ? spaces.filter((s) => s["@id"] !== spaceIriOf(discussion))
+    : [];
+
   return (
     <>
       <Head>
@@ -352,16 +316,12 @@ const DiscussionDetailPage = () => {
                 <p className="text-muted-foreground">
                   Discussion not found, or you don&apos;t have access.
                 </p>
-                {projectId && (
-                  <Button asChild variant="link" className="px-0">
-                    <Link href={`/projects/${projectId}/discussions`}>
-                      Back to discussions
-                    </Link>
-                  </Button>
-                )}
+                <Button asChild variant="link" className="px-0">
+                  <Link href="/discussions">Back to discussions</Link>
+                </Button>
               </CardContent>
             </Card>
-          ) : isLoading || !project || !discussion ? (
+          ) : isLoading || !discussion ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : (
             <>
@@ -372,7 +332,7 @@ const DiscussionDetailPage = () => {
                 className="px-0 h-auto"
               >
                 <Link
-                  href={`/projects/${project.id}/discussions`}
+                  href="/discussions"
                   data-testid="discussion-back-link"
                 >
                   <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Discussions
@@ -409,6 +369,17 @@ const DiscussionDetailPage = () => {
                         {displayName(discussion.author)} ·{" "}
                         {formatRelative(discussion.createdAt)}
                         {discussion.updatedAt && " · edited"}
+                        {space && (
+                          <>
+                            {" · in "}
+                            <Link
+                              href={`/spaces/${space.id}`}
+                              className="hover:underline"
+                            >
+                              {space.name}
+                            </Link>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -497,159 +468,128 @@ const DiscussionDetailPage = () => {
                     </Alert>
                   )}
 
-                  {!editing &&
-                    (() => {
-                      const currentUserIri = `/users/${user.id}`;
-                      const isAuthor =
-                        currentUserIri === discussion.author["@id"];
-                      const isOwner = user.email === project.owner.email;
-                      const canEdit = isAuthor;
-                      const canDelete = isAuthor || isOwner;
-                      const canModerate = isOwner;
-                      if (!canEdit && !canDelete && !canModerate) return null;
-                      return (
-                        <div className="flex flex-wrap gap-2">
-                          {canEdit && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={startEdit}
-                              disabled={busy}
-                              data-testid="discussion-edit"
-                            >
-                              <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                            </Button>
-                          )}
-                          {canModerate && (
-                            <>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => void togglePin()}
-                                disabled={busy}
-                                data-testid="discussion-toggle-pin"
-                              >
-                                <Pin className="h-3.5 w-3.5 mr-1" />
-                                {discussion.isPinned ? "Unpin" : "Pin"}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => void toggleLock()}
-                                disabled={busy}
-                                data-testid="discussion-toggle-lock"
-                              >
-                                <Lock className="h-3.5 w-3.5 mr-1" />
-                                {discussion.isLocked ? "Unlock" : "Lock"}
-                              </Button>
-                            </>
-                          )}
-                          {canDelete && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => void remove()}
-                              disabled={busy}
-                              className="text-destructive hover:text-destructive"
-                              data-testid="discussion-delete"
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                  {/* Move-to-project (#182). Author-or-admin only —
-                      same bar as edit/delete. Hidden when the user
-                      has only the current project (nothing to move
-                      to). The server re-checks target-project
-                      access on POST. */}
-                  {(() => {
-                    const currentUserIri = user ? `/users/${user.id}` : null;
-                    const isAuthor =
-                      currentUserIri === discussion.author["@id"];
-                    const isOwner = user.email === project.owner.email;
-                    const canMove = isAuthor || isOwner;
-                    const otherProjects = accessibleProjects.filter(
-                      (p) => p["@id"] !== project["@id"],
-                    );
-                    // Move requires another project; Copy works
-                    // in-place too. Hide the whole row only when
-                    // the caller can't move/copy at all OR there's
-                    // genuinely nothing to do (no other project AND
-                    // no canMove).
-                    if (!canMove) return null;
-                    return (
-                      <div
-                        className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t"
-                        data-testid="discussion-move-form"
-                      >
-                        <Label
-                          htmlFor="discussion-move-target"
-                          className="text-xs text-muted-foreground"
-                        >
-                          Move or copy to project
-                        </Label>
-                        <select
-                          id="discussion-move-target"
-                          value={moveTargetIri}
-                          onChange={(e) => setMoveTargetIri(e.target.value)}
-                          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                          data-testid="discussion-move-select"
-                        >
-                          <option value="">Pick a project…</option>
-                          {otherProjects.map((p) => (
-                            <option key={p["@id"]} value={p["@id"]}>
-                              {p.title}
-                            </option>
-                          ))}
-                        </select>
+                  {!editing && (canEdit || canDelete || canModerate) && (
+                    <div className="flex flex-wrap gap-2">
+                      {canEdit && (
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          onClick={() => void handleMove()}
-                          disabled={!moveTargetIri || isMoving || isCopying}
-                          data-testid="discussion-move-submit"
+                          variant="ghost"
+                          onClick={startEdit}
+                          disabled={busy}
+                          data-testid="discussion-edit"
                         >
-                          {isMoving ? "Moving…" : "Move"}
+                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                         </Button>
+                      )}
+                      {canModerate && (
+                        <>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void togglePin()}
+                            disabled={busy}
+                            data-testid="discussion-toggle-pin"
+                          >
+                            <Pin className="h-3.5 w-3.5 mr-1" />
+                            {discussion.isPinned ? "Unpin" : "Pin"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void toggleLock()}
+                            disabled={busy}
+                            data-testid="discussion-toggle-lock"
+                          >
+                            <Lock className="h-3.5 w-3.5 mr-1" />
+                            {discussion.isLocked ? "Unlock" : "Lock"}
+                          </Button>
+                        </>
+                      )}
+                      {canDelete && (
                         <Button
                           type="button"
                           size="sm"
-                          variant="outline"
-                          onClick={() => void handleCopy()}
-                          disabled={isMoving || isCopying}
-                          data-testid="discussion-copy-submit"
-                          title={
-                            moveTargetIri
-                              ? "Copy this discussion into the selected project"
-                              : "Copy this discussion into the current project"
+                          variant="ghost"
+                          onClick={() => void remove()}
+                          disabled={busy}
+                          className="text-destructive hover:text-destructive"
+                          data-testid="discussion-delete"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
+                  {canMove && (
+                    <div
+                      className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t"
+                      data-testid="discussion-move-form"
+                    >
+                      <Label
+                        htmlFor="discussion-move-target"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Move or copy to space
+                      </Label>
+                      <select
+                        id="discussion-move-target"
+                        value={moveTargetIri}
+                        onChange={(e) => setMoveTargetIri(e.target.value)}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                        data-testid="discussion-move-select"
+                      >
+                        <option value="">Pick a space…</option>
+                        {otherSpaces.map((s) => (
+                          <option key={s["@id"]} value={s["@id"]}>
+                            {s.name}
+                            {s.isPersonal ? " (Private)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleMove()}
+                        disabled={!moveTargetIri || isMoving || isCopying}
+                        data-testid="discussion-move-submit"
+                      >
+                        {isMoving ? "Moving…" : "Move"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void handleCopy()}
+                        disabled={isMoving || isCopying}
+                        data-testid="discussion-copy-submit"
+                        title={
+                          moveTargetIri
+                            ? "Copy this discussion into the selected space"
+                            : "Copy this discussion into the current space"
+                        }
+                      >
+                        {isCopying ? "Copying…" : "Copy"}
+                      </Button>
+                      {moveMessage && (
+                        <span
+                          role="alert"
+                          className={
+                            "text-xs " +
+                            (moveMessage.kind === "success"
+                              ? "text-muted-foreground"
+                              : "text-destructive")
                           }
                         >
-                          {isCopying ? "Copying…" : "Copy"}
-                        </Button>
-                        {moveMessage && (
-                          <span
-                            role="alert"
-                            className={
-                              "text-xs " +
-                              (moveMessage.kind === "success"
-                                ? "text-muted-foreground"
-                                : "text-destructive")
-                            }
-                          >
-                            {moveMessage.text}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })()}
+                          {moveMessage.text}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </>

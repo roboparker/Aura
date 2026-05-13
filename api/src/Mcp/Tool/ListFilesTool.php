@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -28,7 +28,7 @@ final class ListFilesTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List file attachments on a task or project. Returns metadata (id, name, MIME type, size, gated download URL) — bytes are fetched separately via download_file.';
+        return 'List file attachments on a task or space. Returns metadata (id, name, MIME type, size, gated download URL) — bytes are fetched separately via download_file.';
     }
 
     public function getInputSchema(): array
@@ -36,7 +36,7 @@ final class ListFilesTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'entityType' => ['type' => 'string', 'enum' => ['task', 'project']],
+                'entityType' => ['type' => 'string', 'enum' => ['task', 'space']],
                 'entityId' => ['type' => 'string'],
             ],
             'required' => ['entityType', 'entityId'],
@@ -47,8 +47,8 @@ final class ListFilesTool implements McpToolInterface
     public function invoke(array $arguments, User $user): array
     {
         $entityType = $this->input->requireString($arguments, 'entityType');
-        if (!in_array($entityType, ['task', 'project'], true)) {
-            throw McpException::invalidInput('entityType must be "task" or "project".');
+        if (!in_array($entityType, ['task', 'space'], true)) {
+            throw McpException::invalidInput('entityType must be "task" or "space".');
         }
         $entityId = $this->input->requireUuid('entityId', $arguments['entityId'] ?? null);
 
@@ -59,11 +59,11 @@ final class ListFilesTool implements McpToolInterface
             }
             $attachments = $task->getAttachments();
         } else {
-            $project = $this->em->getRepository(Project::class)->find($entityId);
-            if (null === $project || !$this->authz->canReadProject($project, $user)) {
-                throw McpException::notFound(sprintf('Project %s', $entityId));
+            $space = $this->em->getRepository(Space::class)->find($entityId);
+            if (null === $space || !$space->hasMember($user)) {
+                throw McpException::notFound(sprintf('Space %s', $entityId));
             }
-            $attachments = $project->getAttachments();
+            $attachments = $space->getAttachments();
         }
 
         return [

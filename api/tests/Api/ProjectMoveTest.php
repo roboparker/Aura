@@ -4,7 +4,6 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
@@ -30,7 +29,6 @@ class ProjectMoveTest extends ApiTestCase
             ->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -51,7 +49,6 @@ class ProjectMoveTest extends ApiTestCase
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($alice, 'Target');
         $project = $this->createProject($alice, 'Backend', $source);
-        $this->seedDiscussion($alice, $project, 'Welcome');
         $this->seedDefinition($project, 'Severity');
 
         $client = static::createClient();
@@ -67,11 +64,9 @@ class ProjectMoveTest extends ApiTestCase
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
         $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()->getId());
 
-        // Discussions and CFDs follow the project into the new space.
-        $discussions = $this->entityManager->getRepository(Discussion::class)->findBy(['project' => $reloaded]);
-        $this->assertCount(1, $discussions);
-        $this->assertSame((string) $target->getId(), (string) $discussions[0]->getSpace()->getId());
-
+        // CFDs follow the project into the new space. Discussions
+        // live in the space directly and are unaffected by project
+        // moves.
         $defs = $this->entityManager->getRepository(CustomFieldDefinition::class)->findBy(['project' => $reloaded]);
         $this->assertCount(1, $defs);
         $this->assertSame((string) $target->getId(), (string) $defs[0]->getSpace()->getId());
@@ -187,19 +182,6 @@ class ProjectMoveTest extends ApiTestCase
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;
-    }
-
-    private function seedDiscussion(User $author, Project $project, string $title): Discussion
-    {
-        $disc = new Discussion();
-        $disc->setProject($project);
-        $disc->setAuthor($author);
-        $disc->setTitle($title);
-        $disc->setBody('Body');
-        $disc->setCategory('general');
-        $this->entityManager->persist($disc);
-        $this->entityManager->flush();
-        return $disc;
     }
 
     private function seedDefinition(Project $project, string $name): CustomFieldDefinition

@@ -12,7 +12,6 @@ use ApiPlatform\Metadata\Post;
 use App\Filter\ProjectSearchFilter;
 use App\Repository\ProjectRepository;
 use App\State\ProjectOwnerProcessor;
-use App\Validator\ValidProjectAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -79,7 +78,6 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(ProjectSearchFilter::class)]
 #[ApiFilter(\ApiPlatform\Doctrine\Orm\Filter\SearchFilter::class, properties: ['space' => 'exact'])]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
-#[ValidProjectAttachments]
 class Project
 {
     #[ORM\Id]
@@ -141,28 +139,10 @@ class Project
     #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class)]
     private Collection $tasks;
 
-    /**
-     * MediaObjects attached at the project level (cover docs, shared specs).
-     * Mirrors Task::$attachments. Membership is edited via PATCH on the
-     * Project with an `attachments` array of MediaObject IRIs; the PWA
-     * uploads via `POST /media-objects` (kind=attachment) first to obtain
-     * the IRI. {@see ValidProjectAttachments} enforces that uploaders are
-     * project members and that the kind is correct.
-     *
-     * @var Collection<int, MediaObject>
-     */
-    #[ORM\ManyToMany(targetEntity: MediaObject::class)]
-    #[ORM\JoinTable(name: 'project_attachment')]
-    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[ORM\InverseJoinColumn(name: 'media_object_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['project:read', 'project:write'])]
-    private Collection $attachments;
-
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tasks = new ArrayCollection();
-        $this->attachments = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -225,28 +205,6 @@ class Project
     public function getTasks(): Collection
     {
         return $this->tasks;
-    }
-
-    /**
-     * @return Collection<int, MediaObject>
-     */
-    public function getAttachments(): Collection
-    {
-        return $this->attachments;
-    }
-
-    public function addAttachment(MediaObject $media): static
-    {
-        if (!$this->attachments->contains($media)) {
-            $this->attachments->add($media);
-        }
-        return $this;
-    }
-
-    public function removeAttachment(MediaObject $media): static
-    {
-        $this->attachments->removeElement($media);
-        return $this;
     }
 
     /**

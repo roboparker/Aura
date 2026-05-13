@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -32,7 +32,7 @@ final class UploadFileTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Attach a base64-encoded file to a task or project the user can edit. Mirrors POST /media-objects + PATCH attachment-link in one call. Allowed types match the PWA: images, PDF, plain/CSV text, Markdown, ZIP, JSON. 10 MB max.';
+        return 'Attach a base64-encoded file to a task or space the user can edit. Mirrors POST /media-objects + PATCH attachment-link in one call. Allowed types match the PWA: images, PDF, plain/CSV text, Markdown, ZIP, JSON. 10 MB max.';
     }
 
     public function getInputSchema(): array
@@ -40,7 +40,7 @@ final class UploadFileTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'entityType' => ['type' => 'string', 'enum' => ['task', 'project']],
+                'entityType' => ['type' => 'string', 'enum' => ['task', 'space']],
                 'entityId' => ['type' => 'string'],
                 'fileName' => ['type' => 'string'],
                 'content' => ['type' => 'string', 'description' => 'Base64-encoded file bytes.'],
@@ -53,8 +53,8 @@ final class UploadFileTool implements McpToolInterface
     public function invoke(array $arguments, User $user): array
     {
         $entityType = $this->input->requireString($arguments, 'entityType');
-        if (!in_array($entityType, ['task', 'project'], true)) {
-            throw McpException::invalidInput('entityType must be "task" or "project".');
+        if (!in_array($entityType, ['task', 'space'], true)) {
+            throw McpException::invalidInput('entityType must be "task" or "space".');
         }
         $entityId = $this->input->requireUuid('entityId', $arguments['entityId'] ?? null);
         $fileName = $this->input->requireString($arguments, 'fileName');
@@ -62,8 +62,6 @@ final class UploadFileTool implements McpToolInterface
 
         $owner = $this->resolveOwner($entityType, $entityId, $user);
 
-        // Decode the base64 payload to a temp file so ImageUploadService can
-        // run its existing UploadedFile-based validation (size, MIME, etc.).
         $bytes = base64_decode($contentB64, true);
         if (false === $bytes) {
             throw McpException::invalidInput('content must be valid base64.');
@@ -87,7 +85,7 @@ final class UploadFileTool implements McpToolInterface
         return $this->serializer->mediaObject($media);
     }
 
-    private function resolveOwner(string $entityType, \Symfony\Component\Uid\Uuid $entityId, User $user): Task|Project
+    private function resolveOwner(string $entityType, \Symfony\Component\Uid\Uuid $entityId, User $user): Task|Space
     {
         if ('task' === $entityType) {
             $task = $this->em->getRepository(Task::class)->find($entityId);
@@ -96,10 +94,10 @@ final class UploadFileTool implements McpToolInterface
             }
             return $task;
         }
-        $project = $this->em->getRepository(Project::class)->find($entityId);
-        if (null === $project || !$this->authz->canEditProject($project, $user)) {
-            throw McpException::notFound(sprintf('Project %s', $entityId));
+        $space = $this->em->getRepository(Space::class)->find($entityId);
+        if (null === $space || !$space->hasMember($user)) {
+            throw McpException::notFound(sprintf('Space %s', $entityId));
         }
-        return $project;
+        return $space;
     }
 }

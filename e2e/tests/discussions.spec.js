@@ -10,29 +10,15 @@ const {
 const uniqueEmail = () => shared("discussions");
 
 test.describe("Discussions", () => {
-  test("project owner can post, filter, edit, pin, and delete a discussion", async ({
+  test("space member can post, filter, edit, pin, and delete a discussion", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
 
-    // Create a project to host the discussion.
-    await page.goto(`${BASE_URL}/projects`);
-    const projectTitle = `Discuss-host-${Date.now()}`;
-    await page.fill("#title", projectTitle);
-    await page.click('button[type="submit"]');
-    const projectItem = page.locator('[data-testid="project-item"]', {
-      hasText: projectTitle,
-    });
-    await expect(projectItem).toBeVisible();
+    // Go straight to the top-level /discussions page — scoped to the
+    // user's active space (Private by default).
+    await page.goto(`${BASE_URL}/discussions`);
 
-    // Open the project detail page and follow the Discussions link to the
-    // dedicated list page.
-    await projectItem.locator(`a[href^="/projects/"]`).first().click();
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await page.click('[data-testid="project-discussions-link"]');
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/discussions$/);
-
-    // Empty state shows the right copy.
     const panel = page.locator('[data-testid="discussions-panel"]');
     await expect(panel).toBeVisible();
     await expect(
@@ -62,7 +48,7 @@ test.describe("Discussions", () => {
     await page.getByRole("tab", { name: "Ideas" }).click();
     await expect(discussion).toBeVisible();
 
-    // Owner pin / unpin from the list.
+    // Admin pin / unpin from the list.
     await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
     await expect(discussion.locator("text=Pinned")).toBeVisible();
     await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
@@ -70,9 +56,7 @@ test.describe("Discussions", () => {
 
     // Drill into the detail page via the row's title link.
     await discussion.locator('[data-testid="discussion-title"]').click();
-    await expect(page).toHaveURL(
-      /\/projects\/[a-f0-9-]+\/discussions\/[a-f0-9-]+$/,
-    );
+    await expect(page).toHaveURL(/\/discussions\/[a-f0-9-]+$/);
     const detail = page.locator('[data-testid="discussion-detail"]');
     await expect(detail).toBeVisible();
     await expect(
@@ -98,16 +82,15 @@ test.describe("Discussions", () => {
     // we redirect back to the list, where the row should be gone.
     page.once("dialog", (dialog) => dialog.accept());
     await detail.locator('[data-testid="discussion-delete"]').click();
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/discussions$/);
+    await expect(page).toHaveURL(/\/discussions$/);
     await expect(
       page.locator('[data-testid="discussion-item"]', {
         hasText: "Switch to pnpm",
       }),
     ).toHaveCount(0);
   });
-
 });
 
-// Cross-user project visibility is already covered by `projects.spec.js`;
-// the panel inherits it via `ProjectAccessExtension` and `DiscussionAccessExtension`,
+// Cross-user space visibility is already covered by `projects.spec.js`;
+// the panel inherits it via `SpaceAccessExtension` and `DiscussionAccessExtension`,
 // both of which have direct PHPUnit coverage in `DiscussionTest`.

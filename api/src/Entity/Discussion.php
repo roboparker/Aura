@@ -20,16 +20,13 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Project-level discussion thread (#91). Read access mirrors the
- * project — every member can browse; create access is also any
- * member; edit is author-only; delete + pin/lock are project-owner OR
- * the post's author. Pin/lock are exposed as plain PATCHable fields
- * (gated by {@see DiscussionUpdateProcessor} in a follow-up — for the
- * MVP they're owner-only via the entity-level expression).
+ * Space-level discussion thread. Read/list access mirrors the parent
+ * space — every space member can browse and post; edit is author-only;
+ * delete + pin/lock are author OR space admin.
  *
- * Replies, locking interactions, and the chat side of the original
- * spec land in follow-ups — this PR ships only the Discussion entity
- * and its CRUD so the project tabs UI can be built first.
+ * Originally project-scoped (#91) and reparented to the space (#185)
+ * so the natural unit of conversation matches the access boundary:
+ * spaces are what users join and switch between, not projects.
  */
 #[ApiResource(
     operations: [
@@ -38,38 +35,33 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isAccessibleBy(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
             processor: DiscussionAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
         new Patch(
-            // Edit: author only (#185). Pin/lock are NOT separated at the
-            // operation level — both fields ride this Patch payload — so
-            // a future DiscussionUpdateProcessor will need to enforce
-            // "only space admins may flip isPinned/isLocked" before the
-            // entity is flushed. For now the entity-level expression
-            // gates only "can the caller PATCH at all".
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().isSpaceAdmin(user))",
+            // Edit: author only. Pin/lock ride the same Patch — a
+            // future DiscussionUpdateProcessor will enforce
+            // "only space admins flip isPinned/isLocked".
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user))",
         ),
         new Delete(
-            // Delete: author or space admin (#185).
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getProject().isSpaceAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user))",
         ),
     ],
     normalizationContext: ['groups' => ['discussion:read']],
     denormalizationContext: ['groups' => ['discussion:write']],
     order: ['isPinned' => 'DESC', 'createdAt' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'category' => 'exact', 'space' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'category' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt', 'updatedAt'])]
 #[ApiFilter(DiscussionSearchFilter::class)]
 #[ORM\Entity(repositoryClass: DiscussionRepository::class)]
 #[ORM\Table(name: 'discussion')]
-#[ORM\Index(columns: ['project_id', 'created_at'], name: 'idx_discussion_project_created')]
-#[ORM\Index(columns: ['project_id', 'is_pinned', 'created_at'], name: 'idx_discussion_project_pinned')]
-#[ORM\Index(columns: ['space_id'], name: 'idx_discussion_space')]
+#[ORM\Index(columns: ['space_id', 'created_at'], name: 'idx_discussion_space_created')]
+#[ORM\Index(columns: ['space_id', 'is_pinned', 'created_at'], name: 'idx_discussion_space_pinned')]
 // Mirror the GIN index on `search_vector` from Version20260506010000 so
 // doctrine:schema:validate doesn't try to drop it on every CI run.
 #[ORM\Index(columns: ['search_vector'], name: 'idx_discussion_search_vector', flags: ['gin'])]
@@ -98,22 +90,10 @@ class Discussion
     #[Groups(['discussion:read'])]
     private ?Uuid $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Project::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Assert\NotNull(message: 'Project is required.')]
-    #[Groups(['discussion:read', 'discussion:write'])]
-    private ?Project $project = null;
-
-    /**
-     * The space this discussion lives in (#181). Inherited from the
-     * parent project — kept as a denormalised column so search and
-     * future space-scoped access predicates (PR 2 / #185) can filter
-     * without joining through `project`. Synced by {@see syncSpaceFromProject()}
-     * on PrePersist; never settable on the wire.
-     */
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['discussion:read'])]
+    #[Assert\NotNull(message: 'Space is required.')]
+    #[Groups(['discussion:read', 'discussion:write'])]
     private ?Space $space = null;
 
     /**
@@ -187,35 +167,9 @@ class Discussion
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    /**
-     * Mirrors the parent project's space onto this discussion before
-     * insert so the denormalised column stays accurate even when the
-     * client doesn't (and shouldn't) supply it. Runs only when no space
-     * is already set, so an explicit move-to-space operation in a
-     * future PR can override the default.
-     */
-    #[ORM\PrePersist]
-    public function syncSpaceFromProject(): void
-    {
-        if (null === $this->space && null !== $this->project) {
-            $this->space = $this->project->getSpace();
-        }
-    }
-
     public function getId(): ?Uuid
     {
         return $this->id;
-    }
-
-    public function getProject(): ?Project
-    {
-        return $this->project;
-    }
-
-    public function setProject(?Project $project): static
-    {
-        $this->project = $project;
-        return $this;
     }
 
     public function getSpace(): ?Space

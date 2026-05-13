@@ -142,7 +142,6 @@ test.describe("Search page + autocomplete", () => {
       data: { title: projectTitle, description: "Spinning the wheel." },
     });
     expect(projectRes.ok()).toBeTruthy();
-    const project = await projectRes.json();
 
     const taskRes = await page.request.post(`${BASE_URL}/tasks`, {
       headers: ldHeaders,
@@ -150,10 +149,18 @@ test.describe("Search page + autocomplete", () => {
     });
     expect(taskRes.ok()).toBeTruthy();
 
+    const spacesRes = await page.request.get(`${BASE_URL}/spaces`, {
+      headers: { Accept: "application/ld+json" },
+    });
+    const spacesData = await spacesRes.json();
+    const personalSpace = (spacesData.member ?? spacesData["hydra:member"] ?? [])
+      .find((s) => s.isPersonal);
+    expect(personalSpace).toBeDefined();
+
     const discussionRes = await page.request.post(`${BASE_URL}/discussions`, {
       headers: ldHeaders,
       data: {
-        project: project["@id"],
+        space: personalSpace["@id"],
         title: discussionTitle,
         body: "Round and round it goes.",
         category: "general",
@@ -179,11 +186,6 @@ test.describe("Search page + autocomplete", () => {
     await expect(page).toHaveURL(/kind=discussions/);
     await expect(page.getByTestId("search-results")).toContainText(
       discussionTitle,
-    );
-    // The project chip on the discussion row should mention the host
-    // project so the user can place the thread out of context.
-    await expect(page.getByTestId("search-results")).toContainText(
-      projectTitle,
     );
 
     // Switching back to the Tasks tab drops the kind param from the URL

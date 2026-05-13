@@ -4,7 +4,8 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Discussion;
-use App\Entity\Project;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -24,6 +25,7 @@ class DiscussionTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -37,15 +39,14 @@ class DiscussionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project,$bob);
-        $this->entityManager->flush();
+        $space = $this->createSpace($alice, 'Backend');
+        $this->ensureSpaceMembership($space, $bob);
 
         $client = static::createClient();
         $client->loginUser($bob);
         $client->request('POST', '/discussions', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'space' => '/spaces/' . $space->getId(),
                 'title' => 'Idea: switch to pnpm',
                 'body' => 'Should be a quick win.',
                 'category' => 'ideas',
@@ -68,36 +69,35 @@ class DiscussionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $space = $this->createSpace($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($stranger);
         $client->request('POST', '/discussions', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'space' => '/spaces/' . $space->getId(),
                 'title' => 'Sneaky',
                 'body' => 'Body',
                 'category' => 'general',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
-        // ProjectAccessExtension hides Alice's project from the
+        // SpaceAccessExtension hides Alice's space from the
         // stranger during IRI resolution, so denormalization fails
-        // before securityPostDenormalize runs — same shape as the
-        // CommentTest cross-task case.
+        // before securityPostDenormalize runs.
         $this->assertResponseStatusCodeSame(400);
     }
 
     public function testInvalidCategoryRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $space = $this->createSpace($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/discussions', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'space' => '/spaces/' . $space->getId(),
                 'title' => 'Wrong cat',
                 'body' => 'Body',
                 'category' => 'rumors',
@@ -107,14 +107,14 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testListFiltersToProjectsTheUserBelongsTo(): void
+    public function testListFiltersToSpacesTheUserBelongsTo(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $aliceProject = $this->createProject($alice, 'Alice');
-        $bobProject = $this->createProject($bob, 'Bob');
-        $this->seed($alice, $aliceProject, 'A1');
-        $this->seed($bob, $bobProject, 'B1');
+        $aliceSpace = $this->createSpace($alice, 'Alice');
+        $bobSpace = $this->createSpace($bob, 'Bob');
+        $this->seed($alice, $aliceSpace, 'A1');
+        $this->seed($bob, $bobSpace, 'B1');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -130,9 +130,9 @@ class DiscussionTest extends ApiTestCase
     public function testCanFilterByCategory(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->seed($alice, $project, 'General one', 'general');
-        $this->seed($alice, $project, 'Idea one', 'ideas');
+        $space = $this->createSpace($alice, 'Backend');
+        $this->seed($alice, $space, 'General one', 'general');
+        $this->seed($alice, $space, 'Idea one', 'ideas');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -148,8 +148,8 @@ class DiscussionTest extends ApiTestCase
     public function testAuthorCanEdit(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $disc = $this->seed($alice, $project, 'Original');
+        $space = $this->createSpace($alice, 'Backend');
+        $disc = $this->seed($alice, $space, 'Original');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -168,10 +168,9 @@ class DiscussionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project,$bob);
-        $this->entityManager->flush();
-        $aliceDiscussion = $this->seed($alice, $project, 'Original');
+        $space = $this->createSpace($alice, 'Backend');
+        $this->ensureSpaceMembership($space, $bob);
+        $aliceDiscussion = $this->seed($alice, $space, 'Original');
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -182,14 +181,13 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(403);
     }
 
-    public function testProjectOwnerCanPinAnotherMembersDiscussion(): void
+    public function testSpaceAdminCanPinAnotherMembersDiscussion(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project,$bob);
-        $this->entityManager->flush();
-        $bobDiscussion = $this->seed($bob, $project, 'Bob post');
+        $space = $this->createSpace($alice, 'Backend');
+        $this->ensureSpaceMembership($space, $bob);
+        $bobDiscussion = $this->seed($bob, $space, 'Bob post');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -204,8 +202,8 @@ class DiscussionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $disc = $this->seed($alice, $project, 'Hidden');
+        $space = $this->createSpace($alice, 'Backend');
+        $disc = $this->seed($alice, $space, 'Hidden');
 
         $client = static::createClient();
         $client->loginUser($stranger);
@@ -213,14 +211,13 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testProjectOwnerCanDeleteOthersDiscussion(): void
+    public function testSpaceAdminCanDeleteOthersDiscussion(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project,$bob);
-        $this->entityManager->flush();
-        $bobDiscussion = $this->seed($bob, $project, 'Off-topic');
+        $space = $this->createSpace($alice, 'Backend');
+        $this->ensureSpaceMembership($space, $bob);
+        $bobDiscussion = $this->seed($bob, $space, 'Off-topic');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -228,10 +225,10 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(204);
     }
 
-    private function seed(User $author, Project $project, string $title, string $category = 'general'): Discussion
+    private function seed(User $author, Space $space, string $title, string $category = 'general'): Discussion
     {
         $disc = new Discussion();
-        $disc->setProject($project);
+        $disc->setSpace($space);
         $disc->setAuthor($author);
         $disc->setTitle($title);
         $disc->setBody('Body for ' . $title);
@@ -241,15 +238,19 @@ class DiscussionTest extends ApiTestCase
         return $disc;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createSpace(User $admin, string $name): Space
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project,$owner);
-        $this->entityManager->persist($project);
+        $space = new Space();
+        $space->setName($name);
+        $space->setCreatedBy($admin);
+        $this->entityManager->persist($space);
+        $membership = (new SpaceMembership())
+            ->setUser($admin)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($membership);
+        $this->entityManager->persist($membership);
         $this->entityManager->flush();
-        return $project;
+        return $space;
     }
 
     /**
