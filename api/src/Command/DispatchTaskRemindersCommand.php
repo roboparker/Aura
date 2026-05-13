@@ -258,11 +258,12 @@ final class DispatchTaskRemindersCommand extends Command
         if (!in_array($offset, ValidReminders::ALLOWED_OFFSETS, true)) {
             return null;
         }
+        // $offset is one of ALLOWED_OFFSETS (the in_array guard above),
+        // so the match is exhaustive over the literal values.
         return match ($offset) {
             '15m' => $dueDate->modify('-15 minutes'),
             '1h' => $dueDate->modify('-1 hour'),
             '1d' => $dueDate->modify('-1 day'),
-            default => null,
         };
     }
 

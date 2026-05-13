@@ -15,12 +15,12 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * returns the in-memory object's id is gone and the Doctrine listener
  * has already detached it.
  *
- * @implements ProcessorInterface<Comment, void|Comment>
+ * @implements ProcessorInterface<Comment, Comment>
  */
 final class CommentDeleteProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<Comment, void|Comment> $removeProcessor
+     * @param ProcessorInterface<Comment, Comment> $removeProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
