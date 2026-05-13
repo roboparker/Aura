@@ -23,8 +23,9 @@ class TaskCustomFieldValueTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         // Order matters: values FK to task + definition; definitions FK
         // to project. Clear from leaves to roots.

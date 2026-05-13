@@ -19,8 +19,9 @@ class ProjectTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         // task.project_id, space.created_by_id cascade/SET-NULL via FK,
         // so deleting parents is enough to clean state between tests.

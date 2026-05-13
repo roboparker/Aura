@@ -3,26 +3,4 @@
 # after clearing a batch. Anything new fails CI; baselined errors do not.
 
 parameters:
-    ignoreErrors:
-        # Doctrine relationship properties typed `?Foo` on the PHP side
-        # while the JoinColumn is `nullable: false`. Tightening the PHP
-        # type breaks runtime initialisation paths that build entities
-        # incrementally before the PrePersist listener / state processor
-        # assigns the required relation; leaving as nullable + baselined
-        # is safer than chasing every construction site.
-        -
-            message: '#Property App\\Entity\\[A-Za-z]+::\$[a-zA-Z]+ type mapping mismatch: property can contain App\\Entity\\[A-Za-z]+\|null but database expects#'
-            paths:
-                - src/Entity/*.php
-
-        # Test classes type `$entityManager` as EntityManagerInterface but
-        # fetch it via `->get('doctrine')->getManager()` which is declared
-        # to return ObjectManager. Switching to `get(EntityManagerInterface::class)`
-        # fails at runtime because the alias is private in the regular
-        # container; switching every test to the test-container accessor
-        # is mechanical noise. PHPStan-side narrowing not worth a project
-        # convention change.
-        -
-            message: '#Property App\\Tests\\Api\\[A-Za-z]+::\$(em|entityManager) \(Doctrine\\ORM\\EntityManagerInterface\) does not accept Doctrine\\Persistence\\ObjectManager\.#'
-            paths:
-                - tests/Api/*.php
+    ignoreErrors: []

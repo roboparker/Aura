@@ -17,8 +17,9 @@ class UserInviteTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         // Order matters — group_invite -> user_invite -> user_group -> user.
         $this->entityManager->createQuery('DELETE FROM App\Entity\GroupInvite')->execute();

@@ -20,8 +20,9 @@ class CommentTest extends ApiTestCase
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $this->entityManager = $kernel->getContainer()
-            ->get('doctrine')->getManager();
+        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $this->entityManager = $em;
 
         // Notifications hold FKs to both Comment and Task (mention rows
         // and reminder rows respectively); wipe them first so the bulk
