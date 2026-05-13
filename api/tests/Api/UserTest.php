@@ -48,7 +48,9 @@ class UserTest extends ApiTestCase
         ]);
 
         // Password should not be in response; color should be set to a palette entry
-        $response = json_decode($client->getResponse()->getContent(), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $response = json_decode($response->getContent(), true);
         $this->assertArrayNotHasKey('password', $response);
         $this->assertArrayNotHasKey('plainPassword', $response);
         $this->assertContains($response['personalizedColor'], AvatarColorService::PALETTE);
@@ -203,7 +205,9 @@ class UserTest extends ApiTestCase
 
         $client->request('GET', '/api/me');
         $this->assertResponseIsSuccessful();
-        $response = json_decode($client->getResponse()->getContent(), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $response = json_decode($response->getContent(), true);
         $this->assertSame('me@example.com', $response['email']);
         $this->assertSame('Test', $response['givenName']);
         $this->assertSame('User', $response['familyName']);

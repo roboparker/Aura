@@ -65,7 +65,9 @@ class TaskCustomFieldValueTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertCount(2, $body['customFieldValues']);
         $values = array_combine(
             array_map(fn ($v) => $v['definition'], $body['customFieldValues']),

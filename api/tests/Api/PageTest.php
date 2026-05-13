@@ -102,9 +102,11 @@ class PageTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/pages');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($p) => $p['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Alice page'], $titles);
     }
@@ -280,9 +282,11 @@ class PageTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/pages?search=onboarding');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($p) => $p['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Onboarding guide'], $titles);
     }

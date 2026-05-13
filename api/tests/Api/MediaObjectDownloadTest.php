@@ -47,7 +47,9 @@ class MediaObjectDownloadTest extends ApiTestCase
         // The endpoint returns 401 explicitly when no user is attached, but
         // some test configs short-circuit anonymous requests at the firewall
         // before reaching the controller; either way, 200 must not happen.
-        $this->assertNotSame(200, $client->getResponse()->getStatusCode());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertNotSame(200, $response->getStatusCode());
     }
 
     public function testOwnerCanDownloadOwnAttachment(): void

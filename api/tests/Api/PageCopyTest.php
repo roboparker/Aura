@@ -55,7 +55,9 @@ class PageCopyTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('Onboarding (copy)', $body['title']);
         $this->assertSame('/spaces/' . $source->getId(), $body['space']);
 
@@ -84,11 +86,15 @@ class PageCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('/spaces/' . $target->getId(), $response->toArray()['space']);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertSame((string) $target->getId(), (string) $copy->getSpace()->getId());
     }
 
@@ -105,7 +111,9 @@ class PageCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('Notes (copy)', $client->getResponse()->toArray()['title']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('Notes (copy)', $response->toArray()['title']);
     }
 
     public function testCopyOwnerIsCurrentUserNotSourceCreator(): void
@@ -125,8 +133,10 @@ class PageCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertSame((string) $bob->getId(), (string) $copy->getCreatedBy()->getId());
     }
 
@@ -146,8 +156,10 @@ class PageCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Page::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertNull(
             $copy->getParent(),
             'A copy is always top-level — descendants do not transplant in v1.',
@@ -224,7 +236,9 @@ class PageCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('/spaces/' . $target->getId(), $response->toArray()['space']);
     }
 
     public function testIncludeDescendantsFalseLeavesSubtreeAlone(): void
@@ -241,10 +255,14 @@ class PageCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame(0, $client->getResponse()->toArray()['descendantsCloned']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(0, $response->toArray()['descendantsCloned']);
 
         $this->entityManager->clear();
-        $copyId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyId = $response->toArray()['id'];
         $copyChildren = $this->entityManager->getRepository(Page::class)
             ->findBy(['parent' => $copyId]);
         $this->assertCount(0, $copyChildren);
@@ -266,10 +284,14 @@ class PageCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame(3, $client->getResponse()->toArray()['descendantsCloned']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(3, $response->toArray()['descendantsCloned']);
 
         $this->entityManager->clear();
-        $copyRootId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyRootId = $response->toArray()['id'];
         $copyRoot = $this->entityManager->getRepository(Page::class)->find($copyRootId);
         $this->assertNull($copyRoot->getParent(), 'Cloned root stays top-level in the target.');
         $this->assertSame('Root (copy)', $copyRoot->getTitle());
@@ -308,8 +330,10 @@ class PageCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copyRoot = $this->entityManager->getRepository(Page::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertSame((string) $target->getId(), (string) $copyRoot->getSpace()->getId());
         $copyChild = $this->entityManager->getRepository(Page::class)
             ->findOneBy(['parent' => $copyRoot]);

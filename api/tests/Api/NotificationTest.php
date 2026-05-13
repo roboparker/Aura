@@ -73,9 +73,11 @@ class NotificationTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/notifications');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($n) => $n['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['For Alice'], $titles);
         $this->assertNotNull($aliceNote->getId());
@@ -129,9 +131,11 @@ class NotificationTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/notifications?exists[readAt]=false');
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($n) => $n['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Unread'], $titles);
         $this->assertNotNull($unread->getId());

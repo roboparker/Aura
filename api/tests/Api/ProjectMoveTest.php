@@ -58,7 +58,9 @@ class ProjectMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
@@ -153,7 +155,9 @@ class ProjectMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertFalse($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertFalse($response->toArray()['moved']);
     }
 
     public function testAcceptsBareUuidAsTarget(): void
@@ -170,7 +174,9 @@ class ProjectMoveTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        $this->assertTrue($client->getResponse()->toArray()['moved']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['moved']);
     }
 
     private function createProject(User $owner, string $title, Space $space): Project

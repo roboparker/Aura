@@ -5,14 +5,6 @@
 parameters:
     ignoreErrors:
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 5
-            path: tests/Api/ActivityHistoryTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 2
-            path: tests/Api/ApiTokenTest.php
-        -
             message: '#^Cannot\ call\ method\ equals\(\)\ on\ Symfony\\Component\\Uid\\Uuid\|null\.#'
             count: 2
             path: tests/Api/CommentTest.php
@@ -25,27 +17,6 @@ parameters:
         -
             message: '#^Cannot\ call\ method\ getUpdatedAt\(\)\ on\ App\\Entity\\Comment\|null\.#'
             path: tests/Api/CommentTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 4
-            path: tests/Api/CommentTest.php
-        -
-            message: '#^Cannot\ call\ method\ getKernelResponse\(\)\ on#'
-            path: tests/Api/CommentsMercureTokenTest.php
-        -
-            message: '#^Cannot\ call\ method\ getStatusCode\(\)\ on#'
-            path: tests/Api/CommentsMercureTokenTest.php
-        -
-            message: '#^Cannot\ call\ method\ getStatusCode\(\)\ on#'
-            count: 2
-            path: tests/Api/CustomFieldDefinitionTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/CustomFieldDefinitionTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 6
-            path: tests/Api/CustomFieldFooterTest.php
         -
             message: '#^Cannot\ call\ method\ getAuthor\(\)\ on\ App\\Entity\\Discussion\|null\.#'
             path: tests/Api/DiscussionCopyTest.php
@@ -62,46 +33,17 @@ parameters:
             count: 2
             path: tests/Api/DiscussionCopyTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 6
-            path: tests/Api/DiscussionCopyTest.php
-        -
             message: '#^Cannot\ call\ method\ getId\(\)\ on\ App\\Entity\\Space\|null\.#'
             path: tests/Api/DiscussionMoveTest.php
         -
             message: '#^Cannot\ call\ method\ getSpace\(\)\ on\ App\\Entity\\Discussion\|null\.#'
             path: tests/Api/DiscussionMoveTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 3
-            path: tests/Api/DiscussionMoveTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 2
-            path: tests/Api/DiscussionTest.php
-        -
             message: '#^Parameter\ \#1\ \$email\ of\ method#'
             count: 5
             path: tests/Api/EmailChangeTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/McpTest.php
-        -
-            message: '#^Cannot\ call\ method\ getStatusCode\(\)\ on#'
-            path: tests/Api/MediaObjectDownloadTest.php
-        -
-            message: '#^Cannot\ call\ method\ getContent\(\)\ on#'
-            count: 3
-            path: tests/Api/MediaObjectTest.php
-        -
-            message: '#^Cannot\ call\ method\ getStatusCode\(\)\ on#'
-            path: tests/Api/MediaObjectTest.php
-        -
             message: '#^Cannot\ call\ method\ getEmail\(\)\ on\ App\\Entity\\User\|null\.#'
-            path: tests/Api/NotificationTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 2
             path: tests/Api/NotificationTest.php
         -
             message: '#^Parameter\ \#1\ \$email\ of\ method#'
@@ -134,10 +76,6 @@ parameters:
             count: 2
             path: tests/Api/PageCopyTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 12
-            path: tests/Api/PageCopyTest.php
-        -
             message: '#^Cannot\ call\ method\ getId\(\)\ on\ App\\Entity\\Space\|null\.#'
             count: 2
             path: tests/Api/PageMoveTest.php
@@ -148,14 +86,6 @@ parameters:
             message: '#^Cannot\ call\ method\ getSpace\(\)\ on\ App\\Entity\\Page\|null\.#'
             count: 2
             path: tests/Api/PageMoveTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 3
-            path: tests/Api/PageMoveTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 2
-            path: tests/Api/PageTest.php
         -
             message: '#^Cannot\ call\ method\ getId\(\)\ on\ App\\Entity\\Space\|null\.#'
             count: 2
@@ -171,19 +101,11 @@ parameters:
             message: '#^Cannot\ call\ method\ getSpace\(\)\ on\ App\\Entity\\Project\|null\.#'
             path: tests/Api/ProjectCopyTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 12
-            path: tests/Api/ProjectCopyTest.php
-        -
             message: '#^Cannot\ call\ method\ getId\(\)\ on\ App\\Entity\\Space\|null\.#'
             count: 2
             path: tests/Api/ProjectMoveTest.php
         -
             message: '#^Cannot\ call\ method\ getSpace\(\)\ on\ App\\Entity\\Project\|null\.#'
-            path: tests/Api/ProjectMoveTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 3
             path: tests/Api/ProjectMoveTest.php
         -
             message: '#^Cannot\ call\ method\ equals\(\)\ on\ Symfony\\Component\\Uid\\Uuid\|null\.#'
@@ -200,27 +122,11 @@ parameters:
             message: '#^Cannot\ call\ method\ getTitle\(\)\ on\ App\\Entity\\Task\|null\.#'
             path: tests/Api/ProjectTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/ProjectTest.php
-        -
-            message: '#^Cannot\ call\ method\ getContent\(\)\ on#'
-            path: tests/Api/PushSubscriptionTest.php
-        -
-            message: '#^Cannot\ call\ method\ getStatusCode\(\)\ on#'
-            path: tests/Api/PushSubscriptionTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/PushSubscriptionTest.php
-        -
             message: '#^Cannot\ call\ method\ getAttachments\(\)\ on\ App\\Entity\\Space\|null\.#'
             path: tests/Api/SpaceAttachmentTest.php
         -
             message: '#^Cannot\ call\ method\ hasMember\(\)\ on\ App\\Entity\\Space\|null\.#'
             count: 3
-            path: tests/Api/SpaceInviteTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 2
             path: tests/Api/SpaceInviteTest.php
         -
             message: '#^Cannot\ call\ method\ equals\(\)\ on\ Symfony\\Component\\Uid\\Uuid\|null\.#'
@@ -234,18 +140,8 @@ parameters:
             count: 2
             path: tests/Api/TagTest.php
         -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/TagTest.php
-        -
             message: '#^Cannot\ call\ method\ getAttachments\(\)\ on\ App\\Entity\\Task\|null\.#'
             path: tests/Api/TaskAttachmentTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 3
-            path: tests/Api/TaskAttachmentTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/TaskCustomFieldValueTest.php
         -
             message: '#^Cannot\ call\ method\ equals\(\)\ on\ Symfony\\Component\\Uid\\Uuid\|null\.#'
             count: 2
@@ -258,14 +154,6 @@ parameters:
             message: '#^Cannot\ call\ method\ getPosition\(\)\ on\ App\\Entity\\Task\|null\.#'
             count: 8
             path: tests/Api/TaskTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 21
-            path: tests/Api/TaskTest.php
-        -
-            message: '#^Cannot\ call\ method\ getContent\(\)\ on#'
-            count: 7
-            path: tests/Api/TwoFactorTest.php
         -
             message: '#^Cannot\ call\ method\ equals\(\)\ on\ Symfony\\Component\\Uid\\Uuid\|null\.#'
             path: tests/Api/UserGroupTest.php
@@ -287,14 +175,3 @@ parameters:
             message: '#^Cannot\ call\ method\ getMembers\(\)\ on\ App\\Entity\\UserGroup\|null\.#'
             count: 5
             path: tests/Api/UserInviteTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            path: tests/Api/UserInviteTest.php
-        -
-            message: '#^Cannot\ call\ method\ toArray\(\)\ on#'
-            count: 4
-            path: tests/Api/UserPreferencesTest.php
-        -
-            message: '#^Cannot\ call\ method\ getContent\(\)\ on#'
-            count: 2
-            path: tests/Api/UserTest.php

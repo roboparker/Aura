@@ -681,7 +681,9 @@ class TaskTest extends ApiTestCase
 
         $client->request('GET', '/tasks');
         $this->assertResponseIsSuccessful();
-        $response = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $response = $response->toArray();
         $titles = array_map(fn ($t) => $t['title'], $response['member']);
         $this->assertSame(['B', 'C', 'A'], $titles);
     }
@@ -941,9 +943,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?assignees=/users/' . $bob->getId());
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'],
+            $response->toArray()['member'],
         );
         $this->assertSame(['Both assigned'], $titles);
     }
@@ -1067,7 +1071,9 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?overdue=true');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame(1, $body['totalItems']);
         $this->assertSame('Overdue task', $body['member'][0]['title']);
     }
@@ -1090,7 +1096,9 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?overdue=true&itemsPerPage=1');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame(3, $body['totalItems']);
         $this->assertCount(1, $body['member']);
     }
@@ -1141,7 +1149,9 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/me/assignable-users');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $emails = array_map(fn ($u) => $u['email'], $body['member'] ?? []);
         $this->assertSame(['alice@example.com'], $emails);
     }
@@ -1159,7 +1169,9 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/me/assignable-users');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $emails = array_map(fn ($u) => $u['email'], $body['member'] ?? []);
         sort($emails);
         $this->assertSame(['alice@example.com', 'bob@example.com'], $emails);
@@ -1285,9 +1297,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=launch');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Plan launch checklist'], $titles);
     }
@@ -1307,9 +1321,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=moonshot');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $this->assertCount(
             1,
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
     }
 
@@ -1332,9 +1348,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=moonshot');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Misc'], $titles);
     }
@@ -1349,9 +1367,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=launch');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $this->assertCount(
             1,
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
     }
 
@@ -1368,9 +1388,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=' . urlencode('50%'));
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['50% off promo'], $titles);
     }
@@ -1386,9 +1408,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=' . urlencode('   '));
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $this->assertCount(
             2,
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
     }
 
@@ -1404,9 +1428,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=launch');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Alice launch plan'], $titles);
     }
@@ -1435,9 +1461,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=migration');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         // Title weight A > description weight B, so the title hit must
         // come first regardless of insertion order.
@@ -1464,9 +1492,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=moonshot');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Triage'], $titles);
     }
@@ -1491,9 +1521,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?search=review');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Login redesign'], $titles);
     }
@@ -1511,9 +1543,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?status=open');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Open one'], $titles);
     }
@@ -1531,9 +1565,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?status=completed');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['Done'], $titles);
     }
@@ -1549,7 +1585,9 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?status=banana');
 
         $this->assertResponseIsSuccessful();
-        $this->assertCount(2, $client->getResponse()->toArray()['member'] ?? []);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertCount(2, $response->toArray()['member'] ?? []);
     }
 
     public function testDueDateRangeFilter(): void
@@ -1571,9 +1609,11 @@ class TaskTest extends ApiTestCase
         );
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['In window'], $titles);
     }
@@ -1592,9 +1632,11 @@ class TaskTest extends ApiTestCase
         $client->request('GET', '/tasks?order%5BdueDate%5D=asc');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $titles = array_map(
             fn ($t) => $t['title'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['B', 'A'], $titles);
     }

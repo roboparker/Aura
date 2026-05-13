@@ -305,7 +305,9 @@ class McpTest extends ApiTestCase
             'headers' => ['Authorization' => 'Bearer ' . $bearer],
         ]);
         $this->assertResponseIsSuccessful();
-        return $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        return $response->toArray();
     }
 
     /**

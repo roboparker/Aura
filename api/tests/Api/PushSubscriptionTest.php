@@ -69,7 +69,9 @@ class PushSubscriptionTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = (string) $client->getResponse()->getContent();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = (string) $response->getContent();
         $this->assertStringNotContainsString('SECRET-PUBKEY', $body);
         $this->assertStringNotContainsString('SECRET-AUTH', $body);
     }
@@ -86,9 +88,11 @@ class PushSubscriptionTest extends ApiTestCase
         $client->request('GET', '/me/push-subscriptions');
 
         $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $endpoints = array_map(
             fn ($s) => $s['endpoint'],
-            $client->getResponse()->toArray()['member'] ?? [],
+            $response->toArray()['member'] ?? [],
         );
         $this->assertSame(['https://fcm.example/a'], $endpoints);
     }
@@ -146,7 +150,9 @@ class PushSubscriptionTest extends ApiTestCase
         // Either the validator (UniqueEntity) or the DB unique index
         // catches it; both shapes are acceptable. Reject anything in
         // the 2xx range.
-        $this->assertGreaterThanOrEqual(400, $client->getResponse()->getStatusCode());
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertGreaterThanOrEqual(400, $response->getStatusCode());
     }
 
     public function testMultipleDevicesAllowedPerUser(): void

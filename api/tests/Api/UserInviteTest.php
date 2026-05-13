@@ -208,7 +208,9 @@ class UserInviteTest extends ApiTestCase
         $client->request('GET', '/groups/' . $group->getId() . '/invites');
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertCount(1, $body['invites']);
         $this->assertSame('newcomer@example.com', $body['invites'][0]['email']);
     }

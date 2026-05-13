@@ -44,8 +44,10 @@ class MediaObjectTest extends ApiTestCase
             'extra' => ['files' => ['file' => $this->createPngUpload()]],
         ]);
 
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $this->assertContains(
-            $client->getResponse()->getStatusCode(),
+            $response->getStatusCode(),
             [401, 403],
             'Unauthenticated upload must be denied.',
         );
@@ -63,7 +65,9 @@ class MediaObjectTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(201);
-        $response = json_decode($client->getResponse()->getContent(), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $response = json_decode($response->getContent(), true);
         $this->assertSame('avatar', $response['kind']);
         $this->assertArrayHasKey('variantUrls', $response);
         $this->assertArrayHasKey('profile', $response['variantUrls']);
@@ -112,7 +116,9 @@ class MediaObjectTest extends ApiTestCase
             'extra' => ['files' => ['file' => $this->createPngUpload()]],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $iri = json_decode($client->getResponse()->getContent(), true)['@id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $iri = json_decode($response->getContent(), true)['@id'];
 
         $client->request('PATCH', '/users/' . $user->getId(), [
             'json' => ['avatar' => $iri],
@@ -122,7 +128,9 @@ class MediaObjectTest extends ApiTestCase
 
         $client->request('GET', '/api/me');
         $this->assertResponseIsSuccessful();
-        $me = json_decode($client->getResponse()->getContent(), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $me = json_decode($response->getContent(), true);
         $this->assertNotNull($me['avatarUrls']);
         $this->assertStringStartsWith('/media/avatars/', $me['avatarUrls']['profile']);
     }

@@ -63,7 +63,9 @@ class ProjectCopyTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('Template (copy)', $body['title']);
         $this->assertSame('/spaces/' . $source->getId(), $body['space']);
 
@@ -107,7 +109,9 @@ class ProjectCopyTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame('/spaces/' . $target->getId(), $body['space']);
 
         $this->entityManager->clear();
@@ -128,7 +132,9 @@ class ProjectCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('Template (copy)', $client->getResponse()->toArray()['title']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('Template (copy)', $response->toArray()['title']);
     }
 
     public function testCloneOwnerIsCurrentUserNotSourceOwner(): void
@@ -148,8 +154,10 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Project::class)
-            ->find($client->getResponse()->toArray()['id']);
+            ->find($response->toArray()['id']);
         $this->assertSame((string) $bob->getId(), (string) $copy->getOwner()->getId());
     }
 
@@ -216,7 +224,9 @@ class ProjectCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame('/spaces/' . $target->getId(), $client->getResponse()->toArray()['space']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame('/spaces/' . $target->getId(), $response->toArray()['space']);
     }
 
     public function testIncludeTasksFalseLeavesTasksOnSourceOnly(): void
@@ -234,10 +244,14 @@ class ProjectCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame(0, $client->getResponse()->toArray()['tasksCloned']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(0, $response->toArray()['tasksCloned']);
 
         $this->entityManager->clear();
-        $copyId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyId = $response->toArray()['id'];
         $copyTasks = $this->entityManager->getRepository(Task::class)
             ->findBy(['project' => $copyId]);
         $this->assertCount(0, $copyTasks);
@@ -263,10 +277,14 @@ class ProjectCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame(1, $client->getResponse()->toArray()['tasksCloned']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(1, $response->toArray()['tasksCloned']);
 
         $this->entityManager->clear();
-        $copyId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyId = $response->toArray()['id'];
         /** @var Task[] $cloned */
         $cloned = $this->entityManager->getRepository(Task::class)
             ->findBy(['project' => $copyId]);
@@ -311,7 +329,9 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
-        $copyId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyId = $response->toArray()['id'];
         /** @var Task[] $cloned */
         $cloned = $this->entityManager->getRepository(Task::class)
             ->findBy(['project' => $copyId]);
@@ -339,10 +359,14 @@ class ProjectCopyTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
-        $this->assertSame(3, $client->getResponse()->toArray()['tasksCloned']);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertSame(3, $response->toArray()['tasksCloned']);
 
         $this->entityManager->clear();
-        $copyId = $client->getResponse()->toArray()['id'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $copyId = $response->toArray()['id'];
         $cloned = $this->entityManager->getRepository(Task::class)
             ->findBy(['project' => $copyId], ['position' => 'ASC']);
         $titlesByPosition = array_map(fn (Task $t) => $t->getTitle(), $cloned);

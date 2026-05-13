@@ -32,7 +32,9 @@ class TwoFactorTest extends ApiTestCase
         $client->request('POST', '/me/2fa/setup');
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertNotEmpty($body['secret']);
         $this->assertStringStartsWith('otpauth://totp/', $body['provisioningUri']);
     }
@@ -57,7 +59,9 @@ class TwoFactorTest extends ApiTestCase
         $client->loginUser($user);
 
         $client->request('POST', '/me/2fa/setup');
-        $secret = json_decode($client->getResponse()->getContent(false), true)['secret'];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $secret = json_decode($response->getContent(false), true)['secret'];
 
         $reloaded = $this->reloadUser('v@example.com');
         $totpSecret = $reloaded->getDecryptedTotpSecret();
@@ -68,7 +72,9 @@ class TwoFactorTest extends ApiTestCase
         $client->request('POST', '/me/2fa/verify', ['json' => ['code' => $code]]);
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertTrue($body['enabled']);
         $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $body['recoveryCodes']);
 
@@ -102,7 +108,9 @@ class TwoFactorTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertSame('plain@example.com', $body['email']);
         $this->assertFalse($body['twoFactor']['enabled']);
     }
@@ -118,7 +126,9 @@ class TwoFactorTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(401);
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertTrue($body['requiresTwoFactor']);
     }
 
@@ -141,7 +151,9 @@ class TwoFactorTest extends ApiTestCase
         $client->request('POST', '/auth/2fa-check', ['json' => ['code' => $code]]);
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertSame('tfa@example.com', $body['email']);
     }
 
@@ -201,7 +213,9 @@ class TwoFactorTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode($client->getResponse()->getContent(false), true);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = json_decode($response->getContent(false), true);
         $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $body['recoveryCodes']);
         $this->assertEmpty(
             array_intersect($original, $body['recoveryCodes']),

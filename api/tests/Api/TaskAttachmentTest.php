@@ -44,7 +44,9 @@ class TaskAttachmentTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(201);
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertSame(MediaObject::KIND_ATTACHMENT, $body['kind']);
         $this->assertSame('notes.txt', $body['originalName']);
         $this->assertSame('text/plain', $body['mimeType']);
@@ -103,7 +105,9 @@ class TaskAttachmentTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertCount(1, $body['attachments']);
         $this->assertSame('spec.pdf', $body['attachments'][0]['originalName']);
         $this->assertArrayHasKey('original', $body['attachments'][0]['variantUrls']);
@@ -125,7 +129,9 @@ class TaskAttachmentTest extends ApiTestCase
 
         $client->request('GET', '/tasks/' . $task->getId());
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $this->assertCount(1, $body['attachments']);
     }
 
