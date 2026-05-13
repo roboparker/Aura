@@ -112,6 +112,8 @@ final class McpInputHelper
      * when the field is absent. Tools that want to clear a date pass an
      * explicit empty string, which we map to a sentinel via the
      * 3-arg overload below.
+     *
+     * @param array<string, mixed> $args
      */
     public function optionalDateTime(array $args, string $key): ?\DateTimeImmutable
     {
@@ -154,6 +156,7 @@ final class McpInputHelper
      * Page/limit clamping shared by every list tool. Defaults match the
      * API Platform global default (30 per page).
      *
+     * @param array<string, mixed> $args
      * @return array{page: int, limit: int}
      */
     public function pagination(array $args, int $maxLimit = 100): array

@@ -308,6 +308,9 @@ class McpTest extends ApiTestCase
         return $client->getResponse()->toArray();
     }
 
+    /**
+     * @param list<string> $scopes
+     */
     private function mintToken(User $user, string $name, ?\DateTimeImmutable $expiresAt = null, array $scopes = []): string
     {
         $plain = ApiToken::PLAINTEXT_PREFIX . bin2hex(random_bytes(16));

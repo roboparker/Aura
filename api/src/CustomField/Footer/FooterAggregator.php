@@ -81,6 +81,9 @@ final class FooterAggregator
         return $rows;
     }
 
+    /**
+     * @param list<string> $taskIds
+     */
     private function compute(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
     {
         // No tasks in scope — every aggregate is either null or 0.
@@ -115,6 +118,9 @@ final class FooterAggregator
         return null;
     }
 
+    /**
+     * @param list<string> $taskIds
+     */
     private function countNonNull(?string $definitionId, array $taskIds): int
     {
         if (null === $definitionId) {
@@ -136,6 +142,9 @@ final class FooterAggregator
         return (int) $stmt->fetchOne();
     }
 
+    /**
+     * @param list<string> $taskIds
+     */
     private function aggregateNumeric(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
@@ -200,6 +209,9 @@ final class FooterAggregator
         return $numeric;
     }
 
+    /**
+     * @param list<string> $taskIds
+     */
     private function aggregateDate(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
