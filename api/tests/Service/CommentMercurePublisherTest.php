@@ -90,6 +90,40 @@ class CommentMercurePublisherTest extends TestCase
     }
 
     /**
+     * Hub failure mid-publish (CI cold-start, hub restart, network
+     * blip) must not bubble up into the calling request — the
+     * publisher logs + swallows so the underlying write succeeds
+     * regardless of subscriber reachability.
+     */
+    public function testPublishSwallowsHubFailure(): void
+    {
+        $hub = new class implements HubInterface {
+            public function publish(Update $update): string
+            {
+                throw new \RuntimeException('Failed to send an update.');
+            }
+            public function getUrl(): string { return 'http://test'; }
+            public function getPublicUrl(): string { return 'http://test'; }
+            public function getProvider(): \Symfony\Component\Mercure\Jwt\TokenProviderInterface { throw new \LogicException(); }
+            public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface { return null; }
+        };
+        $normalizer = $this->createMock(NormalizerInterface::class);
+        $normalizer->method('normalize')->willReturn(['@id' => '/comments/x']);
+        $publisher = new CommentMercurePublisher($hub, $normalizer);
+
+        $comment = $this->makeComment(
+            '0193aaaa-0001-7000-8000-000000000099',
+            '0193bbbb-0001-7000-8000-000000000099',
+            'body',
+        );
+
+        // The expectation is no exception bubbles out; if the throw
+        // wasn't caught, the test would fail with the RuntimeException.
+        $publisher->publishCreated($comment);
+        $this->expectNotToPerformAssertions();
+    }
+
+    /**
      * @return array{0: CommentMercurePublisher, 1: object{updates: array<int, Update>}}
      */
     private function makePublisher(): array

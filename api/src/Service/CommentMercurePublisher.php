@@ -3,6 +3,8 @@
 namespace App\Service;
 
 use App\Entity\Comment;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
@@ -26,6 +28,7 @@ final class CommentMercurePublisher
     public function __construct(
         private HubInterface $hub,
         private NormalizerInterface $normalizer,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -93,11 +96,26 @@ final class CommentMercurePublisher
     }
 
     /**
+     * Best-effort publish. Mercure is a notification side-channel —
+     * if the hub is briefly unreachable (CI cold-start, network
+     * blip, hub restart), swallow the error and log so the caller's
+     * write isn't dragged into a 500. The cost is "a live subscriber
+     * may miss this event until they reload," which is the right
+     * trade-off vs. failing a comment POST because the hub is
+     * warming up.
+     *
      * @param array<string, mixed> $payload
      */
     private function dispatch(string $topic, array $payload): void
     {
-        $this->hub->publish(new Update($topic, json_encode($payload, \JSON_THROW_ON_ERROR), true));
+        try {
+            $this->hub->publish(new Update($topic, json_encode($payload, \JSON_THROW_ON_ERROR), true));
+        } catch (\Throwable $e) {
+            $this->logger->warning('Mercure publish failed; subscribers may miss this event.', [
+                'topic' => $topic,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
