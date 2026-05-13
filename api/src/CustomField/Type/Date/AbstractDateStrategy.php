@@ -158,6 +158,16 @@ abstract class AbstractDateStrategy extends AbstractTypeStrategy
     private function parse(string $value): ?\DateTimeImmutable
     {
         $parsed = \DateTimeImmutable::createFromFormat('!' . $this->format(), $value);
-        return false === $parsed ? null : $parsed;
+        if (false === $parsed) {
+            return null;
+        }
+        // PHP's createFromFormat is forgiving: '25:00' parses to the next
+        // day with a warning rather than a failure. Round-trip the
+        // formatted value and reject if it doesn't match — that's the
+        // only way to catch overflows like '2026-02-30' or '25:00'.
+        if ($parsed->format($this->format()) !== $value) {
+            return null;
+        }
+        return $parsed;
     }
 }
