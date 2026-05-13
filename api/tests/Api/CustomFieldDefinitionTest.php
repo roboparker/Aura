@@ -44,7 +44,9 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Severity',
-                'type' => 'text',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -65,7 +67,9 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Severity',
-                'type' => 'text',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -118,26 +122,9 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Priority',
-                'type' => 'dropdown',
-            ],
-            'headers' => ['Content-Type' => 'application/ld+json'],
-        ]);
-        $this->assertResponseStatusCodeSame(422);
-    }
-
-    public function testNonDropdownRejectsOptions(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-
-        $client = static::createClient();
-        $client->loginUser($alice);
-        $client->request('POST', '/custom_field_definitions', [
-            'json' => [
-                'project' => '/projects/' . $project->getId(),
-                'name' => 'Severity',
-                'type' => 'text',
-                'options' => ['Low', 'High'],
+                'kind' => 'select',
+                'subtype' => 'single',
+                'config' => ['multi' => false],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -155,9 +142,17 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Priority',
-                'type' => 'dropdown',
-                'options' => ['Low', 'Medium', 'High'],
-                'required' => true,
+                'kind' => 'select',
+                'subtype' => 'single',
+                'config' => [
+                    'multi' => false,
+                    'options' => [
+                        ['key' => 'Low', 'label' => 'Low'],
+                        ['key' => 'Medium', 'label' => 'Medium'],
+                        ['key' => 'High', 'label' => 'High'],
+                    ],
+                ],
+                'nullable' => false,
                 'position' => 1,
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -165,14 +160,14 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
         $this->assertJsonContains([
             'name' => 'Priority',
-            'type' => 'dropdown',
-            'options' => ['Low', 'Medium', 'High'],
-            'required' => true,
+            'kind' => 'select',
+            'subtype' => 'single',
+            'nullable' => false,
             'position' => 1,
         ]);
     }
 
-    public function testInvalidTypeRejected(): void
+    public function testInvalidKindRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
         $project = $this->createProject($alice, 'Backend');
@@ -183,7 +178,9 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Mystery',
-                'type' => 'mystery-shape',
+                'kind' => 'mystery-shape',
+                'subtype' => 'mystery-shape',
+                'config' => [],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -202,7 +199,9 @@ class CustomFieldDefinitionTest extends ApiTestCase
             'json' => [
                 'project' => '/projects/' . $project->getId(),
                 'name' => 'Severity',
-                'type' => 'text',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);

@@ -3,9 +3,10 @@ import {
   FormEvent,
   useCallback,
   useEffect,
+  useMemo,
   useState,
 } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -14,24 +15,29 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  CustomFieldConfigEditor,
+  KIND_DESCRIPTORS,
+  KIND_ORDER,
+  defaultConfigFor,
+  fallbackSubtypeFor,
+} from "./kind-editors";
+import type {
+  CustomFieldConfig,
+  CustomFieldDefinition,
+  CustomFieldKind,
+  CustomFieldSubtype,
+  FooterDescriptor,
+  FooterKind,
+} from "./types";
 
-export type CustomFieldType =
-  | "text"
-  | "number"
-  | "date"
-  | "dropdown"
-  | "checkbox";
-
-export interface CustomFieldDefinition {
-  "@id": string;
-  id: string;
-  name: string;
-  type: CustomFieldType;
-  options: string[] | null;
-  position: number;
-  required: boolean;
-}
-
+/**
+ * Schema editor for a project's custom field catalogue. Talks to
+ * `/custom_field_definitions` with the {kind, subtype, config, footer,
+ * nullable} payload the API now expects (#227). Per-kind config
+ * editors live in `kind-editors.tsx`; this component owns the shared
+ * scaffolding (list, composer, footer descriptor).
+ */
 interface Collection<T> {
   member?: T[];
   "hydra:member"?: T[];
@@ -41,22 +47,6 @@ interface Props {
   projectIri: string;
   isSpaceAdmin: boolean;
 }
-
-const TYPE_LABEL: Record<CustomFieldType, string> = {
-  text: "Text",
-  number: "Number",
-  date: "Date",
-  dropdown: "Dropdown",
-  checkbox: "Checkbox",
-};
-
-const TYPE_ORDER: CustomFieldType[] = [
-  "text",
-  "number",
-  "date",
-  "dropdown",
-  "checkbox",
-];
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -71,7 +61,17 @@ const errorMessage = async (res: Response): Promise<string> => {
 const sortByPosition = (
   list: CustomFieldDefinition[],
 ): CustomFieldDefinition[] =>
-  [...list].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
+  [...list].sort(
+    (a, b) => a.position - b.position || a.name.localeCompare(b.name),
+  );
+
+const describeType = (def: CustomFieldDefinition): string => {
+  const kindLabel = KIND_DESCRIPTORS[def.kind]?.label ?? def.kind;
+  const subtypeLabel =
+    KIND_DESCRIPTORS[def.kind]?.subtypes.find((s) => s.value === def.subtype)
+      ?.label ?? def.subtype;
+  return `${kindLabel} · ${subtypeLabel}`;
+};
 
 const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
@@ -91,9 +91,7 @@ const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
       });
       if (!res.ok) throw new Error("Failed to load custom fields.");
       const data: Collection<CustomFieldDefinition> = await res.json();
-      setDefs(
-        sortByPosition(data.member ?? data["hydra:member"] ?? []),
-      );
+      setDefs(sortByPosition(data.member ?? data["hydra:member"] ?? []));
     } catch (err) {
       setLoadError(
         err instanceof Error ? err.message : "Failed to load custom fields.",
@@ -141,7 +139,8 @@ const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
     }
   };
 
-  const nextPosition = defs.length > 0 ? Math.max(...defs.map((d) => d.position)) + 1 : 0;
+  const nextPosition =
+    defs.length > 0 ? Math.max(...defs.map((d) => d.position)) + 1 : 0;
 
   return (
     <div className="space-y-4" data-testid="custom-fields-manager">
@@ -199,14 +198,23 @@ const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
                           >
                             {def.name}
                           </span>
-                          <Badge variant="outline">{TYPE_LABEL[def.type]}</Badge>
-                          {def.required && (
+                          <Badge variant="outline">{describeType(def)}</Badge>
+                          {!def.nullable && (
                             <Badge variant="secondary">Required</Badge>
                           )}
+                          {def.config.multi && (
+                            <Badge variant="secondary">Multi-value</Badge>
+                          )}
+                          {def.footer && (
+                            <Badge variant="secondary">
+                              Footer: {def.footer.kind}
+                            </Badge>
+                          )}
                         </div>
-                        {def.type === "dropdown" && def.options && (
+                        {def.kind === "select" && def.config.options && (
                           <p className="text-xs text-muted-foreground">
-                            Options: {def.options.join(", ")}
+                            Options:{" "}
+                            {def.config.options.map((o) => o.label).join(", ")}
                           </p>
                         )}
                       </div>
@@ -282,45 +290,65 @@ const CustomFieldComposer = ({
   onCancel,
 }: ComposerProps) => {
   const [name, setName] = useState(initial?.name ?? "");
-  const [type, setType] = useState<CustomFieldType>(initial?.type ?? "text");
-  const [required, setRequired] = useState(initial?.required ?? false);
-  const [options, setOptions] = useState<string[]>(initial?.options ?? []);
+  const [kind, setKind] = useState<CustomFieldKind>(initial?.kind ?? "text");
+  const [subtype, setSubtype] = useState<CustomFieldSubtype>(
+    initial?.subtype ?? fallbackSubtypeFor("text"),
+  );
+  const [config, setConfig] = useState<CustomFieldConfig>(
+    initial?.config ?? defaultConfigFor("text", "text"),
+  );
+  const [nullable, setNullable] = useState(initial?.nullable ?? true);
+  const [footer, setFooter] = useState<FooterDescriptor | null>(
+    initial?.footer ?? null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isEdit = Boolean(initial);
+  const descriptor = KIND_DESCRIPTORS[kind];
 
-  const setOptionAt = (idx: number, value: string) => {
-    setOptions((prev) => prev.map((o, i) => (i === idx ? value : o)));
+  const multiSupported = useMemo(() => {
+    if (!descriptor.supportsMulti) return false;
+    if (descriptor.noMultiSubtypes?.includes(subtype)) return false;
+    // select.multi forces multi=true; select.single forces false.
+    if (kind === "select") return false;
+    return true;
+  }, [descriptor, subtype, kind]);
+
+  const handleKindChange = (next: CustomFieldKind) => {
+    const nextSubtype = KIND_DESCRIPTORS[next].subtypes[0].value;
+    setKind(next);
+    setSubtype(nextSubtype);
+    setConfig(defaultConfigFor(next, nextSubtype));
+    setFooter(null);
   };
 
-  const addOption = () => setOptions((prev) => [...prev, ""]);
-  const removeOption = (idx: number) =>
-    setOptions((prev) => prev.filter((_, i) => i !== idx));
+  const handleSubtypeChange = (next: CustomFieldSubtype) => {
+    setSubtype(next);
+    if (kind === "select") {
+      // Keep options across single<->multi switches; just flip the
+      // multi flag in config since it's intrinsic to the subtype.
+      setConfig((prev) => ({ ...prev, multi: next === "multi" }));
+    } else if (descriptor.noMultiSubtypes?.includes(next)) {
+      setConfig((prev) => ({ ...prev, multi: false }));
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
 
-    const cleanedOptions =
-      type === "dropdown"
-        ? options.map((o) => o.trim()).filter((o) => o.length > 0)
-        : null;
-
-    if (type === "dropdown" && cleanedOptions && cleanedOptions.length === 0) {
-      setError("Add at least one option for a dropdown field.");
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
     try {
       const body: Record<string, unknown> = {
         name: trimmedName,
-        type,
-        required,
-        options: cleanedOptions,
+        kind,
+        subtype,
+        config,
+        nullable,
+        footer,
       };
       let res: Response;
       if (isEdit && initial) {
@@ -370,71 +398,101 @@ const CustomFieldComposer = ({
               data-testid="custom-field-name-input"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="cf-type">Type</Label>
-            <select
-              id="cf-type"
-              value={type}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => {
-                const next = e.target.value as CustomFieldType;
-                setType(next);
-                if (next === "dropdown" && options.length === 0) {
-                  setOptions([""]);
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-kind">Kind</Label>
+              <select
+                id="cf-kind"
+                value={kind}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                  handleKindChange(e.target.value as CustomFieldKind)
                 }
-              }}
-              className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              data-testid="custom-field-type-input"
-            >
-              {TYPE_ORDER.map((t) => (
-                <option key={t} value={t}>
-                  {TYPE_LABEL[t]}
-                </option>
-              ))}
-            </select>
-          </div>
-          {type === "dropdown" && (
-            <div className="space-y-2" data-testid="custom-field-options">
-              <Label>Options</Label>
-              {options.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    value={opt}
-                    onChange={(e) => setOptionAt(idx, e.target.value)}
-                    placeholder={`Option ${idx + 1}`}
-                    aria-label={`Option ${idx + 1}`}
-                    data-testid="custom-field-option-input"
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => removeOption(idx)}
-                    aria-label={`Remove option ${idx + 1}`}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={addOption}
-                data-testid="custom-field-option-add"
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                data-testid="custom-field-kind-input"
               >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add option
-              </Button>
+                {KIND_ORDER.map((k) => (
+                  <option key={k} value={k}>
+                    {KIND_DESCRIPTORS[k].label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cf-subtype">Subtype</Label>
+              <select
+                id="cf-subtype"
+                value={subtype}
+                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                  handleSubtypeChange(e.target.value as CustomFieldSubtype)
+                }
+                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                data-testid="custom-field-subtype-input"
+              >
+                {descriptor.subtypes.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <CustomFieldConfigEditor
+            kind={kind}
+            subtype={subtype}
+            config={config}
+            onChange={setConfig}
+          />
+
+          {multiSupported && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="cf-multi"
+                checked={Boolean(config.multi)}
+                onCheckedChange={(checked) =>
+                  setConfig({ ...config, multi: Boolean(checked) })
+                }
+                data-testid="custom-field-multi-input"
+              />
+              <Label htmlFor="cf-multi">Allow multiple values</Label>
             </div>
           )}
+
           <div className="flex items-center gap-2">
             <Checkbox
               id="cf-required"
-              checked={required}
-              onCheckedChange={(checked) => setRequired(Boolean(checked))}
+              checked={!nullable}
+              onCheckedChange={(checked) => setNullable(!checked)}
               data-testid="custom-field-required-input"
             />
             <Label htmlFor="cf-required">Required</Label>
           </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cf-footer">
+              Footer aggregation{" "}
+              <span className="text-muted-foreground text-xs">(optional)</span>
+            </Label>
+            <select
+              id="cf-footer"
+              value={footer?.kind ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setFooter(v === "" ? null : { kind: v as FooterKind });
+              }}
+              className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              data-testid="custom-field-footer-input"
+            >
+              <option value="">No footer</option>
+              {descriptor.footerKinds.map((fk) => (
+                <option key={fk} value={fk}>
+                  {fk}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>

@@ -70,7 +70,12 @@ jobs:
           compression-level: 0
 
   phpunit:
-    name: PHPUnit
+    # Branch protection on `main` requires a status check named "Tests"
+    # (legacy name from before this workflow split out per-tool checks).
+    # Keeping the workflow job-id `phpunit` for backward search/log
+    # familiarity, but the displayed check name has to match the
+    # protection rule.
+    name: Tests
     needs: build
     runs-on: ubuntu-latest
     steps:

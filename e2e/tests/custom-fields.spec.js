@@ -8,8 +8,8 @@ const {
 
 const uniqueEmail = () => shared("custom-fields");
 
-test.describe("Custom field definitions", () => {
-  test("project owner can create, edit, and delete a dropdown field", async ({
+test.describe("Custom field definitions (kind-aware, #227)", () => {
+  test("project owner can create a select.single field, edit it, and delete it", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
@@ -35,13 +35,13 @@ test.describe("Custom field definitions", () => {
     const composer = page.getByTestId("custom-field-composer");
     await expect(composer).toBeVisible();
 
-    // Switch type to dropdown — the options editor appears with one
-    // empty row pre-populated.
-    await composer.getByTestId("custom-field-type-input").selectOption("dropdown");
+    // Switch kind to select; subtype defaults to "single". The options
+    // editor appears.
+    await composer.getByTestId("custom-field-kind-input").selectOption("select");
     const options = composer.getByTestId("custom-field-options");
     await expect(options).toBeVisible();
 
-    // Fill name + two dropdown options.
+    // Fill name + two options.
     await composer
       .getByTestId("custom-field-name-input")
       .fill("Severity");
@@ -58,7 +58,8 @@ test.describe("Custom field definitions", () => {
       hasText: "Severity",
     });
     await expect(item).toBeVisible();
-    await expect(item.locator("text=Dropdown")).toBeVisible();
+    // The badge shows the human label for `select.single`.
+    await expect(item.locator("text=Single choice")).toBeVisible();
     await expect(item.locator("text=Required")).toBeVisible();
     await expect(item.locator("text=Options: low, high")).toBeVisible();
 
@@ -84,8 +85,48 @@ test.describe("Custom field definitions", () => {
       }),
     ).toHaveCount(0);
   });
+
+  test("composer surfaces per-kind config — money currency, numeric min/max", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+
+    await page.goto(`${BASE_URL}/projects`);
+    const projectTitle = `CF-kinds-${Date.now()}`;
+    await page.fill("#title", projectTitle);
+    await page.click('button[type="submit"]');
+    const projectItem = page.locator('[data-testid="project-item"]', {
+      hasText: projectTitle,
+    });
+    await expect(projectItem).toBeVisible();
+    await projectItem.locator(`a[href^="/projects/"]`).first().click();
+    await page.click('[data-testid="project-custom-fields-link"]');
+
+    await page.getByTestId("custom-field-add").click();
+    const composer = page.getByTestId("custom-field-composer");
+
+    // Pick numeric > money → currency input shows up.
+    await composer.getByTestId("custom-field-kind-input").selectOption("numeric");
+    await composer
+      .getByTestId("custom-field-subtype-input")
+      .selectOption("money");
+    await expect(composer.getByTestId("custom-field-currency-input")).toBeVisible();
+    await composer.getByTestId("custom-field-currency-input").fill("EUR");
+
+    await composer.getByTestId("custom-field-name-input").fill("Budget");
+    // Money supports footer aggregations (sum/avg/min/max/count).
+    await composer.getByTestId("custom-field-footer-input").selectOption("sum");
+    await composer.getByTestId("custom-field-save").click();
+
+    const item = page.locator('[data-testid="custom-field-item"]', {
+      hasText: "Budget",
+    });
+    await expect(item).toBeVisible();
+    await expect(item.locator("text=Money")).toBeVisible();
+    await expect(item.locator("text=Footer: sum")).toBeVisible();
+  });
 });
 
-// API-side authorization (members can read, only the owner can write)
+// API-side authorization (members can read, only space admins can write)
 // is covered by CustomFieldDefinitionTest in PHPUnit; the access
 // extension also has direct coverage there.

@@ -81,8 +81,11 @@ class ProjectCopyTest extends ApiTestCase
             ->findBy(['project' => $copy], ['position' => 'ASC']);
         $this->assertCount(2, $defs);
         $this->assertSame('Severity', $defs[0]->getName());
-        $this->assertSame('dropdown', $defs[0]->getType());
-        $this->assertSame(['low', 'med', 'high'], $defs[0]->getOptions());
+        $this->assertSame('select.single', $defs[0]->getTypeKey());
+        $this->assertSame(
+            ['low', 'med', 'high'],
+            array_map(static fn (array $o) => $o['key'], $defs[0]->getConfig()['options'] ?? []),
+        );
         $this->assertSame('Notes', $defs[1]->getName());
 
         // Source project is untouched (its 2 CFDs still there).

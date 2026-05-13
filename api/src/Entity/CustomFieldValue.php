@@ -58,21 +58,40 @@ class CustomFieldValue
     private ?CustomFieldDefinition $definition = null;
 
     /**
-     * Type-erased scalar. Stored as JSON so a single column can hold any
-     * of the five supported types; null is a deliberate "no value" for
-     * an optional field. See {@see App\Validator\ValidCustomFieldValues}
-     * for per-type shape rules.
+     * Type-erased scalar (or list). Stored as JSON so a single column
+     * can hold any kind/subtype the strategy registry supports — string
+     * for text/url/dropdown, int|float for numeric, ISO date string for
+     * date, bool for boolean, `{amount, currency}` for money,
+     * `{user|task|page|discussion: "/iri/..."}` for references, and the
+     * list-of-any-of-the-above shape when `config.multi=true`. Null is
+     * a deliberate "no value" for a nullable field. Shape validation
+     * lives in {@see App\Validator\ValidCustomFieldValues}.
      */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private mixed $value = null;
 
     /**
-     * Postgres-managed tsvector over the value's text projection
-     * (`value #>> '{}'`), populated by a STORED generated column — see
-     * Version20260505000000. Mapped here so DQL can reference
-     * `cfv.searchVector` from the task search filter's EXISTS subquery;
-     * never written from PHP, never serialised.
+     * Plain-text projection of `value` for the FTS index. Written by the
+     * type strategies on persist — references dereference the target's
+     * display label, dates render as `Y-m-d`, money renders the amount
+     * + currency, references emit the target's name so FTS hits work
+     * against user-facing strings rather than UUIDs. Null/empty means
+     * the value contributes nothing searchable.
+     *
+     * The Postgres-managed `search_vector` column is generated from this
+     * (see Version20260513000000) so DQL can keep referencing
+     * `cfv.searchVector` unchanged.
+     */
+    #[ORM\Column(name: 'value_search', type: 'text', nullable: true)]
+    private ?string $valueSearch = null;
+
+    /**
+     * Postgres-managed tsvector projection of {@see $valueSearch},
+     * populated by a STORED generated column — see Version20260513000000.
+     * Mapped here so DQL can reference `cfv.searchVector` from the task
+     * search filter's EXISTS subquery; never written from PHP, never
+     * serialised.
      */
     #[ORM\Column(name: 'search_vector', type: 'text', nullable: true, insertable: false, updatable: false)]
     private ?string $searchVector = null;
@@ -112,6 +131,17 @@ class CustomFieldValue
     public function setValue(mixed $value): static
     {
         $this->value = $value;
+        return $this;
+    }
+
+    public function getValueSearch(): ?string
+    {
+        return $this->valueSearch;
+    }
+
+    public function setValueSearch(?string $valueSearch): static
+    {
+        $this->valueSearch = $valueSearch;
         return $this;
     }
 }
