@@ -49,7 +49,8 @@ class PageMoveController extends AbstractController
         }
 
         $sourceSpace = $page->getSpace();
-        if (!$this->isGranted('ROLE_ADMIN')
+        if (
+            !$this->isGranted('ROLE_ADMIN')
             && (null === $sourceSpace || !$sourceSpace->hasMember($user))
         ) {
             // Hide source-membership failures behind a 404 (existence-hiding).

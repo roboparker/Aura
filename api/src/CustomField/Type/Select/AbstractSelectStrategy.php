@@ -129,7 +129,8 @@ abstract class AbstractSelectStrategy extends AbstractTypeStrategy
         }
         $labels = [];
         foreach ($options as $option) {
-            if (is_array($option)
+            if (
+                is_array($option)
                 && is_string($key = $option['key'] ?? null)
                 && is_string($label = $option['label'] ?? null)
             ) {

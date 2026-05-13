@@ -99,8 +99,10 @@ class ProjectMoveController extends AbstractController
         // breaking access extensions and search filters. Discussions
         // live on the space directly (no project link) and stay in
         // their source space — they aren't carried by the move.
-        foreach ($this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project]) as $definition) {
+        foreach (
+            $this->em->getRepository(CustomFieldDefinition::class)
+            ->findBy(['project' => $project]) as $definition
+        ) {
             $definition->setSpace($target);
         }
 

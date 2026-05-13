@@ -1,0 +1,43 @@
+includes:
+    - phpstan-baseline.neon
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-symfony/rules.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-doctrine/rules.neon
+    - vendor/phpstan/phpstan-phpunit/extension.neon
+    - vendor/phpstan/phpstan-phpunit/rules.neon
+
+parameters:
+    level: 5
+    paths:
+        - src
+        - tests
+    excludePaths:
+        - tests/phpstan/*
+    bootstrapFiles:
+        - vendor/autoload.php
+    tmpDir: var/phpstan
+    # Tolerate baseline patterns that don't match in subset runs (e.g.,
+    # `phpstan analyse src/Filter`). CI runs the full suite where the
+    # patterns are expected to match.
+    reportUnmatchedIgnoredErrors: false
+    symfony:
+        # Boots a real `test` kernel so the analyzer can resolve service
+        # IDs and the custom `doctrine.uuid_generator` factory. Container
+        # XML is warmed by the CI step before phpstan runs.
+        containerXmlPath: var/cache/test/App_KernelTestDebugContainer.xml
+        consoleApplicationLoader: tests/phpstan/console-application.php
+    doctrine:
+        # Required so phpstan-doctrine can instantiate the EntityManager
+        # (with our custom UUID generator service) when typing
+        # ::getRepository(), QueryBuilder, etc.
+        objectManagerLoader: tests/phpstan/object-manager.php
+    parallel:
+        # Each worker forks a child PHP process; the analyzer reads vendor/
+        # over a bind-mount on dev machines which can race under WSL2/Docker
+        # Desktop and segfault. Two workers stays well under that ceiling
+        # while still parallelising in CI on real Linux.
+        maximumNumberOfProcesses: 2
+    # Pre-existing violations live in phpstan-baseline.neon so CI only fails
+    # on *new* errors. Regenerate after fixing a batch:
+    #   docker compose run --rm phpstan analyse --generate-baseline

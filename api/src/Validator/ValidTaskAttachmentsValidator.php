@@ -41,7 +41,8 @@ final class ValidTaskAttachmentsValidator extends ConstraintValidator
 
         foreach ($value->getAttachments() as $attachment) {
             $attachmentOwner = $attachment->getOwner();
-            if (null === $attachmentOwner || null === $attachmentOwner->getId()
+            if (
+                null === $attachmentOwner || null === $attachmentOwner->getId()
                 || (string) $attachmentOwner->getId() !== (string) $owner->getId()
             ) {
                 $this->context->buildViolation($constraint->messageNotOwner)

@@ -102,10 +102,22 @@ class CommentMercurePublisherTest extends TestCase
             {
                 throw new \RuntimeException('Failed to send an update.');
             }
-            public function getUrl(): string { return 'http://test'; }
-            public function getPublicUrl(): string { return 'http://test'; }
-            public function getProvider(): \Symfony\Component\Mercure\Jwt\TokenProviderInterface { throw new \LogicException(); }
-            public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface { return null; }
+            public function getUrl(): string
+            {
+                return 'http://test';
+            }
+            public function getPublicUrl(): string
+            {
+                return 'http://test';
+            }
+            public function getProvider(): \Symfony\Component\Mercure\Jwt\TokenProviderInterface
+            {
+                throw new \LogicException();
+            }
+            public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface
+            {
+                return null;
+            }
         };
         $normalizer = $this->createMock(NormalizerInterface::class);
         $normalizer->method('normalize')->willReturn(['@id' => '/comments/x']);
@@ -138,10 +150,22 @@ class CommentMercurePublisherTest extends TestCase
                 return 'id-' . count($this->updates);
             }
 
-            public function getUrl(): string { return 'http://test'; }
-            public function getPublicUrl(): string { return 'http://test'; }
-            public function getProvider(): \Symfony\Component\Mercure\Jwt\TokenProviderInterface { throw new \LogicException(); }
-            public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface { return null; }
+            public function getUrl(): string
+            {
+                return 'http://test';
+            }
+            public function getPublicUrl(): string
+            {
+                return 'http://test';
+            }
+            public function getProvider(): \Symfony\Component\Mercure\Jwt\TokenProviderInterface
+            {
+                throw new \LogicException();
+            }
+            public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface
+            {
+                return null;
+            }
         };
 
         $normalizer = $this->createMock(NormalizerInterface::class);

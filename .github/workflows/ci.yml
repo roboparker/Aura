@@ -120,6 +120,78 @@ jobs:
         # keeps growing.
         run: docker compose exec -T php php -d memory_limit=512M bin/phpunit
 
+  phpstan:
+    name: PHPStan
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
+      -
+        # Need the php container up so vendor/ is composer-installed into
+        # the shared api_vendor volume. Skip PWA — phpstan doesn't need it.
+        name: Start services
+        run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build php database
+      -
+        name: Run PHPStan
+        # The cache:warmup + phpstan analyse pair has to run in a single
+        # container: the dev Dockerfile declares `VOLUME /app/var/`, so
+        # every `docker compose run --rm` instantiates a fresh anonymous
+        # volume on /app/var and the warmup's compiled container XML
+        # vanishes between calls. Chaining them via `sh -c` keeps the
+        # warmed cache visible to phpstan-symfony's containerXmlPath and
+        # phpstan-doctrine's objectManagerLoader.
+        #
+        # PHPStan exits 0 even when parallel workers crash (the "Result
+        # is incomplete" path), so we tee the output and fail manually
+        # on that banner — otherwise an analyzer crash would silently
+        # let real errors through CI.
+        run: |
+          set -o pipefail
+          docker compose -f compose.yaml -f compose.override.yaml run --rm --entrypoint=sh phpstan -c '
+            php -d xdebug.mode=off bin/console -e test cache:warmup &&
+            php -d xdebug.mode=off vendor/bin/phpstan analyse --memory-limit=4G --no-progress
+          ' 2>&1 | tee /tmp/phpstan.out
+          if grep -q "Result is incomplete\|Some parallel worker jobs have not finished" /tmp/phpstan.out; then
+            echo "::error::PHPStan analysis was incomplete — failing the build."
+            exit 1
+          fi
+
+  phpcs:
+    name: PHPCS
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Download images artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+      -
+        name: Load images
+        run: docker load -i /tmp/images.tar.gz
+      -
+        # phpcs only needs vendor/ — no database, no PWA.
+        name: Start php service
+        run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build php
+      -
+        name: Run PHP_CodeSniffer
+        run: docker compose -f compose.yaml -f compose.override.yaml run --rm phpcs
+
   schema:
     name: Doctrine Schema
     needs: build

@@ -61,7 +61,8 @@ class PageCopyController extends AbstractController
         }
 
         $sourceSpace = $source->getSpace();
-        if (!$this->isGranted('ROLE_ADMIN')
+        if (
+            !$this->isGranted('ROLE_ADMIN')
             && (null === $sourceSpace || !$sourceSpace->hasMember($user))
         ) {
             return $this->json(['error' => 'Page not found.'], 404);
