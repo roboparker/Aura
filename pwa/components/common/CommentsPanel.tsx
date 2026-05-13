@@ -256,7 +256,11 @@ const CommentItem = ({
           </div>
         ) : (
           <>
-            <MarkdownView source={comment.body} className="text-sm" />
+            <MarkdownView
+              source={comment.body}
+              className="text-sm"
+              highlightMentions
+            />
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
