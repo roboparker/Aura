@@ -2,26 +2,30 @@
 
 namespace App\Service;
 
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\User;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Parses `@mention` tokens out of a comment body and creates one
- * `task_mention` Notification per resolved recipient. Tokens are
- * resolved against the comment's task: project members + task owner.
- * Mentions of users outside that set are ignored silently — the spec
- * (#106) treats unknown handles as plain text rather than an error so
- * users can write `@TODO` or `@anywhere` without provoking a 4xx.
+ * Parses `@mention` tokens out of a {@see Comment} body and creates
+ * one `mention` Notification per resolved recipient. The recipient
+ * set is derived from the comment's parent:
  *
- * Idempotent on edit: the (recipient, comment) unique index plus the
- * pre-flight existsForCommentRecipient check make sure adding a new
- * mention to an existing comment notifies only the new recipient,
+ *  - task comments: task owner + project space members.
+ *  - page comments: page's space members.
+ *
+ * Unknown handles are ignored silently — the spec treats them as
+ * plain text rather than 4xx-ing so users can write `@TODO` or
+ * `@anywhere` without provoking validation noise.
+ *
+ * Idempotent on edit: the `(recipient, comment)` unique index plus
+ * the pre-flight existsForCommentRecipient check make sure adding a
+ * new mention to an existing comment notifies only the new recipient,
  * never re-pings the previously mentioned ones.
  */
-final class TaskCommentMentionService
+final class CommentMentionService
 {
     /**
      * Matches `@token` where token is a non-whitespace run that looks
@@ -38,9 +42,7 @@ final class TaskCommentMentionService
 
     /**
      * Returns the deduplicated list of @mention tokens (without the @)
-     * found in the body, preserving first-seen order. Used by callers
-     * that want to render or display the list; the create path below
-     * uses the same parser internally.
+     * found in the body, preserving first-seen order.
      *
      * @return string[]
      */
@@ -60,13 +62,12 @@ final class TaskCommentMentionService
     }
 
     /**
-     * Creates Notification rows for each mention in the comment's body
-     * that resolves to an authorized recipient (project member or task
-     * owner). Returns the count of rows created — 0 when every mention
-     * was either unknown, the comment author themselves (no self-pings),
-     * or already notified.
+     * Creates Notification rows for each mention in the comment's
+     * body that resolves to an authorized recipient. Returns the
+     * count of rows created — 0 when every mention was unknown, the
+     * comment author themselves (no self-pings), or already notified.
      */
-    public function dispatchMentions(TaskComment $comment): int
+    public function dispatchMentions(Comment $comment): int
     {
         $body = $comment->getBody();
         $tokens = $this->extractMentions($body);
@@ -74,9 +75,8 @@ final class TaskCommentMentionService
             return 0;
         }
 
-        $task = $comment->getTask();
         $author = $comment->getAuthor();
-        if (null === $task || null === $author) {
+        if (null === $author) {
             return 0;
         }
 
@@ -91,7 +91,6 @@ final class TaskCommentMentionService
             if (null === $user) {
                 continue;
             }
-            // Suppress self-mentions — pinging yourself is just noise.
             if ($author->getId()?->equals($user->getId())) {
                 continue;
             }
@@ -101,14 +100,19 @@ final class TaskCommentMentionService
 
             $notification = new Notification();
             $notification->setRecipient($user);
-            $notification->setTask($task);
             $notification->setComment($comment);
-            $notification->setType(Notification::TYPE_TASK_MENTION);
-            $notification->setTitle(sprintf(
-                '%s mentioned you on "%s"',
-                $this->displayName($author),
-                $task->getTitle(),
-            ));
+            $notification->setType(Notification::TYPE_MENTION);
+
+            // Carry the parent task on `Notification.task` when the
+            // comment is task-scoped so the existing deep-link path
+            // on the bell keeps working. Page-scoped notifications
+            // leave `task` null and rely on `comment` for the link.
+            $task = $comment->getTask();
+            if (null !== $task) {
+                $notification->setTask($task);
+            }
+
+            $notification->setTitle($this->renderTitle($author, $comment));
             $notification->setBody($this->snippet($body));
             $this->em->persist($notification);
 
@@ -116,9 +120,8 @@ final class TaskCommentMentionService
                 $this->em->flush();
                 ++$created;
             } catch (UniqueConstraintViolationException) {
-                // Race with a concurrent edit on the same comment —
-                // the row landed via the other path. Recover the EM
-                // and continue with the remaining tokens.
+                // Race with a concurrent edit on the same comment;
+                // recover the EM and continue with remaining tokens.
                 $this->em->clear();
             }
         }
@@ -127,28 +130,40 @@ final class TaskCommentMentionService
     }
 
     /**
-     * Space members of the parent project + task owner (#185). Personal
-     * tasks (no project) yield just the owner — useful for self-mention
-     * suppression rather than notification, but the contract stays
-     * consistent.
+     * Recipient set for the comment's parent.
      *
-     * @return User[] Keyed by lowercase email-local-part for fast resolution.
+     *  - Task: owner + project space members. Standalone (projectless)
+     *    tasks yield just the owner.
+     *  - Page: page's space members (effective: direct + via group).
+     *
+     * @return array<string, User> Keyed by lowercase email-local-part
+     *                              for fast token resolution.
      */
-    private function collectMentionableUsers(TaskComment $comment): array
+    private function collectMentionableUsers(Comment $comment): array
     {
-        $task = $comment->getTask();
-        if (null === $task) {
-            return [];
-        }
         $bag = [];
-        $owner = $task->getOwner();
-        if (null !== $owner) {
-            $bag[$this->localPart($owner)] = $owner;
+        $task = $comment->getTask();
+        if (null !== $task) {
+            $owner = $task->getOwner();
+            if (null !== $owner) {
+                $bag[$this->localPart($owner)] = $owner;
+            }
+            $project = $task->getProject();
+            if (null !== $project) {
+                foreach ($project->getEffectiveMembers() as $member) {
+                    $bag[$this->localPart($member)] = $member;
+                }
+            }
+            return $bag;
         }
-        $project = $task->getProject();
-        if (null !== $project) {
-            foreach ($project->getEffectiveMembers() as $member) {
-                $bag[$this->localPart($member)] = $member;
+
+        $page = $comment->getPage();
+        if (null !== $page) {
+            $space = $page->getSpace();
+            if (null !== $space) {
+                foreach ($space->getEffectiveUsers() as $member) {
+                    $bag[$this->localPart($member)] = $member;
+                }
             }
         }
         return $bag;
@@ -169,12 +184,26 @@ final class TaskCommentMentionService
         return false === $at ? $email : substr($email, 0, $at);
     }
 
-    private function alreadyNotified(User $recipient, TaskComment $comment): bool
+    private function alreadyNotified(User $recipient, Comment $comment): bool
     {
         return null !== $this->em->getRepository(Notification::class)->findOneBy([
             'recipient' => $recipient,
             'comment' => $comment,
         ]);
+    }
+
+    private function renderTitle(User $author, Comment $comment): string
+    {
+        $name = $this->displayName($author);
+        $task = $comment->getTask();
+        if (null !== $task) {
+            return sprintf('%s mentioned you on "%s"', $name, $task->getTitle());
+        }
+        $page = $comment->getPage();
+        if (null !== $page) {
+            return sprintf('%s mentioned you on "%s"', $name, $page->getTitle());
+        }
+        return sprintf('%s mentioned you', $name);
     }
 
     private function displayName(User $user): string

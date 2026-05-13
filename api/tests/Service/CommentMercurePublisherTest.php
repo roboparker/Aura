@@ -2,10 +2,10 @@
 
 namespace App\Tests\Service;
 
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\Task;
 use App\Entity\User;
-use App\Service\TaskCommentMercurePublisher;
+use App\Service\CommentMercurePublisher;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Mercure\HubInterface;
 use Symfony\Component\Mercure\Update;
@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
  * recorder; we don't go through ApiPlatform here because the goal is to
  * pin the topic format and payload shape so subscribers can rely on them.
  */
-class TaskCommentMercurePublisherTest extends TestCase
+class CommentMercurePublisherTest extends TestCase
 {
     public function testPublishCreatedSendsCommentPayloadOnTaskTopic(): void
     {
@@ -37,7 +37,7 @@ class TaskCommentMercurePublisherTest extends TestCase
         $payload = json_decode($update->getData(), true, 512, \JSON_THROW_ON_ERROR);
         $this->assertSame('create', $payload['type']);
         $this->assertSame('Looks good.', $payload['comment']['body']);
-        $this->assertSame('/task_comments/0193bbbb-0001-7000-8000-000000000001', $payload['comment']['@id']);
+        $this->assertSame('/comments/0193bbbb-0001-7000-8000-000000000001', $payload['comment']['@id']);
     }
 
     public function testPublishUpdatedUsesUpdateType(): void
@@ -73,8 +73,8 @@ class TaskCommentMercurePublisherTest extends TestCase
         $payload = json_decode($update->getData(), true, 512, \JSON_THROW_ON_ERROR);
         $this->assertSame([
             'type' => 'delete',
-            'id' => '/task_comments/0193bbbb-0001-7000-8000-000000000003',
-            'task' => '/tasks/0193aaaa-0001-7000-8000-000000000003',
+            'id' => '/comments/0193bbbb-0001-7000-8000-000000000003',
+            'parent' => '/tasks/0193aaaa-0001-7000-8000-000000000003',
         ], $payload);
     }
 
@@ -84,13 +84,13 @@ class TaskCommentMercurePublisherTest extends TestCase
         // reference between persist and publish — we'd rather skip the
         // event than throw and 500 the API call.
         [$publisher, $hub] = $this->makePublisher();
-        $comment = new TaskComment();
+        $comment = new Comment();
         $publisher->publishCreated($comment);
         $this->assertCount(0, $hub->updates);
     }
 
     /**
-     * @return array{0: TaskCommentMercurePublisher, 1: object{updates: array<int, Update>}}
+     * @return array{0: CommentMercurePublisher, 1: object{updates: array<int, Update>}}
      */
     private function makePublisher(): array
     {
@@ -117,20 +117,20 @@ class TaskCommentMercurePublisherTest extends TestCase
             // the publisher routes data through whatever NormalizerInterface
             // it gets — the actual JSON-LD shape is exercised by the
             // existing CommentTest cases.
-            static function (TaskComment $c): array {
+            static function (Comment $c): array {
                 return [
-                    '@id' => '/task_comments/' . $c->getId(),
-                    '@type' => 'TaskComment',
+                    '@id' => '/comments/' . $c->getId(),
+                    '@type' => 'Comment',
                     'id' => (string) $c->getId(),
                     'body' => $c->getBody(),
                 ];
             },
         );
 
-        return [new TaskCommentMercurePublisher($hub, $normalizer), $hub];
+        return [new CommentMercurePublisher($hub, $normalizer), $hub];
     }
 
-    private function makeComment(string $taskId, string $commentId, string $body): TaskComment
+    private function makeComment(string $taskId, string $commentId, string $body): Comment
     {
         $owner = new User();
         $this->setEntityId($owner, '0193cccc-0001-7000-8000-000000000001');
@@ -140,7 +140,7 @@ class TaskCommentMercurePublisherTest extends TestCase
         $task->setTitle('Parent task');
         $this->setEntityId($task, $taskId);
 
-        $comment = new TaskComment();
+        $comment = new Comment();
         $comment->setTask($task);
         $comment->setAuthor($owner);
         $comment->setBody($body);

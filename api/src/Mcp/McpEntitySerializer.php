@@ -2,7 +2,7 @@
 
 namespace App\Mcp;
 
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\MediaObject;
 use App\Entity\Project;
@@ -80,12 +80,13 @@ final class McpEntitySerializer
     /**
      * @return array<string, mixed>
      */
-    public function comment(TaskComment $comment): array
+    public function comment(Comment $comment): array
     {
         return [
             'id' => (string) $comment->getId(),
+            'commentableType' => $comment->getCommentableType(),
             'taskId' => null === $comment->getTask() ? null : (string) $comment->getTask()->getId(),
-            'parentCommentId' => null === $comment->getParentComment() ? null : (string) $comment->getParentComment()->getId(),
+            'pageId' => null === $comment->getPage() ? null : (string) $comment->getPage()->getId(),
             'body' => $comment->getBody(),
             'author' => $this->userSummary($comment->getAuthor()),
             'createdAt' => $comment->getCreatedAt()->format(\DateTimeInterface::ATOM),

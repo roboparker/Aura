@@ -29,7 +29,7 @@ class ActivityHistoryTest extends ApiTestCase
 
         // Wipe in dependency order. ext_log_entries has no FK so we
         // truncate it via DQL last to keep cross-test runs clean.
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();

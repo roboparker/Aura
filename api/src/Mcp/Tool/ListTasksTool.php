@@ -88,7 +88,7 @@ final class ListTasksTool implements McpToolInterface
 
         $search = $this->input->optionalString($arguments, 'search');
         if (null !== $search && '' !== trim($search)) {
-            $qb->leftJoin(\App\Entity\TaskComment::class, 'c_search', 'WITH', 'c_search.task = t')
+            $qb->leftJoin(\App\Entity\Comment::class, 'c_search', 'WITH', 'c_search.task = t')
                 ->andWhere('LOWER(t.title) LIKE :search OR LOWER(t.description) LIKE :search OR LOWER(c_search.body) LIKE :search')
                 ->setParameter('search', '%' . strtolower(trim($search)) . '%');
             $qb->groupBy('t.id');
