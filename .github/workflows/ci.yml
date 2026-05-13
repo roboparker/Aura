@@ -143,26 +143,25 @@ jobs:
         name: Start services
         run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build php database
       -
-        # phpstan-symfony's containerXmlPath + phpstan-doctrine's
-        # objectManagerLoader both read the test container's compiled XML.
-        # We warm via the `phpstan` service (not `php`) because the `php`
-        # service mounts `/app/var` as an anonymous volume — cache files
-        # written there don't escape into the bind mount the phpstan
-        # service reads from. Running the warmup inside the phpstan
-        # service writes to /app/var via the ./api:/app bind mount, so
-        # the subsequent analysis step sees the compiled container XML.
-        name: Warm test cache
-        run: docker compose -f compose.yaml -f compose.override.yaml run --rm --entrypoint=php phpstan -d xdebug.mode=off bin/console -e test cache:warmup
-      -
         name: Run PHPStan
+        # The cache:warmup + phpstan analyse pair has to run in a single
+        # container: the dev Dockerfile declares `VOLUME /app/var/`, so
+        # every `docker compose run --rm` instantiates a fresh anonymous
+        # volume on /app/var and the warmup's compiled container XML
+        # vanishes between calls. Chaining them via `sh -c` keeps the
+        # warmed cache visible to phpstan-symfony's containerXmlPath and
+        # phpstan-doctrine's objectManagerLoader.
+        #
         # PHPStan exits 0 even when parallel workers crash (the "Result
         # is incomplete" path), so we tee the output and fail manually
         # on that banner — otherwise an analyzer crash would silently
         # let real errors through CI.
         run: |
           set -o pipefail
-          docker compose -f compose.yaml -f compose.override.yaml run --rm phpstan \
-            analyse --memory-limit=4G --no-progress 2>&1 | tee /tmp/phpstan.out
+          docker compose -f compose.yaml -f compose.override.yaml run --rm --entrypoint=sh phpstan -c '
+            php -d xdebug.mode=off bin/console -e test cache:warmup &&
+            php -d xdebug.mode=off vendor/bin/phpstan analyse --memory-limit=4G --no-progress
+          ' 2>&1 | tee /tmp/phpstan.out
           if grep -q "Result is incomplete\|Some parallel worker jobs have not finished" /tmp/phpstan.out; then
             echo "::error::PHPStan analysis was incomplete — failing the build."
             exit 1
