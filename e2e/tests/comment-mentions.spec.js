@@ -94,12 +94,12 @@ test.describe("Comment @-mentions", () => {
     await editor.click();
     await alicePage.keyboard.type(commentText);
 
-    // Capture the POST /task_comments request body so we can verify the
-    // markdown that BlockNote emitted.
+    // Capture the POST /comments request body so we can verify the
+    // markdown that BlockNote emitted (#228 unified the resource).
     const [postRequest] = await Promise.all([
       alicePage.waitForRequest(
         (req) =>
-          req.method() === "POST" && req.url().endsWith("/task_comments"),
+          req.method() === "POST" && req.url().endsWith("/comments"),
       ),
       panel.locator('[data-testid="comment-submit"]').click(),
     ]);

@@ -236,7 +236,7 @@ const CommentItem = ({
                 size="sm"
                 disabled={busy || !draft.trim()}
                 onClick={() => void saveEdit()}
-                data-testid="comment-save-edit"
+                data-testid="comment-edit-save"
               >
                 {busy ? "Saving…" : "Save"}
               </Button>
