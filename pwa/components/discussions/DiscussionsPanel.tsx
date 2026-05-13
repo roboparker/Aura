@@ -38,8 +38,7 @@ interface Collection<T> {
 }
 
 interface Props {
-  projectId: string;
-  projectIri: string;
+  spaceIri: string;
   currentUserIri: string | null;
   isSpaceAdmin: boolean;
 }
@@ -86,8 +85,7 @@ export const errorMessage = async (res: Response): Promise<string> => {
 };
 
 const DiscussionsPanel = ({
-  projectId,
-  projectIri,
+  spaceIri,
   currentUserIri,
   isSpaceAdmin,
 }: Props) => {
@@ -110,7 +108,7 @@ const DiscussionsPanel = ({
     setIsLoading(true);
     setLoadError(null);
     try {
-      const url = `${ENTRYPOINT}/discussions?project=${encodeURIComponent(projectIri)}`;
+      const url = `${ENTRYPOINT}/discussions?space=${encodeURIComponent(spaceIri)}`;
       const res = await fetch(url, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
@@ -125,7 +123,7 @@ const DiscussionsPanel = ({
     } finally {
       setIsLoading(false);
     }
-  }, [projectIri]);
+  }, [spaceIri]);
 
   useEffect(() => {
     void load();
@@ -150,7 +148,7 @@ const DiscussionsPanel = ({
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
-          project: projectIri,
+          space: spaceIri,
           title,
           body,
           category: newCategory,
@@ -339,7 +337,6 @@ const DiscussionsPanel = ({
             <DiscussionRow
               key={d["@id"]}
               discussion={d}
-              projectId={projectId}
               currentUserIri={currentUserIri}
               isSpaceAdmin={isSpaceAdmin}
               onPatch={patchDiscussion}
@@ -362,7 +359,6 @@ const sortDiscussions = (list: Discussion[]): Discussion[] =>
 
 interface RowProps {
   discussion: Discussion;
-  projectId: string;
   currentUserIri: string | null;
   isSpaceAdmin: boolean;
   onPatch: (
@@ -374,7 +370,6 @@ interface RowProps {
 
 const DiscussionRow = ({
   discussion,
-  projectId,
   currentUserIri,
   isSpaceAdmin,
   onPatch,
@@ -432,7 +427,7 @@ const DiscussionRow = ({
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <Link
-                  href={`/projects/${projectId}/discussions/${discussion.id}`}
+                  href={`/discussions/${discussion.id}`}
                   className="font-semibold text-foreground no-underline hover:underline"
                   data-testid="discussion-title"
                 >

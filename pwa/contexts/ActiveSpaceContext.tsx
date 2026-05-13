@@ -34,6 +34,16 @@ export interface SpaceGroupMembershipRow {
   role: "admin" | "member";
 }
 
+export interface SpaceAttachment {
+  "@id": string;
+  id: string;
+  originalName: string;
+  mimeType: string;
+  byteSize: number;
+  variantUrls: { original?: string };
+  downloadUrl?: string | null;
+}
+
 export interface Space {
   "@id": string;
   id: string;
@@ -44,6 +54,10 @@ export interface Space {
   createdBy: { "@id": string; id: string; email: string } | null;
   userMemberships: SpaceMembershipRow[];
   groupMemberships: SpaceGroupMembershipRow[];
+  /** Shared files attached at the space level. Present on the detail
+   *  endpoint; may be undefined on the list endpoint when the
+   *  collection isn't expanded. */
+  attachments?: SpaceAttachment[];
 }
 
 interface SpaceCollection {

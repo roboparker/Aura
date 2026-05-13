@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\SpaceRepository;
 use App\State\SpaceCreateProcessor;
+use App\Validator\ValidSpaceAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -68,6 +69,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     columns: ['created_by_id'],
     options: ['where' => '(is_personal = true)'],
 )]
+#[ValidSpaceAttachments]
 class Space
 {
     public const ROLE_ADMIN = 'admin';
@@ -167,11 +169,32 @@ class Space
     #[Groups(['space:read'])]
     private Collection $groupMemberships;
 
+    /**
+     * MediaObjects attached at the space level (cover docs, shared
+     * specs, anything not pinned to a specific task). Replaces the
+     * old `project_attachment` join — attachments now live at the
+     * space so they're available to every project + member in it.
+     * Membership is edited via PATCH on the Space with an
+     * `attachments` array of MediaObject IRIs; the PWA uploads via
+     * `POST /media-objects` (kind=attachment) first.
+     * {@see ValidSpaceAttachments} enforces uploader-is-member +
+     * kind=attachment.
+     *
+     * @var Collection<int, MediaObject>
+     */
+    #[ORM\ManyToMany(targetEntity: MediaObject::class)]
+    #[ORM\JoinTable(name: 'space_attachment')]
+    #[ORM\JoinColumn(name: 'space_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'media_object_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['space:read', 'space:write'])]
+    private Collection $attachments;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->userMemberships = new ArrayCollection();
         $this->groupMemberships = new ArrayCollection();
+        $this->attachments = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -276,6 +299,28 @@ class Space
     public function removeGroupMembership(SpaceGroupMembership $membership): static
     {
         $this->groupMemberships->removeElement($membership);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, MediaObject>
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function addAttachment(MediaObject $media): static
+    {
+        if (!$this->attachments->contains($media)) {
+            $this->attachments->add($media);
+        }
+        return $this;
+    }
+
+    public function removeAttachment(MediaObject $media): static
+    {
+        $this->attachments->removeElement($media);
         return $this;
     }
 

@@ -3,7 +3,7 @@
 namespace App\Validator;
 
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Validator\Constraint;
@@ -11,7 +11,7 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
-final class ValidProjectAttachmentsValidator extends ConstraintValidator
+final class ValidSpaceAttachmentsValidator extends ConstraintValidator
 {
     public function __construct(private Security $security)
     {
@@ -19,26 +19,24 @@ final class ValidProjectAttachmentsValidator extends ConstraintValidator
 
     public function validate(mixed $value, Constraint $constraint): void
     {
-        if (!$constraint instanceof ValidProjectAttachments) {
-            throw new UnexpectedTypeException($constraint, ValidProjectAttachments::class);
+        if (!$constraint instanceof ValidSpaceAttachments) {
+            throw new UnexpectedTypeException($constraint, ValidSpaceAttachments::class);
         }
 
         if (null === $value) {
             return;
         }
 
-        if (!$value instanceof Project) {
-            throw new UnexpectedValueException($value, Project::class);
+        if (!$value instanceof Space) {
+            throw new UnexpectedValueException($value, Space::class);
         }
 
-        // Build the member-id set from the project's space (#185). On
-        // POST the owner is added to the space inside
-        // ProjectOwnerProcessor *after* validation, so include the
-        // current security user too — without that, the very first
-        // attachment upload during project creation would 422 every
-        // time.
+        // Effective members already covers direct + group-inherited
+        // membership. Include the current security user too so the
+        // very first attachment upload during space creation doesn't
+        // 422 before the creator's membership is persisted.
         $memberIds = [];
-        foreach ($value->getEffectiveMembers() as $id => $member) {
+        foreach ($value->getEffectiveUsers() as $id => $member) {
             $memberIds[$id] = true;
         }
         $current = $this->security->getUser();

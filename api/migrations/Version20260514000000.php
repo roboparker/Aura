@@ -8,182 +8,175 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
 /**
- * Unifies `task_comment` + `page_comment` into one `comment` table (#228).
+ * Reparents attachments and discussions from `project` to `space`.
  *
- * The two tables had converged on the same shape (flat thread, @mentions,
- * author/body/created/updated) and the only remaining differences were
- * which parent FK they carried. We keep both parent FKs (`task_id` and
- * `page_id`) on the unified table — exactly one is set per row, with a
- * check constraint to enforce that — so cascade-on-delete from each
- * parent type still works without a polymorphic untyped column.
+ *   1. `discussion.project_id` is dropped — the denormalised `space_id`
+ *      column (introduced in Version20260507120000) becomes the only
+ *      parent. The two project-scoped indexes on `discussion` are
+ *      replaced with space-scoped equivalents.
  *
- * Steps (single transaction, reversible):
+ *   2. `project_attachment` is replaced by `space_attachment`. Existing
+ *      rows are migrated by joining through `project.space_id`. The new
+ *      join table has the same shape (composite PK, CASCADE on both
+ *      sides). Duplicates (same media attached to multiple projects in
+ *      the same space) collapse via ON CONFLICT DO NOTHING.
  *
- *   1. Extend `task_comment`:
- *      - Add `commentable_type VARCHAR(8) NULL` (NOT NULL after backfill).
- *      - Add `page_id UUID NULL` + FK to `page` ON DELETE CASCADE.
- *      - Backfill `commentable_type = 'task'` for every existing row.
- *
- *   2. Flatten the reply tree. The old `parent_comment_id` self-FK
- *      supported up to 3 levels of nesting; #228 collapses to flat
- *      chronological. Just drop the FK + column — replies stay as
- *      standalone rows ordered by `created_at` (their context lives in
- *      the chronological view).
- *
- *   3. Make `task_id` nullable so page-parent rows can leave it empty.
- *
- *   4. Migrate `page_comment` rows in: `INSERT INTO task_comment (id,
- *      page_id, author_id, body, created_at, updated_at,
- *      commentable_type) SELECT ..., 'page' FROM page_comment`.
- *
- *   5. Migrate notifications: `task_mention` → `mention` so the type
- *      column matches the new unified naming.
- *
- *   6. Rename the table `task_comment` → `comment`. Rename the
- *      Doctrine-generated FK/index names so the crc32(table) prefix
- *      matches the new table (`8B957886` → `9474526C`).
- *
- *   7. Drop the now-empty `page_comment` table.
- *
- *   8. Tighten:
- *      - `commentable_type` NOT NULL.
- *      - CHECK constraint: exactly one of `task_id` / `page_id` is set,
- *        and `commentable_type` matches.
- *      - Add `idx_comment_page_created (page_id, created_at)` companion
- *        to the existing task index.
+ * The discussion FTS `search_vector` doesn't reference project_id so
+ * the GIN index stays untouched.
  */
 final class Version20260514000000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Unify task_comment + page_comment into one polymorphic comment table (#228).';
+        return 'Reparent discussions + attachments from project to space.';
     }
 
     public function up(Schema $schema): void
     {
-        // 1. New columns on task_comment.
-        $this->addSql('ALTER TABLE task_comment ADD COLUMN commentable_type VARCHAR(8)');
-        $this->addSql('ALTER TABLE task_comment ADD COLUMN page_id UUID DEFAULT NULL');
-        $this->addSql("UPDATE task_comment SET commentable_type = 'task'");
-        $this->addSql('ALTER TABLE task_comment ADD CONSTRAINT FK_8B957886C4663E4 FOREIGN KEY (page_id) REFERENCES page (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
-        // Postgres doesn't auto-create an index for new FKs; Doctrine
-        // expects one matching the constraint hash on every ManyToOne
-        // join column. Create it explicitly to keep
-        // `doctrine:schema:validate` clean after the rename.
-        $this->addSql('CREATE INDEX IDX_8B957886C4663E4 ON task_comment (page_id)');
+        // ----- Discussions -----------------------------------------
 
-        // 2. Flatten the reply tree.
-        $this->addSql('ALTER TABLE task_comment DROP CONSTRAINT FK_8B957886BF2AF943');
-        $this->addSql('DROP INDEX idx_task_comment_parent');
-        $this->addSql('ALTER TABLE task_comment DROP COLUMN parent_comment_id');
+        // Drop project-scoped indexes — they reference project_id and
+        // would block the column drop.
+        $this->addSql('DROP INDEX IF EXISTS idx_discussion_project_created');
+        $this->addSql('DROP INDEX IF EXISTS idx_discussion_project_pinned');
 
-        // 3. task_id becomes nullable so page rows can sit alongside.
-        $this->addSql('ALTER TABLE task_comment ALTER COLUMN task_id DROP NOT NULL');
-
-        // 4. Move page_comment rows over.
+        // Drop the FK + column. space_id (already populated) becomes
+        // the sole parent.
         $this->addSql(<<<'SQL'
-            INSERT INTO task_comment (id, page_id, author_id, body, created_at, updated_at, commentable_type)
-            SELECT id, page_id, author_id, body, created_at, updated_at, 'page'
-            FROM page_comment
+            ALTER TABLE discussion
+            DROP CONSTRAINT IF EXISTS fk_5b7be83b166d1f9c
         SQL);
-
-        // 5. Notification type rename.
-        $this->addSql("UPDATE notification SET type = 'mention' WHERE type = 'task_mention'");
-
-        // 6. Rename the table + every Doctrine-hashed name attached to it.
-        //
-        //    crc32('task_comment') = 8B957886 (lowercase in the catalog
-        //    because the original CREATE INDEX was unquoted)
-        //    crc32('comment')      = 9474526C
-        $this->addSql('ALTER TABLE task_comment RENAME TO comment');
-        $this->addSql('ALTER INDEX task_comment_pkey RENAME TO comment_pkey');
-        $this->addSql('ALTER INDEX idx_task_comment_task_created RENAME TO idx_comment_task_created');
-        $this->addSql('ALTER INDEX idx_task_comment_search_vector RENAME TO idx_comment_search_vector');
-        $this->addSql('ALTER INDEX IDX_8B9578868DB60186 RENAME TO IDX_9474526C8DB60186');
-        $this->addSql('ALTER INDEX IDX_8B957886F675F31B RENAME TO IDX_9474526CF675F31B');
-        $this->addSql('ALTER INDEX IDX_8B957886C4663E4 RENAME TO IDX_9474526CC4663E4');
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_8B9578868DB60186 TO FK_9474526C8DB60186');
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_8B957886F675F31B TO FK_9474526CF675F31B');
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_8B957886C4663E4 TO FK_9474526CC4663E4');
-
-        // 7. Drop the source table.
-        $this->addSql('DROP TABLE page_comment');
-
-        // 8. Tighten + index.
-        $this->addSql('ALTER TABLE comment ALTER COLUMN commentable_type SET NOT NULL');
-        $this->addSql('CREATE INDEX idx_comment_page_created ON comment (page_id, created_at)');
+        // Doctrine's actual constraint name is hashed; do a defensive
+        // sweep based on column.
         $this->addSql(<<<'SQL'
-            ALTER TABLE comment
-            ADD CONSTRAINT chk_comment_parent_exactly_one
-            CHECK (
-                (commentable_type = 'task' AND task_id IS NOT NULL AND page_id IS NULL)
-                OR (commentable_type = 'page' AND page_id IS NOT NULL AND task_id IS NULL)
+            DO $$
+            DECLARE
+                fk_name TEXT;
+            BEGIN
+                FOR fk_name IN
+                    SELECT conname FROM pg_constraint
+                    WHERE conrelid = 'discussion'::regclass
+                      AND contype = 'f'
+                      AND conkey @> ARRAY[
+                          (SELECT attnum FROM pg_attribute
+                           WHERE attrelid = 'discussion'::regclass
+                             AND attname = 'project_id')
+                      ]
+                LOOP
+                    EXECUTE 'ALTER TABLE discussion DROP CONSTRAINT ' || quote_ident(fk_name);
+                END LOOP;
+            END$$
+        SQL);
+        $this->addSql('ALTER TABLE discussion DROP COLUMN project_id');
+
+        // Drop the single-column `idx_discussion_space` from
+        // Version20260507120000 — the composite indexes below subsume
+        // it, and keeping it would show as an orphan in doctrine:
+        // schema:validate against the entity mapping.
+        $this->addSql('DROP INDEX IF EXISTS idx_discussion_space');
+
+        // Re-add the two indexes scoped to space_id.
+        $this->addSql('CREATE INDEX idx_discussion_space_created ON discussion (space_id, created_at)');
+        $this->addSql('CREATE INDEX idx_discussion_space_pinned ON discussion (space_id, is_pinned, created_at)');
+
+        // ----- Attachments -----------------------------------------
+
+        $this->addSql(<<<'SQL'
+            CREATE TABLE space_attachment (
+                space_id UUID NOT NULL,
+                media_object_id UUID NOT NULL,
+                PRIMARY KEY(space_id, media_object_id)
             )
         SQL);
+        // Index + FK names follow Doctrine's auto-generated convention
+        // so doctrine:schema:validate matches the entity mapping with
+        // no rename diffs.
+        $this->addSql('CREATE INDEX IDX_7FC0CDEA23575340 ON space_attachment (space_id)');
+        $this->addSql('CREATE INDEX IDX_7FC0CDEA64DE5A5 ON space_attachment (media_object_id)');
+        $this->addSql(<<<'SQL'
+            ALTER TABLE space_attachment
+            ADD CONSTRAINT FK_7FC0CDEA23575340 FOREIGN KEY (space_id)
+            REFERENCES space (id) ON DELETE CASCADE
+            NOT DEFERRABLE INITIALLY IMMEDIATE
+        SQL);
+        $this->addSql(<<<'SQL'
+            ALTER TABLE space_attachment
+            ADD CONSTRAINT FK_7FC0CDEA64DE5A5 FOREIGN KEY (media_object_id)
+            REFERENCES media_object (id) ON DELETE CASCADE
+            NOT DEFERRABLE INITIALLY IMMEDIATE
+        SQL);
+
+        // Backfill from project_attachment: every (project, media) pair
+        // becomes (project.space, media). Collisions (same media on
+        // multiple projects in the same space) collapse via the PK.
+        $this->addSql(<<<'SQL'
+            INSERT INTO space_attachment (space_id, media_object_id)
+            SELECT DISTINCT p.space_id, pa.media_object_id
+            FROM project_attachment pa
+            INNER JOIN project p ON p.id = pa.project_id
+            WHERE p.space_id IS NOT NULL
+            ON CONFLICT DO NOTHING
+        SQL);
+
+        // Drop the old join table now that data has migrated.
+        $this->addSql('DROP TABLE project_attachment');
     }
 
     public function down(Schema $schema): void
     {
-        // Reverse step 8.
-        $this->addSql('ALTER TABLE comment DROP CONSTRAINT chk_comment_parent_exactly_one');
-        $this->addSql('DROP INDEX idx_comment_page_created');
-        $this->addSql('ALTER TABLE comment ALTER COLUMN commentable_type DROP NOT NULL');
+        // ----- Attachments (reverse) -------------------------------
 
-        // Reverse step 7 — recreate page_comment.
         $this->addSql(<<<'SQL'
-            CREATE TABLE page_comment (
-                id UUID NOT NULL,
-                page_id UUID NOT NULL,
-                author_id UUID NOT NULL,
-                body TEXT NOT NULL,
-                created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
-                updated_at TIMESTAMP(0) WITHOUT TIME ZONE DEFAULT NULL,
-                PRIMARY KEY(id)
+            CREATE TABLE project_attachment (
+                project_id UUID NOT NULL,
+                media_object_id UUID NOT NULL,
+                PRIMARY KEY(project_id, media_object_id)
             )
         SQL);
-        $this->addSql('CREATE INDEX idx_page_comment_page_created ON page_comment (page_id, created_at)');
-        $this->addSql('ALTER TABLE page_comment ADD CONSTRAINT fk_page_comment_page FOREIGN KEY (page_id) REFERENCES page(id) ON DELETE CASCADE');
-        $this->addSql('ALTER TABLE page_comment ADD CONSTRAINT fk_page_comment_author FOREIGN KEY (author_id) REFERENCES "user"(id) ON DELETE CASCADE');
+        $this->addSql('CREATE INDEX IDX_61F9A289166D1F9C ON project_attachment (project_id)');
+        $this->addSql('CREATE INDEX IDX_61F9A28964DE5A5 ON project_attachment (media_object_id)');
+        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_61F9A289166D1F9C FOREIGN KEY (project_id) REFERENCES project (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
+        $this->addSql('ALTER TABLE project_attachment ADD CONSTRAINT FK_61F9A28964DE5A5 FOREIGN KEY (media_object_id) REFERENCES media_object (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
 
-        // Reverse step 6 — rename back. Notification.comment_id FK
-        // implicitly follows the table rename.
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_9474526CC4663E4 TO FK_8B957886C4663E4');
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_9474526CF675F31B TO FK_8B957886F675F31B');
-        $this->addSql('ALTER TABLE comment RENAME CONSTRAINT FK_9474526C8DB60186 TO FK_8B9578868DB60186');
-        $this->addSql('ALTER INDEX IDX_9474526CC4663E4 RENAME TO IDX_8B957886C4663E4');
-        $this->addSql('ALTER INDEX IDX_9474526CF675F31B RENAME TO IDX_8B957886F675F31B');
-        $this->addSql('ALTER INDEX IDX_9474526C8DB60186 RENAME TO IDX_8B9578868DB60186');
-        $this->addSql('ALTER INDEX idx_comment_search_vector RENAME TO idx_task_comment_search_vector');
-        $this->addSql('ALTER INDEX idx_comment_task_created RENAME TO idx_task_comment_task_created');
-        $this->addSql('ALTER INDEX comment_pkey RENAME TO task_comment_pkey');
-        $this->addSql('ALTER TABLE comment RENAME TO task_comment');
-
-        // Reverse step 5 — restore the old notification type name.
-        $this->addSql("UPDATE notification SET type = 'task_mention' WHERE type = 'mention'");
-
-        // Reverse step 4 — move page-parent rows back out.
+        // Best-effort restoration: stamp every (space, media) onto
+        // every project in that space. Pre-rename projects had the
+        // exact pair so this re-creates a superset of the original
+        // mapping — okay for a last-resort escape hatch.
         $this->addSql(<<<'SQL'
-            INSERT INTO page_comment (id, page_id, author_id, body, created_at, updated_at)
-            SELECT id, page_id, author_id, body, created_at, updated_at
-            FROM task_comment
-            WHERE commentable_type = 'page'
+            INSERT INTO project_attachment (project_id, media_object_id)
+            SELECT p.id, sa.media_object_id
+            FROM space_attachment sa
+            INNER JOIN project p ON p.space_id = sa.space_id
+            ON CONFLICT DO NOTHING
         SQL);
-        $this->addSql("DELETE FROM task_comment WHERE commentable_type = 'page'");
 
-        // Reverse step 3.
-        $this->addSql('ALTER TABLE task_comment ALTER COLUMN task_id SET NOT NULL');
+        $this->addSql('DROP TABLE space_attachment');
 
-        // Reverse step 2. Restore parent_comment_id without data — the
-        // flatten step in up() lost the parent references and we can't
-        // reconstruct them.
-        $this->addSql('ALTER TABLE task_comment ADD COLUMN parent_comment_id UUID DEFAULT NULL');
-        $this->addSql('CREATE INDEX idx_task_comment_parent ON task_comment (parent_comment_id)');
-        $this->addSql('ALTER TABLE task_comment ADD CONSTRAINT FK_8B957886BF2AF943 FOREIGN KEY (parent_comment_id) REFERENCES task_comment(id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
+        // ----- Discussions (reverse) -------------------------------
 
-        // Reverse step 1.
-        $this->addSql('DROP INDEX IDX_8B957886C4663E4');
-        $this->addSql('ALTER TABLE task_comment DROP CONSTRAINT FK_8B957886C4663E4');
-        $this->addSql('ALTER TABLE task_comment DROP COLUMN page_id');
-        $this->addSql('ALTER TABLE task_comment DROP COLUMN commentable_type');
+        $this->addSql('DROP INDEX IF EXISTS idx_discussion_space_created');
+        $this->addSql('DROP INDEX IF EXISTS idx_discussion_space_pinned');
+
+        // Re-add project_id nullable, backfill from the "first project
+        // in the same space" so existing rows pass the eventual NOT
+        // NULL — same best-effort caveat as the attachment fan-out.
+        $this->addSql('ALTER TABLE discussion ADD COLUMN project_id UUID');
+        $this->addSql(<<<'SQL'
+            UPDATE discussion d
+            SET project_id = (
+                SELECT p.id FROM project p
+                WHERE p.space_id = d.space_id
+                ORDER BY p.created_on ASC
+                LIMIT 1
+            )
+        SQL);
+        $this->addSql(<<<'SQL'
+            ALTER TABLE discussion
+            ADD CONSTRAINT FK_5B7BE83B166D1F9C FOREIGN KEY (project_id)
+            REFERENCES project (id) ON DELETE CASCADE
+        SQL);
+        // Restore the original indexes.
+        $this->addSql('CREATE INDEX idx_discussion_project_created ON discussion (project_id, created_at)');
+        $this->addSql('CREATE INDEX idx_discussion_project_pinned ON discussion (project_id, is_pinned, created_at)');
     }
 }

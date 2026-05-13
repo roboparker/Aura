@@ -3,7 +3,6 @@
 namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\Tag;
@@ -40,13 +39,9 @@ use Symfony\Component\Uid\Uuid;
  *    custom field values are deliberately dropped — those are
  *    user-specific state, and CFV would need an old-CFD→new-CFD
  *    mapping that's a heavier slice on its own.
- *  - Discussions: opt-in via `includeDiscussions: true`. Each
- *    discussion thread is cloned with title + body + category; the
- *    clone's `author` is the caller (fresh audit history). `isPinned`
- *    and `isLocked` reset to false — those are moderation state tied
- *    to the source thread, not to the content. Mirrors the v1 scope
- *    of {@see DiscussionCopyController}; discussions don't have a
- *    comments model so there's nothing else to carry.
+ *  - Discussions live at the space level — not project — so they're
+ *    never carried along on a project copy. Use
+ *    {@see DiscussionCopyController} to clone a thread independently.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults
@@ -169,30 +164,6 @@ class ProjectCopyController extends AbstractController
             }
         }
 
-        // Optional discussion clone (#182 deep-copy). Opt-in via
-        // `includeDiscussions: true`. Each thread's title + body +
-        // category move over; the clone's author is the caller so the
-        // audit history starts fresh, and pin/lock reset to false
-        // because they're moderation state tied to the source thread,
-        // not properties of the content itself. Same v1 scope as
-        // DiscussionCopyController.
-        $discussionsCloned = 0;
-        if (true === ($payload['includeDiscussions'] ?? false)) {
-            $sourceDiscussions = $this->em->getRepository(Discussion::class)
-                ->findBy(['project' => $source], ['createdAt' => 'ASC']);
-            foreach ($sourceDiscussions as $sourceDiscussion) {
-                $cloneDiscussion = (new Discussion())
-                    ->setProject($copy)
-                    ->setSpace($target)
-                    ->setAuthor($user)
-                    ->setTitle($sourceDiscussion->getTitle())
-                    ->setBody($sourceDiscussion->getBody())
-                    ->setCategory($sourceDiscussion->getCategory());
-                $this->em->persist($cloneDiscussion);
-                ++$discussionsCloned;
-            }
-        }
-
         $this->em->flush();
 
         return $this->json([
@@ -201,7 +172,6 @@ class ProjectCopyController extends AbstractController
             'title' => $copy->getTitle(),
             'space' => '/spaces/' . $target->getId(),
             'tasksCloned' => $tasksCloned,
-            'discussionsCloned' => $discussionsCloned,
         ], 201);
     }
 
