@@ -37,14 +37,11 @@ interface PageDetail {
   createdBy: AvatarUser & { "@id": string; id: string };
 }
 
-interface PageComment {
-  "@id": string;
-  id: string;
-  body: string;
-  createdAt: string;
-  updatedAt: string | null;
-  author: AvatarUser & { "@id": string; id: string };
-}
+// Unified comment shape + UI (#228) — same as the task surface.
+import CommentsPanel, {
+  type Comment as PageCommentRow,
+} from "@/components/common/CommentsPanel";
+import { useCommentLiveUpdates } from "@/lib/useCommentLiveUpdates";
 
 interface ChildPage {
   "@id": string;
@@ -91,7 +88,7 @@ const PageDetailView = () => {
 
   const [page, setPage] = useState<PageDetail | null>(null);
   const [children, setChildren] = useState<ChildPage[]>([]);
-  const [comments, setComments] = useState<PageComment[]>([]);
+  const [comments, setComments] = useState<PageCommentRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -153,7 +150,7 @@ const PageDetailView = () => {
           { credentials: "include", headers: { Accept: "application/ld+json" } },
         ),
         fetch(
-          `${ENTRYPOINT}/page_comments?page=${encodeURIComponent(data["@id"])}&itemsPerPage=100`,
+          `${ENTRYPOINT}/comments?page=${encodeURIComponent(data["@id"])}&itemsPerPage=100`,
           { credentials: "include", headers: { Accept: "application/ld+json" } },
         ),
       ]);
@@ -162,7 +159,7 @@ const PageDetailView = () => {
         setChildren(collection.member ?? collection["hydra:member"] ?? []);
       }
       if (commentsRes.ok) {
-        const collection: Collection<PageComment> = await commentsRes.json();
+        const collection: Collection<PageCommentRow> = await commentsRes.json();
         setComments(collection.member ?? collection["hydra:member"] ?? []);
       }
     } catch (err) {
@@ -251,54 +248,74 @@ const PageDetailView = () => {
     }
   };
 
-  const handlePostComment = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!page || !newComment.trim()) return;
-    setPostingComment(true);
-    setCommentError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/page_comments`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          page: page["@id"],
-          body: newComment.trim(),
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(await errorMessage(res));
-      }
-      // Optimistic insert from the POST response — same shape as
-      // tasks.tsx's handleCreateComment. Avoids a GET round-trip
-      // racing the assertion (the previous load()/refreshComments
-      // approach was timing out on CI even with isLoading isolated).
-      const created: PageComment = await res.json();
-      setComments((prev) =>
-        prev.some((c) => c["@id"] === created["@id"])
-          ? prev
-          : [...prev, created],
-      );
-      setNewComment("");
-    } catch (err) {
-      setCommentError(err instanceof Error ? err.message : "Failed to post.");
-    } finally {
-      setPostingComment(false);
-    }
+  const handleCreateComment = async (body: string): Promise<void> => {
+    if (!page) return;
+    const res = await fetch(`${ENTRYPOINT}/comments`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/ld+json" },
+      body: JSON.stringify({ page: page["@id"], body }),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    const created: PageCommentRow = await res.json();
+    // Optimistic insert; the Mercure echo of this POST may also
+    // arrive and tries to add the same IRI — dedupe defensively.
+    setComments((prev) =>
+      prev.some((c) => c["@id"] === created["@id"])
+        ? prev
+        : [...prev, created],
+    );
   };
 
-  const handleDeleteComment = async (comment: PageComment) => {
-    if (!window.confirm("Delete this comment?")) return;
+  const handleEditComment = async (
+    comment: PageCommentRow,
+    body: string,
+  ): Promise<void> => {
+    const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ body }),
+    });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    const updated: PageCommentRow = await res.json();
+    setComments((prev) =>
+      prev.map((c) => (c["@id"] === updated["@id"] ? updated : c)),
+    );
+  };
+
+  const handleDeleteComment = async (
+    comment: PageCommentRow,
+  ): Promise<void> => {
     const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
       method: "DELETE",
       credentials: "include",
     });
     if (!res.ok) {
-      setError(await errorMessage(res));
-      return;
+      throw new Error(await errorMessage(res));
     }
     setComments((prev) => prev.filter((c) => c["@id"] !== comment["@id"]));
   };
+
+  // Live updates over Mercure — fold create/update/delete events
+  // into local state so a co-editor's posts appear without reload.
+  useCommentLiveUpdates(page?.["@id"] ?? null, !!page, (event) => {
+    if (event.type === "delete") {
+      setComments((prev) => prev.filter((c) => c["@id"] !== event.id));
+      return;
+    }
+    const incoming = event.comment as unknown as PageCommentRow;
+    setComments((prev) => {
+      const idx = prev.findIndex((c) => c["@id"] === incoming["@id"]);
+      if (idx === -1) {
+        if (event.type !== "create") return prev;
+        return [...prev, incoming];
+      }
+      const next = [...prev];
+      next[idx] = incoming;
+      return next;
+    });
+  });
 
   const handleMove = async () => {
     if (!page || !moveTargetIri) return;
@@ -635,73 +652,16 @@ const PageDetailView = () => {
               <Card>
                 <CardContent className="pt-6">
                   <h2 className="text-lg font-semibold mb-3">Comments</h2>
-                  {comments.length === 0 ? (
-                    <p className="text-sm text-muted-foreground mb-4">
-                      No comments yet.
-                    </p>
-                  ) : (
-                    <ul className="space-y-3 mb-4" data-testid="page-comments">
-                      {comments.map((c) => {
-                        const isOwn = user.id === c.author.id;
-                        const canDelete = isOwn || isSpaceAdmin;
-                        return (
-                          <li
-                            key={c["@id"]}
-                            className="flex items-start gap-3"
-                            data-testid="page-comment"
-                          >
-                            <UserAvatar user={c.author} size="sm" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs text-muted-foreground">
-                                {displayName(c.author)} ·{" "}
-                                {formatRelative(c.createdAt)}
-                                {c.updatedAt && " · edited"}
-                              </p>
-                              <p className="text-sm whitespace-pre-wrap break-words">
-                                {c.body}
-                              </p>
-                            </div>
-                            {canDelete && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteComment(c)}
-                                aria-label="Delete comment"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-
-                  <form onSubmit={handlePostComment} className="space-y-2">
-                    <Label htmlFor="new-page-comment" className="sr-only">
-                      Add a comment
-                    </Label>
-                    <Textarea
-                      id="new-page-comment"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment…"
-                      rows={3}
-                      maxLength={50000}
-                    />
-                    {commentError && (
-                      <Alert variant="destructive">
-                        <AlertDescription>{commentError}</AlertDescription>
-                      </Alert>
-                    )}
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={postingComment || !newComment.trim()}
-                    >
-                      {postingComment ? "Posting…" : "Post comment"}
-                    </Button>
-                  </form>
+                  <CommentsPanel
+                    parentLabel={page.title}
+                    comments={comments}
+                    isLoading={false}
+                    currentUserIri={user ? `/users/${user.id}` : null}
+                    canModerate={!!isSpaceAdmin}
+                    onCreate={handleCreateComment}
+                    onEdit={handleEditComment}
+                    onDelete={handleDeleteComment}
+                  />
                 </CardContent>
               </Card>
             </>

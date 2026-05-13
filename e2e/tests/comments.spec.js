@@ -134,8 +134,8 @@ test.describe("Task comments", () => {
     expect(taskRes.ok()).toBeTruthy();
     const task = await taskRes.json();
 
-    // Bob posts a comment via API.
-    const commentRes = await bob.request.post(`${BASE_URL}/task_comments`, {
+    // Bob posts a comment via API (#228 unified the resource).
+    const commentRes = await bob.request.post(`${BASE_URL}/comments`, {
       headers: { "Content-Type": "application/ld+json" },
       data: { task: task["@id"], body: "Bob's note." },
     });

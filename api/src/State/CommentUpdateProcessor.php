@@ -4,35 +4,35 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\TaskComment;
-use App\Service\TaskCommentMentionService;
-use App\Service\TaskCommentMercurePublisher;
+use App\Entity\Comment;
+use App\Service\CommentMentionService;
+use App\Service\CommentMercurePublisher;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Wraps the default ORM persist processor on `PATCH /task_comments/{id}` so we
- * can publish the edit to Mercure subscribers after the row has been
- * flushed. Same pattern as TaskUpdateProcessor.
+ * Wraps the default ORM persist processor on `PATCH /comments/{id}`
+ * so we can publish the edit to Mercure subscribers after the row
+ * has been flushed. Same pattern as TaskUpdateProcessor.
  *
- * @implements ProcessorInterface<TaskComment, TaskComment>
+ * @implements ProcessorInterface<Comment, Comment>
  */
-final class TaskCommentUpdateProcessor implements ProcessorInterface
+final class CommentUpdateProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<TaskComment, TaskComment> $persistProcessor
+     * @param ProcessorInterface<Comment, Comment> $persistProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private TaskCommentMercurePublisher $publisher,
-        private TaskCommentMentionService $mentions,
+        private CommentMercurePublisher $publisher,
+        private CommentMentionService $mentions,
     ) {
     }
 
     /**
-     * @param TaskComment $data
+     * @param Comment $data
      */
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): TaskComment
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Comment
     {
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
         // Edits can introduce new @mentions; the (recipient, comment)

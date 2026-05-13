@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
-use App\Entity\TaskComment;
+use App\Entity\Comment;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -34,7 +34,7 @@ class McpTest extends ApiTestCase
         $this->entityManager = $kernel->getContainer()->get('doctrine')->getManager();
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TaskComment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();

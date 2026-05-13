@@ -40,17 +40,17 @@ import {
 } from "@/lib/attachments";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
-  useTaskCommentLiveUpdates,
+  useCommentLiveUpdates,
   type CommentLiveEvent,
-} from "@/lib/useTaskCommentLiveUpdates";
+} from "@/lib/useCommentLiveUpdates";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
 import TagsCombobox from "@/components/tasks/TagsCombobox";
-import TaskCommentsPanel, {
-  type TaskComment,
-} from "@/components/tasks/TaskCommentsPanel";
+import CommentsPanel, {
+  type Comment,
+} from "@/components/common/CommentsPanel";
 import AttachmentsPanel, {
   type Attachment,
 } from "@/components/tasks/AttachmentsPanel";
@@ -554,30 +554,11 @@ const plainTextDescription = (markdown: string | null): string => {
     .trim();
 };
 
-// Removes a comment and every descendant whose `parentComment` chain
-// terminates at the deleted IRI. Used after a manual delete *and* when a
-// Mercure delete event arrives — the server cascade fires at the DB
-// level and only the top of the subtree is broadcast.
-const pruneSubtree = (list: TaskComment[], removedIri: string): TaskComment[] => {
-  const removed = new Set<string>([removedIri]);
-  // Comments arrive oldest-first; a single forward pass catches all
-  // descendants because a reply is always created after its parent.
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const c of list) {
-      if (
-        !removed.has(c["@id"]) &&
-        c.parentComment !== null &&
-        removed.has(c.parentComment)
-      ) {
-        removed.add(c["@id"]);
-        changed = true;
-      }
-    }
-  }
-  return list.filter((c) => !removed.has(c["@id"]));
-};
+// Drops one comment from the local list. Was a recursive subtree
+// pruner pre-#228 when comments had a reply tree; the unified model
+// is flat, so a single ID filter is enough.
+const removeComment = (list: Comment[], removedIri: string): Comment[] =>
+  list.filter((c) => c["@id"] !== removedIri);
 
 interface SortableHeaderProps {
   label: string;
@@ -613,7 +594,7 @@ interface TaskRowProps {
   assignableUsers: AssigneeOption[];
   reorderable: boolean;
   currentUserIri: string | null;
-  comments: TaskComment[] | undefined;
+  comments: Comment[] | undefined;
   commentsLoading: boolean;
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
@@ -628,19 +609,15 @@ interface TaskRowProps {
   ) => Promise<void>;
   onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
   onAssigneeAvatarClick: (assignee: AssigneeOption) => void;
-  /** Lazy-load trigger: parent fetches `/task_comments?task=…` the first time
+  /** Lazy-load trigger: parent fetches `/comments?task=…` the first time
    *  this fires for a task. */
   onLoadComments: (task: Task) => Promise<void>;
-  onCreateComment: (
-    task: Task,
-    body: string,
-    parentIri?: string | null,
-  ) => Promise<void>;
-  onEditComment: (comment: TaskComment, body: string) => Promise<void>;
-  onDeleteComment: (comment: TaskComment) => Promise<void>;
+  onCreateComment: (task: Task, body: string) => Promise<void>;
+  onEditComment: (comment: Comment, body: string) => Promise<void>;
+  onDeleteComment: (comment: Comment) => Promise<void>;
   onAttachMedia: (task: Task, mediaObjectIri: string) => Promise<void>;
   onDetachMedia: (task: Task, attachment: Attachment) => Promise<void>;
-  /** Forwarded to useTaskCommentLiveUpdates: parent merges deltas published
+  /** Forwarded to useCommentLiveUpdates: parent merges deltas published
    *  by Mercure into commentsByTask state. */
   onCommentLiveEvent: (taskIri: string, event: CommentLiveEvent) => void;
 }
@@ -757,7 +734,7 @@ const TaskRow = ({
   // Subscribe to live comment updates only while the panel is open.
   // Closes the EventSource on collapse so we don't leave a connection
   // open per task in the list.
-  useTaskCommentLiveUpdates(commentsExpanded ? task.id : null, commentsExpanded, (event) => {
+  useCommentLiveUpdates(commentsExpanded ? task["@id"] : null, commentsExpanded, (event) => {
     onCommentLiveEvent(task["@id"], event);
   });
 
@@ -1064,15 +1041,13 @@ const TaskRow = ({
           <TableCell className="w-8" aria-hidden="true" />
           <TableCell className="w-10" aria-hidden="true" />
           <TableCell colSpan={5} className="pl-0 pr-4 pt-0 pb-4">
-            <TaskCommentsPanel
-              taskTitle={task.title}
+            <CommentsPanel
+              parentLabel={task.title}
               comments={comments ?? []}
               isLoading={commentsLoading && comments === undefined}
               currentUserIri={currentUserIri}
-              isTaskOwner={isLikelyTaskOwner}
-              onCreate={(body, parentIri) =>
-                onCreateComment(task, body, parentIri)
-              }
+              canModerate={isLikelyTaskOwner}
+              onCreate={(body) => onCreateComment(task, body)}
               onEdit={(comment, body) => onEditComment(comment, body)}
               onDelete={(comment) => onDeleteComment(comment)}
             />
@@ -1381,7 +1356,7 @@ const Tasks = () => {
   // empty array = fetched and there are none. The TaskRow uses the
   // distinction to show "Comments" vs "Comments (0)" before the first load.
   const [commentsByTask, setCommentsByTask] = useState<
-    Record<string, TaskComment[] | undefined>
+    Record<string, Comment[] | undefined>
   >({});
   const [loadingCommentsFor, setLoadingCommentsFor] = useState<Set<string>>(
     () => new Set(),
@@ -1899,14 +1874,14 @@ const Tasks = () => {
       });
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/task_comments?task=${encodeURIComponent(taskIri)}&itemsPerPage=200`,
+          `${ENTRYPOINT}/comments?task=${encodeURIComponent(taskIri)}&itemsPerPage=200`,
           {
             credentials: "include",
             headers: { Accept: "application/ld+json" },
           },
         );
         if (!res.ok) throw new Error("Failed to load comments.");
-        const data: { member?: TaskComment[]; "hydra:member"?: TaskComment[] } =
+        const data: { member?: Comment[]; "hydra:member"?: Comment[] } =
           await res.json();
         const list = data.member ?? data["hydra:member"] ?? [];
         setCommentsByTask((prev) => ({ ...prev, [taskIri]: list }));
@@ -1924,15 +1899,14 @@ const Tasks = () => {
   );
 
   const handleCreateComment = useCallback(
-    async (task: Task, body: string, parentIri: string | null = null) => {
+    async (task: Task, body: string) => {
       const trimmed = body.trim();
       if (!trimmed) return;
-      const payload: { task: string; body: string; parentComment?: string } = {
+      const payload: { task: string; body: string } = {
         task: task["@id"],
         body,
       };
-      if (parentIri) payload.parentComment = parentIri;
-      const res = await fetch(`${ENTRYPOINT}/task_comments`, {
+      const res = await fetch(`${ENTRYPOINT}/comments`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
@@ -1944,7 +1918,7 @@ const Tasks = () => {
           data["hydra:description"] || data.detail || "Failed to post comment.",
         );
       }
-      const created: TaskComment = await res.json();
+      const created: Comment = await res.json();
       setCommentsByTask((prev) => {
         const existing = prev[task["@id"]] ?? [];
         // The Mercure echo of this POST can race the response and
@@ -1963,7 +1937,7 @@ const Tasks = () => {
   );
 
   const handleEditComment = useCallback(
-    async (comment: TaskComment, body: string) => {
+    async (comment: Comment, body: string) => {
       const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
         method: "PATCH",
         credentials: "include",
@@ -1976,8 +1950,8 @@ const Tasks = () => {
           data["hydra:description"] || data.detail || "Failed to update comment.",
         );
       }
-      const updated: TaskComment = await res.json();
-      // TaskComment doesn't carry its task IRI on the wire (`task` is the bare
+      const updated: Comment = await res.json();
+      // Comment doesn't carry its task IRI on the wire (`task` is the bare
       // IRI string serialized at write time, but the read response from
       // PATCH inlines the embedded task). Either way, walk every loaded
       // task list and replace the matching comment.
@@ -2067,10 +2041,10 @@ const Tasks = () => {
         if (event.type === "delete") {
           return {
             ...prev,
-            [taskIri]: pruneSubtree(list, event.id),
+            [taskIri]: removeComment(list, event.id),
           };
         }
-        const incoming = event.comment as unknown as TaskComment;
+        const incoming = event.comment as unknown as Comment;
         const idx = list.findIndex((c) => c["@id"] === incoming["@id"]);
         if (event.type === "create") {
           if (idx !== -1) return prev;
@@ -2086,7 +2060,7 @@ const Tasks = () => {
     [],
   );
 
-  const handleDeleteComment = useCallback(async (comment: TaskComment) => {
+  const handleDeleteComment = useCallback(async (comment: Comment) => {
     const res = await fetch(`${ENTRYPOINT}${comment["@id"]}`, {
       method: "DELETE",
       credentials: "include",
@@ -2104,7 +2078,7 @@ const Tasks = () => {
           next[taskIri] = list;
           continue;
         }
-        next[taskIri] = pruneSubtree(list, comment["@id"]);
+        next[taskIri] = removeComment(list, comment["@id"]);
       }
       return next;
     });

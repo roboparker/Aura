@@ -24,7 +24,7 @@ use Symfony\Component\Uid\Uuid;
  *  - Clone root is top-level in the target (no parent). Even when
  *    copying within the same space we drop the parent FK so the
  *    clone reads as "a new doc" rather than a sibling of the source.
- *  - PageComments are NOT copied. The cloned page tree starts as a
+ *  - Comments are NOT copied. The cloned page tree starts as a
  *    fresh thread surface.
  *  - Descendants: opt-in via `includeDescendants: true` on the
  *    body. When set, a breadth-first walk clones every descendant
