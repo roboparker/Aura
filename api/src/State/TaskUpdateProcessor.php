@@ -65,13 +65,21 @@ final class TaskUpdateProcessor implements ProcessorInterface
      */
     private function createNextOccurrence(Task $completed): void
     {
+        // Caller only invokes us after asserting both fields are set —
+        // re-narrow so phpstan can see the non-null shape on the
+        // advanceDueDate call below.
+        $dueDate = $completed->getDueDate();
+        $rule = $completed->getRecurrenceRule();
+        if (null === $dueDate || null === $rule) {
+            return;
+        }
         $next = new Task();
         $next->setOwner($completed->getOwner());
         $next->setProject($completed->getProject());
         $next->setTitle($completed->getTitle());
         $next->setDescription($completed->getDescription());
-        $next->setRecurrenceRule($completed->getRecurrenceRule());
-        $next->setDueDate($this->advanceDueDate($completed->getDueDate(), $completed->getRecurrenceRule()));
+        $next->setRecurrenceRule($rule);
+        $next->setDueDate($this->advanceDueDate($dueDate, $rule));
 
         foreach ($completed->getTags() as $tag) {
             $next->addTag($tag);
