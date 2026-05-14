@@ -83,10 +83,14 @@ class CustomFieldFooterTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertCount(1, $body['footers']);
-        $this->assertSame('sum', $body['footers'][0]['kind']);
-        $this->assertSame('Estimate', $body['footers'][0]['name']);
-        $this->assertEqualsCanonicalizing(8, $body['footers'][0]['value']);
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $this->assertCount(1, $footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('sum', $first['kind']);
+        $this->assertSame('Estimate', $first['name']);
+        $this->assertEqualsCanonicalizing(8, $first['value']);
     }
 
     public function testCountAndAvg(): void
@@ -112,9 +116,15 @@ class CustomFieldFooterTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $byName = array_column($body['footers'], null, 'name');
-        $this->assertSame(1, $byName['Owner']['value']);
-        $this->assertEqualsCanonicalizing(6, $byName['Hours']['value']);
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $byName = array_column($footers, null, 'name');
+        $owner = $byName['Owner'] ?? null;
+        $this->assertIsArray($owner);
+        $this->assertSame(1, $owner['value']);
+        $hours = $byName['Hours'] ?? null;
+        $this->assertIsArray($hours);
+        $this->assertEqualsCanonicalizing(6, $hours['value']);
     }
 
     public function testFilterChainHonouredViaStatus(): void
@@ -138,14 +148,22 @@ class CustomFieldFooterTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertEqualsCanonicalizing(8, $body['footers'][0]['value']);
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertEqualsCanonicalizing(8, $first['value']);
 
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?status=completed');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertEqualsCanonicalizing(7, $body['footers'][0]['value']);
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertEqualsCanonicalizing(7, $first['value']);
     }
 
     public function testMoneyFooterEmitsAmountCurrencyShape(): void
@@ -164,7 +182,11 @@ class CustomFieldFooterTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertSame(['amount' => 3500, 'currency' => 'USD'], $body['footers'][0]['value']);
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame(['amount' => 3500, 'currency' => 'USD'], $first['value']);
     }
 
     private function createProject(User $owner, string $title): Project

@@ -250,12 +250,20 @@ class TagTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $response = $response->toArray();
+        $body = $response->toArray();
 
-        $this->assertCount(1, $response['member']);
-        $this->assertCount(1, $response['member'][0]['tags']);
-        $this->assertSame('Badge', $response['member'][0]['tags'][0]['title']);
-        $this->assertSame('#f59e0b', $response['member'][0]['tags'][0]['color']);
+        $members = $body['member'] ?? null;
+        $this->assertIsArray($members);
+        $this->assertCount(1, $members);
+        $task = $members[0] ?? null;
+        $this->assertIsArray($task);
+        $tags = $task['tags'] ?? null;
+        $this->assertIsArray($tags);
+        $this->assertCount(1, $tags);
+        $firstTag = $tags[0] ?? null;
+        $this->assertIsArray($firstTag);
+        $this->assertSame('Badge', $firstTag['title']);
+        $this->assertSame('#f59e0b', $firstTag['color']);
     }
 
     public function testDeletingTagRemovesItFromTasks(): void
