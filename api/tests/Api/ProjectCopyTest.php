@@ -382,6 +382,8 @@ class ProjectCopyTest extends ApiTestCase
 
     /**
      * @param string[]|null $options
+     *
+     * @param list<string>|null $options
      */
     private function seedDefinition(Project $project, string $name, string $type, ?array $options = null, int $position = 0): CustomFieldDefinition
     {
