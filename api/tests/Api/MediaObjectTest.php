@@ -162,7 +162,6 @@ class MediaObjectTest extends ApiTestCase
     private function createTestUser(string $email): User
     {
         $container = static::getContainer();
-        /** @var UserPasswordHasherInterface $hasher */
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
         $user = new User();

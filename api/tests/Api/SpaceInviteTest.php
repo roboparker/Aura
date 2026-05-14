@@ -317,7 +317,6 @@ class SpaceInviteTest extends ApiTestCase
     private function createUserWithSpace(string $email): User
     {
         $container = static::getContainer();
-        /** @var UserPasswordHasherInterface $hasher */
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
         $user = (new User())

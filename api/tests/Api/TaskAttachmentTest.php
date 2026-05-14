@@ -256,7 +256,6 @@ class TaskAttachmentTest extends ApiTestCase
     private function createUser(string $email): User
     {
         $container = static::getContainer();
-        /** @var UserPasswordHasherInterface $hasher */
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
         $user = new User();
