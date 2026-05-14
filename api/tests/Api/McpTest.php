@@ -83,9 +83,12 @@ class McpTest extends ApiTestCase
         $body = $this->callMcp($client, $plain, 'initialize', ['protocolVersion' => '2024-11-05']);
 
         $this->assertSame('2.0', $body['jsonrpc']);
-        $this->assertArrayHasKey('result', $body);
-        $this->assertSame('aura-mcp', $body['result']['serverInfo']['name']);
-        $this->assertArrayHasKey('tools', $body['result']['capabilities']);
+        $serverInfo = $body['result']['serverInfo'] ?? null;
+        $this->assertIsArray($serverInfo);
+        $this->assertSame('aura-mcp', $serverInfo['name']);
+        $capabilities = $body['result']['capabilities'] ?? null;
+        $this->assertIsArray($capabilities);
+        $this->assertArrayHasKey('tools', $capabilities);
     }
 
     public function testToolsListIncludesAllCategories(): void
@@ -96,7 +99,9 @@ class McpTest extends ApiTestCase
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/list');
 
-        $names = array_column($body['result']['tools'], 'name');
+        $tools = $body['result']['tools'] ?? null;
+        $this->assertIsArray($tools);
+        $names = array_column($tools, 'name');
         foreach (
             [
             'create_task', 'get_task', 'update_task', 'delete_task', 'list_tasks', 'search_tasks',
@@ -122,10 +127,13 @@ class McpTest extends ApiTestCase
             'arguments' => ['title' => 'From MCP', 'description' => 'Hello'],
         ]);
 
-        $this->assertFalse($body['result']['isError']);
-        $structured = $body['result']['structuredContent'];
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
         $this->assertSame('From MCP', $structured['title']);
-        $this->assertSame('alice@example.com', $structured['owner']['email']);
+        $owner = $structured['owner'];
+        $this->assertIsArray($owner);
+        $this->assertSame('alice@example.com', $owner['email']);
         $this->assertSame('open', $structured['status']);
     }
 
@@ -142,9 +150,12 @@ class McpTest extends ApiTestCase
             'arguments' => ['taskId' => (string) $bobsTask->getId()],
         ]);
 
-        $this->assertArrayHasKey('result', $body);
-        $this->assertTrue($body['result']['isError']);
-        $this->assertStringContainsString('not found', $body['result']['content'][0]['text']);
+        $this->assertTrue($body['result']['isError'] ?? null);
+        $content = $body['result']['content'] ?? null;
+        $this->assertIsArray($content);
+        $this->assertIsArray($content[0]);
+        $this->assertIsString($content[0]['text']);
+        $this->assertStringContainsString('not found', $content[0]['text']);
     }
 
     public function testUpdateTaskCompletes(): void
@@ -158,8 +169,10 @@ class McpTest extends ApiTestCase
             'name' => 'update_task',
             'arguments' => ['taskId' => (string) $task->getId(), 'status' => 'completed'],
         ]);
-        $this->assertFalse($body['result']['isError']);
-        $this->assertSame('completed', $body['result']['structuredContent']['status']);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('completed', $structured['status']);
     }
 
     public function testListProjectsHonoursMembership(): void
@@ -175,7 +188,11 @@ class McpTest extends ApiTestCase
             'name' => 'list_projects',
             'arguments' => [],
         ]);
-        $titles = array_column($body['result']['structuredContent']['items'], 'title');
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $titles = array_column($items, 'title');
         $this->assertSame(['Mine'], $titles);
     }
 
@@ -192,8 +209,12 @@ class McpTest extends ApiTestCase
             'name' => 'assign_task',
             'arguments' => ['taskId' => (string) $task->getId(), 'userId' => (string) $bob->getId()],
         ]);
-        $this->assertFalse($body['result']['isError']);
-        $emails = array_column($body['result']['structuredContent']['assignees'], 'email');
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $assignees = $structured['assignees'] ?? null;
+        $this->assertIsArray($assignees);
+        $emails = array_column($assignees, 'email');
         $this->assertContains('bob@example.com', $emails);
     }
 
@@ -208,9 +229,13 @@ class McpTest extends ApiTestCase
             'name' => 'add_task_comment',
             'arguments' => ['taskId' => (string) $task->getId(), 'body' => 'Looks good!'],
         ]);
-        $this->assertFalse($body['result']['isError']);
-        $this->assertSame('Looks good!', $body['result']['structuredContent']['body']);
-        $this->assertSame('alice@example.com', $body['result']['structuredContent']['author']['email']);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('Looks good!', $structured['body']);
+        $author = $structured['author'];
+        $this->assertIsArray($author);
+        $this->assertSame('alice@example.com', $author['email']);
     }
 
     public function testInvalidUuidProducesValidationError(): void
@@ -223,8 +248,12 @@ class McpTest extends ApiTestCase
             'name' => 'get_task',
             'arguments' => ['taskId' => 'not-a-uuid'],
         ]);
-        $this->assertTrue($body['result']['isError']);
-        $this->assertStringContainsString('UUID', $body['result']['content'][0]['text']);
+        $this->assertTrue($body['result']['isError'] ?? null);
+        $content = $body['result']['content'] ?? null;
+        $this->assertIsArray($content);
+        $this->assertIsArray($content[0]);
+        $this->assertIsString($content[0]['text']);
+        $this->assertStringContainsString('UUID', $content[0]['text']);
     }
 
     public function testUnknownToolReturnsToolError(): void
@@ -237,7 +266,7 @@ class McpTest extends ApiTestCase
             'name' => 'no_such_tool',
             'arguments' => [],
         ]);
-        $this->assertTrue($body['result']['isError']);
+        $this->assertTrue($body['result']['isError'] ?? null);
     }
 
     public function testNotificationProduces202(): void
@@ -264,14 +293,18 @@ class McpTest extends ApiTestCase
             'name' => 'get_task',
             'arguments' => ['taskId' => (string) $task->getId()],
         ]);
-        $this->assertFalse($body['result']['isError']);
+        $this->assertFalse($body['result']['isError'] ?? null);
 
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'create_task',
             'arguments' => ['title' => 'Forbidden'],
         ]);
-        $this->assertTrue($body['result']['isError']);
-        $this->assertStringContainsString('scopes', $body['result']['content'][0]['text']);
+        $this->assertTrue($body['result']['isError'] ?? null);
+        $content = $body['result']['content'] ?? null;
+        $this->assertIsArray($content);
+        $this->assertIsArray($content[0]);
+        $this->assertIsString($content[0]['text']);
+        $this->assertStringContainsString('scopes', $content[0]['text']);
     }
 
     public function testTokenLastUsedIsStamped(): void
@@ -290,8 +323,19 @@ class McpTest extends ApiTestCase
     }
 
     /**
+     * Returns the JSON-RPC response body. Every site that uses this
+     * helper goes through {@see assertResponseIsSuccessful()} and
+     * checks a `result`, so the shape is widened to `array<string, mixed>`
+     * on result (deep nesting is narrowed per-callsite with explicit
+     * `assertIsArray()` / `assertArrayHasKey()` calls).
+     *
      * @param array<string, mixed> $params
-     * @return array<string, mixed>
+     * @return array{
+     *   jsonrpc: string,
+     *   id?: int|string,
+     *   result: array<string, mixed>,
+     *   error?: array{code: int, message: string, data?: mixed}
+     * }
      */
     private function callMcp(Client $client, string $bearer, string $method, array $params = []): array
     {
@@ -307,7 +351,16 @@ class McpTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        return $response->toArray();
+        /**
+         * @var array{
+         *   jsonrpc: string,
+         *   id?: int|string,
+         *   result: array<string, mixed>,
+         *   error?: array{code: int, message: string, data?: mixed}
+         * } $body
+         */
+        $body = $response->toArray();
+        return $body;
     }
 
     /**

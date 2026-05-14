@@ -72,7 +72,7 @@ class TwoFactorController extends AbstractController
             return $this->json(['error' => 'Too many attempts. Try again later.'], 429);
         }
 
-        $code = (string) ($this->jsonBody($request)['code'] ?? '');
+        $code = $this->stringField($this->jsonBody($request), 'code');
         if (!$this->setup->verifyCode($user, $code)) {
             return $this->json(['error' => 'Invalid code.'], 422);
         }
@@ -98,7 +98,7 @@ class TwoFactorController extends AbstractController
         }
 
         $body = $this->jsonBody($request);
-        $password = (string) ($body['currentPassword'] ?? '');
+        $password = $this->stringField($body, 'currentPassword');
         if (!$this->hasher->isPasswordValid($user, $password)) {
             return $this->json(['error' => 'Current password is incorrect.'], 400);
         }
@@ -120,7 +120,7 @@ class TwoFactorController extends AbstractController
         }
 
         $body = $this->jsonBody($request);
-        $password = (string) ($body['currentPassword'] ?? '');
+        $password = $this->stringField($body, 'currentPassword');
         if (!$this->hasher->isPasswordValid($user, $password)) {
             return $this->json(['error' => 'Current password is incorrect.'], 400);
         }
@@ -150,5 +150,14 @@ class TwoFactorController extends AbstractController
     {
         $decoded = json_decode($request->getContent(), true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function stringField(array $body, string $key): string
+    {
+        $value = $body[$key] ?? null;
+        return is_string($value) ? $value : '';
     }
 }

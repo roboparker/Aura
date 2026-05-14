@@ -27,11 +27,12 @@ final class UserInviteRepository extends ServiceEntityRepository
      */
     public function findByEmail(string $email): ?UserInvite
     {
-        return $this->createQueryBuilder('i')
+        $result = $this->createQueryBuilder('i')
             ->andWhere('LOWER(i.email) = LOWER(:email)')
             ->setParameter('email', $email)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+        return $result instanceof UserInvite ? $result : null;
     }
 }

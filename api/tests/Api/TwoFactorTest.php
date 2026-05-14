@@ -34,9 +34,11 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
+        $body = $response->toArray(false);
         $this->assertNotEmpty($body['secret']);
-        $this->assertStringStartsWith('otpauth://totp/', $body['provisioningUri']);
+        $provisioningUri = $body['provisioningUri'];
+        $this->assertIsString($provisioningUri);
+        $this->assertStringStartsWith('otpauth://totp/', $provisioningUri);
     }
 
     public function testSetupRejectedWhenAlreadyEnabled(): void
@@ -61,7 +63,7 @@ class TwoFactorTest extends ApiTestCase
         $client->request('POST', '/me/2fa/setup');
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $secret = json_decode($response->getContent(false), true)['secret'];
+        $secret = $response->toArray(false)['secret'] ?? null;
 
         $reloaded = $this->reloadUser('v@example.com');
         $totpSecret = $reloaded->getDecryptedTotpSecret();
@@ -74,9 +76,11 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
+        $body = $response->toArray(false);
         $this->assertTrue($body['enabled']);
-        $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $body['recoveryCodes']);
+        $recoveryCodes = $body['recoveryCodes'];
+        $this->assertIsArray($recoveryCodes);
+        $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $recoveryCodes);
 
         $refreshed = $this->reloadUser('v@example.com');
         $this->assertTrue($refreshed->isTotpEnabled());
@@ -110,9 +114,11 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
+        $body = $response->toArray(false);
         $this->assertSame('plain@example.com', $body['email']);
-        $this->assertFalse($body['twoFactor']['enabled']);
+        $twoFactor = $body['twoFactor'];
+        $this->assertIsArray($twoFactor);
+        $this->assertFalse($twoFactor['enabled']);
     }
 
     public function testLoginWithTwoFactorPromptsForCode(): void
@@ -128,7 +134,7 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(401);
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
+        $body = $response->toArray(false);
         $this->assertTrue($body['requiresTwoFactor']);
     }
 
@@ -153,7 +159,7 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
+        $body = $response->toArray(false);
         $this->assertSame('tfa@example.com', $body['email']);
     }
 
@@ -215,10 +221,13 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = json_decode($response->getContent(false), true);
-        $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $body['recoveryCodes']);
+        $body = $response->toArray(false);
+        $recoveryCodes = $body['recoveryCodes'];
+        $this->assertIsArray($recoveryCodes);
+        /** @var list<string> $recoveryCodes */
+        $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $recoveryCodes);
         $this->assertEmpty(
-            array_intersect($original, $body['recoveryCodes']),
+            array_intersect($original, $recoveryCodes),
             'Old recovery codes should not appear in the regenerated set.'
         );
     }

@@ -68,6 +68,7 @@ class TaskActivityController extends AbstractController
             ->setParameter('id', (string) $task->getId())
             ->getQuery()
             ->getSingleScalarResult();
+        /** @var ActivityLog[] $rows */
         $rows = $repo->createQueryBuilder('l')
             ->where('l.objectClass = :class AND l.objectId = :id')
             ->setParameter('class', Task::class)

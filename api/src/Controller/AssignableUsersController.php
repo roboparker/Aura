@@ -54,7 +54,8 @@ class AssignableUsersController extends AbstractController
             'jsonld',
             ['groups' => ['user:read']],
         );
-        $members = json_decode($json, true) ?? [];
+        $decoded = json_decode($json, true);
+        $members = is_array($decoded) ? $decoded : [];
 
         // Wrap in a hydra-shaped collection so the frontend can consume this
         // the same way it consumes `/tasks` and `/projects`.
