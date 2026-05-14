@@ -51,7 +51,7 @@ final class TaskReorderController extends AbstractController
 
         $ids = [];
         foreach ($payload['order'] as $iri) {
-            if (!is_string($iri) || !preg_match('#^/tasks/([0-9a-fA-F-]{36})$#', $iri, $match) || !Uuid::isValid($match[1])) {
+            if (!is_string($iri) || 1 !== preg_match('#^/tasks/([0-9a-fA-F-]{36})$#', $iri, $match) || !Uuid::isValid($match[1])) {
                 return $this->json(['error' => sprintf('Invalid Task IRI: %s', is_string($iri) ? $iri : gettype($iri))], 400);
             }
             $id = Uuid::fromString($match[1])->toRfc4122();

@@ -79,7 +79,7 @@ class ProjectMoveController extends AbstractController
         }
 
         $current = $project->getSpace();
-        if (null !== $current && $current->getId()?->equals($target->getId())) {
+        if (null !== $current && true === $current->getId()?->equals($target->getId())) {
             // No-op move — return the project unchanged with 200 rather
             // than a 304 so the PWA's "Move to" UX gets a consistent
             // response shape even if the user picks the current space.

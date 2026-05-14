@@ -155,7 +155,7 @@ class ProjectCopyController extends AbstractController
                     ->setRecurrenceRule($sourceTask->getRecurrenceRule())
                     ->setPosition($sourceTask->getPosition());
                 foreach ($sourceTask->getTags() as $tag) {
-                    if ($tag->getOwner()?->getId()?->equals($user->getId())) {
+                    if (true === $tag->getOwner()?->getId()?->equals($user->getId())) {
                         $cloneTask->addTag($tag);
                     }
                 }

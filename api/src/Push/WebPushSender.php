@@ -73,8 +73,8 @@ final class WebPushSender implements PushSenderInterface
 
     private function isConfigured(): bool
     {
-        return !empty($this->publicKey)
-            && !empty($this->privateKey)
-            && !empty($this->subject);
+        return null !== $this->publicKey && '' !== $this->publicKey
+            && null !== $this->privateKey && '' !== $this->privateKey
+            && null !== $this->subject && '' !== $this->subject;
     }
 }

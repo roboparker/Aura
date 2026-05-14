@@ -41,9 +41,10 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         // need it post-persist to wire the new user into their invited group.
         $inviteToken = $data->getInviteToken();
 
-        if ($data->getPlainPassword()) {
+        $plainPassword = $data->getPlainPassword();
+        if (null !== $plainPassword && '' !== $plainPassword) {
             $data->setPassword(
-                $this->passwordHasher->hashPassword($data, $data->getPlainPassword())
+                $this->passwordHasher->hashPassword($data, $plainPassword)
             );
             $data->eraseCredentials();
         }
@@ -123,7 +124,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
             $space = $spaceInvite->getSpace();
             $alreadyMember = false;
             foreach ($space->getUserMemberships() as $existing) {
-                if ($existing->getUser()?->getId()?->equals($user->getId())) {
+                if (true === $existing->getUser()?->getId()?->equals($user->getId())) {
                     $alreadyMember = true;
                     break;
                 }

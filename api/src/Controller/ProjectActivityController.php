@@ -68,14 +68,14 @@ class ProjectActivityController extends AbstractController
 
         $repo = $this->em->getRepository(ActivityLog::class);
         $where = '(l.objectClass = :projectClass AND l.objectId = :projectId)';
-        if (!empty($taskIds)) {
+        if ([] !== $taskIds) {
             $where .= ' OR (l.objectClass = :taskClass AND l.objectId IN (:taskIds))';
         }
 
         $applyParams = function (\Doctrine\ORM\QueryBuilder $qb) use ($project, $taskIds): \Doctrine\ORM\QueryBuilder {
             $qb->setParameter('projectClass', Project::class)
                 ->setParameter('projectId', (string) $project->getId());
-            if (!empty($taskIds)) {
+            if ([] !== $taskIds) {
                 $qb->setParameter('taskClass', Task::class)
                     ->setParameter('taskIds', $taskIds);
             }

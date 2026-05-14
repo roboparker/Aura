@@ -112,7 +112,7 @@ class MediaObjectDownloadController extends AbstractController
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
-        if ($media->getOwner()?->getId()?->equals($user->getId())) {
+        if (true === $media->getOwner()?->getId()?->equals($user->getId())) {
             return true;
         }
         if ($this->isGranted('ROLE_ADMIN')) {
