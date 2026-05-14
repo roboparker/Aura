@@ -1277,7 +1277,7 @@ class TaskTest extends ApiTestCase
     }
 
     /**
-     * @param string[]|null $options
+     * @param list<string>|null $options
      */
     private function createCustomFieldDefinition(
         Project $project,
