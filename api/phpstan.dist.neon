@@ -8,7 +8,7 @@ includes:
     - vendor/phpstan/phpstan-phpunit/rules.neon
 
 parameters:
-    level: 9
+    level: 10
     paths:
         - src
         - tests

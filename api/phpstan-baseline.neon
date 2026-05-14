@@ -1,10 +1,162 @@
-# PHPStan level-9 baseline.
-#
-# The chip-away PRs cleared every entry from this file. It's kept here
-# (empty) as the documented capture surface for the next round of new
-# violations — regenerate with:
+# Auto-generated baseline for the level-9 → level-10 bump.
+# Identifiers + counts captured here are the explicit-mixed violations
+# level 10 surfaces, primarily in test helpers that decode JSON-RPC /
+# REST response bodies. Chip away in follow-up PRs and regenerate via
 #   docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon
-# and chip away in follow-up PRs.
 
 parameters:
-    ignoreErrors: []
+    ignoreErrors:
+        -
+            identifier: argument.type
+            path: src/Controller/CustomFieldFooterController.php
+        -
+            identifier: cast.string
+            count: 3
+            path: src/Controller/EmailChangeController.php
+        -
+            identifier: argument.type
+            path: src/Controller/McpController.php
+        -
+            identifier: cast.string
+            count: 5
+            path: src/Controller/PasswordController.php
+        -
+            identifier: argument.type
+            path: src/Controller/ProjectActivityController.php
+        -
+            identifier: cast.int
+            path: src/Controller/ProjectActivityController.php
+        -
+            identifier: method.nonObject
+            count: 8
+            path: src/Controller/ProjectActivityController.php
+        -
+            identifier: return.type
+            path: src/Controller/TwoFactorController.php
+        -
+            identifier: argument.type
+            count: 4
+            path: tests/Api/ActivityHistoryTest.php
+        -
+            identifier: binaryOp.invalid
+            count: 4
+            path: tests/Api/ActivityHistoryTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 10
+            path: tests/Api/ActivityHistoryTest.php
+        -
+            identifier: argument.type
+            count: 3
+            path: tests/Api/ApiTokenTest.php
+        -
+            identifier: argument.type
+            count: 4
+            path: tests/Api/CommentTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/CommentTest.php
+        -
+            identifier: argument.type
+            path: tests/Api/CustomFieldDefinitionTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            path: tests/Api/CustomFieldDefinitionTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/CustomFieldFooterTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 14
+            path: tests/Api/CustomFieldFooterTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/DiscussionTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/DiscussionTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/NotificationTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/NotificationTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/PageTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/PageTest.php
+        -
+            identifier: argument.type
+            path: tests/Api/ProjectCopyTest.php
+        -
+            identifier: argument.type
+            path: tests/Api/ProjectTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            path: tests/Api/ProjectTest.php
+        -
+            identifier: argument.type
+            path: tests/Api/PushSubscriptionTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            path: tests/Api/PushSubscriptionTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/SpaceInviteTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 6
+            path: tests/Api/SpaceInviteTest.php
+        -
+            identifier: argument.type
+            count: 2
+            path: tests/Api/TagTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 10
+            path: tests/Api/TagTest.php
+        -
+            identifier: argument.type
+            count: 5
+            path: tests/Api/TaskAttachmentTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 4
+            path: tests/Api/TaskAttachmentTest.php
+        -
+            identifier: argument.type
+            count: 5
+            path: tests/Api/TaskCustomFieldValueTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/TaskCustomFieldValueTest.php
+        -
+            identifier: argument.type
+            count: 21
+            path: tests/Api/TaskTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 17
+            path: tests/Api/TaskTest.php
+        -
+            identifier: argument.type
+            path: tests/Api/UserInviteTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            count: 2
+            path: tests/Api/UserInviteTest.php
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            path: tests/Api/UserPreferencesTest.php
