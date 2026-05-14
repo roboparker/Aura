@@ -1,8 +1,236 @@
-# PHPStan level-10 baseline.
+# Baseline for the phpstan-strict-rules bump.
 #
-# Empty for now — the previous chip-away PRs cleared every entry.
-# Regenerate after adding new violations with
+# The dominant violation is staticMethod.dynamicCall — strict-rules
+# wants $this->assertSame() (and every other PHPUnit Assert::*)
+# called as self:: / static:: / ClassName::. That is a style
+# preference, not a correctness check, and $this-> is PHPUnit-
+# idiomatic, so ignore the identifier wholesale.
+#
+# Other entries are real strict-rule violations queued for chip-away.
+# Regenerate after a cleanup pass via
 #   docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon
 
 parameters:
-    ignoreErrors: []
+    ignoreErrors:
+        -
+            identifier: staticMethod.dynamicCall
+        -
+            identifier: ternary.shortNotAllowed
+            path: src/Command/DispatchNotificationDigestCommand.php
+        -
+            identifier: ternary.shortNotAllowed
+            path: src/Command/DispatchTaskRemindersCommand.php
+        -
+            identifier: cast.useless
+            path: src/Controller/CustomFieldFooterController.php
+        -
+            identifier: booleanAnd.rightNotBoolean
+            path: src/Controller/DiscussionMoveController.php
+        -
+            identifier: cast.useless
+            count: 2
+            path: src/Controller/EmailChangeController.php
+        -
+            identifier: ternary.shortNotAllowed
+            count: 2
+            path: src/Controller/EmailChangeController.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Controller/MediaObjectDownloadController.php
+        -
+            identifier: ternary.shortNotAllowed
+            count: 2
+            path: src/Controller/MediaObjectDownloadController.php
+        -
+            identifier: booleanAnd.rightNotBoolean
+            path: src/Controller/PageMoveController.php
+        -
+            identifier: ternary.shortNotAllowed
+            path: src/Controller/PasswordController.php
+        -
+            identifier: empty.notAllowed
+            count: 2
+            path: src/Controller/ProjectActivityController.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Controller/ProjectCopyController.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Controller/ProjectMemberController.php
+        -
+            identifier: booleanAnd.rightNotBoolean
+            path: src/Controller/ProjectMoveController.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: src/Controller/SpaceInviteController.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Controller/SpaceMemberController.php
+        -
+            identifier: ternary.condNotBoolean
+            path: src/Controller/SpaceMemberController.php
+        -
+            identifier: booleanAnd.rightNotBoolean
+            path: src/Controller/TaskAssigneeController.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: src/Controller/TaskReorderController.php
+        -
+            identifier: ternary.condNotBoolean
+            path: src/Controller/UserGroupMemberController.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: src/Controller/UserInviteController.php
+        -
+            identifier: method.childReturnType
+            path: src/CustomField/Type/AbstractTypeStrategy.php
+        -
+            identifier: method.childReturnType
+            path: src/CustomField/Type/Date/AbstractDateStrategy.php
+        -
+            identifier: method.childReturnType
+            path: src/CustomField/Type/Numeric/AbstractNumericStrategy.php
+        -
+            identifier: method.childReturnType
+            path: src/CustomField/Type/Numeric/MoneyStrategy.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Mcp/Tool/DownloadFileTool.php
+        -
+            identifier: empty.notAllowed
+            count: 3
+            path: src/Push/WebPushSender.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: src/Security/ApiTokenAuthenticator.php
+        -
+            identifier: ternary.shortNotAllowed
+            path: src/Security/ApiTokenAuthenticator.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: src/Service/CommentMentionService.php
+        -
+            identifier: if.condNotBoolean
+            path: src/Service/CommentMentionService.php
+        -
+            identifier: cast.useless
+            path: src/Service/ImageUploadService.php
+        -
+            identifier: ternary.shortNotAllowed
+            count: 5
+            path: src/Service/ImageUploadService.php
+        -
+            identifier: ternary.shortNotAllowed
+            path: src/Service/InviteMailer.php
+        -
+            identifier: cast.useless
+            path: src/State/TaskUpdateProcessor.php
+        -
+            identifier: if.condNotBoolean
+            count: 2
+            path: src/State/UserPasswordHasherProcessor.php
+        -
+            identifier: varTag.type
+            path: tests/Api/ActivityHistoryTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/ApiTokenTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/CommentTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/CommentsMercureTokenTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/CustomFieldDefinitionTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/CustomFieldFooterTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/DiscussionCopyTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/DiscussionMoveTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/DiscussionTest.php
+        -
+            identifier: booleanNot.exprNotBoolean
+            path: tests/Api/EmailChangeTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/McpTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/MediaObjectDownloadTest.php
+        -
+            identifier: ternary.shortNotAllowed
+            path: tests/Api/MediaObjectTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/MediaObjectTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/NotificationTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/PageCopyTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/PageMoveTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/PageTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/ProjectCopyTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/ProjectMoveTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/ProjectTest.php
+        -
+            identifier: cast.useless
+            path: tests/Api/PushSubscriptionTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/PushSubscriptionTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/SpaceAttachmentTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/SpaceInviteTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/SpaceTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/TagTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/TaskAttachmentTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/TaskCustomFieldValueTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/TaskTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserGroupTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserInviteTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserPreferencesTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserTest.php
+        -
+            identifier: if.condNotBoolean
+            path: tests/bootstrap.php
