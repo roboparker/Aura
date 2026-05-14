@@ -68,13 +68,21 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertCount(2, $body['customFieldValues']);
-        $values = array_combine(
-            array_map(fn ($v) => $v['definition'], $body['customFieldValues']),
-            array_map(fn ($v) => $v['value'], $body['customFieldValues']),
+        $cfvs = $body['customFieldValues'] ?? null;
+        $this->assertIsArray($cfvs);
+        $this->assertCount(2, $cfvs);
+        $definitions = array_map(
+            static fn (mixed $v): mixed => is_array($v) ? $v['definition'] ?? null : null,
+            $cfvs,
         );
-        $this->assertSame('critical', $values['/custom_field_definitions/' . $severity->getId()]);
-        $this->assertSame('High', $values['/custom_field_definitions/' . $priority->getId()]);
+        $values = array_map(
+            static fn (mixed $v): mixed => is_array($v) ? $v['value'] ?? null : null,
+            $cfvs,
+        );
+        /** @var list<string> $definitions */
+        $byDefinition = array_combine($definitions, $values);
+        $this->assertSame('critical', $byDefinition['/custom_field_definitions/' . $severity->getId()]);
+        $this->assertSame('High', $byDefinition['/custom_field_definitions/' . $priority->getId()]);
     }
 
     public function testNumberFieldRejectsNonNumeric(): void

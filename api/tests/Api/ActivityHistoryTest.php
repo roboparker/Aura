@@ -57,6 +57,7 @@ class ActivityHistoryTest extends ApiTestCase
         self::assertNotNull($response);
         $created = $response->toArray();
         $taskId = $created['id'];
+        $this->assertIsString($taskId);
 
         // Mutate a versioned field so an UPDATE row joins the CREATE row.
         $client->request('PATCH', '/tasks/' . $taskId, [
@@ -73,12 +74,22 @@ class ActivityHistoryTest extends ApiTestCase
         $body = $response->toArray();
 
         $this->assertSame(2, $body['totalItems']);
-        $this->assertCount(2, $body['items']);
-        $this->assertSame('update', $body['items'][0]['action']);
-        $this->assertSame('Renamed title', $body['items'][0]['data']['title']);
-        $this->assertSame('create', $body['items'][1]['action']);
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertCount(2, $items);
+        $latest = $items[0] ?? null;
+        $this->assertIsArray($latest);
+        $this->assertSame('update', $latest['action']);
+        $latestData = $latest['data'] ?? null;
+        $this->assertIsArray($latestData);
+        $this->assertSame('Renamed title', $latestData['title']);
+        $first = $items[1] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('create', $first['action']);
         // Actor map is keyed by IRI so the PWA can render avatars.
-        $this->assertArrayHasKey('/users/' . $alice->getId(), $body['actors']);
+        $actors = $body['actors'] ?? null;
+        $this->assertIsArray($actors);
+        $this->assertArrayHasKey('/users/' . $alice->getId(), $actors);
     }
 
     public function testNonReadableTaskActivityIs404(): void
@@ -127,7 +138,9 @@ class ActivityHistoryTest extends ApiTestCase
         $body = $response->toArray();
         $this->assertGreaterThanOrEqual(2, $body['totalItems']);
 
-        $classes = array_column($body['items'], 'objectClass');
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $classes = array_column($items, 'objectClass');
         $this->assertContains('Project', $classes, 'Feed should include the project update.');
         $this->assertContains('Task', $classes, 'Feed should include the in-project task creation.');
     }
@@ -168,6 +181,7 @@ class ActivityHistoryTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $taskId = $response->toArray()['id'];
+        $this->assertIsString($taskId);
 
         // Generate enough log rows to exercise pagination — five
         // updates → six total entries (one create + five updates).
@@ -184,8 +198,14 @@ class ActivityHistoryTest extends ApiTestCase
         self::assertNotNull($response);
         $body = $response->toArray();
         $this->assertSame(6, $body['totalItems']);
-        $this->assertCount(2, $body['items']);
-        $this->assertSame('Pageable v5', $body['items'][0]['data']['title']);
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertCount(2, $items);
+        $latest = $items[0] ?? null;
+        $this->assertIsArray($latest);
+        $data = $latest['data'] ?? null;
+        $this->assertIsArray($data);
+        $this->assertSame('Pageable v5', $data['title']);
     }
 
     private function seedTask(User $owner, string $title): Task

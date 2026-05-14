@@ -50,8 +50,12 @@ class TaskAttachmentTest extends ApiTestCase
         $this->assertSame(MediaObject::KIND_ATTACHMENT, $body['kind']);
         $this->assertSame('notes.txt', $body['originalName']);
         $this->assertSame('text/plain', $body['mimeType']);
-        $this->assertArrayHasKey('original', $body['variantUrls']);
-        $this->assertStringStartsWith('/media/attachments/', $body['variantUrls']['original']);
+        $variantUrls = $body['variantUrls'] ?? null;
+        $this->assertIsArray($variantUrls);
+        $this->assertArrayHasKey('original', $variantUrls);
+        $original = $variantUrls['original'];
+        $this->assertIsString($original);
+        $this->assertStringStartsWith('/media/attachments/', $original);
     }
 
     public function testUploadAttachmentRejectsDisallowedMime(): void
@@ -108,9 +112,15 @@ class TaskAttachmentTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertCount(1, $body['attachments']);
-        $this->assertSame('spec.pdf', $body['attachments'][0]['originalName']);
-        $this->assertArrayHasKey('original', $body['attachments'][0]['variantUrls']);
+        $attachments = $body['attachments'] ?? null;
+        $this->assertIsArray($attachments);
+        $this->assertCount(1, $attachments);
+        $first = $attachments[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('spec.pdf', $first['originalName']);
+        $variantUrls = $first['variantUrls'] ?? null;
+        $this->assertIsArray($variantUrls);
+        $this->assertArrayHasKey('original', $variantUrls);
     }
 
     public function testAttachMediaPersistsAndAppearsOnGet(): void
@@ -132,7 +142,9 @@ class TaskAttachmentTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertCount(1, $body['attachments']);
+        $attachments = $body['attachments'] ?? null;
+        $this->assertIsArray($attachments);
+        $this->assertCount(1, $attachments);
     }
 
     public function testCannotAttachAnotherUsersMedia(): void
