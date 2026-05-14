@@ -105,9 +105,16 @@ bin/phpunit                           # Run tests
 ```
 
 ### Static analysis (PHPStan)
-PHPStan runs against `api/src` and `api/tests` at **level 10** (max strictness in PHPStan 2.x) as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); pre-existing violations are deferred via [api/phpstan-baseline.neon](api/phpstan-baseline.neon) so CI only fails on *new* errors. Regenerate after a cleanup pass with `docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon`.
+PHPStan runs against `api/src` and `api/tests` at **level 10** (max strictness in PHPStan 2.x) with `phpstan/phpstan-strict-rules` layered on top, as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); the baseline at [api/phpstan-baseline.neon](api/phpstan-baseline.neon) is intentionally minimal — a single wildcard entry that ignores `staticMethod.dynamicCall` (strict-rules wants `self::assertX()` everywhere, but `$this->assertX()` is PHPUnit-idiomatic and we keep it). Every other level-10 + strict-rules violation is cleared at the source. Regenerate after a cleanup pass with `docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon`.
+
+Patterns the codebase has converged on for surviving level 10:
+- **Controllers reading JSON bodies**: `$payload = $request->toArray()` (typed `array<int|string, mixed>`) instead of `json_decode($request->getContent(), true)` (returns `mixed`). Pluck string fields through a private `stringField()` helper (see `TwoFactorController` / `PasswordController`) — `(string) ($data[$key] ?? '')` triggers `cast.string`.
+- **Tests reading response bodies**: `$response->toArray()` (or `$response->toArray(false)` when the status may be non-2xx) plus inline `$x = $body['key']; $this->assertIsArray($x);` narrowing before any second-level offset access. The shared trait `App\Tests\Api\JsonBodyAssertions` packages this as `arrayField()` / `stringField()` / `intField()` / `boolField()` helpers — adopt it per-test as you touch them.
+- **Nullable `?->equals()` chains in boolean contexts**: `true === $x?->getId()?->equals($y)` (strict-rules rejects bare `bool|null` as an `if`/`&&` operand).
+- **`!preg_match(...)`**: write `1 !== preg_match(...)` — `preg_match` returns `int|false`, not bool.
 
 Extensions wired up:
+- `phpstan/phpstan-strict-rules` — ~30 semantic checks on top of level 10 (no short ternary, no `empty()`, explicit nullability in boolean contexts, etc.).
 - `phpstan/phpstan-symfony` — service-id / config-resolver awareness via `var/cache/test/App_KernelTestDebugContainer.xml`, console application loaded from [api/tests/phpstan/console-application.php](api/tests/phpstan/console-application.php).
 - `phpstan/phpstan-doctrine` — `getRepository()` / `QueryBuilder` / DQL typing. Needs an `objectManagerLoader` because our entities use the `doctrine.uuid_generator` Symfony service; see [api/tests/phpstan/object-manager.php](api/tests/phpstan/object-manager.php). Bootstrapping the test kernel requires the test cache to be warm (`bin/console -e test cache:warmup`) — CI does this for you.
 - `phpstan/phpstan-phpunit` — `TestCase` assertion awareness so test-side dataset / mock typing stops tripping false positives.
