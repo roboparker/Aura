@@ -15,7 +15,7 @@ parameters:
             message: '#^Method\ App\\Controller\\McpController::decode\(\)\ should\ return#'
             path: src/Controller/McpController.php
         -
-            message: '#^Parameter\ \#1\ \$arguments\ of\ method\ array<mixed,\ mixed>\ given\.#'
+            message: '#^Parameter\ \#1\ \$arguments\ of\ method\ App\\Mcp\\Tool\\McpToolInterface::invoke\(\)#'
             path: src/Controller/McpController.php
         -
             message: '#^Parameter\ \#1\ \$rows\ of\ static\ method#'
