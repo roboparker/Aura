@@ -8,33 +8,6 @@ parameters:
     ignoreErrors:
         -
             identifier: argument.type
-            path: src/Controller/CustomFieldFooterController.php
-        -
-            identifier: cast.string
-            count: 3
-            path: src/Controller/EmailChangeController.php
-        -
-            identifier: argument.type
-            path: src/Controller/McpController.php
-        -
-            identifier: cast.string
-            count: 5
-            path: src/Controller/PasswordController.php
-        -
-            identifier: argument.type
-            path: src/Controller/ProjectActivityController.php
-        -
-            identifier: cast.int
-            path: src/Controller/ProjectActivityController.php
-        -
-            identifier: method.nonObject
-            count: 8
-            path: src/Controller/ProjectActivityController.php
-        -
-            identifier: return.type
-            path: src/Controller/TwoFactorController.php
-        -
-            identifier: argument.type
             count: 4
             path: tests/Api/ActivityHistoryTest.php
         -

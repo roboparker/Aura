@@ -41,8 +41,8 @@ class PasswordController extends AbstractController
         }
 
         $data = $request->toArray();
-        $currentPassword = (string) ($data['currentPassword'] ?? '');
-        $newPassword = (string) ($data['newPassword'] ?? '');
+        $currentPassword = self::stringField($data, 'currentPassword');
+        $newPassword = self::stringField($data, 'newPassword');
 
         if (!$this->hasher->isPasswordValid($user, $currentPassword)) {
             return $this->json(['error' => 'Current password is incorrect.'], 400);
@@ -70,7 +70,7 @@ class PasswordController extends AbstractController
     public function forgotPassword(Request $request): JsonResponse
     {
         $data = $request->toArray();
-        $email = (string) ($data['email'] ?? '');
+        $email = self::stringField($data, 'email');
 
         // Always return 200 to prevent email enumeration
         $response = $this->json([
@@ -106,8 +106,8 @@ class PasswordController extends AbstractController
     public function resetPassword(Request $request): JsonResponse
     {
         $data = $request->toArray();
-        $plainToken = (string) ($data['token'] ?? '');
-        $newPassword = (string) ($data['newPassword'] ?? '');
+        $plainToken = self::stringField($data, 'token');
+        $newPassword = self::stringField($data, 'newPassword');
 
         if ('' === $plainToken) {
             return $this->json(['error' => 'Token is required.'], 400);
@@ -155,5 +155,18 @@ class PasswordController extends AbstractController
             ));
 
         $this->mailer->send($email);
+    }
+
+    /**
+     * Plucks a string field from a JSON body, defaulting to '' for
+     * missing / non-string values. Avoids the cast.string violation
+     * that comes with `(string) ($data[$key] ?? '')`.
+     *
+     * @param array<int|string, mixed> $data
+     */
+    private static function stringField(array $data, string $key): string
+    {
+        $value = $data[$key] ?? null;
+        return is_string($value) ? $value : '';
     }
 }

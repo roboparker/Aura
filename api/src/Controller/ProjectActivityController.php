@@ -72,7 +72,7 @@ class ProjectActivityController extends AbstractController
             $where .= ' OR (l.objectClass = :taskClass AND l.objectId IN (:taskIds))';
         }
 
-        $applyParams = function ($qb) use ($project, $taskIds) {
+        $applyParams = function (\Doctrine\ORM\QueryBuilder $qb) use ($project, $taskIds): \Doctrine\ORM\QueryBuilder {
             $qb->setParameter('projectClass', Project::class)
                 ->setParameter('projectId', (string) $project->getId());
             if (!empty($taskIds)) {
@@ -84,11 +84,13 @@ class ProjectActivityController extends AbstractController
 
         // Count and select share filters but the count must NOT carry
         // ORDER BY — Postgres rejects mixing it with COUNT(*).
-        $totalItems = (int) $applyParams(
+        $rawTotal = $applyParams(
             $repo->createQueryBuilder('l')
                 ->select('COUNT(l.id)')
                 ->where($where),
         )->getQuery()->getSingleScalarResult();
+        $totalItems = is_numeric($rawTotal) ? (int) $rawTotal : 0;
+        /** @var ActivityLog[] $rows */
         $rows = $applyParams(
             $repo->createQueryBuilder('l')
                 ->where($where)

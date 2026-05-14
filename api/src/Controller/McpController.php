@@ -83,6 +83,12 @@ class McpController extends AbstractController
         if (array_is_list($payload)) {
             $responses = [];
             foreach ($payload as $envelope) {
+                // Belt + braces: a batch entry could be a non-array
+                // (malformed client), drop those.
+                if (!is_array($envelope)) {
+                    continue;
+                }
+                /** @var array<string, mixed> $envelope */
                 $resp = $this->dispatch($envelope, $request, $user);
                 if (null !== $resp) {
                     $responses[] = $resp;
