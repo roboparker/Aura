@@ -107,7 +107,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
      */
     private function advanceDueDate(\DateTimeImmutable $current, array $rule): \DateTimeImmutable
     {
-        $interval = max(1, (int) $rule['interval']);
+        $interval = max(1, $rule['interval']);
         // \DateTimeImmutable::modify is calendar-aware: "+1 month" off Jan 31
         // becomes Mar 3 (skipping Feb), which is the standard PHP behaviour
         // and matches what users intuitively expect for monthly recurrence.

@@ -125,7 +125,7 @@ class CustomFieldFooterController extends AbstractController
             }
         }
 
-        if ('true' === strtolower((string) $request->query->get('overdue', ''))) {
+        if ('true' === strtolower($request->query->get('overdue', ''))) {
             $qb->andWhere('t.completedOn IS NULL')
                 ->andWhere('t.dueDate IS NOT NULL')
                 ->andWhere('t.dueDate < :now')

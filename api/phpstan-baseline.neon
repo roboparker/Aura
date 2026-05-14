@@ -1,62 +1,16 @@
-# Baseline for the phpstan-strict-rules bump.
+# Baseline for phpstan-strict-rules.
 #
 # The dominant violation is staticMethod.dynamicCall — strict-rules
 # wants $this->assertSame() (and every other PHPUnit Assert::*)
 # called as self:: / static:: / ClassName::. That is a style
 # preference, not a correctness check, and $this-> is PHPUnit-
-# idiomatic, so ignore the identifier wholesale.
+# idiomatic, so ignore the identifier wholesale. Every other
+# strict-rule violation is cleared at the source.
 #
-# Other entries are real strict-rule violations queued for chip-away.
-# Regenerate after a cleanup pass via
+# Regenerate after adding new violations via
 #   docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon
 
 parameters:
     ignoreErrors:
         -
             identifier: staticMethod.dynamicCall
-        -
-            identifier: cast.useless
-            path: src/Controller/CustomFieldFooterController.php
-        -
-            identifier: if.condNotBoolean
-            path: src/Controller/MediaObjectDownloadController.php
-        -
-            identifier: ternary.shortNotAllowed
-            count: 2
-            path: src/Controller/MediaObjectDownloadController.php
-        -
-            identifier: booleanNot.exprNotBoolean
-            path: src/Controller/SpaceInviteController.php
-        -
-            identifier: ternary.condNotBoolean
-            path: src/Controller/SpaceMemberController.php
-        -
-            identifier: ternary.condNotBoolean
-            path: src/Controller/UserGroupMemberController.php
-        -
-            identifier: booleanNot.exprNotBoolean
-            path: src/Controller/UserInviteController.php
-        -
-            identifier: method.childReturnType
-            path: src/CustomField/Type/AbstractTypeStrategy.php
-        -
-            identifier: method.childReturnType
-            path: src/CustomField/Type/Date/AbstractDateStrategy.php
-        -
-            identifier: method.childReturnType
-            path: src/CustomField/Type/Numeric/AbstractNumericStrategy.php
-        -
-            identifier: method.childReturnType
-            path: src/CustomField/Type/Numeric/MoneyStrategy.php
-        -
-            identifier: cast.useless
-            path: src/Service/ImageUploadService.php
-        -
-            identifier: cast.useless
-            path: src/State/TaskUpdateProcessor.php
-        -
-            identifier: booleanNot.exprNotBoolean
-            path: tests/Api/EmailChangeTest.php
-        -
-            identifier: if.condNotBoolean
-            path: tests/bootstrap.php
