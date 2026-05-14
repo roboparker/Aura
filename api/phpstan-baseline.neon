@@ -1,6 +1,202 @@
-# Pre-existing PHPStan level-8 violations. Regenerate with:
+# Pre-existing PHPStan level-9 violations. Mostly mixed-type nested
+# accesses in tests. Regenerate with
 #   docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon
 # Chip away in follow-up PRs.
 
 parameters:
-    ignoreErrors: []
+    ignoreErrors:
+        -
+            message: '#^Parameter\ \#1\ \$value\ of\ function\ count\ expects\ array\|Countable,\ mixed#'
+            path: src/Controller/AssignableUsersController.php
+        -
+            message: '#^Cannot\ access\ offset\ ''id''\ on\ mixed\.#'
+            path: src/Controller/CustomFieldFooterController.php
+        -
+            message: '#^Method\ App\\Controller\\McpController::decode\(\)\ should\ return#'
+            path: src/Controller/McpController.php
+        -
+            message: '#^Parameter\ \#1\ \$arguments\ of\ method\ array<mixed,\ mixed>\ given\.#'
+            path: src/Controller/McpController.php
+        -
+            message: '#^Parameter\ \#1\ \$rows\ of\ static\ method#'
+            path: src/Controller/PageActivityController.php
+        -
+            message: '#^Parameter\ \#1\ \$rows\ of\ static\ method#'
+            path: src/Controller/TaskActivityController.php
+        -
+            message: '#^Cannot\ cast\ mixed\ to\ string\.#'
+            count: 3
+            path: src/Controller/TwoFactorController.php
+        -
+            message: '#^Cannot\ cast\ mixed\ to\ float\.#'
+            path: src/CustomField/Footer/FooterAggregator.php
+        -
+            message: '#^Cannot\ cast\ mixed\ to\ int\.#'
+            path: src/CustomField/Footer/FooterAggregator.php
+        -
+            message: '#^Method\ App\\Repository\\UserInviteRepository::findByEmail\(\)\ should#'
+            path: src/Repository/UserInviteRepository.php
+        -
+            message: '#^Cannot\ access\ offset\ ''assignees''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''author''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''body''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''capabilities''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''content''\ on\ mixed\.#'
+            count: 3
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''email''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''isError''\ on\ mixed\.#'
+            count: 9
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''items''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''name''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''owner''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''serverInfo''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''status''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''structuredContent''\ on\ mixed\.#'
+            count: 6
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''text''\ on\ mixed\.#'
+            count: 3
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''title''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''tools''\ on\ mixed\.#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ 0\ on\ mixed\.#'
+            count: 3
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Parameter\ \#1\ \$array\ of\ function\ array_column\ expects\ array,\ mixed#'
+            count: 3
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Parameter\ \#2\ \$array\ of\ method#'
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Parameter\ \#2\ \$haystack\ of\ method#'
+            count: 3
+            path: tests/Api/McpTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''@id''\ on\ mixed\.#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''avatarUrls''\ on\ mixed\.#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''kind''\ on\ mixed\.#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''profile''\ on\ mixed\.#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Parameter\ \#2\ \$array\ of\ method#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Parameter\ \#2\ \$string\ of\ method#'
+            path: tests/Api/MediaObjectTest.php
+        -
+            message: '#^Parameter\ \#1\ \$callback\ of\ function\ array_map\ expects#'
+            path: tests/Api/ProjectCopyTest.php
+        -
+            message: '#^Parameter\ \#2\ \$array\ of\ function\ array_map\ expects\ array,\ mixed\ given\.#'
+            path: tests/Api/ProjectCopyTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''email''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''enabled''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''provisioningUri''\ on\ mixed\.#'
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''recoveryCodes''\ on\ mixed\.#'
+            count: 3
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''requiresTwoFactor''\ on\ mixed\.#'
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''secret''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''twoFactor''\ on\ mixed\.#'
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Parameter\ \#2\ \$haystack\ of\ method#'
+            count: 2
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Parameter\ \#2\ \$string\ of\ method#'
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Parameter\ \#2\ \.\.\.\$arrays\ of\ function\ array_intersect\ expects\ array,#'
+            path: tests/Api/TwoFactorTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''avatarUrls''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''email''\ on\ mixed\.#'
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''familyName''\ on\ mixed\.#'
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''givenName''\ on\ mixed\.#'
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''personalizedColor''\ on\ mixed\.#'
+            count: 2
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Parameter\ \#2\ \$array\ of\ method#'
+            count: 2
+            path: tests/Api/UserTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''@id''\ on\ mixed\.#'
+            path: tests/Service/CommentMercurePublisherTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''body''\ on\ mixed\.#'
+            count: 2
+            path: tests/Service/CommentMercurePublisherTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''comment''\ on\ mixed\.#'
+            count: 3
+            path: tests/Service/CommentMercurePublisherTest.php
+        -
+            message: '#^Cannot\ access\ offset\ ''type''\ on\ mixed\.#'
+            count: 2
+            path: tests/Service/CommentMercurePublisherTest.php

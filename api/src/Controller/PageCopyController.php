@@ -68,7 +68,7 @@ class PageCopyController extends AbstractController
             return $this->json(['error' => 'Page not found.'], 404);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $rawSpace = $payload['space'] ?? null;
         $target = $sourceSpace;
         if (is_string($rawSpace) && '' !== trim($rawSpace)) {

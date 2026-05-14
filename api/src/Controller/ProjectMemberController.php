@@ -54,7 +54,7 @@ class ProjectMemberController extends AbstractController
             return $this->json(['error' => 'Project is not attached to a space.'], 500);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $email = is_string($payload['email'] ?? null) ? trim($payload['email']) : '';
         if ('' === $email) {
             return $this->json(['error' => 'Email is required.'], 400);

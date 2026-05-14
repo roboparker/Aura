@@ -65,7 +65,7 @@ class UserGroupMemberController extends AbstractController
             return $this->json(['error' => 'Only the group owner can add members.'], 403);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $email = is_string($payload['email'] ?? null) ? trim($payload['email']) : '';
         if ('' === $email) {
             return $this->json(['error' => 'Email is required.'], 400);

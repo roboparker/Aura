@@ -40,7 +40,7 @@ class PasswordController extends AbstractController
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $currentPassword = (string) ($data['currentPassword'] ?? '');
         $newPassword = (string) ($data['newPassword'] ?? '');
 
@@ -69,7 +69,7 @@ class PasswordController extends AbstractController
     #[Route('/auth/forgot-password', name: 'auth_forgot_password', methods: ['POST'])]
     public function forgotPassword(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $email = (string) ($data['email'] ?? '');
 
         // Always return 200 to prevent email enumeration
@@ -105,7 +105,7 @@ class PasswordController extends AbstractController
     #[Route('/auth/reset-password', name: 'auth_reset_password', methods: ['POST'])]
     public function resetPassword(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $plainToken = (string) ($data['token'] ?? '');
         $newPassword = (string) ($data['newPassword'] ?? '');
 

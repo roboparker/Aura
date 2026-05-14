@@ -46,7 +46,7 @@ class EmailChangeController extends AbstractController
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $newEmail = trim((string) ($data['newEmail'] ?? ''));
 
         if ('' === $newEmail) {
@@ -98,7 +98,7 @@ class EmailChangeController extends AbstractController
     #[Route('/auth/confirm-email-change', name: 'auth_confirm_email_change', methods: ['POST'])]
     public function confirm(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $plainToken = (string) ($data['token'] ?? '');
 
         if ('' === $plainToken) {
@@ -145,7 +145,7 @@ class EmailChangeController extends AbstractController
     #[Route('/auth/revert-email-change', name: 'auth_revert_email_change', methods: ['POST'])]
     public function revert(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $request->toArray();
         $plainToken = (string) ($data['token'] ?? '');
 
         if ('' === $plainToken) {

@@ -73,7 +73,7 @@ class ProjectCopyController extends AbstractController
             return $this->json(['error' => 'Project not found.'], 404);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $rawSpace = $payload['space'] ?? null;
         $target = $source->getSpace();
         if (is_string($rawSpace) && '' !== trim($rawSpace)) {
