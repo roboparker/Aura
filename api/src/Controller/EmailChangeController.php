@@ -243,7 +243,7 @@ class EmailChangeController extends AbstractController
                 $changeRequest->getNewEmail(),
                 $revertUrl,
                 $resetUrl,
-                (int) (self::REVERT_TOKEN_TTL_HOURS / 24),
+                self::REVERT_TOKEN_TTL_HOURS / 24,
             ))
             ->html(sprintf(
                 '<p>Hi,</p>'
@@ -256,7 +256,7 @@ class EmailChangeController extends AbstractController
                 htmlspecialchars($changeRequest->getNewEmail()),
                 htmlspecialchars($revertUrl),
                 htmlspecialchars($resetUrl),
-                (int) (self::REVERT_TOKEN_TTL_HOURS / 24),
+                self::REVERT_TOKEN_TTL_HOURS / 24,
             ));
 
         $this->mailer->send($email);
