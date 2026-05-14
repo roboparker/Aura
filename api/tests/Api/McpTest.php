@@ -83,7 +83,6 @@ class McpTest extends ApiTestCase
         $body = $this->callMcp($client, $plain, 'initialize', ['protocolVersion' => '2024-11-05']);
 
         $this->assertSame('2.0', $body['jsonrpc']);
-        $this->assertArrayHasKey('result', $body);
         $serverInfo = $body['result']['serverInfo'] ?? null;
         $this->assertIsArray($serverInfo);
         $this->assertSame('aura-mcp', $serverInfo['name']);
@@ -151,7 +150,6 @@ class McpTest extends ApiTestCase
             'arguments' => ['taskId' => (string) $bobsTask->getId()],
         ]);
 
-        $this->assertArrayHasKey('result', $body);
         $this->assertTrue($body['result']['isError'] ?? null);
         $content = $body['result']['content'] ?? null;
         $this->assertIsArray($content);
