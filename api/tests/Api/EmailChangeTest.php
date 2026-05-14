@@ -231,7 +231,7 @@ class EmailChangeTest extends ApiTestCase
         $email = $this->getMailerMessage(0);
         self::assertNotNull($email);
         self::assertInstanceOf(\Symfony\Component\Mime\Email::class, $email);
-        if (!preg_match('#/revert-email-change\?token=([0-9a-f]+)#', (string) $email->getTextBody(), $m)) {
+        if (1 !== preg_match('#/revert-email-change\?token=([0-9a-f]+)#', (string) $email->getTextBody(), $m)) {
             $this->fail('Revert email did not contain a revert link.');
         }
         $plainRevertToken = $m[1];

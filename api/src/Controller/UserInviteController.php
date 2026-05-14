@@ -129,7 +129,7 @@ class UserInviteController extends AbstractController
         }
 
         $groupInvite = $this->groupInviteRepository->find($groupInviteId);
-        if (null === $groupInvite || !$groupInvite->getGroup()->getId()?->equals($group->getId())) {
+        if (null === $groupInvite || true !== $groupInvite->getGroup()->getId()?->equals($group->getId())) {
             return $this->json(['error' => 'Invite not found.'], 404);
         }
 

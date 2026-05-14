@@ -139,7 +139,7 @@ class SpaceMemberController extends AbstractController
             $invite->setExpiresAt($expiresAt);
         }
 
-        $existing = $invite->getId()
+        $existing = null !== $invite->getId()
             ? $this->spaceInviteRepository->findByInviteAndSpace($invite, $space)
             : null;
         if (null === $existing) {

@@ -128,7 +128,7 @@ class UserGroupMemberController extends AbstractController
             $invite->setExpiresAt($expiresAt);
         }
 
-        $existingGroupInvite = $invite->getId()
+        $existingGroupInvite = null !== $invite->getId()
             ? $this->groupInviteRepository->findByInviteAndGroup($invite, $group)
             : null;
         if (null === $existingGroupInvite) {

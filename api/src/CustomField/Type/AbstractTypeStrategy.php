@@ -35,7 +35,7 @@ abstract class AbstractTypeStrategy implements CustomFieldTypeInterface
      * non-null value). Kinds that can compute richer aggregates
      * (numeric: sum/avg/min/max, date: min/max) override.
      *
-     * @return list<string>
+     * @return list<value-of<\App\CustomField\Footer\FooterKind>>
      */
     public function supportedAggregations(): array
     {

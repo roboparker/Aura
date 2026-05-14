@@ -91,7 +91,7 @@ class SpaceInviteController extends AbstractController
         }
 
         $spaceInvite = $this->spaceInviteRepository->find($spaceInviteId);
-        if (null === $spaceInvite || !$spaceInvite->getSpace()->getId()?->equals($space->getId())) {
+        if (null === $spaceInvite || true !== $spaceInvite->getSpace()->getId()?->equals($space->getId())) {
             return $this->json(['error' => 'Invite not found.'], 404);
         }
 

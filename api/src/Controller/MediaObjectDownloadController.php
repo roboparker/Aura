@@ -80,9 +80,10 @@ class MediaObjectDownloadController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
+        $originalName = $media->getOriginalName();
         $disposition = HeaderUtils::makeDisposition(
             HeaderUtils::DISPOSITION_ATTACHMENT,
-            $media->getOriginalName() ?: 'download',
+            '' !== $originalName ? $originalName : 'download',
         );
 
         return new StreamedResponse(
@@ -94,7 +95,7 @@ class MediaObjectDownloadController extends AbstractController
             },
             200,
             [
-                'Content-Type' => $media->getMimeType() ?: 'application/octet-stream',
+                'Content-Type' => '' !== $media->getMimeType() ? $media->getMimeType() : 'application/octet-stream',
                 'Content-Length' => (string) $media->getByteSize(),
                 'Content-Disposition' => $disposition,
                 // Force a revalidation so updated/replaced bytes never get

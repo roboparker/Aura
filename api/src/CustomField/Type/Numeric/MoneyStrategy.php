@@ -53,7 +53,7 @@ final class MoneyStrategy extends AbstractTypeStrategy
     }
 
     /**
-     * @return list<string>
+     * @return list<value-of<\App\CustomField\Footer\FooterKind>>
      */
     public function supportedAggregations(): array
     {

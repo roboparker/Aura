@@ -162,7 +162,7 @@ final class ImageUploadService
         if ($file->getSize() > self::MAX_ATTACHMENT_BYTES) {
             throw new BadRequestHttpException(sprintf(
                 'File is larger than %d MB.',
-                (int) (self::MAX_ATTACHMENT_BYTES / 1024 / 1024),
+                intdiv(self::MAX_ATTACHMENT_BYTES, 1024 * 1024),
             ));
         }
 
