@@ -259,7 +259,6 @@ class UserTest extends ApiTestCase
     private function createTestUser(string $email, string $plainPassword, array $roles = ['ROLE_USER']): User
     {
         $container = static::getContainer();
-        /** @var UserPasswordHasherInterface $hasher */
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
         $user = new User();

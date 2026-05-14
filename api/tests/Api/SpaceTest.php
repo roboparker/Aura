@@ -245,7 +245,6 @@ class SpaceTest extends ApiTestCase
     private function createUserWithPersonalSpace(string $email): User
     {
         $container = static::getContainer();
-        /** @var UserPasswordHasherInterface $hasher */
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
         $user = (new User())
