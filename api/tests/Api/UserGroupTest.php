@@ -178,7 +178,8 @@ class UserGroupTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
-        $this->assertTrue($bob->getId()->equals($reloaded->getOwner()?->getId()));
+        $this->assertNotNull($reloaded);
+        $this->assertTrue($bob->getId()?->equals($reloaded->getOwner()?->getId()));
     }
 
     public function testNonOwnerCannotTransferOwnership(): void
@@ -214,6 +215,7 @@ class UserGroupTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(2, $reloaded->getMembers());
     }
 
@@ -274,6 +276,7 @@ class UserGroupTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
         $this->assertCount(2, $reloaded->getMembers());
     }
 

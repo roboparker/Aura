@@ -67,7 +67,7 @@ class DiscussionCopyTest extends ApiTestCase
         $this->assertNotNull($copy);
         $this->assertSame('Quick intro.', $copy->getBody());
         $this->assertSame('announcements', $copy->getCategory());
-        $this->assertSame((string) $alice->getId(), (string) $copy->getAuthor()->getId());
+        $this->assertSame((string) $alice->getId(), (string) $copy->getAuthor()?->getId());
         $this->assertFalse($copy->getIsPinned());
         $this->assertFalse($copy->getIsLocked());
     }
@@ -132,7 +132,8 @@ class DiscussionCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Discussion::class)
             ->find($response->toArray()['id']);
-        $this->assertSame((string) $bob->getId(), (string) $copy->getAuthor()->getId());
+        $this->assertNotNull($copy);
+        $this->assertSame((string) $bob->getId(), (string) $copy->getAuthor()?->getId());
     }
 
     public function testPinAndLockResetOnCopy(): void
@@ -157,10 +158,12 @@ class DiscussionCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copy = $this->entityManager->getRepository(Discussion::class)
             ->find($response->toArray()['id']);
+        $this->assertNotNull($copy);
         $this->assertFalse($copy->getIsPinned());
         $this->assertFalse($copy->getIsLocked());
 
         $reloaded = $this->entityManager->getRepository(Discussion::class)->find($discussion->getId());
+        $this->assertNotNull($reloaded);
         $this->assertTrue($reloaded->getIsPinned());
         $this->assertTrue($reloaded->getIsLocked());
     }

@@ -58,7 +58,7 @@ class TagTest extends ApiTestCase
         ]);
 
         $tag = $this->reloadTagByTitle('Urgent');
-        $this->assertTrue($user->getId()->equals($tag->getOwner()?->getId()));
+        $this->assertTrue($user->getId()?->equals($tag->getOwner()?->getId()));
     }
 
     public function testCreateTagIgnoresClientSuppliedOwner(): void
@@ -80,7 +80,7 @@ class TagTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $tag = $this->reloadTagByTitle('Sneaky');
-        $this->assertTrue($alice->getId()->equals($tag->getOwner()?->getId()));
+        $this->assertTrue($alice->getId()?->equals($tag->getOwner()?->getId()));
     }
 
     public function testCreateTagRequiresTitle(): void
