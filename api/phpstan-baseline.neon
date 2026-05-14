@@ -219,3 +219,18 @@ parameters:
         -
             identifier: varTag.type
             path: tests/Api/TaskTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserGroupTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserInviteTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserPreferencesTest.php
+        -
+            identifier: varTag.type
+            path: tests/Api/UserTest.php
+        -
+            identifier: if.condNotBoolean
+            path: tests/bootstrap.php
