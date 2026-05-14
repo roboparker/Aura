@@ -224,6 +224,7 @@ class TwoFactorTest extends ApiTestCase
         $body = $response->toArray(false);
         $recoveryCodes = $body['recoveryCodes'];
         $this->assertIsArray($recoveryCodes);
+        /** @var list<string> $recoveryCodes */
         $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $recoveryCodes);
         $this->assertEmpty(
             array_intersect($original, $recoveryCodes),

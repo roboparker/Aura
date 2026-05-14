@@ -151,7 +151,7 @@ class CustomFieldFooterController extends AbstractController
         $rows = $qb->getQuery()->getArrayResult();
         $ids = [];
         foreach ($rows as $row) {
-            $idValue = $row['id'] ?? null;
+            $idValue = $row['id'];
             if ($idValue instanceof Uuid) {
                 $ids[] = $idValue->toRfc4122();
             } elseif (is_string($idValue)) {
