@@ -218,6 +218,7 @@ class McpController extends AbstractController
         if (!is_array($arguments)) {
             throw McpException::invalidInput('tools/call "arguments" must be an object.');
         }
+        /** @var array<string, mixed> $arguments */
 
         $result = $tool->invoke($arguments, $user);
 
@@ -251,7 +252,11 @@ class McpController extends AbstractController
         } catch (\JsonException) {
             return null;
         }
-        return is_array($decoded) ? $decoded : null;
+        if (!is_array($decoded)) {
+            return null;
+        }
+        /** @var array<string, mixed>|list<array<string, mixed>> $decoded */
+        return $decoded;
     }
 
     /**

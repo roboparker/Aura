@@ -122,10 +122,12 @@ class McpTest extends ApiTestCase
             'arguments' => ['title' => 'From MCP', 'description' => 'Hello'],
         ]);
 
-        $this->assertFalse($body['result']['isError']);
-        $structured = $body['result']['structuredContent'];
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? [];
         $this->assertSame('From MCP', $structured['title']);
-        $this->assertSame('alice@example.com', $structured['owner']['email']);
+        $owner = $structured['owner'];
+        $this->assertIsArray($owner);
+        $this->assertSame('alice@example.com', $owner['email']);
         $this->assertSame('open', $structured['status']);
     }
 
@@ -175,7 +177,9 @@ class McpTest extends ApiTestCase
             'name' => 'list_projects',
             'arguments' => [],
         ]);
-        $titles = array_column($body['result']['structuredContent']['items'], 'title');
+        $items = $body['result']['structuredContent']['items'] ?? [];
+        $this->assertIsArray($items);
+        $titles = array_column($items, 'title');
         $this->assertSame(['Mine'], $titles);
     }
 
@@ -192,8 +196,10 @@ class McpTest extends ApiTestCase
             'name' => 'assign_task',
             'arguments' => ['taskId' => (string) $task->getId(), 'userId' => (string) $bob->getId()],
         ]);
-        $this->assertFalse($body['result']['isError']);
-        $emails = array_column($body['result']['structuredContent']['assignees'], 'email');
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $assignees = $body['result']['structuredContent']['assignees'] ?? [];
+        $this->assertIsArray($assignees);
+        $emails = array_column($assignees, 'email');
         $this->assertContains('bob@example.com', $emails);
     }
 
@@ -208,9 +214,12 @@ class McpTest extends ApiTestCase
             'name' => 'add_task_comment',
             'arguments' => ['taskId' => (string) $task->getId(), 'body' => 'Looks good!'],
         ]);
-        $this->assertFalse($body['result']['isError']);
-        $this->assertSame('Looks good!', $body['result']['structuredContent']['body']);
-        $this->assertSame('alice@example.com', $body['result']['structuredContent']['author']['email']);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? [];
+        $this->assertSame('Looks good!', $structured['body']);
+        $author = $structured['author'];
+        $this->assertIsArray($author);
+        $this->assertSame('alice@example.com', $author['email']);
     }
 
     public function testInvalidUuidProducesValidationError(): void
@@ -291,7 +300,19 @@ class McpTest extends ApiTestCase
 
     /**
      * @param array<string, mixed> $params
-     * @return array<string, mixed>
+     * @return array{
+     *   jsonrpc: string,
+     *   id?: int|string,
+     *   result?: array{
+     *     isError?: bool,
+     *     content?: list<array{type: string, text: string}>,
+     *     structuredContent?: array<string, mixed>,
+     *     tools?: list<array{name: string, description?: string}>,
+     *     serverInfo?: array{name: string, version?: string},
+     *     capabilities?: array<string, mixed>
+     *   },
+     *   error?: array{code: int, message: string, data?: mixed}
+     * }
      */
     private function callMcp(Client $client, string $bearer, string $method, array $params = []): array
     {
@@ -307,7 +328,23 @@ class McpTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        return $response->toArray();
+        /**
+         * @var array{
+         *   jsonrpc: string,
+         *   id?: int|string,
+         *   result?: array{
+         *     isError?: bool,
+         *     content?: list<array{type: string, text: string}>,
+         *     structuredContent?: array<string, mixed>,
+         *     tools?: list<array{name: string, description?: string}>,
+         *     serverInfo?: array{name: string, version?: string},
+         *     capabilities?: array<string, mixed>
+         *   },
+         *   error?: array{code: int, message: string, data?: mixed}
+         * } $body
+         */
+        $body = $response->toArray();
+        return $body;
     }
 
     /**

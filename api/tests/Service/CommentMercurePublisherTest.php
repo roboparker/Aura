@@ -35,9 +35,12 @@ class CommentMercurePublisherTest extends TestCase
         $this->assertTrue($update->isPrivate(), 'Updates must be private so unauthorised subscribers cannot read them.');
 
         $payload = json_decode($update->getData(), true, 512, \JSON_THROW_ON_ERROR);
+        $this->assertIsArray($payload);
         $this->assertSame('create', $payload['type']);
-        $this->assertSame('Looks good.', $payload['comment']['body']);
-        $this->assertSame('/comments/0193bbbb-0001-7000-8000-000000000001', $payload['comment']['@id']);
+        $comment = $payload['comment'];
+        $this->assertIsArray($comment);
+        $this->assertSame('Looks good.', $comment['body']);
+        $this->assertSame('/comments/0193bbbb-0001-7000-8000-000000000001', $comment['@id']);
     }
 
     public function testPublishUpdatedUsesUpdateType(): void
@@ -51,8 +54,11 @@ class CommentMercurePublisherTest extends TestCase
         ));
 
         $payload = json_decode($hub->updates[0]->getData(), true, 512, \JSON_THROW_ON_ERROR);
+        $this->assertIsArray($payload);
         $this->assertSame('update', $payload['type']);
-        $this->assertSame('Edited.', $payload['comment']['body']);
+        $comment = $payload['comment'];
+        $this->assertIsArray($comment);
+        $this->assertSame('Edited.', $comment['body']);
     }
 
     public function testPublishDeletedSendsLeanIriPayload(): void

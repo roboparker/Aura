@@ -139,7 +139,11 @@ final class FooterAggregator
             $sql,
             array_merge([$definitionId], $params),
         );
-        return (int) $stmt->fetchOne();
+        $count = $stmt->fetchOne();
+        if (is_int($count)) {
+            return $count;
+        }
+        return is_numeric($count) ? (int) $count : 0;
     }
 
     /**
@@ -188,7 +192,7 @@ final class FooterAggregator
             array_merge([$definitionId], $params),
         )->fetchOne();
 
-        if (null === $raw || false === $raw) {
+        if (null === $raw || false === $raw || !is_numeric($raw)) {
             return null;
         }
 
@@ -201,9 +205,8 @@ final class FooterAggregator
         }
         if ($isMoney) {
             $amount = FooterKind::AVG->value === $aggKind ? (int) round($numeric) : (int) $numeric;
-            $currency = is_string($definition->getConfig()['currency'] ?? null)
-                ? strtoupper($definition->getConfig()['currency'])
-                : null;
+            $rawCurrency = $definition->getConfig()['currency'] ?? null;
+            $currency = is_string($rawCurrency) ? strtoupper($rawCurrency) : null;
             return ['amount' => $amount, 'currency' => $currency];
         }
         return $numeric;

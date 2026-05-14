@@ -82,9 +82,11 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertCount(2, $defs);
         $this->assertSame('Severity', $defs[0]->getName());
         $this->assertSame('select.single', $defs[0]->getTypeKey());
+        $options = $defs[0]->getConfig()['options'] ?? [];
+        $this->assertIsArray($options);
         $this->assertSame(
             ['low', 'med', 'high'],
-            array_map(static fn (array $o) => $o['key'], $defs[0]->getConfig()['options'] ?? []),
+            array_map(static fn (array $o) => $o['key'], $options),
         );
         $this->assertSame('Notes', $defs[1]->getName());
 

@@ -67,12 +67,16 @@ class MediaObjectTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $response = json_decode($response->getContent(), true);
-        $this->assertSame('avatar', $response['kind']);
-        $this->assertArrayHasKey('variantUrls', $response);
-        $this->assertArrayHasKey('profile', $response['variantUrls']);
-        $this->assertArrayHasKey('thumb', $response['variantUrls']);
-        $this->assertStringStartsWith('/media/avatars/', $response['variantUrls']['profile']);
+        $body = $response->toArray();
+        $this->assertSame('avatar', $body['kind']);
+        $this->assertArrayHasKey('variantUrls', $body);
+        $variantUrls = $body['variantUrls'];
+        $this->assertIsArray($variantUrls);
+        $this->assertArrayHasKey('profile', $variantUrls);
+        $this->assertArrayHasKey('thumb', $variantUrls);
+        $profile = $variantUrls['profile'];
+        $this->assertIsString($profile);
+        $this->assertStringStartsWith('/media/avatars/', $profile);
     }
 
     public function testRejectsNonImageMimeType(): void
@@ -118,7 +122,8 @@ class MediaObjectTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $iri = json_decode($response->getContent(), true)['@id'];
+        $iri = $response->toArray()['@id'];
+        $this->assertIsString($iri);
 
         $client->request('PATCH', '/users/' . $user->getId(), [
             'json' => ['avatar' => $iri],
@@ -130,9 +135,12 @@ class MediaObjectTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $me = json_decode($response->getContent(), true);
-        $this->assertNotNull($me['avatarUrls']);
-        $this->assertStringStartsWith('/media/avatars/', $me['avatarUrls']['profile']);
+        $me = $response->toArray();
+        $avatarUrls = $me['avatarUrls'] ?? null;
+        $this->assertIsArray($avatarUrls);
+        $profile = $avatarUrls['profile'];
+        $this->assertIsString($profile);
+        $this->assertStringStartsWith('/media/avatars/', $profile);
     }
 
     private function createPngUpload(): UploadedFile

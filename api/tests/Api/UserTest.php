@@ -50,11 +50,11 @@ class UserTest extends ApiTestCase
         // Password should not be in response; color should be set to a palette entry
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $response = json_decode($response->getContent(), true);
-        $this->assertArrayNotHasKey('password', $response);
-        $this->assertArrayNotHasKey('plainPassword', $response);
-        $this->assertContains($response['personalizedColor'], AvatarColorService::PALETTE);
-        $this->assertNull($response['avatarUrls'] ?? null);
+        $body = $response->toArray();
+        $this->assertArrayNotHasKey('password', $body);
+        $this->assertArrayNotHasKey('plainPassword', $body);
+        $this->assertContains($body['personalizedColor'], AvatarColorService::PALETTE);
+        $this->assertNull($body['avatarUrls'] ?? null);
     }
 
     public function testRegisterDuplicateEmail(): void
@@ -207,12 +207,12 @@ class UserTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $response = json_decode($response->getContent(), true);
-        $this->assertSame('me@example.com', $response['email']);
-        $this->assertSame('Test', $response['givenName']);
-        $this->assertSame('User', $response['familyName']);
-        $this->assertNotEmpty($response['personalizedColor']);
-        $this->assertNull($response['avatarUrls']);
+        $body = $response->toArray();
+        $this->assertSame('me@example.com', $body['email']);
+        $this->assertSame('Test', $body['givenName']);
+        $this->assertSame('User', $body['familyName']);
+        $this->assertNotEmpty($body['personalizedColor']);
+        $this->assertNull($body['avatarUrls']);
     }
 
     public function testGetMeUnauthenticated(): void

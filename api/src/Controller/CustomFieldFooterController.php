@@ -147,6 +147,7 @@ class CustomFieldFooterController extends AbstractController
                 ->setParameter('ftsQuery', trim($search));
         }
 
+        /** @var list<array{id: Uuid|string}> $rows */
         $rows = $qb->getQuery()->getArrayResult();
         $ids = [];
         foreach ($rows as $row) {
