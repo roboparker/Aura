@@ -57,7 +57,7 @@ class PageMoveController extends AbstractController
             return $this->json(['error' => 'Page not found.'], 404);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $rawSpace = $payload['space'] ?? null;
         if (!is_string($rawSpace) || '' === trim($rawSpace)) {
             return $this->json(['error' => 'Target `space` IRI is required.'], 400);

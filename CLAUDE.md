@@ -105,7 +105,7 @@ bin/phpunit                           # Run tests
 ```
 
 ### Static analysis (PHPStan)
-PHPStan runs against `api/src` and `api/tests` at **level 8** as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); pre-existing test-side null-safety patterns are deferred via [api/phpstan-baseline.neon](api/phpstan-baseline.neon) so CI only fails on *new* errors. Regenerate after a cleanup pass with `docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon`.
+PHPStan runs against `api/src` and `api/tests` at **level 9** as a required CI check. Config lives in [api/phpstan.dist.neon](api/phpstan.dist.neon); pre-existing mixed-type accesses (mostly nested key lookups on JSON-RPC responses in test helpers) are deferred via [api/phpstan-baseline.neon](api/phpstan-baseline.neon) so CI only fails on *new* errors. Regenerate after a cleanup pass with `docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon`.
 
 Extensions wired up:
 - `phpstan/phpstan-symfony` — service-id / config-resolver awareness via `var/cache/test/App_KernelTestDebugContainer.xml`, console application loaded from [api/tests/phpstan/console-application.php](api/tests/phpstan/console-application.php).

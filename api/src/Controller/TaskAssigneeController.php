@@ -43,7 +43,7 @@ class TaskAssigneeController extends AbstractController
             return $this->json(['error' => 'Task not found.'], 404);
         }
 
-        $payload = json_decode($request->getContent(), true) ?? [];
+        $payload = $request->toArray();
         $userId = is_string($payload['userId'] ?? null) ? trim($payload['userId']) : '';
         if ('' === $userId || !Uuid::isValid($userId)) {
             return $this->json(['error' => 'A valid userId is required.'], 400);
