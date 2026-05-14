@@ -1,16 +1,8 @@
-# Auto-generated baseline for the level-9 → level-10 bump.
-# Identifiers + counts captured here are the explicit-mixed violations
-# level 10 surfaces, primarily in test helpers that decode JSON-RPC /
-# REST response bodies. Chip away in follow-up PRs and regenerate via
+# PHPStan level-10 baseline.
+#
+# Empty for now — the previous chip-away PRs cleared every entry.
+# Regenerate after adding new violations with
 #   docker compose run --rm phpstan analyse --generate-baseline=phpstan-baseline.neon
 
 parameters:
-    ignoreErrors:
-        -
-            identifier: argument.type
-            count: 21
-            path: tests/Api/TaskTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 17
-            path: tests/Api/TaskTest.php
+    ignoreErrors: []
