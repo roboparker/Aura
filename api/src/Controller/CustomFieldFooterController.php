@@ -134,6 +134,7 @@ class CustomFieldFooterController extends AbstractController
 
         $dueDate = $request->query->all()['dueDate'] ?? null;
         if (is_array($dueDate)) {
+            /** @var array<string, mixed> $dueDate */
             $this->applyDueDateBounds($qb, $dueDate);
         }
 

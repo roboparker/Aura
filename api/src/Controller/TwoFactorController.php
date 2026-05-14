@@ -149,7 +149,11 @@ class TwoFactorController extends AbstractController
     private function jsonBody(Request $request): array
     {
         $decoded = json_decode($request->getContent(), true);
-        return is_array($decoded) ? $decoded : [];
+        if (!is_array($decoded)) {
+            return [];
+        }
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
     }
 
     /**

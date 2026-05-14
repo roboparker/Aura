@@ -47,7 +47,8 @@ class EmailChangeController extends AbstractController
         }
 
         $data = $request->toArray();
-        $newEmail = trim((string) ($data['newEmail'] ?? ''));
+        $rawEmail = $data['newEmail'] ?? '';
+        $newEmail = trim(is_string($rawEmail) ? $rawEmail : '');
 
         if ('' === $newEmail) {
             return $this->json(['error' => 'New email is required.'], 422);
@@ -99,7 +100,8 @@ class EmailChangeController extends AbstractController
     public function confirm(Request $request): JsonResponse
     {
         $data = $request->toArray();
-        $plainToken = (string) ($data['token'] ?? '');
+        $rawToken = $data['token'] ?? '';
+        $plainToken = is_string($rawToken) ? $rawToken : '';
 
         if ('' === $plainToken) {
             return $this->json(['error' => 'Token is required.'], 400);
@@ -146,7 +148,8 @@ class EmailChangeController extends AbstractController
     public function revert(Request $request): JsonResponse
     {
         $data = $request->toArray();
-        $plainToken = (string) ($data['token'] ?? '');
+        $rawToken = $data['token'] ?? '';
+        $plainToken = is_string($rawToken) ? $rawToken : '';
 
         if ('' === $plainToken) {
             return $this->json(['error' => 'Token is required.'], 400);
