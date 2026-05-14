@@ -78,9 +78,11 @@ final class ImageUploadService
         $media->setOwner($owner);
         $media->setKind(MediaObject::KIND_AVATAR);
         $media->setVariants(['profile' => $profilePath, 'thumb' => $thumbPath]);
-        $media->setOriginalName($file->getClientOriginalName() ?: 'avatar');
+        $clientName = $file->getClientOriginalName();
+        $media->setOriginalName('' !== $clientName ? $clientName : 'avatar');
         $media->setMimeType('image/webp');
-        $media->setByteSize($file->getSize() ?: 0);
+        $size = $file->getSize();
+        $media->setByteSize(false !== $size ? $size : 0);
 
         $this->em->persist($media);
         $this->em->flush();
@@ -99,14 +101,18 @@ final class ImageUploadService
         $this->assertValidAttachment($file);
 
         $uuid = (string) Uuid::v7();
-        $original = $file->getClientOriginalName() ?: 'file';
+        $clientName = $file->getClientOriginalName();
+        $original = '' !== $clientName ? $clientName : 'file';
         $extension = pathinfo($original, PATHINFO_EXTENSION);
         $base = pathinfo($original, PATHINFO_FILENAME);
         // Strip path separators and other shell-unfriendly characters from
         // the name slug; the UUID prefix already guarantees uniqueness so
         // the slug is purely a human-readable hint.
         $slug = preg_replace('/[^A-Za-z0-9._-]+/', '-', $base) ?? 'file';
-        $slug = trim($slug, '-') ?: 'file';
+        $slug = trim($slug, '-');
+        if ('' === $slug) {
+            $slug = 'file';
+        }
         $path = sprintf(
             'attachments/%s-%s%s',
             $uuid,
@@ -126,7 +132,8 @@ final class ImageUploadService
         $media->setVariants(['original' => $path]);
         $media->setOriginalName($original);
         $media->setMimeType($file->getMimeType() ?? 'application/octet-stream');
-        $media->setByteSize($file->getSize() ?: 0);
+        $size = $file->getSize();
+        $media->setByteSize(false !== $size ? $size : 0);
 
         $this->em->persist($media);
         $this->em->flush();

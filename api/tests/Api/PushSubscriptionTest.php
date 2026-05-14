@@ -71,7 +71,7 @@ class PushSubscriptionTest extends ApiTestCase
 
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $body = (string) $response->getContent();
+        $body = $response->getContent();
         $this->assertStringNotContainsString('SECRET-PUBKEY', $body);
         $this->assertStringNotContainsString('SECRET-AUTH', $body);
     }

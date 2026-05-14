@@ -134,7 +134,7 @@ class TaskAssigneeController extends AbstractController
     private function isAllowedAssignee(Task $task, User $candidate): bool
     {
         $owner = $task->getOwner();
-        if (null !== $owner && $owner->getId()?->equals($candidate->getId())) {
+        if (null !== $owner && true === $owner->getId()?->equals($candidate->getId())) {
             return true;
         }
         $project = $task->getProject();

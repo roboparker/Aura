@@ -187,7 +187,7 @@ class EmailChangeController extends AbstractController
             rtrim($this->frontendUrl, '/'),
             $plainToken,
         );
-        $from = $this->mailerFrom ?: 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
 
         $email = (new Email())
             ->from($from)
@@ -226,7 +226,7 @@ class EmailChangeController extends AbstractController
             $revertToken,
         );
         $resetUrl = sprintf('%s/forgot-password', rtrim($this->frontendUrl, '/'));
-        $from = $this->mailerFrom ?: 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
 
         $email = (new Email())
             ->from($from)
@@ -243,7 +243,7 @@ class EmailChangeController extends AbstractController
                 $changeRequest->getNewEmail(),
                 $revertUrl,
                 $resetUrl,
-                (int) (self::REVERT_TOKEN_TTL_HOURS / 24),
+                self::REVERT_TOKEN_TTL_HOURS / 24,
             ))
             ->html(sprintf(
                 '<p>Hi,</p>'
@@ -256,7 +256,7 @@ class EmailChangeController extends AbstractController
                 htmlspecialchars($changeRequest->getNewEmail()),
                 htmlspecialchars($revertUrl),
                 htmlspecialchars($resetUrl),
-                (int) (self::REVERT_TOKEN_TTL_HOURS / 24),
+                self::REVERT_TOKEN_TTL_HOURS / 24,
             ));
 
         $this->mailer->send($email);

@@ -36,7 +36,7 @@ final class InviteMailer
             rtrim($this->frontendUrl, '/'),
             $plainToken,
         );
-        $from = $this->mailerFrom ?: 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
 
         $targets = $this->collectTargetLabels($invite);
         $contextLine = $this->formatContextLine($targets);

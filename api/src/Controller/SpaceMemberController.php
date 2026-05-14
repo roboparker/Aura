@@ -87,7 +87,7 @@ class SpaceMemberController extends AbstractController
             // friendly "already added" notice. Group-inherited
             // membership doesn't count as "already a direct member".
             foreach ($space->getUserMemberships() as $existing) {
-                if ($existing->getUser()?->getId()?->equals($candidate->getId())) {
+                if (true === $existing->getUser()?->getId()?->equals($candidate->getId())) {
                     return $this->json(['error' => 'That user is already a member.'], 409);
                 }
             }

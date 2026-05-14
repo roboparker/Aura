@@ -88,8 +88,9 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
+        $messageKey = $exception->getMessageKey();
         return new JsonResponse(
-            ['error' => $exception->getMessageKey() ?: 'Authentication failed.'],
+            ['error' => '' !== $messageKey ? $messageKey : 'Authentication failed.'],
             Response::HTTP_UNAUTHORIZED,
             ['WWW-Authenticate' => 'Bearer realm="aura"'],
         );
@@ -101,7 +102,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator
         if (null === $header) {
             return null;
         }
-        if (!preg_match('/^Bearer\s+(\S+)$/i', $header, $matches)) {
+        if (1 !== preg_match('/^Bearer\s+(\S+)$/i', $header, $matches)) {
             return null;
         }
         return $matches[1];

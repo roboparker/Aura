@@ -29,7 +29,8 @@ class MediaObjectTest extends ApiTestCase
     protected function tearDown(): void
     {
         if (is_dir($this->tempDir)) {
-            foreach (glob($this->tempDir . '/*') ?: [] as $file) {
+            $files = glob($this->tempDir . '/*');
+            foreach (false !== $files ? $files : [] as $file) {
                 @unlink($file);
             }
             @rmdir($this->tempDir);

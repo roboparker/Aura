@@ -207,7 +207,7 @@ final class DispatchTaskRemindersCommand extends Command
         }
 
         $email = (new TemplatedEmail())
-            ->from($this->mailerFrom ?: 'no-reply@aura.test')
+            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test')
             ->to($recipient->getEmail())
             ->subject(sprintf('Reminder: %s', $task->getTitle()))
             ->htmlTemplate('emails/task_reminder.html.twig')

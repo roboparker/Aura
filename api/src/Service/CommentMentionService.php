@@ -48,7 +48,7 @@ final class CommentMentionService
      */
     public function extractMentions(string $body): array
     {
-        if (!preg_match_all(self::MENTION_PATTERN, $body, $matches)) {
+        if (1 > preg_match_all(self::MENTION_PATTERN, $body, $matches)) {
             return [];
         }
         $seen = [];
@@ -91,7 +91,7 @@ final class CommentMentionService
             if (null === $user) {
                 continue;
             }
-            if ($author->getId()?->equals($user->getId())) {
+            if (true === $author->getId()?->equals($user->getId())) {
                 continue;
             }
             if ($this->alreadyNotified($user, $comment)) {

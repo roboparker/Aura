@@ -71,7 +71,7 @@ class ProjectMemberController extends AbstractController
         // doesn't count as "already a member" here; we still want a
         // direct row so removal-by-PATCH works without un-grouping them.
         foreach ($space->getUserMemberships() as $existing) {
-            if ($existing->getUser()?->getId()?->equals($candidate->getId())) {
+            if (true === $existing->getUser()?->getId()?->equals($candidate->getId())) {
                 return $this->json(['error' => 'That user is already a member.'], 409);
             }
         }

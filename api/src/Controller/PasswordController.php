@@ -137,7 +137,7 @@ class PasswordController extends AbstractController
     private function sendResetEmail(User $user, string $plainToken): void
     {
         $resetUrl = sprintf('%s/reset-password?token=%s', rtrim($this->frontendUrl, '/'), $plainToken);
-        $from = $this->mailerFrom ?: 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
 
         $email = (new Email())
             ->from($from)

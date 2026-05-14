@@ -80,7 +80,7 @@ final class DownloadFileTool implements McpToolInterface
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
-        if ($media->getOwner()?->getId()?->equals($user->getId())) {
+        if (true === $media->getOwner()?->getId()?->equals($user->getId())) {
             return true;
         }
 

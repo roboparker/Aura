@@ -65,7 +65,7 @@ class DiscussionMoveController extends AbstractController
             return $this->json(['error' => 'Target space not found.'], 404);
         }
 
-        if (null !== $sourceSpace && $sourceSpace->getId()?->equals($target->getId())) {
+        if (null !== $sourceSpace && true === $sourceSpace->getId()?->equals($target->getId())) {
             return $this->json([
                 '@id' => '/discussions/' . $discussion->getId(),
                 'id' => (string) $discussion->getId(),
