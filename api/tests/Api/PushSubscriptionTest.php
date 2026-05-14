@@ -90,9 +90,11 @@ class PushSubscriptionTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $endpoints = array_map(
-            fn ($s) => $s['endpoint'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $s): mixed => is_array($s) ? $s['endpoint'] ?? null : null,
+            $members,
         );
         $this->assertSame(['https://fcm.example/a'], $endpoints);
     }

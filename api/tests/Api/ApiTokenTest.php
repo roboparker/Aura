@@ -40,13 +40,15 @@ class ApiTokenTest extends ApiTestCase
         $body = $response->toArray();
         $this->assertSame('Local CLI', $body['name']);
         $this->assertArrayHasKey('plainToken', $body);
-        $this->assertStringStartsWith(ApiToken::PLAINTEXT_PREFIX, $body['plainToken']);
+        $plainToken = $body['plainToken'];
+        $this->assertIsString($plainToken);
+        $this->assertStringStartsWith(ApiToken::PLAINTEXT_PREFIX, $plainToken);
 
         // The persisted hash should be the sha256 of the returned plaintext.
         $repo = $this->entityManager->getRepository(ApiToken::class);
         $token = $repo->findOneBy(['name' => 'Local CLI']);
         $this->assertNotNull($token);
-        $this->assertSame(hash('sha256', $body['plainToken']), $token->getTokenHash());
+        $this->assertSame(hash('sha256', $plainToken), $token->getTokenHash());
     }
 
     public function testListReturnsOnlyOwnTokens(): void
@@ -64,7 +66,9 @@ class ApiTokenTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $names = array_column($body['member'] ?? [], 'name');
+        $members = $body['member'] ?? [];
+        $this->assertIsArray($members);
+        $names = array_column($members, 'name');
         $this->assertSame(['Alice CLI'], $names);
     }
 

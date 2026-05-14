@@ -104,9 +104,11 @@ class PageTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($p) => $p['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $p): mixed => is_array($p) ? $p['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['Alice page'], $titles);
     }
@@ -284,9 +286,11 @@ class PageTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($p) => $p['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $p): mixed => is_array($p) ? $p['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['Onboarding guide'], $titles);
     }

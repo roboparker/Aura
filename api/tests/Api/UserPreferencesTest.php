@@ -9,6 +9,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class UserPreferencesTest extends ApiTestCase
 {
+    use JsonBodyAssertions;
+
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -191,8 +193,7 @@ class UserPreferencesTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertArrayHasKey('preferences', $body);
-        $this->assertSame('dark', $body['preferences']['theme']);
+        $this->assertSame('dark', $this->arrayField($body, 'preferences')['theme']);
     }
 
     /**

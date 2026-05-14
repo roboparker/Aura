@@ -106,9 +106,11 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $names = array_map(
-            fn ($c) => $c['name'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $c): mixed => is_array($c) ? $c['name'] ?? null : null,
+            $members,
         );
         $this->assertSame(['A1'], $names);
     }

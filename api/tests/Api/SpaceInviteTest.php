@@ -190,8 +190,12 @@ class SpaceInviteTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $payload = $response->toArray();
-        $this->assertCount(1, $payload['invites']);
-        $this->assertSame('pending@example.com', $payload['invites'][0]['email']);
+        $invites = $payload['invites'] ?? null;
+        $this->assertIsArray($invites);
+        $this->assertCount(1, $invites);
+        $first = $invites[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('pending@example.com', $first['email']);
     }
 
     public function testRevokeInviteDropsParentWhenLastAttachment(): void
@@ -232,9 +236,13 @@ class SpaceInviteTest extends ApiTestCase
         self::assertNotNull($response);
         $payload = $response->toArray();
         $this->assertSame('pending@example.com', $payload['email']);
-        $this->assertCount(1, $payload['spaces']);
-        $this->assertSame((string) $space->getId(), $payload['spaces'][0]['id']);
-        $this->assertSame($space->getName(), $payload['spaces'][0]['name']);
+        $spaces = $payload['spaces'] ?? null;
+        $this->assertIsArray($spaces);
+        $this->assertCount(1, $spaces);
+        $first = $spaces[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame((string) $space->getId(), $first['id']);
+        $this->assertSame($space->getName(), $first['name']);
     }
 
     public function testSignupWithInviteTokenAttachesUserToSpace(): void

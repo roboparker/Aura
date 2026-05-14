@@ -212,8 +212,12 @@ class UserInviteTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertCount(1, $body['invites']);
-        $this->assertSame('newcomer@example.com', $body['invites'][0]['email']);
+        $invites = $body['invites'] ?? null;
+        $this->assertIsArray($invites);
+        $this->assertCount(1, $invites);
+        $first = $invites[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('newcomer@example.com', $first['email']);
     }
 
     public function testNonOwnerMemberCannotListInvites(): void
