@@ -122,9 +122,11 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($d) => $d['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $d): mixed => is_array($d) ? $d['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['A1'], $titles);
     }
@@ -142,9 +144,11 @@ class DiscussionTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($d) => $d['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $d): mixed => is_array($d) ? $d['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['Idea one'], $titles);
     }

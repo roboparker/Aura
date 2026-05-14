@@ -75,9 +75,11 @@ class NotificationTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($n) => $n['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $n): mixed => is_array($n) ? $n['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['For Alice'], $titles);
         $this->assertNotNull($aliceNote->getId());
@@ -134,9 +136,11 @@ class NotificationTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $titles = array_map(
-            fn ($n) => $n['title'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $n): mixed => is_array($n) ? $n['title'] ?? null : null,
+            $members,
         );
         $this->assertSame(['Unread'], $titles);
         $this->assertNotNull($unread->getId());

@@ -162,9 +162,11 @@ class CommentTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $bodies = array_map(
-            fn ($c) => $c['body'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $c): mixed => is_array($c) ? $c['body'] ?? null : null,
+            $members,
         );
         $this->assertSame(['My note.'], $bodies);
     }
@@ -194,9 +196,11 @@ class CommentTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
+        $this->assertIsArray($members);
         $bodies = array_map(
-            fn ($c) => $c['body'],
-            $response->toArray()['member'] ?? [],
+            static fn (mixed $c): mixed => is_array($c) ? $c['body'] ?? null : null,
+            $members,
         );
         $this->assertSame(['First', 'Second'], $bodies);
     }
@@ -437,9 +441,11 @@ class CommentTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $created = $response->toArray();
+        $iri = $created['@id'];
+        $this->assertIsString($iri);
 
         // Edit keeps the same mention — must NOT create a second notification.
-        $client->request('PATCH', $created['@id'], [
+        $client->request('PATCH', $iri, [
             'json' => ['body' => 'Hey @bob (small typo fix)'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -472,8 +478,10 @@ class CommentTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $created = $response->toArray();
+        $iri = $created['@id'];
+        $this->assertIsString($iri);
 
-        $client->request('PATCH', $created['@id'], [
+        $client->request('PATCH', $iri, [
             'json' => ['body' => 'Hey @bob and @carol'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);

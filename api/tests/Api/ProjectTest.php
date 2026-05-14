@@ -234,8 +234,13 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $response = $response->toArray();
-        $titles = array_map(fn ($t) => $t['title'], $response['member']);
+        $body = $response->toArray();
+        $members = $body['member'] ?? [];
+        $this->assertIsArray($members);
+        $titles = array_map(
+            static fn (mixed $t): mixed => is_array($t) ? $t['title'] ?? null : null,
+            $members,
+        );
         $this->assertSame(['Alice project task'], $titles);
     }
 

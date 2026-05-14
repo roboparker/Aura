@@ -20,77 +20,12 @@ parameters:
             path: tests/Api/ActivityHistoryTest.php
         -
             identifier: argument.type
-            count: 3
-            path: tests/Api/ApiTokenTest.php
-        -
-            identifier: argument.type
-            count: 4
-            path: tests/Api/CommentTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 2
-            path: tests/Api/CommentTest.php
-        -
-            identifier: argument.type
-            path: tests/Api/CustomFieldDefinitionTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            path: tests/Api/CustomFieldDefinitionTest.php
-        -
-            identifier: argument.type
             count: 2
             path: tests/Api/CustomFieldFooterTest.php
         -
             identifier: offsetAccess.nonOffsetAccessible
             count: 14
             path: tests/Api/CustomFieldFooterTest.php
-        -
-            identifier: argument.type
-            count: 2
-            path: tests/Api/DiscussionTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 2
-            path: tests/Api/DiscussionTest.php
-        -
-            identifier: argument.type
-            count: 2
-            path: tests/Api/NotificationTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 2
-            path: tests/Api/NotificationTest.php
-        -
-            identifier: argument.type
-            count: 2
-            path: tests/Api/PageTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 2
-            path: tests/Api/PageTest.php
-        -
-            identifier: argument.type
-            path: tests/Api/ProjectCopyTest.php
-        -
-            identifier: argument.type
-            path: tests/Api/ProjectTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            path: tests/Api/ProjectTest.php
-        -
-            identifier: argument.type
-            path: tests/Api/PushSubscriptionTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            path: tests/Api/PushSubscriptionTest.php
-        -
-            identifier: argument.type
-            count: 2
-            path: tests/Api/SpaceInviteTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 6
-            path: tests/Api/SpaceInviteTest.php
         -
             identifier: argument.type
             count: 2
@@ -123,13 +58,3 @@ parameters:
             identifier: offsetAccess.nonOffsetAccessible
             count: 17
             path: tests/Api/TaskTest.php
-        -
-            identifier: argument.type
-            path: tests/Api/UserInviteTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            count: 2
-            path: tests/Api/UserInviteTest.php
-        -
-            identifier: offsetAccess.nonOffsetAccessible
-            path: tests/Api/UserPreferencesTest.php
