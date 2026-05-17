@@ -84,19 +84,18 @@ test.describe("Auth redirect", () => {
     await expect(page).toHaveURL(/\/projects$/);
   });
 
-  test("/signup tab on the unified auth card preserves ?next through registration", async ({
+  test("/signup link on the auth card preserves ?next through registration", async ({
     page,
   }) => {
     const email = uniqueEmail("signup-redirect");
     const password = "password123";
 
-    // Land on /signin?next=/tasks, then click into the Sign Up tab.
-    // The Radix Tabs trigger has role="tab" while the form submit is a
-    // normal <button>, so role-based selectors disambiguate them — both
-    // happen to be labelled "Sign Up". Tab clicks navigate to the
-    // matching URL so the form rendered always matches the URL.
+    // Land on /signin?next=/tasks, then follow the footer "Create an
+    // account" link. The auth card no longer renders tabs — switching
+    // forms is a plain <Link> in the card footer that navigates to
+    // /signup while preserving the query string.
     await page.goto(`${BASE_URL}/signin?next=%2Ftasks`);
-    await page.getByRole("tab", { name: "Sign Up" }).click();
+    await page.getByRole("link", { name: "Create an account" }).click();
     await expect(page).toHaveURL(/\/signup\?.*next=%2Ftasks/);
 
     await page.fill('input[name="givenName"]', "New");
