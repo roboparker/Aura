@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Formik, Form } from "formik";
 import { FormikField } from "@/components/ui/formik-field";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,11 @@ const Demo = () => (
         label="Password"
         type="password"
         description="At least 8 characters."
+        labelAddon={
+          <Link href="#" className="text-xs text-primary font-medium">
+            Forgot password?
+          </Link>
+        }
       />
       <Button type="submit">Sign in</Button>
     </Form>

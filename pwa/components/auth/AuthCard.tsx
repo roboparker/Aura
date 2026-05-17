@@ -1,25 +1,42 @@
 import { useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { safeNextPath } from "@/lib/authRedirect";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import AuraWordmark from "./AuraWordmark";
 import SignInForm from "./SignInForm";
 import SignUpForm from "./SignUpForm";
 
 type Tab = "signin" | "signup";
 
 interface Props {
-  /**
-   * Which tab the page entry point selects. The currently-displayed tab
-   * is fully URL-driven — `/signin` shows "signin", `/signup` shows
-   * "signup", and tab triggers navigate between the two so the active
-   * form always matches the URL the user (and tests) can read.
-   */
+  /** Which form this page entry point renders. */
   defaultTab: Tab;
 }
 
-const titleFor = (tab: Tab) => (tab === "signin" ? "Welcome back" : "Create your account");
+const COPY: Record<Tab, { title: string; subtitle: string; switchLabel: string; switchCta: string; switchPath: string }> = {
+  signin: {
+    title: "Welcome back",
+    subtitle: "Sign in to your Aura workspace.",
+    switchLabel: "New to Aura?",
+    switchCta: "Create an account",
+    switchPath: "/signup",
+  },
+  signup: {
+    title: "Create your account",
+    subtitle: "Get started with Aura in seconds.",
+    switchLabel: "Already have an account?",
+    switchCta: "Sign in",
+    switchPath: "/signin",
+  },
+};
 
 const AuthCard = ({ defaultTab }: Props) => {
   const router = useRouter();
@@ -40,40 +57,38 @@ const AuthCard = ({ defaultTab }: Props) => {
     }
   }, [isLoading, isAuthenticated, next, router]);
 
-  // Tab clicks navigate between /signin and /signup, preserving any
-  // existing query string (so `?next=/tasks` and `?invite=xxx` flow
-  // through). This keeps the URL the source of truth — clicking Sign Up,
-  // submitting, then bouncing back to /signin lands on the *Sign In*
-  // form rather than re-showing whatever local state the user last had.
-  const switchTab = (target: Tab) => {
-    if (target === defaultTab) return;
-    const targetPath = target === "signin" ? "/signin" : "/signup";
-    const queryIndex = router.asPath.indexOf("?");
-    const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
-    router.push(`${targetPath}${search}`);
-  };
+  const copy = COPY[defaultTab];
+  const queryIndex = router.asPath.indexOf("?");
+  const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
+  const switchHref = `${copy.switchPath}${search}`;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-8">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl text-center">{titleFor(defaultTab)}</CardTitle>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
+      <AuraWordmark />
+      <Card className="w-full max-w-lg overflow-hidden p-0">
+        <CardHeader className="p-8 pb-6">
+          <CardTitle className="text-3xl font-bold">{copy.title}</CardTitle>
+          <CardDescription className="text-base">{copy.subtitle}</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <Tabs value={defaultTab} onValueChange={(value) => switchTab(value as Tab)}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-            <TabsContent value="signin" className="mt-4">
-              <SignInForm next={next} registered={registered} reset={reset} />
-            </TabsContent>
-            <TabsContent value="signup" className="mt-4">
-              <SignUpForm inviteToken={inviteToken} next={next} />
-            </TabsContent>
-          </Tabs>
+        <CardContent className="p-8 pt-2">
+          {defaultTab === "signin" ? (
+            <SignInForm next={next} registered={registered} reset={reset} />
+          ) : (
+            <SignUpForm inviteToken={inviteToken} next={next} />
+          )}
         </CardContent>
+        <div className="border-t border-border bg-background px-8 py-5 text-center text-sm text-muted-foreground">
+          {copy.switchLabel}{" "}
+          <Link href={switchHref} className="text-primary font-semibold hover:text-foreground">
+            {copy.switchCta}
+          </Link>
+        </div>
       </Card>
+      <p className="text-xs text-muted-foreground tracking-wide">
+        <a href="/privacy" className="hover:text-foreground">privacy</a>
+        <span className="mx-2 opacity-60">•</span>
+        <a href="/terms" className="hover:text-foreground">terms</a>
+      </p>
     </div>
   );
 };
