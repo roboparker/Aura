@@ -78,7 +78,7 @@ test.describe("Authentication", () => {
     await page.fill("#password", "wrongpassword");
     await page.click('button[type="submit"]');
 
-    await expect(page.locator("text=Invalid credentials")).toBeVisible();
+    await expect(page.locator("text=Invalid email or password")).toBeVisible();
   });
 
   test("sign in with fixture admin user accesses admin page", async ({ page }) => {

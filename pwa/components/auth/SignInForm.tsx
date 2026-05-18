@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
 import { safeNextPath } from "@/lib/authRedirect";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
 import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
@@ -37,6 +37,7 @@ const SignInForm = ({ next, registered, reset }: Props) => {
   // already on a server cookie — there's nothing useful to put in the URL,
   // and a back-button to /signin should restart, not resume.
   const [twoFactorPrompt, setTwoFactorPrompt] = useState(false);
+  const [ssoNotice, setSsoNotice] = useState<string | null>(null);
 
   if (twoFactorPrompt) {
     return (
@@ -65,6 +66,12 @@ const SignInForm = ({ next, registered, reset }: Props) => {
         </Alert>
       )}
 
+      {ssoNotice && (
+        <Alert>
+          <AlertDescription>{ssoNotice}</AlertDescription>
+        </Alert>
+      )}
+
       <Formik<SignInValues>
         initialValues={{ email: "", password: "" }}
         validate={validate}
@@ -84,12 +91,32 @@ const SignInForm = ({ next, registered, reset }: Props) => {
         }}
       >
         {({ isSubmitting, status }) => (
-          <Form className="space-y-4" noValidate>
-            {status && (
-              <Alert variant="destructive">
-                <AlertDescription>{status}</AlertDescription>
-              </Alert>
-            )}
+          <Form className="space-y-5" noValidate>
+            {status && (() => {
+              const isCreds = /invalid credentials/i.test(status);
+              const title = isCreds ? "Invalid email or password" : status;
+              const description = isCreds
+                ? "Double-check your credentials. After 5 failed attempts we'll pause sign-in briefly."
+                : null;
+              return (
+                <Alert variant="destructive">
+                  <svg
+                    viewBox="0 0 10 10"
+                    width="10"
+                    height="10"
+                    aria-hidden="true"
+                    style={{
+                      filter:
+                        "drop-shadow(0 0 4px oklch(0.65 0.2 25 / 0.9)) drop-shadow(0 0 8px oklch(0.65 0.2 25 / 0.6))",
+                    }}
+                  >
+                    <rect x="1" y="1" width="8" height="8" rx="2" fill="currentColor" />
+                  </svg>
+                  <AlertTitle>{title}</AlertTitle>
+                  {description && <AlertDescription>{description}</AlertDescription>}
+                </Alert>
+              );
+            })()}
 
             <FormikField
               name="email"
@@ -97,6 +124,7 @@ const SignInForm = ({ next, registered, reset }: Props) => {
               label="Email"
               placeholder="you@example.com"
               autoComplete="email"
+              inputClassName="h-11 text-base"
             />
 
             <FormikField
@@ -105,17 +133,34 @@ const SignInForm = ({ next, registered, reset }: Props) => {
               label="Password"
               placeholder="Your password"
               autoComplete="current-password"
+              inputClassName="h-11 text-base"
+              labelAddon={
+                <Link
+                  href="/forgot-password"
+                  className="text-sm text-primary font-semibold hover:text-foreground"
+                >
+                  Forgot password?
+                </Link>
+              }
             />
 
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Signing In..." : "Sign In"}
-            </Button>
-
-            <p className="text-center text-sm">
-              <Link href="/forgot-password" className="text-primary font-medium">
-                Forgot password?
-              </Link>
-            </p>
+            <div className="space-y-3 pt-2">
+              <Button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full h-12 text-base font-semibold"
+              >
+                {isSubmitting ? "Signing in..." : "Sign in"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full h-12 text-base font-semibold text-foreground border border-border"
+                onClick={() => setSsoNotice("SSO sign-in isn't enabled for this workspace yet.")}
+              >
+                Sign in with SSO
+              </Button>
+            </div>
           </Form>
         )}
       </Formik>
