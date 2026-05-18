@@ -6,13 +6,18 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    assignees:
+      - roboparker
+    open-pull-requests-limit: 10
   - package-ecosystem: composer
     directory: /api
     schedule:
       interval: daily
     labels:
       - dependencies
-    open-pull-requests-limit: 5
+    assignees:
+      - roboparker
+    open-pull-requests-limit: 10
     ignore:
       # Symfony components are pinned to 7.2.* in composer.json — bumping a
       # single component to a new major (e.g. dotenv 8.0) desyncs the stack.
@@ -25,4 +30,6 @@ updates:
       interval: daily
     labels:
       - dependencies
-    open-pull-requests-limit: 5
+    assignees:
+      - roboparker
+    open-pull-requests-limit: 10
