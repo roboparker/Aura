@@ -213,6 +213,17 @@ const Home = () => {
               className="underline-offset-4 hover:underline"
             >
               GitHub
+            </Link>{" "}
+            ·{" "}
+            <Link href="/terms" className="underline-offset-4 hover:underline">
+              Terms
+            </Link>{" "}
+            ·{" "}
+            <Link
+              href="/privacy"
+              className="underline-offset-4 hover:underline"
+            >
+              Privacy
             </Link>
           </div>
         </footer>
