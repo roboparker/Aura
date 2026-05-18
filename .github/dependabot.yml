@@ -6,12 +6,16 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    assignees:
+      - roboparker
   - package-ecosystem: composer
     directory: /api
     schedule:
       interval: daily
     labels:
       - dependencies
+    assignees:
+      - roboparker
     open-pull-requests-limit: 5
     ignore:
       # Symfony components are pinned to 7.2.* in composer.json — bumping a
@@ -25,4 +29,6 @@ updates:
       interval: daily
     labels:
       - dependencies
+    assignees:
+      - roboparker
     open-pull-requests-limit: 5
