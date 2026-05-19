@@ -113,7 +113,7 @@ jobs:
           OUTPUT: unreleased.md
 
       - name: Upload preview artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: changelog-preview
           path: |
