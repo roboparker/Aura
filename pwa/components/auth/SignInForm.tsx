@@ -30,9 +30,11 @@ interface Props {
   /**
    * Called when `/auth/login` responds `requiresTwoFactor`. The parent
    * (AuthCard) swaps the form body + footer copy in lockstep — keeping the
-   * mode here would force the footer to live inside this form too.
+   * mode here would force the footer to live inside this form too. The
+   * email is forwarded so the challenge form can show a "Signing in as
+   * X" line without an extra round-trip.
    */
-  onTwoFactorRequired: () => void;
+  onTwoFactorRequired: (email: string) => void;
 }
 
 const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => {
@@ -71,7 +73,7 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
           try {
             const result = await login(values.email, values.password);
             if (result.requiresTwoFactor) {
-              onTwoFactorRequired();
+              onTwoFactorRequired(values.email);
               return;
             }
             router.push(safeNextPath(next));
