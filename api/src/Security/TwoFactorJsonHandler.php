@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Security;
 
 use App\Entity\User;
+use App\Security\TooManyTwoFactorAttemptsException;
 use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -57,6 +58,30 @@ final class TwoFactorJsonHandler implements
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
+        // Rate-limit hit: thrown from
+        // {@see \App\EventSubscriber\TwoFactorChallengeRateLimiter} when
+        // the per-user bucket is empty. Surface as a structured 429
+        // with both header and body retry-after so the PWA can drive a
+        // countdown without parsing the message string.
+        $rateLimit = $exception instanceof TooManyTwoFactorAttemptsException
+            ? $exception
+            : ($exception->getPrevious() instanceof TooManyTwoFactorAttemptsException
+                ? $exception->getPrevious()
+                : null);
+        if (null !== $rateLimit) {
+            return new JsonResponse(
+                [
+                    'error' => sprintf(
+                        'Too many attempts. Try again in %d seconds.',
+                        $rateLimit->retryAfterSeconds,
+                    ),
+                    'retryAfter' => $rateLimit->retryAfterSeconds,
+                ],
+                429,
+                ['Retry-After' => (string) $rateLimit->retryAfterSeconds],
+            );
+        }
+
         return new JsonResponse([
             'error' => 'Invalid authentication code.',
         ], 401);

@@ -79,6 +79,18 @@ interface AuthContextType {
   clearError: () => void;
 }
 
+/**
+ * Thrown by `submitTwoFactorCode` when the backend returns 429. Carries
+ * the retry-after window so the challenge form can disable Verify and
+ * drive a live countdown.
+ */
+export class TwoFactorRateLimitError extends Error {
+  constructor(message: string, public readonly retryAfterSeconds: number) {
+    super(message);
+    this.name = "TwoFactorRateLimitError";
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -158,6 +170,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      // 429 from the rate-limit subscriber carries a structured
+      // retryAfter (and a Retry-After header) — surface it as a typed
+      // error so the form can drive a countdown without parsing the
+      // message string.
+      if (res.status === 429) {
+        throw new TwoFactorRateLimitError(
+          data.error || "Too many attempts.",
+          typeof data.retryAfter === "number" ? data.retryAfter : 60,
+        );
+      }
       throw new Error(data.error || "Invalid authentication code.");
     }
 

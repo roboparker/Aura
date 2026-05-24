@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Formik, Form, useFormikContext } from "formik";
 import { Clock3, ShieldAlert } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { TwoFactorRateLimitError, useAuth } from "@/contexts/AuthContext";
 import { safeNextPath } from "@/lib/authRedirect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,25 @@ const TOTP_WINDOW_SECONDS = 30;
 const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
   const { submitTwoFactorCode } = useAuth();
   const router = useRouter();
+  // Wall-clock instant when the rate-limit bucket refills enough for
+  // another attempt — null whenever we're not currently throttled. We
+  // store the deadline (vs. seconds-remaining) so the countdown stays
+  // accurate even if the browser tab goes inactive and rejoins.
+  const [rateLimitedUntil, setRateLimitedUntil] = useState<number | null>(null);
+  const rateLimitSecondsLeft = useCountdownTo(rateLimitedUntil);
+  // Clear the throttle once the bucket has refilled. Check the
+  // wall-clock deadline (not the derived seconds-left) because the
+  // countdown's initial state is 0 on the very render where
+  // `rateLimitedUntil` was just set — a `seconds <= 0` check would
+  // immediately clear the throttle on that render before the countdown
+  // effect catches up.
+  useEffect(() => {
+    if (rateLimitedUntil !== null && Date.now() >= rateLimitedUntil) {
+      setRateLimitedUntil(null);
+    }
+  }, [rateLimitedUntil, rateLimitSecondsLeft]);
+
+  const isRateLimited = rateLimitedUntil !== null;
 
   return (
     <div className="space-y-5">
@@ -73,6 +92,9 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
             await submitTwoFactorCode(code.trim());
             router.push(safeNextPath(next));
           } catch (err) {
+            if (err instanceof TwoFactorRateLimitError) {
+              setRateLimitedUntil(Date.now() + err.retryAfterSeconds * 1000);
+            }
             setStatus(err instanceof Error ? err.message : "Verification failed.");
           } finally {
             setSubmitting(false);
@@ -81,10 +103,15 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
       >
         {({ isSubmitting, status, values }) => (
           <Form className="space-y-5" noValidate>
-            <FormStatusAlert status={status} mode={mode} hasInput={Boolean(values.code.trim())} />
+            <FormStatusAlert
+              status={status}
+              mode={mode}
+              hasInput={Boolean(values.code.trim())}
+              rateLimitSecondsLeft={isRateLimited ? rateLimitSecondsLeft : null}
+            />
 
             {mode === "totp" ? (
-              <TotpField hasError={Boolean(status)} />
+              <TotpField hasError={Boolean(status)} disabled={isRateLimited} />
             ) : (
               <FormikField
                 name="code"
@@ -94,6 +121,7 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
                 inputMode="text"
                 autoFocus
                 inputClassName="font-mono"
+                disabled={isRateLimited}
                 data-testid="2fa-code"
               />
             )}
@@ -102,11 +130,15 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
 
             <Button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRateLimited}
               className="w-full"
               data-testid="2fa-submit"
             >
-              {isSubmitting ? "Verifying..." : "Verify"}
+              {isRateLimited
+                ? `Verify (${rateLimitSecondsLeft}s)`
+                : isSubmitting
+                ? "Verifying..."
+                : "Verify"}
             </Button>
 
             {mode === "backup" && <BackupCodeNote />}
@@ -139,7 +171,7 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
  * input can shovel digits into the `code` field without us threading
  * the form's bag through every wrapper.
  */
-const TotpField = ({ hasError }: { hasError: boolean }) => {
+const TotpField = ({ hasError, disabled }: { hasError: boolean; disabled: boolean }) => {
   const { values, setFieldValue, submitForm } = useFormikContext<Values>();
 
   return (
@@ -157,6 +189,7 @@ const TotpField = ({ hasError }: { hasError: boolean }) => {
           }
         }}
         autoFocus
+        disabled={disabled}
         data-testid="2fa-code"
         containerClassName="justify-center gap-2"
       >
@@ -173,6 +206,31 @@ const TotpField = ({ hasError }: { hasError: boolean }) => {
       </InputOTP>
     </div>
   );
+};
+
+/**
+ * Recomputes the seconds remaining until `deadlineMs` every 250ms.
+ * Pure derivation, so flipping the deadline to null pauses the timer.
+ * Returns 0 when the deadline has passed (or when deadline is null).
+ */
+const useCountdownTo = (deadlineMs: number | null): number => {
+  const compute = () =>
+    deadlineMs === null ? 0 : Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000));
+  const [secondsLeft, setSecondsLeft] = useState(compute);
+
+  useEffect(() => {
+    setSecondsLeft(compute());
+    if (deadlineMs === null) return;
+    const id = window.setInterval(() => {
+      setSecondsLeft(Math.max(0, Math.ceil((deadlineMs - Date.now()) / 1000)));
+    }, 250);
+    return () => window.clearInterval(id);
+    // compute is intentionally re-defined per render and not memoized —
+    // it closes over deadlineMs which is the only signal that matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deadlineMs]);
+
+  return secondsLeft;
 };
 
 /**
@@ -207,33 +265,38 @@ const secondsUntilNextWindow = (): number => {
 /**
  * Inline alert for the various error states. Wrong-code copy spells out
  * the 30-second rotation so users who hit a stale code understand why
- * a "correct" looking entry didn't match. Rate-limit copy is wired up
- * for when the backend starts returning 429 on /auth/2fa-check —
- * harmless if it never does.
+ * a "correct" looking entry didn't match. Rate-limit copy uses the
+ * live `rateLimitSecondsLeft` countdown so the user sees the wait
+ * tick down without re-querying anything.
  */
 const FormStatusAlert = ({
   status,
   mode,
   hasInput,
+  rateLimitSecondsLeft,
 }: {
   status: string | undefined;
   mode: TwoFactorMode;
   hasInput: boolean;
+  /** Seconds until the rate-limit bucket has a token again; null when not throttled. */
+  rateLimitSecondsLeft: number | null;
 }) => {
-  if (!status) return null;
+  const isRateLimited = rateLimitSecondsLeft !== null;
+  if (!status && !isRateLimited) return null;
   // Don't shout "enter a code" right after the user clears the input —
   // they're presumably about to start typing. The button-disabled
   // state already conveys that nothing's submittable yet.
-  if (!hasInput && /enter (the|a|one of)/i.test(status)) return null;
+  if (!isRateLimited && !hasInput && status && /enter (the|a|one of)/i.test(status)) {
+    return null;
+  }
 
-  const isRateLimited = /too many/i.test(status);
   const title = isRateLimited
     ? "Too many attempts"
     : mode === "totp"
     ? "That code didn't match"
     : "That backup code didn't work";
   const description = isRateLimited
-    ? status
+    ? `We allow 5 codes per minute. Try again in ${rateLimitSecondsLeft}s, or use a backup code.`
     : mode === "totp"
     ? "Enter the current code from your authenticator. Codes rotate every 30s."
     : "Each backup code can only be used once. Try a different one.";
