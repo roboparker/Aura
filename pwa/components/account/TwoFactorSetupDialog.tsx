@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Formik, Form } from "formik";
-import QRCode from "qrcode";
+// Force the browser bundle: Turbopack doesn't honor qrcode's `browser`
+// field swap, so a plain `from "qrcode"` import drags in the Node entry
+// which hangs in the browser and leaves the QR spinner forever.
+// @ts-expect-error — @types/qrcode only ships types for the package root.
+import QRCode from "qrcode/lib/browser";
 import { Check, Copy, Download, Loader2, ShieldCheck } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
