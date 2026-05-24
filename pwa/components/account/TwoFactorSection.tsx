@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Formik, Form } from "formik";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ShieldAlert, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -34,6 +34,11 @@ const TwoFactorSection = () => {
   const [regenOpen, setRegenOpen] = useState(false);
   const [codes, setCodes] = useState<RecoveryCodeEntry[] | null>(null);
   const [codesError, setCodesError] = useState<string | null>(null);
+  // Step-up reveal: populated by the password-gated reveal dialog,
+  // intentionally not persisted anywhere — closing/reopening the panel
+  // forces a fresh password challenge so the plaintext can't linger.
+  const [revealed, setRevealed] = useState<RecoveryCodeEntry[] | null>(null);
+  const [revealOpen, setRevealOpen] = useState(false);
 
   // Optional-chain through twoFactor: older /auth responses didn't always
   // include the block, and a missing field shouldn't crash the security
@@ -64,10 +69,18 @@ const TwoFactorSection = () => {
   useEffect(() => {
     if (!enabled) {
       setCodes(null);
+      setRevealed(null);
       return;
     }
     fetchCodes();
   }, [enabled, recoveryCodesRemaining, fetchCodes]);
+
+  // If the user regenerates while the panel is open, the revealed
+  // plaintexts they saw are no longer the same codes that exist on the
+  // server — clear so the UI doesn't pretend otherwise.
+  useEffect(() => {
+    setRevealed(null);
+  }, [recoveryCodesRemaining]);
 
   if (!user) return null;
 
@@ -121,14 +134,38 @@ const TwoFactorSection = () => {
               {recoveryCodesRemaining} recovery code{recoveryCodesRemaining === 1 ? "" : "s"}{" "}
               remaining
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setRegenOpen(true)}
-              data-testid="2fa-regenerate-button"
-            >
-              Regenerate codes
-            </Button>
+            <div className="flex items-center gap-1">
+              {revealed ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRevealed(null)}
+                  data-testid="2fa-recovery-hide"
+                >
+                  <EyeOff className="h-3.5 w-3.5" /> Hide codes
+                </Button>
+              ) : (
+                codes &&
+                codes.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setRevealOpen(true)}
+                    data-testid="2fa-recovery-reveal"
+                  >
+                    <Eye className="h-3.5 w-3.5" /> Reveal codes
+                  </Button>
+                )
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRegenOpen(true)}
+                data-testid="2fa-regenerate-button"
+              >
+                Regenerate codes
+              </Button>
+            </div>
           </div>
 
           {codesError && (
@@ -137,7 +174,9 @@ const TwoFactorSection = () => {
             </Alert>
           )}
 
-          {codes && codes.length > 0 && <RecoveryCodeList codes={codes} />}
+          {(revealed ?? codes) && (revealed ?? codes)!.length > 0 && (
+            <RecoveryCodeList codes={revealed ?? codes!} />
+          )}
         </div>
       )}
 
@@ -165,10 +204,19 @@ const TwoFactorSection = () => {
         onSuccess={() => {
           // recoveryCodesRemaining stays at RECOVERY_CODE_COUNT before and
           // after a regen, so the count-based useEffect won't refetch — we
-          // pull the new envelopes explicitly here.
+          // pull the new envelopes explicitly here. Drop any previously
+          // revealed plaintext so the UI doesn't keep showing codes that
+          // no longer exist.
           refreshUser();
           fetchCodes();
+          setRevealed(null);
         }}
+      />
+
+      <RevealConfirmDialog
+        open={revealOpen}
+        onOpenChange={setRevealOpen}
+        onRevealed={(entries) => setRevealed(entries)}
       />
     </div>
   );
@@ -364,6 +412,87 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
     </Dialog>
   );
 };
+
+interface RevealProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** Called with the full plaintext list after a successful step-up. */
+  onRevealed: (entries: RecoveryCodeEntry[]) => void;
+}
+
+/**
+ * Password-gated step-up dialog: the cookie session alone isn't enough
+ * to reveal unused codes (they're real credentials and a stolen cookie
+ * shouldn't yield a portable 2FA bypass), so we re-prompt for the
+ * password and hand the response back to the parent for one-time render.
+ */
+const RevealConfirmDialog = ({ open, onOpenChange, onRevealed }: RevealProps) => (
+  <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Reveal recovery codes</DialogTitle>
+        <DialogDescription>
+          Confirm with your current password to display your recovery codes.
+          They'll only stay visible while this page is open.
+        </DialogDescription>
+      </DialogHeader>
+
+      <Formik<{ currentPassword: string }>
+        initialValues={{ currentPassword: "" }}
+        validate={({ currentPassword }) =>
+          currentPassword ? {} : { currentPassword: "Password is required." }
+        }
+        onSubmit={async ({ currentPassword }, { setSubmitting, setStatus, resetForm }) => {
+          try {
+            const res = await fetch(`${ENTRYPOINT}/me/2fa/recovery-codes/reveal`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ currentPassword }),
+            });
+            if (!res.ok) {
+              const data = await res.json().catch(() => ({}));
+              throw new Error(data.error || "Could not reveal codes.");
+            }
+            const data = (await res.json()) as { recoveryCodes: RecoveryCodeEntry[] };
+            onRevealed(data.recoveryCodes);
+            resetForm();
+            onOpenChange(false);
+          } catch (err) {
+            setStatus(err instanceof Error ? err.message : "Could not reveal codes.");
+          } finally {
+            setSubmitting(false);
+          }
+        }}
+      >
+        {({ isSubmitting, status }) => (
+          <Form className="space-y-4" noValidate>
+            {status && (
+              <Alert variant="destructive">
+                <AlertDescription>{status}</AlertDescription>
+              </Alert>
+            )}
+            <FormikField
+              name="currentPassword"
+              type="password"
+              label="Current password"
+              autoComplete="current-password"
+              data-testid="2fa-reveal-password"
+            />
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full"
+              data-testid="2fa-reveal-submit"
+            >
+              {isSubmitting ? "Working..." : "Reveal codes"}
+            </Button>
+          </Form>
+        )}
+      </Formik>
+    </DialogContent>
+  </Dialog>
+);
 
 interface RecoveryCodeListProps {
   codes: RecoveryCodeEntry[];

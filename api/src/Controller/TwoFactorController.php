@@ -146,6 +146,30 @@ class TwoFactorController extends AbstractController
         ]);
     }
 
+    #[Route('/me/2fa/recovery-codes/reveal', name: 'me_2fa_recovery_codes_reveal', methods: ['POST'])]
+    public function revealRecoveryCodes(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (null === $user) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$user->isTotpEnabled()) {
+            return $this->json(['error' => '2FA is not enabled.'], 409);
+        }
+
+        // Step-up auth: unused codes are real credentials. Cookie session
+        // alone isn't enough — a stolen cookie shouldn't yield a portable
+        // 2FA bypass that survives password rotation.
+        $body = $this->jsonBody($request);
+        $password = $this->stringField($body, 'currentPassword');
+        if (!$this->hasher->isPasswordValid($user, $password)) {
+            return $this->json(['error' => 'Current password is incorrect.'], 400);
+        }
+
+        return $this->json([
+            'recoveryCodes' => $this->setup->revealRecoveryCodes($user),
+        ]);
+    }
+
     #[Route('/me/2fa/status', name: 'me_2fa_status', methods: ['GET'])]
     public function status(#[CurrentUser] ?User $user): JsonResponse
     {

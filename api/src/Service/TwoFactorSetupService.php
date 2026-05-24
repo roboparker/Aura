@@ -26,9 +26,9 @@ final class TwoFactorSetupService
 
     /**
      * Per-entry status for the security-panel list. `code` is the
-     * plaintext captured at consumption time so the panel can re-display
-     * spent codes struck-through — null for every still-spendable entry
-     * and for entries consumed before that capture existed.
+     * plaintext for spent codes only — unused entries return null so the
+     * UI keeps them masked. Spent codes can't re-authenticate (hash check
+     * rejects them) so surfacing them is harmless.
      *
      * @return list<array{code: ?string, consumedAt: ?string}>
      */
@@ -36,8 +36,48 @@ final class TwoFactorSetupService
     {
         $out = [];
         foreach ($user->getRecoveryCodes() as $entry) {
+            $code = null;
+            if (null !== $entry['consumedAt']) {
+                // Prefer the encrypted envelope (new path), fall back to
+                // the legacy `consumedCode` field for entries written
+                // before encrypted-at-generation shipped.
+                if (isset($entry['encrypted'])) {
+                    $code = $this->cipher->decrypt($entry['encrypted']);
+                } else {
+                    $code = $entry['consumedCode'] ?? null;
+                }
+            }
             $out[] = [
-                'code' => $entry['consumedCode'] ?? null,
+                'code' => $code,
+                'consumedAt' => $entry['consumedAt'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Decrypts every entry's plaintext for the GitHub-style "reveal codes"
+     * flow. Callers must gate this behind a step-up password challenge —
+     * unused codes are real credentials and shouldn't be surfaced from a
+     * session whose only auth is a cookie.
+     *
+     * Legacy entries with no `encrypted` field (predating the reveal
+     * feature) return null for `code`; the UI marks them as unavailable.
+     *
+     * @return list<array{code: ?string, consumedAt: ?string}>
+     */
+    public function revealRecoveryCodes(User $user): array
+    {
+        $out = [];
+        foreach ($user->getRecoveryCodes() as $entry) {
+            $code = null;
+            if (isset($entry['encrypted'])) {
+                $code = $this->cipher->decrypt($entry['encrypted']);
+            } elseif (null !== $entry['consumedAt']) {
+                $code = $entry['consumedCode'] ?? null;
+            }
+            $out[] = [
+                'code' => $code,
                 'consumedAt' => $entry['consumedAt'],
             ];
         }
@@ -90,6 +130,11 @@ final class TwoFactorSetupService
             $plain[] = $code;
             $entries[] = [
                 'hash' => hash('sha256', $code),
+                // Envelope-encrypt the plaintext so the GitHub-style
+                // reveal flow can re-display it after a step-up password
+                // challenge. Hash stays the source of truth for
+                // verification — encrypted is only ever read for display.
+                'encrypted' => $this->cipher->encrypt($code),
                 'consumedAt' => null,
             ];
         }

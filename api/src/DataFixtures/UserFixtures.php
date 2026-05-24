@@ -76,8 +76,9 @@ class UserFixtures extends Fixture
         $user->setTotpSecretCache(self::FIXTURE_TOTP_SECRET);
         $user->setTotpEnabled(true);
         $user->setRecoveryCodes(array_map(
-            static fn (string $code): array => [
+            fn (string $code): array => [
                 'hash' => hash('sha256', $code),
+                'encrypted' => $this->totpCipher->encrypt($code),
                 'consumedAt' => null,
             ],
             self::FIXTURE_RECOVERY_CODES,

@@ -155,26 +155,37 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Recovery codes for the 2FA challenge.
      *
-     * Each entry is `{hash, consumedAt, consumedCode}`:
+     * Each entry is `{hash, consumedAt, encrypted?, consumedCode?}`:
      * - `hash`: sha256 of the plaintext, the source of truth for verification.
      * - `consumedAt`: ATOM timestamp when the code was used during a 2FA
      *    challenge. Non-null entries are kept on the row so the security
      *    panel can show "consumed N of M" with strikethrough, but they're
      *    excluded from the "remaining" count and rejected on future
      *    challenges.
-     * - `consumedCode`: plaintext captured at consumption time so the
-     *    security panel can re-display the code struck-through. Null for
-     *    every still-spendable entry and null for entries that were
-     *    consumed before this column existed.
+     * - `encrypted`: envelope-encrypted plaintext via {@see TwoFactorSecretCipher}
+     *    so the GitHub-style "reveal codes" flow can re-display the full
+     *    list after a fresh password challenge. Optional — older rows
+     *    written before the reveal feature don't have it and surface as
+     *    "(unavailable)" in the reveal view.
+     * - `consumedCode`: legacy field — earlier iterations captured
+     *    plaintext only on consumption. New writes use `encrypted` for
+     *    everything; this stays so the in-place "consumed code" display
+     *    still works for entries written in the interim. Read order:
+     *    `encrypted` (decrypted) wins, `consumedCode` fallback.
      *
-     * Storing plaintext for *unused* codes would collapse the second
-     * factor into single-factor on a password compromise — the same
-     * logged-in session could reveal an unused code and bypass TOTP from a
-     * fresh device. Plaintext for *spent* codes is safe: the hash check
-     * rejects them on the next challenge regardless of the value, so a DB
-     * leak surfaces nothing usable.
+     * Plaintext for unused codes is a deliberate weakening of the old
+     * hash-only model — a DB-leak + APP_SECRET-leak yields the unused
+     * codes. Surface protections:
+     *  - the reveal endpoint requires re-entering the current password
+     *  - the panel never auto-reveals; the user has to opt in per session
+     *  - consumed codes are safe regardless (hash check rejects them)
      *
-     * @var list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}>|null
+     * @var list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $totpRecoveryCodes = null;
@@ -442,7 +453,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
-     * @param list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}> $entries
+     * @param list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }> $entries
      */
     public function setRecoveryCodes(array $entries): static
     {
@@ -451,7 +467,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
-     * @return list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}>
+     * @return list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }>
      */
     public function getRecoveryCodes(): array
     {
@@ -495,10 +516,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         foreach ($entries as $index => $entry) {
             if ($entry['hash'] === $hash && null === $entry['consumedAt']) {
                 $entries[$index]['consumedAt'] = $now;
-                // Capture plaintext for security-panel display. Safe to
-                // persist because the hash check above already rejects
-                // this code on every future challenge.
-                $entries[$index]['consumedCode'] = $code;
+                // No need to capture plaintext separately — new entries
+                // carry an `encrypted` envelope from generation time that
+                // the security panel decrypts for display. Legacy entries
+                // (pre-encrypted, post-consumedCode) keep their own
+                // capture untouched.
                 $this->totpRecoveryCodes = $entries;
                 return;
             }
