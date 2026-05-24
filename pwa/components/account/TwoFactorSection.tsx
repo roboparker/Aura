@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Formik, Form } from "formik";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,15 @@ import {
 import { FormikField } from "@/components/ui/formik-field";
 import TwoFactorSetupDialog from "./TwoFactorSetupDialog";
 
+/**
+ * One slot in the recovery-code grid. Plaintext is intentionally not
+ * round-tripped (codes are hash-only on disk) — the list exists to surface
+ * "consumed N of M" with strikethrough, not to re-show codes.
+ */
+interface RecoveryCodeEntry {
+  consumedAt: string | null;
+}
+
 const LOW_RECOVERY_THRESHOLD = 3;
 
 const TwoFactorSection = () => {
@@ -22,9 +31,44 @@ const TwoFactorSection = () => {
   const [setupOpen, setSetupOpen] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
+  const [codes, setCodes] = useState<RecoveryCodeEntry[] | null>(null);
+  const [codesError, setCodesError] = useState<string | null>(null);
+
+  // Optional-chain through twoFactor: older /auth responses didn't always
+  // include the block, and a missing field shouldn't crash the security
+  // card while React Query / useAuth refresh in the background.
+  const enabled = user?.twoFactor?.enabled ?? false;
+  const recoveryCodesRemaining = user?.twoFactor?.recoveryCodesRemaining ?? 0;
+
+  const fetchCodes = useCallback(async () => {
+    setCodesError(null);
+    try {
+      const res = await fetch(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not load recovery codes.");
+      }
+      const data = (await res.json()) as { recoveryCodes: RecoveryCodeEntry[] };
+      setCodes(data.recoveryCodes);
+    } catch (err) {
+      setCodesError(err instanceof Error ? err.message : "Could not load recovery codes.");
+    }
+  }, []);
+
+  // Pull the code list whenever 2FA flips on or the remaining-count changes
+  // (regenerate, code consumed during a recent challenge). The endpoint is
+  // gated on isTotpEnabled server-side, so we skip the fetch otherwise.
+  useEffect(() => {
+    if (!enabled) {
+      setCodes(null);
+      return;
+    }
+    fetchCodes();
+  }, [enabled, recoveryCodesRemaining, fetchCodes]);
 
   if (!user) return null;
-  const { enabled, recoveryCodesRemaining } = user.twoFactor;
 
   return (
     <div className="space-y-3" data-testid="2fa-section">
@@ -63,26 +107,36 @@ const TwoFactorSection = () => {
       </div>
 
       {enabled && (
-        <div className="ml-8 flex items-center justify-between gap-2 text-xs">
-          <span
-            className={
-              recoveryCodesRemaining <= LOW_RECOVERY_THRESHOLD
-                ? "text-destructive"
-                : "text-muted-foreground"
-            }
-            data-testid="2fa-recovery-remaining"
-          >
-            {recoveryCodesRemaining} recovery code{recoveryCodesRemaining === 1 ? "" : "s"}{" "}
-            remaining
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setRegenOpen(true)}
-            data-testid="2fa-regenerate-button"
-          >
-            Regenerate codes
-          </Button>
+        <div className="ml-8 space-y-2">
+          <div className="flex items-center justify-between gap-2 text-xs">
+            <span
+              className={
+                recoveryCodesRemaining <= LOW_RECOVERY_THRESHOLD
+                  ? "text-destructive"
+                  : "text-muted-foreground"
+              }
+              data-testid="2fa-recovery-remaining"
+            >
+              {recoveryCodesRemaining} recovery code{recoveryCodesRemaining === 1 ? "" : "s"}{" "}
+              remaining
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setRegenOpen(true)}
+              data-testid="2fa-regenerate-button"
+            >
+              Regenerate codes
+            </Button>
+          </div>
+
+          {codesError && (
+            <Alert variant="destructive">
+              <AlertDescription>{codesError}</AlertDescription>
+            </Alert>
+          )}
+
+          {codes && codes.length > 0 && <RecoveryCodeList codes={codes} />}
         </div>
       )}
 
@@ -107,7 +161,13 @@ const TwoFactorSection = () => {
       <RegenerateConfirmDialog
         open={regenOpen}
         onOpenChange={setRegenOpen}
-        onSuccess={refreshUser}
+        onSuccess={() => {
+          // recoveryCodesRemaining stays at RECOVERY_CODE_COUNT before and
+          // after a regen, so the count-based useEffect won't refetch — we
+          // pull the new envelopes explicitly here.
+          refreshUser();
+          fetchCodes();
+        }}
       />
     </div>
   );
@@ -301,6 +361,53 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
         )}
       </DialogContent>
     </Dialog>
+  );
+};
+
+interface RecoveryCodeListProps {
+  codes: RecoveryCodeEntry[];
+}
+
+/**
+ * Renders the current recovery-code generation as masked slots. Active
+ * codes appear full-opacity; consumed codes stay in the list but
+ * struck-through and muted so a glance shows both "what you've used" and
+ * "what's still good" without rebuilding the list every time a code is
+ * spent. Plaintext is never round-tripped — the user sees an
+ * indistinguishable mask and a positional index so they can cross-
+ * reference against the codes they saved at setup / regenerate time.
+ */
+const RecoveryCodeList = ({ codes }: RecoveryCodeListProps) => {
+  return (
+    <ul
+      className="grid grid-cols-2 gap-1.5 bg-muted rounded-md p-3 font-mono text-sm"
+      data-testid="2fa-recovery-list"
+    >
+      {codes.map((entry, idx) => {
+        const consumed = entry.consumedAt !== null;
+        return (
+          <li
+            key={idx}
+            className={[
+              "flex items-baseline gap-2",
+              consumed && "line-through opacity-50 text-muted-foreground",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            data-testid="2fa-recovery-code"
+            data-consumed={consumed ? "true" : "false"}
+          >
+            <span className="text-xs text-muted-foreground tabular-nums w-6">
+              {String(idx + 1).padStart(2, "0")}
+            </span>
+            <code aria-hidden="true">••••-••••-••••</code>
+            {consumed && (
+              <span className="text-[10px] uppercase tracking-wider">used</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 };
 

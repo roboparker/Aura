@@ -66,6 +66,8 @@ final class TwoFactorJsonHandler implements
      * Mirrors {@see App\Controller\AuthController::serializeUser()}. Kept
      * inline so this file is self-contained for the firewall handler chain
      * — the two-factor success path doesn't run through the controller.
+     * Must stay in sync with AuthController; the PWA treats both responses
+     * as the same User shape.
      *
      * @return array<string, mixed>
      */
@@ -81,6 +83,10 @@ final class TwoFactorJsonHandler implements
             'personalizedColor' => $user->getPersonalizedColor(),
             'avatarUrls' => $user->getAvatarUrls(),
             'preferences' => $user->getPreferences(),
+            'twoFactor' => [
+                'enabled' => $user->isTotpEnabled(),
+                'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+            ],
         ];
     }
 }

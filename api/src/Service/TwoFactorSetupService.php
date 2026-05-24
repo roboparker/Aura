@@ -25,6 +25,22 @@ final class TwoFactorSetupService
     }
 
     /**
+     * Per-entry status for the security-panel list: enough to render
+     * "consumed N of M" with strikethrough, but no plaintext — codes are
+     * hash-only on disk and never recoverable post-generation.
+     *
+     * @return list<array{consumedAt: ?string}>
+     */
+    public function listRecoveryCodes(User $user): array
+    {
+        $out = [];
+        foreach ($user->getRecoveryCodes() as $entry) {
+            $out[] = ['consumedAt' => $entry['consumedAt']];
+        }
+        return $out;
+    }
+
+    /**
      * Generates a new base32 TOTP secret and stores it (encrypted) on the
      * user. Idempotent for repeated calls during the setup flow — a user
      * who never confirms verify just leaves the previous unconfirmed
@@ -38,7 +54,7 @@ final class TwoFactorSetupService
         // Defensive: never leave 2FA "enabled" with a freshly-rotated
         // unconfirmed secret. The verify step flips this back on.
         $user->setTotpEnabled(false);
-        $user->setRecoveryCodeHashes([]);
+        $user->setRecoveryCodes([]);
         return $secret;
     }
 
@@ -53,23 +69,27 @@ final class TwoFactorSetupService
     }
 
     /**
-     * Generates fresh plaintext recovery codes, stores their hashes on the
-     * user, and returns the plaintext list to the caller. Plaintext is
-     * never persisted — the API surfaces it once at this call site and
-     * the user is expected to copy/download.
+     * Generates fresh plaintext recovery codes, persists them on the user
+     * as `{hash, consumedAt}` pairs, and returns the plaintext list to the
+     * caller. Plaintext is surfaced exactly once — the user is expected to
+     * save it; consumed entries are kept (with `consumedAt` set) so the UI
+     * can show "used N of M" with strikethrough.
      *
      * @return string[] plaintext recovery codes (e.g. "a3f9-1c8b-22e0")
      */
     public function regenerateRecoveryCodes(User $user): array
     {
         $plain = [];
-        $hashes = [];
+        $entries = [];
         for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
             $code = $this->generatePlaintextCode();
             $plain[] = $code;
-            $hashes[] = hash('sha256', $code);
+            $entries[] = [
+                'hash' => hash('sha256', $code),
+                'consumedAt' => null,
+            ];
         }
-        $user->setRecoveryCodeHashes($hashes);
+        $user->setRecoveryCodes($entries);
         return $plain;
     }
 
@@ -78,7 +98,7 @@ final class TwoFactorSetupService
         $user->setTotpEnabled(false);
         $user->setTotpSecretEncrypted(null);
         $user->setTotpSecretCache(null);
-        $user->setRecoveryCodeHashes([]);
+        $user->setRecoveryCodes([]);
     }
 
     private function generatePlaintextCode(): string

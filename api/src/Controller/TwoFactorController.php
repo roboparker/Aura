@@ -131,6 +131,21 @@ class TwoFactorController extends AbstractController
         return $this->json(['recoveryCodes' => $codes]);
     }
 
+    #[Route('/me/2fa/recovery-codes', name: 'me_2fa_recovery_codes_list', methods: ['GET'])]
+    public function listRecoveryCodes(#[CurrentUser] ?User $user): JsonResponse
+    {
+        if (null === $user) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$user->isTotpEnabled()) {
+            return $this->json(['error' => '2FA is not enabled.'], 409);
+        }
+
+        return $this->json([
+            'recoveryCodes' => $this->setup->listRecoveryCodes($user),
+        ]);
+    }
+
     #[Route('/me/2fa/status', name: 'me_2fa_status', methods: ['GET'])]
     public function status(#[CurrentUser] ?User $user): JsonResponse
     {
