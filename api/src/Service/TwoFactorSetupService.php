@@ -25,17 +25,21 @@ final class TwoFactorSetupService
     }
 
     /**
-     * Per-entry status for the security-panel list: enough to render
-     * "consumed N of M" with strikethrough, but no plaintext — codes are
-     * hash-only on disk and never recoverable post-generation.
+     * Per-entry status for the security-panel list. `code` is the
+     * plaintext captured at consumption time so the panel can re-display
+     * spent codes struck-through — null for every still-spendable entry
+     * and for entries consumed before that capture existed.
      *
-     * @return list<array{consumedAt: ?string}>
+     * @return list<array{code: ?string, consumedAt: ?string}>
      */
     public function listRecoveryCodes(User $user): array
     {
         $out = [];
         foreach ($user->getRecoveryCodes() as $entry) {
-            $out[] = ['consumedAt' => $entry['consumedAt']];
+            $out[] = [
+                'code' => $entry['consumedCode'] ?? null,
+                'consumedAt' => $entry['consumedAt'],
+            ];
         }
         return $out;
     }

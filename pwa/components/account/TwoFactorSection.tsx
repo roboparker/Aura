@@ -16,11 +16,12 @@ import { FormikField } from "@/components/ui/formik-field";
 import TwoFactorSetupDialog from "./TwoFactorSetupDialog";
 
 /**
- * One slot in the recovery-code grid. Plaintext is intentionally not
- * round-tripped (codes are hash-only on disk) — the list exists to surface
- * "consumed N of M" with strikethrough, not to re-show codes.
+ * One slot in the recovery-code grid. `code` is the plaintext captured
+ * at consumption time — non-null for spent entries (safe: the hash check
+ * rejects them on every challenge), null for still-spendable ones.
  */
 interface RecoveryCodeEntry {
+  code: string | null;
   consumedAt: string | null;
 }
 
@@ -369,13 +370,13 @@ interface RecoveryCodeListProps {
 }
 
 /**
- * Renders the current recovery-code generation as masked slots. Active
- * codes appear full-opacity; consumed codes stay in the list but
- * struck-through and muted so a glance shows both "what you've used" and
- * "what's still good" without rebuilding the list every time a code is
- * spent. Plaintext is never round-tripped — the user sees an
- * indistinguishable mask and a positional index so they can cross-
- * reference against the codes they saved at setup / regenerate time.
+ * Renders the current recovery-code generation. Still-spendable codes
+ * appear as indistinguishable masks (plaintext for *unused* codes is
+ * never round-tripped — that would collapse 2FA into 1FA on a password
+ * compromise). Consumed codes show their actual plaintext struck-through
+ * so the user can cross-reference against the codes they saved at setup.
+ * Older consumed entries with no captured plaintext fall back to a
+ * struck-through mask.
  */
 const RecoveryCodeList = ({ codes }: RecoveryCodeListProps) => {
   return (
@@ -385,6 +386,7 @@ const RecoveryCodeList = ({ codes }: RecoveryCodeListProps) => {
     >
       {codes.map((entry, idx) => {
         const consumed = entry.consumedAt !== null;
+        const label = entry.code ?? "••••-••••-••••";
         return (
           <li
             key={idx}
@@ -400,7 +402,7 @@ const RecoveryCodeList = ({ codes }: RecoveryCodeListProps) => {
             <span className="text-xs text-muted-foreground tabular-nums w-6">
               {String(idx + 1).padStart(2, "0")}
             </span>
-            <code aria-hidden="true">••••-••••-••••</code>
+            <code aria-hidden={entry.code === null}>{label}</code>
             {consumed && (
               <span className="text-[10px] uppercase tracking-wider">used</span>
             )}

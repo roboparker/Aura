@@ -155,24 +155,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Recovery codes for the 2FA challenge.
      *
-     * Each entry is `{hash, consumedAt}`:
+     * Each entry is `{hash, consumedAt, consumedCode}`:
      * - `hash`: sha256 of the plaintext, the source of truth for verification.
-     *    Plaintext is only ever returned once (at setup / regenerate); the
-     *    user is expected to save it. This mirrors password storage — a DB
-     *    leak yields no usable codes.
      * - `consumedAt`: ATOM timestamp when the code was used during a 2FA
      *    challenge. Non-null entries are kept on the row so the security
      *    panel can show "consumed N of M" with strikethrough, but they're
      *    excluded from the "remaining" count and rejected on future
      *    challenges.
+     * - `consumedCode`: plaintext captured at consumption time so the
+     *    security panel can re-display the code struck-through. Null for
+     *    every still-spendable entry and null for entries that were
+     *    consumed before this column existed.
      *
-     * An earlier iteration also stored an envelope-encrypted plaintext so
-     * the panel could re-reveal codes; reverted (#90 follow-up) because it
-     * collapsed the second factor into single-factor whenever the password
-     * was compromised — the same logged-in session could reveal an unused
-     * code and bypass TOTP from a fresh device.
+     * Storing plaintext for *unused* codes would collapse the second
+     * factor into single-factor on a password compromise — the same
+     * logged-in session could reveal an unused code and bypass TOTP from a
+     * fresh device. Plaintext for *spent* codes is safe: the hash check
+     * rejects them on the next challenge regardless of the value, so a DB
+     * leak surfaces nothing usable.
      *
-     * @var list<array{hash: string, consumedAt: ?string}>|null
+     * @var list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $totpRecoveryCodes = null;
@@ -440,7 +442,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
-     * @param list<array{hash: string, consumedAt: ?string}> $entries
+     * @param list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}> $entries
      */
     public function setRecoveryCodes(array $entries): static
     {
@@ -449,7 +451,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
-     * @return list<array{hash: string, consumedAt: ?string}>
+     * @return list<array{hash: string, consumedAt: ?string, consumedCode?: ?string}>
      */
     public function getRecoveryCodes(): array
     {
@@ -493,6 +495,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         foreach ($entries as $index => $entry) {
             if ($entry['hash'] === $hash && null === $entry['consumedAt']) {
                 $entries[$index]['consumedAt'] = $now;
+                // Capture plaintext for security-panel display. Safe to
+                // persist because the hash check above already rejects
+                // this code on every future challenge.
+                $entries[$index]['consumedCode'] = $code;
                 $this->totpRecoveryCodes = $entries;
                 return;
             }
