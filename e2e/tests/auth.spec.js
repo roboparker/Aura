@@ -1,7 +1,6 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
-
-const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
+const { BASE_URL, signInAsFixtureUser } = require("./helpers");
 
 // Generate unique email per test run to avoid conflicts
 const uniqueEmail = () => `test-${Date.now()}@example.com`;
@@ -96,12 +95,10 @@ test.describe("Authentication", () => {
   });
 
   test("sign in with fixture standard user denied admin access", async ({ page }) => {
-    await page.goto(`${BASE_URL}/signin`);
-    await page.fill("#email", "user@aura.test");
-    await page.fill("#password", "user123");
-    await page.click('button[type="submit"]');
-
-    await expect(page).toHaveURL(/\/account/);
+    // Uma has 2FA pre-enabled in fixtures so the standard sign-in path
+    // exercises the challenge step on every reload — see
+    // `App\DataFixtures\UserFixtures`. The helper walks both steps.
+    await signInAsFixtureUser(page);
 
     // Navigate to admin — should show access denied
     await page.goto(`${BASE_URL}/admin`);

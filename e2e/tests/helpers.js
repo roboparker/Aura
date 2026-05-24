@@ -97,10 +97,103 @@ async function openAccountMenu(page) {
   });
 }
 
+/**
+ * Fixture Uma's TOTP secret. Mirrors
+ * `App\DataFixtures\UserFixtures::FIXTURE_TOTP_SECRET` so tests can
+ * compute a valid code without scraping it off the page. Same secret
+ * across every fixture reload — re-pairing each test would just add
+ * flakiness for no gain.
+ */
+const FIXTURE_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+
+/**
+ * Sign in as Uma (the standard fixture user) through the full
+ * password + TOTP challenge. Uma's fixture row has 2FA enabled with a
+ * stable secret so we can compute the code in-process; failing that
+ * would require either disabling 2FA for tests (defeats coverage) or
+ * burning a one-shot backup code per run (mutates fixture state).
+ *
+ * Lands on `/account` once the challenge completes.
+ *
+ * @param {import('@playwright/test').Page} page
+ */
+async function signInAsFixtureUser(page) {
+  await page.goto(`${BASE_URL}/signin`);
+  await page.fill("#email", "user@aura.test");
+  await page.fill("#password", "user123");
+  await page.click('button[type="submit"]');
+
+  await expect(page.getByText("Two-factor authentication")).toBeVisible();
+
+  const code = await computeTotpCode(FIXTURE_TOTP_SECRET);
+  const submitRes = await page.request.post(`${BASE_URL}/auth/2fa-check`, {
+    headers: { "Content-Type": "application/json" },
+    data: { code },
+  });
+  expect(submitRes.ok()).toBeTruthy();
+
+  await page.goto(`${BASE_URL}/account`);
+  await expect(page).toHaveURL(/\/account/);
+}
+
+/**
+ * Browser-side TOTP for tests. Mirrors the OTPHP defaults
+ * (SHA1, 6-digit, 30-second period). Kept here so any spec that needs
+ * to drive the 2FA challenge programmatically can reuse it without
+ * pulling in a dedicated TOTP library.
+ *
+ * @param {string} base32Secret
+ * @returns {Promise<string>}
+ */
+async function computeTotpCode(base32Secret) {
+  const key = base32Decode(base32Secret);
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  const counterBytes = new ArrayBuffer(8);
+  new DataView(counterBytes).setBigUint64(0, BigInt(counter));
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    key,
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"],
+  );
+  const hmac = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, counterBytes));
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const truncated =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+  return String(truncated % 1000000).padStart(6, "0");
+}
+
+/** Minimal RFC 4648 base32 decoder; uppercase, no padding handling beyond stripping. */
+function base32Decode(input) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const cleaned = input.replace(/=+$/, "").toUpperCase();
+  let bits = 0;
+  let value = 0;
+  const output = [];
+  for (const char of cleaned) {
+    const idx = alphabet.indexOf(char);
+    if (idx < 0) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      output.push((value >>> bits) & 0xff);
+    }
+  }
+  return new Uint8Array(output);
+}
+
 module.exports = {
   BASE_URL,
+  FIXTURE_TOTP_SECRET,
   uniqueEmail,
   registerAndSignIn,
+  signInAsFixtureUser,
+  computeTotpCode,
   fillDescription,
   createTaskInline,
   openAccountMenu,
