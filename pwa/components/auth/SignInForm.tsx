@@ -7,7 +7,6 @@ import { safeNextPath } from "@/lib/authRedirect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
-import TwoFactorChallengeForm from "./TwoFactorChallengeForm";
 
 interface SignInValues {
   email: string;
@@ -28,25 +27,18 @@ interface Props {
   registered?: boolean;
   /** True when the user just reset their password. */
   reset?: boolean;
+  /**
+   * Called when `/auth/login` responds `requiresTwoFactor`. The parent
+   * (AuthCard) swaps the form body + footer copy in lockstep — keeping the
+   * mode here would force the footer to live inside this form too.
+   */
+  onTwoFactorRequired: () => void;
 }
 
-const SignInForm = ({ next, registered, reset }: Props) => {
+const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => {
   const { login } = useAuth();
   const router = useRouter();
-  // Local state vs. URL state because the half-authenticated session is
-  // already on a server cookie — there's nothing useful to put in the URL,
-  // and a back-button to /signin should restart, not resume.
-  const [twoFactorPrompt, setTwoFactorPrompt] = useState(false);
   const [ssoNotice, setSsoNotice] = useState<string | null>(null);
-
-  if (twoFactorPrompt) {
-    return (
-      <TwoFactorChallengeForm
-        next={next}
-        onCancel={() => setTwoFactorPrompt(false)}
-      />
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -79,7 +71,7 @@ const SignInForm = ({ next, registered, reset }: Props) => {
           try {
             const result = await login(values.email, values.password);
             if (result.requiresTwoFactor) {
-              setTwoFactorPrompt(true);
+              onTwoFactorRequired();
               return;
             }
             router.push(safeNextPath(next));

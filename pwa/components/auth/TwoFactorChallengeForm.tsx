@@ -6,9 +6,20 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
 
+/**
+ * Which credential the user is presenting for the second factor. Both
+ * paths hit the same `/auth/2fa-check` endpoint — the server distinguishes
+ * by checking the input against the TOTP secret first, then the recovery
+ * code hashes — so this is purely UX: input shape, helper copy, validation
+ * threshold. The toggle between modes lives in AuthCard's footer.
+ */
+export type TwoFactorMode = "totp" | "backup";
+
 interface Props {
   /** `?next=` from the URL — caller forwards it from the sign-in page. */
   next?: string;
+  /** Whether the form prompts for a TOTP code or a backup recovery code. */
+  mode: TwoFactorMode;
   /**
    * Lets the user back out of the half-authenticated state — they'll need
    * to log in again from the start. The sign-in form re-mounts and the
@@ -22,30 +33,47 @@ interface Values {
   code: string;
 }
 
-const validate = ({ code }: Values) => {
-  const errors: Partial<Values> = {};
-  const trimmed = code.trim();
-  if (!trimmed) errors.code = "Enter a code from your authenticator app.";
-  return errors;
+const COPY: Record<TwoFactorMode, {
+  field: { label: string; placeholder: string; autoComplete: string };
+  emptyError: string;
+}> = {
+  totp: {
+    field: {
+      label: "Authentication code",
+      placeholder: "123 456",
+      autoComplete: "one-time-code",
+    },
+    emptyError: "Enter a code from your authenticator app.",
+  },
+  backup: {
+    field: {
+      label: "Backup code",
+      placeholder: "xxxx-xxxx-xxxx",
+      autoComplete: "off",
+    },
+    emptyError: "Enter one of your saved backup codes.",
+  },
 };
 
-const TwoFactorChallengeForm = ({ next, onCancel }: Props) => {
+const TwoFactorChallengeForm = ({ next, mode, onCancel }: Props) => {
   const { submitTwoFactorCode } = useAuth();
   const router = useRouter();
+  const copy = COPY[mode];
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">Two-factor verification</h2>
-        <p className="text-sm text-muted-foreground">
-          Open your authenticator app and enter the 6-digit code, or use one
-          of your saved recovery codes.
-        </p>
-      </div>
-
       <Formik<Values>
+        // Key by mode so switching between TOTP / backup wipes the input
+        // (otherwise a half-typed TOTP would linger when the user clicks
+        // "Use a backup code instead", and the validation message would
+        // be misleading).
+        key={mode}
         initialValues={{ code: "" }}
-        validate={validate}
+        validate={({ code }) => {
+          const errors: Partial<Values> = {};
+          if (!code.trim()) errors.code = copy.emptyError;
+          return errors;
+        }}
         onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
           try {
             await submitTwoFactorCode(code.trim());
@@ -67,9 +95,9 @@ const TwoFactorChallengeForm = ({ next, onCancel }: Props) => {
 
             <FormikField
               name="code"
-              label="Authentication code"
-              placeholder="123 456"
-              autoComplete="one-time-code"
+              label={copy.field.label}
+              placeholder={copy.field.placeholder}
+              autoComplete={copy.field.autoComplete}
               inputMode="text"
               autoFocus
               data-testid="2fa-code"
