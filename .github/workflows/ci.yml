@@ -95,10 +95,6 @@ jobs:
         name: Start services
         run: docker compose -f compose.yaml -f compose.override.yaml up --wait --no-build
       -
-        name: Dump php container logs on failure
-        if: failure()
-        run: docker compose -f compose.yaml -f compose.override.yaml logs php
-      -
         name: Check HTTP reachability
         run: curl -v --fail-with-body http://localhost
       -
