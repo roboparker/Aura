@@ -274,20 +274,22 @@ const ExpiredCard = ({
         </div>
         {invite?.inviter && <InviterPill chip={invite.inviter} prefix="invited by" />}
         <div className="space-y-2">
-          {invite?.inviter && (
+          {invite?.inviter && mailtoFor(invite.inviter.email) && (
             // Only surface "Request a new invite" when we actually know
-            // who the inviter was — otherwise the button has nowhere
-            // sensible to send the user. For the 404 / unknown-token
-            // case the body copy already tells them to ask the sender,
-            // so the bottom button is enough.
+            // who the inviter was AND the email parses as a safe-looking
+            // RFC-shape — otherwise the button has nowhere sensible to
+            // send the user, and a malformed string from a poisoned
+            // response shouldn't make it into a navigation. For the
+            // 404 / unknown-token case the body copy already tells
+            // them to ask the sender, so the bottom button is enough.
             <Button
+              asChild
               type="button"
               className="w-full"
-              onClick={() => {
-                window.location.href = `mailto:${invite.inviter!.email}?subject=${encodeURIComponent("Aura invite expired — could you send a fresh one?")}`;
-              }}
             >
-              Request a new invite
+              <a href={mailtoFor(invite.inviter.email) ?? "#"}>
+                Request a new invite
+              </a>
             </Button>
           )}
           <Button asChild type="button" variant="outline" className="w-full">
@@ -645,6 +647,29 @@ const MismatchRow = ({
     </div>
   </div>
 );
+
+/**
+ * Builds a safe `mailto:` URL for a backend-supplied address, or null
+ * if the value doesn't look like an RFC-shaped email. Two flags fired
+ * on a naive `window.location.href = \`mailto:${apiEmail}\`` here:
+ * URL-redirection and reflected-XSS, both because the email is
+ * user-influenced data flowing into a navigation. Pinning the scheme,
+ * validating the local-and-domain shape against a tight regex (no
+ * whitespace, no angle brackets, exactly one `@`, dot in the domain),
+ * and `encodeURIComponent`-ing both pieces means an attacker can't
+ * smuggle non-mailto control characters or HTML through this code
+ * path. Callers MUST guard on the return value being non-null before
+ * rendering.
+ */
+const SAFE_EMAIL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+function mailtoFor(email: string): string | null {
+  if (!SAFE_EMAIL_RE.test(email)) return null;
+  const [local, domain] = email.split("@");
+  const subject = encodeURIComponent(
+    "Aura invite expired — could you send a fresh one?",
+  );
+  return `mailto:${encodeURIComponent(local)}@${encodeURIComponent(domain)}?subject=${subject}`;
+}
 
 // Re-export for any future caller that wants to render attachments
 // outside the signup card (none today; left intentional so an unused-
