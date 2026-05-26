@@ -8,17 +8,24 @@ use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Entity\UserGroup;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 
 /**
- * Demo project with a handful of tasks and tags so the empty-state isn't the
- * first thing seen after a fresh fixtures load. Owned by Uma; Ada is also a
- * member so the admin login lands on a non-empty Projects page too.
+ * Demo project + spaces / groups for fixture-driven dev and E2E. Uma
+ * owns the "Launch team" space along with four team members (Noah,
+ * Emma, Liam, Ava); admin (Ada) is *not* a member of the team space —
+ * she lives on her own "Admin desk" space so /projects has content
+ * whichever fixture user signs in. The team setup doubles as the
+ * source the invite fixture attaches new signups to.
  */
 class ProjectFixtures extends Fixture implements DependentFixtureInterface
 {
+    public const LAUNCH_SPACE_REFERENCE = 'space-launch';
+    public const ENGINEERING_GROUP_REFERENCE = 'group-engineering';
+
     public function getDependencies(): array
     {
         return [UserFixtures::class];
@@ -49,27 +56,65 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
             $tags[$title] = $tag;
         }
 
-        // Demo "Launch checklist" lives in a shared space so the admin
-        // login also lands on a non-empty Projects page (#185 — access
-        // is now space-scoped, not project-scoped). Uma is admin, Ada
-        // is a regular member; the space + memberships are created
-        // explicitly here rather than relying on the
-        // ProjectSpaceDefaultListener so the fixture stays
-        // self-documenting about who's in what space.
+        // Pull the team members in. Uma owns the space; Noah/Emma/Liam/Ava
+        // are regular members. Admin (Ada) is intentionally excluded —
+        // the "user team space" is for the user side of the demo data
+        // and admin gets a separate space below so /projects still has
+        // content for an admin sign-in.
+        $teamUsers = [];
+        foreach (UserFixtures::TEAM_USER_REFERENCES as $reference) {
+            $teamUsers[$reference] = $this->getReference($reference, User::class);
+        }
+
         $sharedSpace = (new Space())
             ->setName('Launch team')
             ->setCreatedBy($uma);
         $manager->persist($sharedSpace);
         $manager->flush();
+        $this->addReference(self::LAUNCH_SPACE_REFERENCE, $sharedSpace);
 
         $manager->persist((new SpaceMembership())
             ->setSpace($sharedSpace)
             ->setUser($uma)
             ->setRole(Space::ROLE_ADMIN));
+        foreach ($teamUsers as $member) {
+            $manager->persist((new SpaceMembership())
+                ->setSpace($sharedSpace)
+                ->setUser($member)
+                ->setRole(Space::ROLE_MEMBER));
+        }
+
+        // Standalone admin space so an admin sign-in still has /projects
+        // content, without putting admin in the team space.
+        $adminSpace = (new Space())
+            ->setName('Admin desk')
+            ->setCreatedBy($ada);
+        $manager->persist($adminSpace);
+        $manager->flush();
         $manager->persist((new SpaceMembership())
-            ->setSpace($sharedSpace)
+            ->setSpace($adminSpace)
             ->setUser($ada)
-            ->setRole(Space::ROLE_MEMBER));
+            ->setRole(Space::ROLE_ADMIN));
+
+        $adminProject = new Project();
+        $adminProject->setOwner($ada);
+        $adminProject->setSpace($adminSpace);
+        $adminProject->setTitle('Admin checklist');
+        $adminProject->setDescription("Admin housekeeping tasks live here so /projects isn't empty after a fresh fixtures load.");
+        $manager->persist($adminProject);
+
+        // Engineering group: Uma owns, the four team members + Uma are
+        // in it. Doubles as a target for the invite fixture's GroupInvite
+        // attachment so the signup page renders the "GROUP · N ppl" row.
+        $engineering = new UserGroup();
+        $engineering->setOwner($uma);
+        $engineering->setTitle('Engineering');
+        $engineering->addMember($uma);
+        foreach ($teamUsers as $member) {
+            $engineering->addMember($member);
+        }
+        $manager->persist($engineering);
+        $this->addReference(self::ENGINEERING_GROUP_REFERENCE, $engineering);
 
         $project = new Project();
         $project->setOwner($uma);
@@ -79,14 +124,19 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $manager->persist($project);
 
         // [title, description, tagTitles, assignees]. Mix of solo, joint,
-        // and unassigned tasks so the avatar group, "Assigned to me" filter,
-        // and "Assign" empty-state all show up in the demo data.
+        // and unassigned tasks so the avatar group, "Assigned to me"
+        // filter, and "Assign" empty-state all show up. Assignees are
+        // pulled from the team space; admin (Ada) deliberately isn't in
+        // this space so she's not an assignee here either.
+        $noah = $teamUsers['user-noah'];
+        $emma = $teamUsers['user-emma'];
+        $liam = $teamUsers['user-liam'];
         $taskDefinitions = [
             ['Wire up Stripe checkout', 'Hook the pricing page CTA to a Stripe-hosted checkout session.', ['urgent', 'backend'], [$uma]],
-            ['Draft onboarding email', 'Three-step welcome series. Tone: friendly, no jargon.', ['docs'], [$ada]],
-            ['Polish empty states', "Replace the placeholder copy on Projects, Tasks, and Tags with the new illustrations.", ['design'], [$uma, $ada]],
+            ['Draft onboarding email', 'Three-step welcome series. Tone: friendly, no jargon.', ['docs'], [$emma]],
+            ['Polish empty states', "Replace the placeholder copy on Projects, Tasks, and Tags with the new illustrations.", ['design'], [$uma, $noah]],
             ['Add password-reset rate limiting', 'Limit to 3 attempts per email per hour.', ['urgent', 'backend'], []],
-            ['Write API auth docs', 'Cover login, refresh, and logout end-to-end.', ['docs'], [$ada]],
+            ['Write API auth docs', 'Cover login, refresh, and logout end-to-end.', ['docs'], [$liam]],
         ];
 
         $position = 0;
