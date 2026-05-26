@@ -20,3 +20,23 @@ export const AVATAR_PALETTE: readonly string[] = [
   "#7e22ce", // purple-700
   "#be185d", // pink-700
 ];
+
+/**
+ * Deterministic palette pick keyed on a string (name, id — anything
+ * stable for the entity in question). Use for surfaces that need a
+ * persistent color but don't have a `personalizedColor` column to read
+ * from — spaces, groups, anywhere we want the avatar tile to feel
+ * "owned" by the entity without a schema change.
+ *
+ * Hash is intentionally simple: a Tailwind palette of 16 means a fancy
+ * hash buys us nothing; the goal is "same string → same swatch every
+ * time", not collision resistance.
+ */
+export function deterministicPaletteColor(seed: string): string {
+  if (seed.length === 0) return AVATAR_PALETTE[0];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) % AVATAR_PALETTE.length;
+  }
+  return AVATAR_PALETTE[h];
+}
