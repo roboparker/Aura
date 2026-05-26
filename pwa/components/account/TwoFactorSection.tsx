@@ -247,7 +247,16 @@ const PasswordConfirmDialog = ({
   onSuccess,
 }: PasswordConfirmDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="sm:max-w-md">
+    <DialogContent
+      className="sm:max-w-md"
+      // Don't auto-focus the password input on open: Chrome's saved-
+      // password popup appears under the focused field and eats the
+      // first click anywhere outside (including the X close button),
+      // so the dialog needs two X clicks to dismiss. With auto-focus
+      // suppressed the user clicks into the input deliberately and
+      // the close button works on the first try.
+      onOpenAutoFocus={(event) => event.preventDefault()}
+    >
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
@@ -327,7 +336,16 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+      className="sm:max-w-md"
+      // Don't auto-focus the password input on open: Chrome's saved-
+      // password popup appears under the focused field and eats the
+      // first click anywhere outside (including the X close button),
+      // so the dialog needs two X clicks to dismiss. With auto-focus
+      // suppressed the user clicks into the input deliberately and
+      // the close button works on the first try.
+      onOpenAutoFocus={(event) => event.preventDefault()}
+    >
         <DialogHeader>
           <DialogTitle>
             {codes ? "New recovery codes" : "Regenerate recovery codes"}
@@ -429,7 +447,16 @@ interface RevealProps {
  */
 const RevealConfirmDialog = ({ open, onOpenChange, onRevealed }: RevealProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="sm:max-w-md">
+    <DialogContent
+      className="sm:max-w-md"
+      // Don't auto-focus the password input on open: Chrome's saved-
+      // password popup appears under the focused field and eats the
+      // first click anywhere outside (including the X close button),
+      // so the dialog needs two X clicks to dismiss. With auto-focus
+      // suppressed the user clicks into the input deliberately and
+      // the close button works on the first try.
+      onOpenAutoFocus={(event) => event.preventDefault()}
+    >
       <DialogHeader>
         <DialogTitle>Reveal recovery codes</DialogTitle>
         <DialogDescription>
