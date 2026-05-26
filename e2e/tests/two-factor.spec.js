@@ -1,6 +1,11 @@
 // @ts-check
 const { test, expect } = require("@playwright/test");
-const { BASE_URL, uniqueEmail, registerAndSignIn } = require("./helpers");
+const {
+  BASE_URL,
+  computeTotpCode,
+  registerAndSignIn,
+  uniqueEmail,
+} = require("./helpers");
 
 test.describe("Two-factor authentication", () => {
   test("opens setup dialog with QR code and rejects bad codes", async ({ page }) => {
@@ -55,57 +60,8 @@ test.describe("Two-factor authentication", () => {
     await page.fill("#password", password);
     await page.click('button[type="submit"]');
 
-    await expect(page.getByText("Two-factor verification")).toBeVisible();
+    await expect(page.getByText("Two-factor authentication")).toBeVisible();
     await expect(page.getByTestId("2fa-code")).toBeVisible();
   });
 });
 
-/**
- * Browser-side TOTP for tests. Mirrors the OTPHP defaults
- * (SHA1, 6-digit, 30-second period). Lives here because pulling in a
- * dedicated TOTP library for one test isn't worth the dep cost.
- *
- * @param {string} base32Secret
- * @returns {Promise<string>}
- */
-async function computeTotpCode(base32Secret) {
-  const key = base32Decode(base32Secret);
-  const counter = Math.floor(Date.now() / 1000 / 30);
-  const counterBytes = new ArrayBuffer(8);
-  new DataView(counterBytes).setBigUint64(0, BigInt(counter));
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key,
-    { name: "HMAC", hash: "SHA-1" },
-    false,
-    ["sign"],
-  );
-  const hmac = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, counterBytes));
-  const offset = hmac[hmac.length - 1] & 0x0f;
-  const truncated =
-    ((hmac[offset] & 0x7f) << 24) |
-    ((hmac[offset + 1] & 0xff) << 16) |
-    ((hmac[offset + 2] & 0xff) << 8) |
-    (hmac[offset + 3] & 0xff);
-  return String(truncated % 1000000).padStart(6, "0");
-}
-
-/** Minimal RFC 4648 base32 decoder; uppercase, no padding handling beyond stripping. */
-function base32Decode(input) {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-  const cleaned = input.replace(/=+$/, "").toUpperCase();
-  let bits = 0;
-  let value = 0;
-  const output = [];
-  for (const char of cleaned) {
-    const idx = alphabet.indexOf(char);
-    if (idx < 0) continue;
-    value = (value << 5) | idx;
-    bits += 5;
-    if (bits >= 8) {
-      bits -= 8;
-      output.push((value >>> bits) & 0xff);
-    }
-  }
-  return new Uint8Array(output);
-}

@@ -25,6 +25,66 @@ final class TwoFactorSetupService
     }
 
     /**
+     * Per-entry status for the security-panel list. `code` is the
+     * plaintext for spent codes only — unused entries return null so the
+     * UI keeps them masked. Spent codes can't re-authenticate (hash check
+     * rejects them) so surfacing them is harmless.
+     *
+     * @return list<array{code: ?string, consumedAt: ?string}>
+     */
+    public function listRecoveryCodes(User $user): array
+    {
+        $out = [];
+        foreach ($user->getRecoveryCodes() as $entry) {
+            $code = null;
+            if (null !== $entry['consumedAt']) {
+                // Prefer the encrypted envelope (new path), fall back to
+                // the legacy `consumedCode` field for entries written
+                // before encrypted-at-generation shipped.
+                if (isset($entry['encrypted'])) {
+                    $code = $this->cipher->decrypt($entry['encrypted']);
+                } else {
+                    $code = $entry['consumedCode'] ?? null;
+                }
+            }
+            $out[] = [
+                'code' => $code,
+                'consumedAt' => $entry['consumedAt'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Decrypts every entry's plaintext for the GitHub-style "reveal codes"
+     * flow. Callers must gate this behind a step-up password challenge —
+     * unused codes are real credentials and shouldn't be surfaced from a
+     * session whose only auth is a cookie.
+     *
+     * Legacy entries with no `encrypted` field (predating the reveal
+     * feature) return null for `code`; the UI marks them as unavailable.
+     *
+     * @return list<array{code: ?string, consumedAt: ?string}>
+     */
+    public function revealRecoveryCodes(User $user): array
+    {
+        $out = [];
+        foreach ($user->getRecoveryCodes() as $entry) {
+            $code = null;
+            if (isset($entry['encrypted'])) {
+                $code = $this->cipher->decrypt($entry['encrypted']);
+            } elseif (null !== $entry['consumedAt']) {
+                $code = $entry['consumedCode'] ?? null;
+            }
+            $out[] = [
+                'code' => $code,
+                'consumedAt' => $entry['consumedAt'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Generates a new base32 TOTP secret and stores it (encrypted) on the
      * user. Idempotent for repeated calls during the setup flow — a user
      * who never confirms verify just leaves the previous unconfirmed
@@ -38,7 +98,7 @@ final class TwoFactorSetupService
         // Defensive: never leave 2FA "enabled" with a freshly-rotated
         // unconfirmed secret. The verify step flips this back on.
         $user->setTotpEnabled(false);
-        $user->setRecoveryCodeHashes([]);
+        $user->setRecoveryCodes([]);
         return $secret;
     }
 
@@ -53,23 +113,32 @@ final class TwoFactorSetupService
     }
 
     /**
-     * Generates fresh plaintext recovery codes, stores their hashes on the
-     * user, and returns the plaintext list to the caller. Plaintext is
-     * never persisted — the API surfaces it once at this call site and
-     * the user is expected to copy/download.
+     * Generates fresh plaintext recovery codes, persists them on the user
+     * as `{hash, consumedAt}` pairs, and returns the plaintext list to the
+     * caller. Plaintext is surfaced exactly once — the user is expected to
+     * save it; consumed entries are kept (with `consumedAt` set) so the UI
+     * can show "used N of M" with strikethrough.
      *
      * @return string[] plaintext recovery codes (e.g. "a3f9-1c8b-22e0")
      */
     public function regenerateRecoveryCodes(User $user): array
     {
         $plain = [];
-        $hashes = [];
+        $entries = [];
         for ($i = 0; $i < self::RECOVERY_CODE_COUNT; $i++) {
             $code = $this->generatePlaintextCode();
             $plain[] = $code;
-            $hashes[] = hash('sha256', $code);
+            $entries[] = [
+                'hash' => hash('sha256', $code),
+                // Envelope-encrypt the plaintext so the GitHub-style
+                // reveal flow can re-display it after a step-up password
+                // challenge. Hash stays the source of truth for
+                // verification — encrypted is only ever read for display.
+                'encrypted' => $this->cipher->encrypt($code),
+                'consumedAt' => null,
+            ];
         }
-        $user->setRecoveryCodeHashes($hashes);
+        $user->setRecoveryCodes($entries);
         return $plain;
     }
 
@@ -78,7 +147,7 @@ final class TwoFactorSetupService
         $user->setTotpEnabled(false);
         $user->setTotpSecretEncrypted(null);
         $user->setTotpSecretCache(null);
-        $user->setRecoveryCodeHashes([]);
+        $user->setRecoveryCodes([]);
     }
 
     private function generatePlaintextCode(): string

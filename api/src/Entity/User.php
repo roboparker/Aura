@@ -153,17 +153,42 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?\DateTimeImmutable $totpEnabledAt = null;
 
     /**
-     * Hashes (sha256) of the recovery codes still available for one-time
-     * use during 2FA challenge. Marked used by removing the entry — the
-     * column is the single source of truth for "remaining codes" so the
-     * count surfaced to the user (and the dedupe in invalidateBackupCode)
-     * stay in sync. Plaintext codes are only ever returned once at
-     * generation time.
+     * Recovery codes for the 2FA challenge.
      *
-     * @var string[]|null
+     * Each entry is `{hash, consumedAt, encrypted?, consumedCode?}`:
+     * - `hash`: sha256 of the plaintext, the source of truth for verification.
+     * - `consumedAt`: ATOM timestamp when the code was used during a 2FA
+     *    challenge. Non-null entries are kept on the row so the security
+     *    panel can show "consumed N of M" with strikethrough, but they're
+     *    excluded from the "remaining" count and rejected on future
+     *    challenges.
+     * - `encrypted`: envelope-encrypted plaintext via {@see TwoFactorSecretCipher}
+     *    so the GitHub-style "reveal codes" flow can re-display the full
+     *    list after a fresh password challenge. Optional — older rows
+     *    written before the reveal feature don't have it and surface as
+     *    "(unavailable)" in the reveal view.
+     * - `consumedCode`: legacy field — earlier iterations captured
+     *    plaintext only on consumption. New writes use `encrypted` for
+     *    everything; this stays so the in-place "consumed code" display
+     *    still works for entries written in the interim. Read order:
+     *    `encrypted` (decrypted) wins, `consumedCode` fallback.
+     *
+     * Plaintext for unused codes is a deliberate weakening of the old
+     * hash-only model — a DB-leak + APP_SECRET-leak yields the unused
+     * codes. Surface protections:
+     *  - the reveal endpoint requires re-entering the current password
+     *  - the panel never auto-reveals; the user has to opt in per session
+     *  - consumed codes are safe regardless (hash check rejects them)
+     *
+     * @var list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $totpRecoveryCodeHashes = null;
+    private ?array $totpRecoveryCodes = null;
 
     public const ALLOWED_THEMES = ['light', 'dark', 'system'];
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
@@ -427,24 +452,47 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         return $this->totpEnabledAt;
     }
 
-    /** @param string[] $hashes */
-    public function setRecoveryCodeHashes(array $hashes): static
+    /**
+     * @param list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }> $entries
+     */
+    public function setRecoveryCodes(array $entries): static
     {
-        // Re-index so the JSON column is always a list, never a sparse map
-        // after invalidation removes mid-array entries.
-        $this->totpRecoveryCodeHashes = array_values($hashes);
+        $this->totpRecoveryCodes = $entries;
         return $this;
     }
 
-    /** @return string[] */
-    public function getRecoveryCodeHashes(): array
+    /**
+     * @return list<array{
+     *     hash: string,
+     *     consumedAt: ?string,
+     *     encrypted?: ?string,
+     *     consumedCode?: ?string,
+     * }>
+     */
+    public function getRecoveryCodes(): array
     {
-        return $this->totpRecoveryCodeHashes ?? [];
+        return $this->totpRecoveryCodes ?? [];
     }
 
+    /**
+     * Count of recovery codes still available — consumed codes are kept on
+     * the entity for display but excluded here so the "X remaining"
+     * indicator and the regen-prompt threshold continue to work.
+     */
     public function getRecoveryCodeCount(): int
     {
-        return count($this->getRecoveryCodeHashes());
+        $remaining = 0;
+        foreach ($this->getRecoveryCodes() as $entry) {
+            if (null === $entry['consumedAt']) {
+                $remaining++;
+            }
+        }
+        return $remaining;
     }
 
     // --- BackupCodeInterface (Scheb) ---
@@ -452,16 +500,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function isBackupCode(string $code): bool
     {
         $hash = hash('sha256', $code);
-        return in_array($hash, $this->getRecoveryCodeHashes(), true);
+        foreach ($this->getRecoveryCodes() as $entry) {
+            if ($entry['hash'] === $hash && null === $entry['consumedAt']) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public function invalidateBackupCode(string $code): void
     {
         $hash = hash('sha256', $code);
-        $remaining = array_values(array_filter(
-            $this->getRecoveryCodeHashes(),
-            static fn (string $h) => $h !== $hash,
-        ));
-        $this->totpRecoveryCodeHashes = $remaining;
+        $now = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        $entries = $this->getRecoveryCodes();
+        foreach ($entries as $index => $entry) {
+            if ($entry['hash'] === $hash && null === $entry['consumedAt']) {
+                $entries[$index]['consumedAt'] = $now;
+                // No need to capture plaintext separately — new entries
+                // carry an `encrypted` envelope from generation time that
+                // the security panel decrypts for display. Legacy entries
+                // (pre-encrypted, post-consumedCode) keep their own
+                // capture untouched.
+                $this->totpRecoveryCodes = $entries;
+                return;
+            }
+        }
     }
 }

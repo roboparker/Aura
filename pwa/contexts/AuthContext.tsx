@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { ENTRYPOINT } from "../config/entrypoint";
+import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 
 export type ThemePreference = "light" | "dark" | "system";
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
@@ -79,6 +80,18 @@ interface AuthContextType {
   clearError: () => void;
 }
 
+/**
+ * Thrown by `submitTwoFactorCode` when the backend returns 429. Carries
+ * the retry-after window so the challenge form can disable Verify and
+ * drive a live countdown.
+ */
+export class TwoFactorRateLimitError extends Error {
+  constructor(message: string, public readonly retryAfterSeconds: number) {
+    super(message);
+    this.name = "TwoFactorRateLimitError";
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -100,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchMe = useCallback(async () => {
     try {
-      const res = await fetch(`${ENTRYPOINT}/api/me`, { credentials: "include" });
+      const res = await fetchWithTimeout(`${ENTRYPOINT}/api/me`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setUser(data);
@@ -120,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setError(null);
-    const res = await fetch(`${ENTRYPOINT}/auth/login`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -149,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitTwoFactorCode = useCallback(async (code: string) => {
-    const res = await fetch(`${ENTRYPOINT}/auth/2fa-check`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/2fa-check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -158,6 +171,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
+      // 429 from the rate-limit subscriber carries a structured
+      // retryAfter (and a Retry-After header) — surface it as a typed
+      // error so the form can drive a countdown without parsing the
+      // message string.
+      if (res.status === 429) {
+        throw new TwoFactorRateLimitError(
+          data.error || "Too many attempts.",
+          typeof data.retryAfter === "number" ? data.retryAfter : 60,
+        );
+      }
       throw new Error(data.error || "Invalid authentication code.");
     }
 
@@ -167,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(async (input: RegisterInput) => {
     setError(null);
-    const res = await fetch(`${ENTRYPOINT}/users`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/users`, {
       method: "POST",
       headers: { "Content-Type": "application/ld+json" },
       credentials: "include",
@@ -189,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
-    const res = await fetch(`${ENTRYPOINT}/auth/change-password`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/change-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -203,7 +226,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    const res = await fetch(`${ENTRYPOINT}/auth/forgot-password`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/forgot-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -216,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetPassword = useCallback(async (token: string, newPassword: string) => {
-    const res = await fetch(`${ENTRYPOINT}/auth/reset-password`, {
+    const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -235,7 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
-    fetch(`${ENTRYPOINT}/auth/logout`, {
+    fetchWithTimeout(`${ENTRYPOINT}/auth/logout`, {
       method: "POST",
       credentials: "include",
     }).catch(() => {});
