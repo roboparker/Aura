@@ -15,6 +15,8 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Validator\Constraints\PasswordStrength;
+use Symfony\Component\Validator\Constraints\PasswordStrengthValidator;
 
 class PasswordController extends AbstractController
 {
@@ -24,6 +26,11 @@ class PasswordController extends AbstractController
     // floor. NIST SP 800-63B: length is the primary factor, complexity
     // rules are user-hostile.
     private const MIN_PASSWORD_LENGTH = 8;
+    // Pairs with the `Assert\PasswordStrength` on the User entity; the
+    // signup form runs the validator stack so it picks that up via
+    // attribute, but change-password and reset-password are plain
+    // controller actions and re-check by hand.
+    private const MIN_PASSWORD_STRENGTH = PasswordStrength::STRENGTH_WEAK;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -55,6 +62,12 @@ class PasswordController extends AbstractController
         if (strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
             return $this->json([
                 'error' => sprintf('New password must be at least %d characters.', self::MIN_PASSWORD_LENGTH),
+            ], 422);
+        }
+
+        if (PasswordStrengthValidator::estimateStrength($newPassword) < self::MIN_PASSWORD_STRENGTH) {
+            return $this->json([
+                'error' => 'This password is too easy to guess — try mixing in more characters or making it longer.',
             ], 422);
         }
 
@@ -120,6 +133,12 @@ class PasswordController extends AbstractController
         if (strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
             return $this->json([
                 'error' => sprintf('Password must be at least %d characters.', self::MIN_PASSWORD_LENGTH),
+            ], 422);
+        }
+
+        if (PasswordStrengthValidator::estimateStrength($newPassword) < self::MIN_PASSWORD_STRENGTH) {
+            return $this->json([
+                'error' => 'This password is too easy to guess — try mixing in more characters or making it longer.',
             ], 422);
         }
 

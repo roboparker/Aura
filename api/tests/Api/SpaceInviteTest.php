@@ -255,7 +255,7 @@ class SpaceInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newcomer@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!',
                 'givenName' => 'Newt',
                 'familyName' => 'Newcomer',
                 'inviteToken' => $plainToken,
@@ -291,7 +291,7 @@ class SpaceInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'imposter@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!',
                 'givenName' => 'Im',
                 'familyName' => 'Poster',
                 'inviteToken' => $plainToken,
@@ -325,7 +325,7 @@ class SpaceInviteTest extends ApiTestCase
             ->setGivenName('Test')
             ->setFamilyName('User')
             ->setPersonalizedColor('#0369a1');
-        $user->setPassword($hasher->hashPassword($user, 'password123'));
+        $user->setPassword($hasher->hashPassword($user, 'Password123!'));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
