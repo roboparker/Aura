@@ -99,6 +99,24 @@ export class TwoFactorRateLimitError extends Error {
   }
 }
 
+/**
+ * The three reasons `/auth/reset-password` can refuse a token. The PWA
+ * uses the discriminator to swap the "this link can't be used" card —
+ * expired vs already-used vs unrecognised — so the user gets a clear
+ * next step instead of one catch-all message.
+ */
+export type PasswordResetTokenCode =
+  | "token_expired"
+  | "token_used"
+  | "token_invalid";
+
+export class PasswordResetTokenError extends Error {
+  constructor(message: string, public readonly code: PasswordResetTokenCode) {
+    super(message);
+    this.name = "PasswordResetTokenError";
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -256,7 +274,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Failed to reset password.");
+      const message = data.error || "Failed to reset password.";
+      // The token-rejection branch ships a `code` discriminator so the
+      // page can pick the right invalid-link card. Validation errors
+      // (length / strength) don't carry a code — fall through to a
+      // plain Error and the form will render the inline alert.
+      if (
+        data.code === "token_expired" ||
+        data.code === "token_used" ||
+        data.code === "token_invalid"
+      ) {
+        throw new PasswordResetTokenError(message, data.code);
+      }
+      throw new Error(message);
     }
   }, []);
 

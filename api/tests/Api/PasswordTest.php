@@ -201,6 +201,10 @@ class PasswordTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(400);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray(false);
+        $this->assertSame('token_invalid', $body['code'] ?? null);
     }
 
     public function testResetPasswordExpiredToken(): void
@@ -217,6 +221,10 @@ class PasswordTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(400);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray(false);
+        $this->assertSame('token_expired', $body['code'] ?? null);
     }
 
     public function testResetPasswordUsedToken(): void
@@ -245,6 +253,10 @@ class PasswordTest extends ApiTestCase
             ],
         ]);
         $this->assertResponseStatusCodeSame(400);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray(false);
+        $this->assertSame('token_used', $body['code'] ?? null);
     }
 
     public function testResetPasswordTooShort(): void
