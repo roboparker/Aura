@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import AuraWordmark from "./AuraWordmark";
 import AvatarColorPicker from "./AvatarColorPicker";
+import InviteSignup from "./InviteSignup";
 import SignInForm from "./SignInForm";
 import SignUpForm, { type SignUpFormValues } from "./SignUpForm";
 import SignUpProvisioning from "./SignUpProvisioning";
@@ -127,10 +128,16 @@ const AuthCard = ({ defaultTab }: Props) => {
   const reset = router.query.reset === "true";
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    // Authenticated users normally don't need /signin or /signup, so
+    // we bounce them to wherever `next` points. The one exception is
+    // /signup with an `?invite=` token — that user might be signed in
+    // as the wrong account and needs to see the email-mismatch screen
+    // (or accept-as-current-user if they happen to match). InviteSignup
+    // handles the branching internally.
+    if (!isLoading && isAuthenticated && !inviteToken) {
       router.replace(safeNextPath(next));
     }
-  }, [isLoading, isAuthenticated, next, router]);
+  }, [isLoading, isAuthenticated, next, router, inviteToken]);
 
   const queryIndex = router.asPath.indexOf("?");
   const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
@@ -185,22 +192,34 @@ const AuthCard = ({ defaultTab }: Props) => {
     router.push(`/signin?${params.toString()}`);
   };
 
-  // Footer hidden on signup-color (no relevant alt action) and
+  // Invite signup runs in its own component — it owns its own card
+  // header (varies per outcome: expired / accepted / mismatch / form)
+  // and footer (none — its CTAs cover the alt actions), so AuthCard
+  // just provides the Card chrome around it.
+  const isInviteSignup = step === "signup-form" && Boolean(inviteToken);
+
+  // Footer hidden on signup-color (no relevant alt action),
   // signup-provisioning (we're routing away on a timer — offering an
-  // out would just confuse the moment). Stays visible everywhere else.
+  // out would just confuse the moment), and the entire invite flow
+  // (each invite state has its own CTAs in the body).
   const showFooter =
-    step !== "signup-color" && step !== "signup-provisioning";
+    step !== "signup-color" &&
+    step !== "signup-provisioning" &&
+    !isInviteSignup;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
       <AuraWordmark />
       <Card className="w-full max-w-lg overflow-hidden p-0">
-        {cardCopy && (
+        {cardCopy && !isInviteSignup && (
           <CardHeader className="p-8 pb-6">
             <CardTitle className="text-3xl font-bold">{cardCopy.title}</CardTitle>
             <CardDescription className="text-base">{cardCopy.subtitle}</CardDescription>
           </CardHeader>
         )}
+        {isInviteSignup && inviteToken ? (
+          <InviteSignup token={inviteToken} next={next} />
+        ) : (
         <CardContent className={cardCopy ? "p-8 pt-2" : "p-8"}>
           {step === "signup-form" && (
             <SignUpForm
@@ -269,6 +288,7 @@ const AuthCard = ({ defaultTab }: Props) => {
             />
           )}
         </CardContent>
+        )}
         {showFooter && (
           <div className="border-t border-border bg-background px-8 py-5 text-center text-sm text-muted-foreground">
             {isTwoFactor && tfCopy ? (

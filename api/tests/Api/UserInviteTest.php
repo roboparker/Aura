@@ -185,9 +185,15 @@ class UserInviteTest extends ApiTestCase
         $client->request('GET', '/invites/' . $token);
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains([
+            'status' => 'pending',
             'email' => 'newcomer@example.com',
+            'inviter' => ['email' => 'alice@example.com'],
             'groups' => [
-                ['title' => 'Backend', 'invitedBy' => 'alice@example.com'],
+                [
+                    'title' => 'Backend',
+                    'memberCount' => 1,
+                    'invitedBy' => ['email' => 'alice@example.com'],
+                ],
             ],
         ]);
     }

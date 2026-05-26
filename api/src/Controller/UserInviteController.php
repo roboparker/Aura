@@ -41,34 +41,105 @@ class UserInviteController extends AbstractController
     public function lookup(string $token): JsonResponse
     {
         $invite = $this->userInviteRepository->findByTokenHash(hash('sha256', $token));
-        if (null === $invite || !$invite->isPending()) {
+        if (null === $invite) {
             return $this->json(['error' => 'Invitation is invalid or expired.'], 404);
+        }
+
+        // Branch the response on the invite's life-cycle so the PWA can
+        // render dedicated screens for each (expired vs. already used vs.
+        // ready to redeem) instead of bucketing every failure mode into
+        // "invalid or expired". Inviter chip + email are returned in all
+        // three states because the expired / already-used screens still
+        // want to show "this was for X, sent by Y".
+        $primaryInviter = self::primaryInviter($invite);
+        $base = [
+            'email' => $invite->getEmail(),
+            'expiresAt' => $invite->getExpiresAt()->format(\DateTimeInterface::ATOM),
+            'inviter' => $primaryInviter,
+        ];
+
+        if (null !== $invite->getAcceptedAt()) {
+            return $this->json([
+                ...$base,
+                'status' => 'accepted',
+                'acceptedAt' => $invite->getAcceptedAt()->format(\DateTimeInterface::ATOM),
+            ]);
+        }
+
+        if (!$invite->isPending()) {
+            return $this->json([
+                ...$base,
+                'status' => 'expired',
+            ]);
         }
 
         $groups = [];
         foreach ($invite->getGroupInvites() as $groupInvite) {
+            $group = $groupInvite->getGroup();
             $groups[] = [
-                'id' => (string) $groupInvite->getGroup()->getId(),
-                'title' => $groupInvite->getGroup()->getTitle(),
-                'invitedBy' => $groupInvite->getInvitedBy()->getEmail(),
+                'id' => (string) $group->getId(),
+                'title' => $group->getTitle(),
+                'memberCount' => $group->getMembers()->count(),
+                'invitedBy' => self::inviterChip($groupInvite->getInvitedBy()),
             ];
         }
         $spaces = [];
         foreach ($invite->getSpaceInvites() as $spaceInvite) {
+            $space = $spaceInvite->getSpace();
             $spaces[] = [
-                'id' => (string) $spaceInvite->getSpace()->getId(),
-                'name' => $spaceInvite->getSpace()->getName(),
-                'invitedBy' => $spaceInvite->getInvitedBy()->getEmail(),
+                'id' => (string) $space->getId(),
+                'name' => $space->getName(),
                 'role' => $spaceInvite->getRole(),
+                'invitedBy' => self::inviterChip($spaceInvite->getInvitedBy()),
             ];
         }
 
         return $this->json([
-            'email' => $invite->getEmail(),
+            ...$base,
+            'status' => 'pending',
             'groups' => $groups,
             'spaces' => $spaces,
-            'expiresAt' => $invite->getExpiresAt()->format(\DateTimeInterface::ATOM),
         ]);
+    }
+
+    /**
+     * Picks the inviter to show at the top of the signup card. Both group
+     * and space invites carry their own `invitedBy`; in practice all
+     * attachments on a UserInvite share an inviter, but if they don't we
+     * still want a stable "primary" for the headline. First non-null
+     * inviter wins.
+     *
+     * @return array{name: string, email: string, initials: string, color: string}|null
+     */
+    private static function primaryInviter(\App\Entity\UserInvite $invite): ?array
+    {
+        foreach ($invite->getSpaceInvites() as $spaceInvite) {
+            return self::inviterChip($spaceInvite->getInvitedBy());
+        }
+        foreach ($invite->getGroupInvites() as $groupInvite) {
+            return self::inviterChip($groupInvite->getInvitedBy());
+        }
+        return null;
+    }
+
+    /**
+     * @return array{name: string, email: string, initials: string, color: string}
+     */
+    private static function inviterChip(User $user): array
+    {
+        $given = trim($user->getGivenName());
+        $family = trim($user->getFamilyName());
+        $displayName = trim(sprintf('%s %s', $given, $family));
+        $initialsRaw = ($given[0] ?? '') . ($family[0] ?? '');
+        $initials = '' !== $initialsRaw
+            ? strtoupper($initialsRaw)
+            : strtoupper(substr($user->getEmail(), 0, 1));
+        return [
+            'name' => '' !== $displayName ? $displayName : $user->getEmail(),
+            'email' => $user->getEmail(),
+            'initials' => $initials,
+            'color' => $user->getPersonalizedColor(),
+        ];
     }
 
     #[Route('/groups/{id}/invites', name: 'user_invite_list', methods: ['GET'])]
