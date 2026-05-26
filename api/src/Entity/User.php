@@ -120,8 +120,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read'])]
+    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
+
+    /**
+     * Set to true once the setter has been called, so
+     * {@see \App\State\UserPasswordHasherProcessor} can tell a
+     * user-supplied color apart from the entity's default. Transient
+     * (not persisted) — every fresh request rebuilds the entity and the
+     * flag goes back to false until a setter call flips it.
+     */
+    private bool $personalizedColorExplicit = false;
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -313,9 +322,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         return $this->personalizedColor;
     }
 
+    public function isPersonalizedColorExplicitlySet(): bool
+    {
+        return $this->personalizedColorExplicit;
+    }
+
     public function setPersonalizedColor(string $personalizedColor): static
     {
         $this->personalizedColor = $personalizedColor;
+        $this->personalizedColorExplicit = true;
         return $this;
     }
 

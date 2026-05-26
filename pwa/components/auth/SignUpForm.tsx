@@ -1,33 +1,34 @@
-import { useRouter } from "next/router";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Formik, Form } from "formik";
 import { ENTRYPOINT } from "@/config/entrypoint";
-import { useAuth } from "@/contexts/AuthContext";
-import { isSafeNextPath } from "@/lib/authRedirect";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
+import {
+  MIN_PASSWORD_LENGTH,
+  MIN_PASSWORD_STRENGTH,
+  estimatePasswordStrength,
+} from "@/lib/passwordStrength";
+import PasswordStrengthMeter from "./PasswordStrengthMeter";
 
-interface SignUpValues {
+export interface SignUpFormValues {
   givenName: string;
   familyName: string;
   email: string;
   password: string;
-  confirmPassword: string;
 }
 
 interface InviteContext {
   email: string;
   groups: { id: string; title: string; invitedBy: string }[];
-  // `spaces` was added when the space-invite flow shipped (#186); the
-  // backend always returns the array now, but mark optional so older
-  // builds still parse the payload without an exception.
   spaces?: { id: string; name: string; invitedBy: string; role: string }[];
   expiresAt: string;
 }
 
-const validate = (values: SignUpValues) => {
-  const errors: Partial<SignUpValues> = {};
+const validate = (values: SignUpFormValues) => {
+  const errors: Partial<Record<keyof SignUpFormValues, string>> = {};
 
   if (!values.givenName.trim()) {
     errors.givenName = "Given name is required.";
@@ -49,14 +50,10 @@ const validate = (values: SignUpValues) => {
 
   if (!values.password) {
     errors.password = "Password is required.";
-  } else if (values.password.length < 8) {
-    errors.password = "Password must be at least 8 characters.";
-  }
-
-  if (!values.confirmPassword) {
-    errors.confirmPassword = "Please confirm your password.";
-  } else if (values.password !== values.confirmPassword) {
-    errors.confirmPassword = "Passwords do not match.";
+  } else if (values.password.length < MIN_PASSWORD_LENGTH) {
+    errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  } else if (estimatePasswordStrength(values.password) < MIN_PASSWORD_STRENGTH) {
+    errors.password = "Too weak. Use a longer mix of words, numbers, and symbols.";
   }
 
   return errors;
@@ -65,20 +62,21 @@ const validate = (values: SignUpValues) => {
 interface Props {
   /** Optional `?invite=` token from the URL — drives the invite banner. */
   inviteToken?: string;
-  /** Same-origin path to send the user to after a successful sign-in. */
-  next?: string;
+  /**
+   * Called when the form passes validation. Parent (AuthCard) holds the
+   * collected payload and transitions to the avatar-color step before
+   * actually POSTing to /users — sign-up doesn't fire until the user
+   * picks their color.
+   */
+  onCollected: (values: SignUpFormValues, inviteToken?: string) => void;
 }
 
-const SignUpForm = ({ inviteToken, next }: Props) => {
-  const { register } = useAuth();
-  const router = useRouter();
-
+const SignUpForm = ({ inviteToken, onCollected }: Props) => {
   const [invite, setInvite] = useState<InviteContext | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!router.isReady) return;
     if (!inviteToken) {
       setInvite(null);
       setInviteError(null);
@@ -90,7 +88,7 @@ const SignUpForm = ({ inviteToken, next }: Props) => {
     setInviteError(null);
     (async () => {
       try {
-        const res = await fetch(
+        const res = await fetchWithTimeout(
           `${ENTRYPOINT}/invites/${encodeURIComponent(inviteToken)}`,
         );
         if (!res.ok) {
@@ -119,7 +117,7 @@ const SignUpForm = ({ inviteToken, next }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [router.isReady, inviteToken]);
+  }, [inviteToken]);
 
   return (
     <div className="space-y-4">
@@ -165,92 +163,122 @@ const SignUpForm = ({ inviteToken, next }: Props) => {
         </Alert>
       )}
 
-      <Formik<SignUpValues>
+      <Formik<SignUpFormValues>
         enableReinitialize
         initialValues={{
           givenName: "",
           familyName: "",
           email: invite?.email ?? "",
           password: "",
-          confirmPassword: "",
         }}
         validate={validate}
-        onSubmit={async (values, { setSubmitting, setStatus }) => {
-          try {
-            await register({
-              email: values.email,
-              password: values.password,
+        onSubmit={(values, { setSubmitting }) => {
+          // Don't POST yet — hand the collected payload to the parent so
+          // it can run the avatar-color step before registering.
+          onCollected(
+            {
+              ...values,
               givenName: values.givenName.trim(),
               familyName: values.familyName.trim(),
-              inviteToken: invite ? (inviteToken ?? undefined) : undefined,
-            });
-            const params = new URLSearchParams({ registered: "true" });
-            if (isSafeNextPath(next)) params.set("next", next);
-            router.push(`/signin?${params.toString()}`);
-          } catch (err) {
-            setStatus(err instanceof Error ? err.message : "Registration failed.");
-          } finally {
-            setSubmitting(false);
-          }
+            },
+            invite ? inviteToken : undefined,
+          );
+          setSubmitting(false);
         }}
       >
-        {({ isSubmitting, status }) => (
-          <Form className="space-y-4" noValidate>
-            {status && (
-              <Alert variant="destructive">
-                <AlertDescription>{status}</AlertDescription>
-              </Alert>
-            )}
+        {({ errors, touched, submitCount, values, isSubmitting }) => {
+          // Show a top-of-form summary once the user has tried to submit
+          // at least once and we still have outstanding errors — mirrors
+          // the mockup's "Fix the highlighted fields" callout. Counting
+          // errors instead of just listing them keeps the message short
+          // on small viewports.
+          const visibleErrors =
+            submitCount > 0
+              ? (Object.keys(errors) as (keyof SignUpFormValues)[]).filter(
+                  (k) => touched[k] || submitCount > 0,
+                )
+              : [];
 
-            <div className="grid grid-cols-2 gap-3">
+          return (
+            <Form className="space-y-4" noValidate>
+              {visibleErrors.length > 0 && (
+                <Alert variant="destructive" data-testid="signup-error-summary">
+                  <AlertDescription>
+                    <p className="font-semibold">Fix the highlighted fields</p>
+                    <p className="text-xs mt-1">
+                      {visibleErrors.length} issue
+                      {visibleErrors.length === 1 ? "" : "s"} to resolve before you can
+                      continue.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormikField
+                  name="givenName"
+                  type="text"
+                  autoComplete="given-name"
+                  label="Given name"
+                />
+                <FormikField
+                  name="familyName"
+                  type="text"
+                  autoComplete="family-name"
+                  label="Family name"
+                />
+              </div>
+
               <FormikField
-                name="givenName"
-                type="text"
-                autoComplete="given-name"
-                label="Given name"
+                name="email"
+                type="email"
+                label="Work email"
+                placeholder="you@example.com"
+                autoComplete="email"
+                readOnly={!!invite}
+                inputClassName={invite ? "bg-muted text-muted-foreground" : undefined}
+                description={
+                  invite ? "Locked to the email your invitation was sent to." : undefined
+                }
               />
+
               <FormikField
-                name="familyName"
-                type="text"
-                autoComplete="family-name"
-                label="Family name"
+                name="password"
+                type="password"
+                label="Password"
+                placeholder=""
+                autoComplete="new-password"
+                labelAddon={
+                  // 12 (not MIN_PASSWORD_LENGTH = 8) is what the hint
+                  // shows because the MEDIUM strength floor effectively
+                  // rejects everything shorter than ~12 chars even when
+                  // the 8-char length check would let it through. Telling
+                  // the user the technically-allowed minimum sets them up
+                  // for a "but I had 8 characters" rejection — surface
+                  // the practical floor instead.
+                  <span className="text-xs text-muted-foreground">min 12 chars</span>
+                }
               />
-            </div>
+              <PasswordStrengthMeter password={values.password} />
 
-            <FormikField
-              name="email"
-              type="email"
-              label="Email"
-              placeholder="you@example.com"
-              autoComplete="email"
-              readOnly={!!invite}
-              inputClassName={invite ? "bg-muted text-muted-foreground" : undefined}
-              description={
-                invite ? "Locked to the email your invitation was sent to." : undefined
-              }
-            />
+              <Button type="submit" disabled={isSubmitting} className="w-full">
+                Create account
+              </Button>
 
-            <FormikField
-              name="password"
-              type="password"
-              label="Password"
-              placeholder="At least 8 characters"
-              autoComplete="new-password"
-            />
-
-            <FormikField
-              name="confirmPassword"
-              type="password"
-              label="Confirm Password"
-              placeholder="Re-enter your password"
-              autoComplete="new-password"
-            />
-
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Creating Account..." : "Sign Up"}
-            </Button>
-          </Form>
-        )}
+              <p className="text-xs text-muted-foreground text-center">
+                By continuing you agree to Aura&apos;s{" "}
+                <Link href="/terms" className="text-primary font-semibold hover:text-foreground">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="text-primary font-semibold hover:text-foreground">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            </Form>
+          );
+        }}
       </Formik>
     </div>
   );

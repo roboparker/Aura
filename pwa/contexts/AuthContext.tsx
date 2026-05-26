@@ -51,6 +51,13 @@ export interface RegisterInput {
   givenName: string;
   familyName: string;
   inviteToken?: string;
+  /**
+   * Avatar color the user picked at signup. Optional — when omitted,
+   * the backend's `UserPasswordHasherProcessor` falls back to a random
+   * pick from `AvatarColorService::PALETTE`. Must be a hex from that
+   * same palette or the entity-level `Assert\Choice` rejects it.
+   */
+  personalizedColor?: string;
 }
 
 interface AuthContextType {
@@ -200,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         givenName: input.givenName,
         familyName: input.familyName,
         ...(input.inviteToken ? { inviteToken: input.inviteToken } : {}),
+        ...(input.personalizedColor ? { personalizedColor: input.personalizedColor } : {}),
       }),
     });
 

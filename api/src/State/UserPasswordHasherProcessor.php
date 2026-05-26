@@ -49,7 +49,13 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
             $data->eraseCredentials();
         }
 
-        if ($operation instanceof Post) {
+        // Sign-up now lets the user pick a color in the avatar-color
+        // step of the form. If the POST body included `personalizedColor`,
+        // the entity's setter has flipped the explicit flag — leave it
+        // alone. Otherwise fall back to the random pick (callers like
+        // the email-invite flow and one-shot fixture seeders that don't
+        // pass a color still get a valid one without thinking about it).
+        if ($operation instanceof Post && !$data->isPersonalizedColorExplicitlySet()) {
             $data->setPersonalizedColor($this->colorService->pick());
         }
 
