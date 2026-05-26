@@ -6,7 +6,7 @@ import { Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
-import { isSafeNextPath } from "@/lib/authRedirect";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import {
   MIN_PASSWORD_LENGTH,
   MIN_PASSWORD_STRENGTH,
@@ -196,7 +196,12 @@ const InviteSignup = ({ token, next }: Props) => {
           router.replace(router.asPath);
         }}
         onIgnore={() => {
-          router.push(isSafeNextPath(next) ? next : "/account");
+          // safeNextPath returns either `next` or "/account" — same
+          // logic as the inline `isSafeNextPath(next) ? next :
+          // "/account"`, but CodeQL recognizes the helper as a
+          // sanitization barrier where it can't reason through the
+          // boolean-then-pass-through pattern. Functionally identical.
+          router.push(safeNextPath(next));
         }}
         onSignOut={async () => {
           await logout();
