@@ -5,7 +5,9 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\PasswordResetToken;
 use App\Entity\User;
+use App\Service\TwoFactorSetupService;
 use Doctrine\ORM\EntityManagerInterface;
+use OTPHP\TOTP;
 use Symfony\Component\Mailer\Test\Constraint as MailerAssertions;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -111,6 +113,57 @@ class PasswordTest extends ApiTestCase
         ]);
 
         $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testChangePasswordWithTwoFactorRequiresTotpCode(): void
+    {
+        $user = $this->createTestUser('twofa@example.com', 'Password123!@#');
+        $this->enableTwoFactor($user);
+
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        // Old password no longer confirms — 2FA is on, only TOTP works.
+        $client->request('POST', '/auth/change-password', [
+            'json' => [
+                'currentPassword' => 'Password123!@#',
+                'newPassword' => 'newPassword123!@#',
+            ],
+        ]);
+        $this->assertResponseStatusCodeSame(400);
+
+        $client->request('POST', '/auth/change-password', [
+            'json' => [
+                'totpCode' => '000000',
+                'newPassword' => 'newPassword123!@#',
+            ],
+        ]);
+        $this->assertResponseStatusCodeSame(400);
+
+        $secret = $this->reloadUser('twofa@example.com')->getDecryptedTotpSecret();
+        self::assertNotNull($secret);
+        self::assertNotSame('', $secret);
+
+        $client->request('POST', '/auth/change-password', [
+            'json' => [
+                'totpCode' => TOTP::createFromSecret($secret)->now(),
+                'newPassword' => 'newPassword123!@#',
+            ],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
+        $refreshed = $this->reloadUser('twofa@example.com');
+        $this->assertTrue($hasher->isPasswordValid($refreshed, 'newPassword123!@#'));
+    }
+
+    private function enableTwoFactor(User $user): void
+    {
+        $setup = static::getContainer()->get(TwoFactorSetupService::class);
+        $setup->startSetup($user);
+        $user->setTotpEnabled(true);
+        $setup->regenerateRecoveryCodes($user);
+        $this->entityManager->flush();
     }
 
     // --- Forgot password ---

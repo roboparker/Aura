@@ -187,9 +187,9 @@ class TwoFactorTest extends ApiTestCase
         $this->assertSame(TwoFactorSetupService::RECOVERY_CODE_COUNT - 1, $refreshed->getRecoveryCodeCount());
     }
 
-    // --- Disable + regenerate ---
+    // --- Disable + regenerate + reveal ---
 
-    public function testDisableRequiresPassword(): void
+    public function testDisableRequiresValidTotpCode(): void
     {
         $user = $this->createTestUser('d@example.com', 'Password123!@#');
         $this->enableTwoFactor($user);
@@ -197,16 +197,21 @@ class TwoFactorTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($user);
 
-        $client->request('DELETE', '/me/2fa', ['json' => ['currentPassword' => 'wrong']]);
+        // Password no longer accepted — 2FA is on, only TOTP confirms.
+        $client->request('DELETE', '/me/2fa', ['json' => ['currentPassword' => 'Password123!@#']]);
         $this->assertResponseStatusCodeSame(400);
         $this->assertTrue($this->reloadUser('d@example.com')->isTotpEnabled());
 
-        $client->request('DELETE', '/me/2fa', ['json' => ['currentPassword' => 'Password123!@#']]);
+        $client->request('DELETE', '/me/2fa', ['json' => ['totpCode' => '000000']]);
+        $this->assertResponseStatusCodeSame(400);
+        $this->assertTrue($this->reloadUser('d@example.com')->isTotpEnabled());
+
+        $client->request('DELETE', '/me/2fa', ['json' => ['totpCode' => $this->currentTotpCode('d@example.com')]]);
         $this->assertResponseIsSuccessful();
         $this->assertFalse($this->reloadUser('d@example.com')->isTotpEnabled());
     }
 
-    public function testRegenerateRecoveryCodes(): void
+    public function testRegenerateRecoveryCodesRequiresValidTotpCode(): void
     {
         $user = $this->createTestUser('r@example.com', 'Password123!@#');
         $original = $this->enableTwoFactor($user);
@@ -214,8 +219,11 @@ class TwoFactorTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($user);
 
+        $client->request('POST', '/me/2fa/recovery-codes', ['json' => ['totpCode' => '000000']]);
+        $this->assertResponseStatusCodeSame(400);
+
         $client->request('POST', '/me/2fa/recovery-codes', [
-            'json' => ['currentPassword' => 'Password123!@#'],
+            'json' => ['totpCode' => $this->currentTotpCode('r@example.com')],
         ]);
 
         $this->assertResponseIsSuccessful();
@@ -230,6 +238,37 @@ class TwoFactorTest extends ApiTestCase
             array_intersect($original, $recoveryCodes),
             'Old recovery codes should not appear in the regenerated set.'
         );
+    }
+
+    public function testRevealRecoveryCodesRequiresValidTotpCode(): void
+    {
+        $user = $this->createTestUser('rv@example.com', 'Password123!@#');
+        $original = $this->enableTwoFactor($user);
+
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        $client->request('POST', '/me/2fa/recovery-codes/reveal', ['json' => ['totpCode' => '000000']]);
+        $this->assertResponseStatusCodeSame(400);
+
+        $client->request('POST', '/me/2fa/recovery-codes/reveal', [
+            'json' => ['totpCode' => $this->currentTotpCode('rv@example.com')],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray(false);
+        $revealed = $body['recoveryCodes'];
+        $this->assertIsArray($revealed);
+        $this->assertCount(TwoFactorSetupService::RECOVERY_CODE_COUNT, $revealed);
+        // Every reveal entry should match (in order) the plaintext returned
+        // at generation — none have been consumed yet.
+        foreach ($revealed as $idx => $entry) {
+            $this->assertIsArray($entry);
+            $this->assertSame($original[$idx], $entry['code']);
+            $this->assertNull($entry['consumedAt']);
+        }
     }
 
     // --- Helpers ---
@@ -261,6 +300,15 @@ class TwoFactorTest extends ApiTestCase
         $codes = $setup->regenerateRecoveryCodes($user);
         $this->em->flush();
         return $codes;
+    }
+
+    private function currentTotpCode(string $email): string
+    {
+        $secret = $this->reloadUser($email)->getDecryptedTotpSecret();
+        self::assertNotNull($secret);
+        self::assertNotSame('', $secret);
+
+        return TOTP::createFromSecret($secret)->now();
     }
 
     private function reloadUser(string $email): User

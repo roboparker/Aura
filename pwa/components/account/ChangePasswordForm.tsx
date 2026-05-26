@@ -7,45 +7,64 @@ import { FormikField } from "@/components/ui/formik-field";
 
 interface ChangePasswordValues {
   currentPassword: string;
+  totpCode: string;
   newPassword: string;
   confirmPassword: string;
 }
 
-const validate = (values: ChangePasswordValues) => {
-  const errors: Partial<ChangePasswordValues> = {};
-
-  if (!values.currentPassword) {
-    errors.currentPassword = "Current password is required.";
-  }
-
-  if (!values.newPassword) {
-    errors.newPassword = "New password is required.";
-  } else if (values.newPassword.length < 8) {
-    errors.newPassword = "New password must be at least 8 characters.";
-  }
-
-  if (!values.confirmPassword) {
-    errors.confirmPassword = "Please confirm your new password.";
-  } else if (values.newPassword !== values.confirmPassword) {
-    errors.confirmPassword = "Passwords do not match.";
-  }
-
-  return errors;
-};
-
 const ChangePasswordForm = () => {
-  const { changePassword } = useAuth();
+  const { user, changePassword } = useAuth();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // When 2FA is on, owning the password alone shouldn't unlock a rotation —
+  // a stolen password without the device can't change it; a stolen session
+  // without the device can't either. So we swap currentPassword for a
+  // fresh TOTP code from the authenticator app.
+  const twoFactorEnabled = user?.twoFactor?.enabled ?? false;
+
+  const validate = (values: ChangePasswordValues) => {
+    const errors: Partial<ChangePasswordValues> = {};
+
+    if (twoFactorEnabled) {
+      if (!values.totpCode) {
+        errors.totpCode = "Authentication code is required.";
+      }
+    } else if (!values.currentPassword) {
+      errors.currentPassword = "Current password is required.";
+    }
+
+    if (!values.newPassword) {
+      errors.newPassword = "New password is required.";
+    } else if (values.newPassword.length < 8) {
+      errors.newPassword = "New password must be at least 8 characters.";
+    }
+
+    if (!values.confirmPassword) {
+      errors.confirmPassword = "Please confirm your new password.";
+    } else if (values.newPassword !== values.confirmPassword) {
+      errors.confirmPassword = "Passwords do not match.";
+    }
+
+    return errors;
+  };
 
   return (
     <div>
       <Formik<ChangePasswordValues>
-        initialValues={{ currentPassword: "", newPassword: "", confirmPassword: "" }}
+        initialValues={{
+          currentPassword: "",
+          totpCode: "",
+          newPassword: "",
+          confirmPassword: "",
+        }}
         validate={validate}
         onSubmit={async (values, { setSubmitting, setStatus, resetForm }) => {
           setSuccessMessage(null);
           try {
-            await changePassword(values.currentPassword, values.newPassword);
+            const confirmation = twoFactorEnabled
+              ? { totpCode: values.totpCode }
+              : { currentPassword: values.currentPassword };
+            await changePassword(confirmation, values.newPassword);
             setSuccessMessage("Password updated successfully.");
             resetForm();
           } catch (err) {
@@ -71,11 +90,23 @@ const ChangePasswordForm = () => {
               </Alert>
             )}
 
-            <FormikField
-              name="currentPassword"
-              type="password"
-              label="Current Password"
-            />
+            {twoFactorEnabled ? (
+              <FormikField
+                name="totpCode"
+                type="text"
+                label="Authentication code"
+                placeholder="6-digit code from your authenticator app"
+                autoComplete="one-time-code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+              />
+            ) : (
+              <FormikField
+                name="currentPassword"
+                type="password"
+                label="Current Password"
+              />
+            )}
 
             <FormikField
               name="newPassword"
