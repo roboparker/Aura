@@ -58,19 +58,19 @@ test.describe("Change password (authenticated)", () => {
     request,
   }) => {
     const email = uniqueEmail();
-    await registerUser(request, email, "originalpass");
+    await registerUser(request, email, "OriginalPass1!");
 
     // Sign in with original password
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
-    await page.fill("#password", "originalpass");
+    await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
 
     // Change password
-    await page.fill("#currentPassword", "originalpass");
-    await page.fill("#newPassword", "brandnewpass");
-    await page.fill("#confirmPassword", "brandnewpass");
+    await page.fill("#currentPassword", "OriginalPass1!");
+    await page.fill("#newPassword", "BrandNewPass1!");
+    await page.fill("#confirmPassword", "BrandNewPass1!");
     await page.click('button:has-text("Update Password")');
 
     await expect(
@@ -83,18 +83,18 @@ test.describe("Change password (authenticated)", () => {
     await page.click('button:has-text("Sign Out")');
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
-    await page.fill("#password", "brandnewpass");
+    await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
   });
 
   test("wrong current password shows error", async ({ page, request }) => {
     const email = uniqueEmail();
-    await registerUser(request, email, "originalpass");
+    await registerUser(request, email, "OriginalPass1!");
 
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
-    await page.fill("#password", "originalpass");
+    await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
 
@@ -113,15 +113,15 @@ test.describe("Change password (authenticated)", () => {
     request,
   }) => {
     const email = uniqueEmail();
-    await registerUser(request, email, "originalpass");
+    await registerUser(request, email, "OriginalPass1!");
 
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
-    await page.fill("#password", "originalpass");
+    await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
 
-    await page.fill("#currentPassword", "originalpass");
+    await page.fill("#currentPassword", "OriginalPass1!");
     await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "different");
     await page.click('button:has-text("Update Password")');
@@ -136,7 +136,7 @@ test.describe("Forgot password (reset via email)", () => {
     request,
   }) => {
     const email = uniqueEmail();
-    await registerUser(request, email, "originalpass");
+    await registerUser(request, email, "OriginalPass1!");
 
     await clearMailpit(request);
 
@@ -158,8 +158,8 @@ test.describe("Forgot password (reset via email)", () => {
 
     // Visit reset link and set new password
     await page.goto(resetUrl);
-    await page.fill("#newPassword", "brandnewpass");
-    await page.fill("#confirmPassword", "brandnewpass");
+    await page.fill("#newPassword", "BrandNewPass1!");
+    await page.fill("#confirmPassword", "BrandNewPass1!");
     await page.click('button:has-text("Reset Password")');
 
     // Redirected to sign in with success banner
@@ -170,7 +170,7 @@ test.describe("Forgot password (reset via email)", () => {
 
     // Sign in with the new password
     await page.fill("#email", email);
-    await page.fill("#password", "brandnewpass");
+    await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
   });
@@ -200,8 +200,8 @@ test.describe("Forgot password (reset via email)", () => {
   test("reset-password page rejects an invalid token", async ({ page }) => {
     await page.goto(`${BASE_URL}/reset-password?token=not-a-real-token`);
 
-    await page.fill("#newPassword", "brandnewpass");
-    await page.fill("#confirmPassword", "brandnewpass");
+    await page.fill("#newPassword", "BrandNewPass1!");
+    await page.fill("#confirmPassword", "BrandNewPass1!");
     await page.click('button:has-text("Reset Password")');
 
     await expect(

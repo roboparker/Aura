@@ -102,12 +102,17 @@ test.describe("Auth redirect", () => {
     await page.fill('input[name="familyName"]', "User");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
-    await page.fill('input[name="confirmPassword"]', password);
-    await page.getByRole("button", { name: "Sign Up" }).click();
+    await page.getByRole("button", { name: "Create account" }).click();
 
-    // Registration redirects to /signin with both `registered=true` and the
-    // preserved next. Sign in to land on /tasks.
-    await expect(page).toHaveURL(/\/signin\?.*registered=true.*next=%2Ftasks/);
+    // Step 2 — avatar color picker. Commit the random seed.
+    await page.getByTestId("signup-color-continue").click();
+
+    // Step 3 — provisioning animation, then /signin with `registered=true`
+    // + the preserved `next`. Sign in to land on /tasks.
+    await expect(page).toHaveURL(
+      /\/signin\?.*registered=true.*next=%2Ftasks/,
+      { timeout: 10_000 },
+    );
     await page.fill("#email", email);
     await page.fill("#password", password);
     await page.click('button[type="submit"]');

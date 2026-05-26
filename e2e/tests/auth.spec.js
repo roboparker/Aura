@@ -12,36 +12,32 @@ test.describe("Authentication", () => {
     await page.goto(`${BASE_URL}/signup`);
     await expect(page).toHaveTitle("Sign Up - Aura");
 
+    // Step 1 — form. The redesigned signup no longer has a confirm
+    // field; the strength meter does the safety work instead.
     await page.fill("#givenName", "E2e");
     await page.fill("#familyName", "User");
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");
-    await page.fill("#confirmPassword", "Password123!@#");
-    await page.click('button[type="submit"]');
+    await page.getByRole("button", { name: "Create account" }).click();
 
-    // Should redirect to sign-in with success message
-    await expect(page).toHaveURL(/\/signin\?registered=true/);
+    // Step 2 — avatar color picker. Keep the random seed; just commit it.
+    await expect(page.getByTestId("avatar-color-picker")).toBeVisible();
+    await page.getByTestId("signup-color-continue").click();
+
+    // Step 3 — provisioning animation then redirect to /signin with the
+    // success banner. The animation runs ~3.2s — give it room.
+    await expect(page).toHaveURL(/\/signin\?registered=true/, { timeout: 10_000 });
     await expect(page.locator("text=Account created successfully")).toBeVisible();
   });
 
   test("sign up shows validation errors", async ({ page }) => {
     await page.goto(`${BASE_URL}/signup`);
 
-    // Submit empty form
-    await page.click('button[type="submit"]');
+    // Submit empty form → top-of-form summary + inline messages.
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByTestId("signup-error-summary")).toBeVisible();
     await expect(page.locator("text=Email is required")).toBeVisible();
     await expect(page.locator("text=Password is required")).toBeVisible();
-  });
-
-  test("sign up shows password mismatch error", async ({ page }) => {
-    await page.goto(`${BASE_URL}/signup`);
-
-    await page.fill("#email", uniqueEmail());
-    await page.fill("#password", "Password123!@#");
-    await page.fill("#confirmPassword", "different");
-    await page.click('button[type="submit"]');
-
-    await expect(page.locator("text=Passwords do not match")).toBeVisible();
   });
 
   test("sign in with valid credentials", async ({ page }) => {
