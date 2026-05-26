@@ -30,7 +30,7 @@ class UserTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newuser@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'New',
                 'familyName' => 'User',
             ],
@@ -59,12 +59,12 @@ class UserTest extends ApiTestCase
 
     public function testRegisterDuplicateEmail(): void
     {
-        $this->createTestUser('existing@example.com', 'Password123!');
+        $this->createTestUser('existing@example.com', 'Password123!@#');
 
         static::createClient()->request('POST', '/users', [
             'json' => [
                 'email' => 'existing@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'Ex',
                 'familyName' => 'Ist',
             ],
@@ -81,7 +81,7 @@ class UserTest extends ApiTestCase
         static::createClient()->request('POST', '/users', [
             'json' => [
                 'email' => 'not-an-email',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'Foo',
                 'familyName' => 'Bar',
             ],
@@ -129,9 +129,9 @@ class UserTest extends ApiTestCase
 
     /**
      * `Assert\PasswordStrength` on User::$plainPassword rejects passwords
-     * whose entropy is below WEAK (60 bits). "password" passes the 8-char
-     * length floor but is the textbook example of what the strength gate
-     * is supposed to catch.
+     * whose entropy is below MEDIUM (80 bits). "password" passes the
+     * 8-char length floor but is the textbook example of what the
+     * strength gate is supposed to catch.
      */
     public function testRegisterWeakPassword(): void
     {
@@ -155,7 +155,7 @@ class UserTest extends ApiTestCase
         static::createClient()->request('POST', '/users', [
             'json' => [
                 'email' => 'test@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => '',
                 'familyName' => 'User',
             ],
@@ -172,7 +172,7 @@ class UserTest extends ApiTestCase
         static::createClient()->request('POST', '/users', [
             'json' => [
                 'email' => 'test@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'User',
                 'familyName' => '',
             ],
@@ -186,13 +186,13 @@ class UserTest extends ApiTestCase
 
     public function testLoginSuccess(): void
     {
-        $this->createTestUser('login@example.com', 'Password123!');
+        $this->createTestUser('login@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
             'json' => [
                 'email' => 'login@example.com',
-                'password' => 'Password123!',
+                'password' => 'Password123!@#',
             ],
         ]);
 
@@ -206,7 +206,7 @@ class UserTest extends ApiTestCase
 
     public function testLoginWrongPassword(): void
     {
-        $this->createTestUser('login@example.com', 'Password123!');
+        $this->createTestUser('login@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
@@ -221,7 +221,7 @@ class UserTest extends ApiTestCase
 
     public function testGetMeAuthenticated(): void
     {
-        $user = $this->createTestUser('me@example.com', 'Password123!');
+        $user = $this->createTestUser('me@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->loginUser($user);
@@ -246,7 +246,7 @@ class UserTest extends ApiTestCase
 
     public function testPatchSelfUpdatesNickname(): void
     {
-        $user = $this->createTestUser('patch@example.com', 'Password123!');
+        $user = $this->createTestUser('patch@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->loginUser($user);
@@ -262,8 +262,8 @@ class UserTest extends ApiTestCase
 
     public function testPatchOtherUserForbidden(): void
     {
-        $user = $this->createTestUser('self@example.com', 'Password123!');
-        $other = $this->createTestUser('other@example.com', 'Password123!');
+        $user = $this->createTestUser('self@example.com', 'Password123!@#');
+        $other = $this->createTestUser('other@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->loginUser($user);

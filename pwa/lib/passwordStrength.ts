@@ -34,7 +34,7 @@ export type PasswordStrengthScore = 0 | 1 | 2 | 3 | 4;
 /** Floor enforced by both `User::$plainPassword` and `PasswordController`. */
 export const MIN_PASSWORD_LENGTH = 8;
 /** Backend rejects below this; meter mirrors. Adjust both in lockstep. */
-export const MIN_PASSWORD_STRENGTH: PasswordStrengthScore = STRENGTH_WEAK;
+export const MIN_PASSWORD_STRENGTH: PasswordStrengthScore = STRENGTH_MEDIUM;
 
 export function estimatePasswordStrength(password: string): PasswordStrengthScore {
   const length = password.length;

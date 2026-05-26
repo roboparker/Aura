@@ -55,7 +55,7 @@ test.describe("Auth redirect", () => {
     request,
   }) => {
     const email = uniqueEmail("redirect");
-    const password = "Password123!";
+    const password = "Password123!@#";
 
     // Pre-create the account via the API so we can sign in cleanly.
     const res = await request.post(`${BASE_URL}/users`, {
@@ -88,7 +88,7 @@ test.describe("Auth redirect", () => {
     page,
   }) => {
     const email = uniqueEmail("signup-redirect");
-    const password = "Password123!";
+    const password = "Password123!@#";
 
     // Land on /signin?next=/tasks, then follow the footer "Create an
     // account" link. The auth card no longer renders tabs — switching
@@ -156,7 +156,7 @@ test.describe("Auth redirect", () => {
   for (const { label, value } of HOSTILE_NEXT_VALUES) {
     test(`hostile ?next is ignored: ${label}`, async ({ page, request }) => {
       const email = uniqueEmail("safe-next");
-      const password = "Password123!";
+      const password = "Password123!@#";
       await request.post(`${BASE_URL}/users`, {
         headers: { "Content-Type": "application/ld+json" },
         data: {

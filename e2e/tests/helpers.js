@@ -9,7 +9,7 @@ const BASE_URL = process.env.E2E_BASE_URL || "https://localhost";
 const uniqueEmail = (prefix = "e2e") =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
 
-async function registerAndSignIn(page, email, password = "Password123!", options = {}) {
+async function registerAndSignIn(page, email, password = "Password123!@#", options = {}) {
   const { givenName = "E2e", familyName = "User" } = options;
   const res = await page.request.post(`${BASE_URL}/users`, {
     headers: { "Content-Type": "application/ld+json" },

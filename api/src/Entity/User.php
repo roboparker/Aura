@@ -65,13 +65,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[Assert\NotBlank(groups: ['user:create'])]
     // NIST SP 800-63B: length wins over complexity rules. 8 chars is the
     // hard floor (matching `App\Controller\PasswordController::MIN_PASSWORD_LENGTH`).
-    // PasswordStrength's WEAK floor (entropy >= 60 bits) blocks the
-    // bottom-tier offenders ("password", "12345678") without forcing the
-    // classic mixed-case/symbol gauntlet — the PWA meter shows the same
-    // 0-4 score Symfony computes so meter and server can't disagree.
+    // PasswordStrength's MEDIUM floor (entropy >= 80 bits) blocks
+    // bottom-tier offenders ("password", "12345678", "Password1!") and
+    // pushes users toward ~12+ char passwords with character variety —
+    // closer to what a "good password" guide expects. The PWA meter
+    // shows the same 0-4 score Symfony computes so meter and server
+    // can't disagree.
     #[Assert\Length(min: 8, minMessage: 'Password must be at least {{ limit }} characters.')]
     #[Assert\PasswordStrength(
-        minScore: Assert\PasswordStrength::STRENGTH_WEAK,
+        minScore: Assert\PasswordStrength::STRENGTH_MEDIUM,
         message: 'This password is too easy to guess — try mixing in more characters or making it longer.',
     )]
     #[Groups(['user:create'])]

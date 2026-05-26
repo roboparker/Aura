@@ -104,11 +104,11 @@ class TwoFactorTest extends ApiTestCase
 
     public function testLoginWithoutTwoFactorReturnsUser(): void
     {
-        $this->createTestUser('plain@example.com', 'Password123!');
+        $this->createTestUser('plain@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
-            'json' => ['email' => 'plain@example.com', 'password' => 'Password123!'],
+            'json' => ['email' => 'plain@example.com', 'password' => 'Password123!@#'],
         ]);
 
         $this->assertResponseIsSuccessful();
@@ -123,12 +123,12 @@ class TwoFactorTest extends ApiTestCase
 
     public function testLoginWithTwoFactorPromptsForCode(): void
     {
-        $user = $this->createTestUser('tfa@example.com', 'Password123!');
+        $user = $this->createTestUser('tfa@example.com', 'Password123!@#');
         $this->enableTwoFactor($user);
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
-            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!'],
+            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!@#'],
         ]);
 
         $this->assertResponseStatusCodeSame(401);
@@ -140,12 +140,12 @@ class TwoFactorTest extends ApiTestCase
 
     public function testLoginCompletesAfterValidTotpCode(): void
     {
-        $user = $this->createTestUser('tfa@example.com', 'Password123!');
+        $user = $this->createTestUser('tfa@example.com', 'Password123!@#');
         $this->enableTwoFactor($user);
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
-            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!'],
+            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!@#'],
         ]);
         $this->assertResponseStatusCodeSame(401);
 
@@ -165,12 +165,12 @@ class TwoFactorTest extends ApiTestCase
 
     public function testLoginCompletesWithRecoveryCode(): void
     {
-        $user = $this->createTestUser('tfa@example.com', 'Password123!');
+        $user = $this->createTestUser('tfa@example.com', 'Password123!@#');
         $codes = $this->enableTwoFactor($user);
 
         $client = static::createClient();
         $client->request('POST', '/auth/login', [
-            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!'],
+            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!@#'],
         ]);
         $client->request('POST', '/auth/2fa-check', ['json' => ['code' => $codes[0]]]);
 
@@ -178,7 +178,7 @@ class TwoFactorTest extends ApiTestCase
         // Single-use: the same code must not work a second time on a fresh login
         $client2 = static::createClient();
         $client2->request('POST', '/auth/login', [
-            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!'],
+            'json' => ['email' => 'tfa@example.com', 'password' => 'Password123!@#'],
         ]);
         $client2->request('POST', '/auth/2fa-check', ['json' => ['code' => $codes[0]]]);
         $this->assertResponseStatusCodeSame(401);
@@ -191,7 +191,7 @@ class TwoFactorTest extends ApiTestCase
 
     public function testDisableRequiresPassword(): void
     {
-        $user = $this->createTestUser('d@example.com', 'Password123!');
+        $user = $this->createTestUser('d@example.com', 'Password123!@#');
         $this->enableTwoFactor($user);
 
         $client = static::createClient();
@@ -201,21 +201,21 @@ class TwoFactorTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(400);
         $this->assertTrue($this->reloadUser('d@example.com')->isTotpEnabled());
 
-        $client->request('DELETE', '/me/2fa', ['json' => ['currentPassword' => 'Password123!']]);
+        $client->request('DELETE', '/me/2fa', ['json' => ['currentPassword' => 'Password123!@#']]);
         $this->assertResponseIsSuccessful();
         $this->assertFalse($this->reloadUser('d@example.com')->isTotpEnabled());
     }
 
     public function testRegenerateRecoveryCodes(): void
     {
-        $user = $this->createTestUser('r@example.com', 'Password123!');
+        $user = $this->createTestUser('r@example.com', 'Password123!@#');
         $original = $this->enableTwoFactor($user);
 
         $client = static::createClient();
         $client->loginUser($user);
 
         $client->request('POST', '/me/2fa/recovery-codes', [
-            'json' => ['currentPassword' => 'Password123!'],
+            'json' => ['currentPassword' => 'Password123!@#'],
         ]);
 
         $this->assertResponseIsSuccessful();
@@ -234,7 +234,7 @@ class TwoFactorTest extends ApiTestCase
 
     // --- Helpers ---
 
-    private function createTestUser(string $email, string $password = 'Password123!'): User
+    private function createTestUser(string $email, string $password = 'Password123!@#'): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 

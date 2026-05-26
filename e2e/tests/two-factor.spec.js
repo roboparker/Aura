@@ -36,7 +36,7 @@ test.describe("Two-factor authentication", () => {
 
   test("login with 2FA enabled prompts for a code on next sign-in", async ({ page, request }) => {
     const email = uniqueEmail("tfa-login");
-    const password = "Password123!";
+    const password = "Password123!@#";
     await registerAndSignIn(page, email, password);
 
     // Drive the API directly to fully enable 2FA — the UI verify step

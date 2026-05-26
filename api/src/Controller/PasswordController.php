@@ -30,7 +30,7 @@ class PasswordController extends AbstractController
     // signup form runs the validator stack so it picks that up via
     // attribute, but change-password and reset-password are plain
     // controller actions and re-check by hand.
-    private const MIN_PASSWORD_STRENGTH = PasswordStrength::STRENGTH_WEAK;
+    private const MIN_PASSWORD_STRENGTH = PasswordStrength::STRENGTH_MEDIUM;
 
     public function __construct(
         private EntityManagerInterface $em,

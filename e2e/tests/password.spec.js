@@ -99,8 +99,8 @@ test.describe("Change password (authenticated)", () => {
     await expect(page).toHaveURL(/\/account/);
 
     await page.fill("#currentPassword", "wrongpass");
-    await page.fill("#newPassword", "newPassword123!");
-    await page.fill("#confirmPassword", "newPassword123!");
+    await page.fill("#newPassword", "newPassword123!@#");
+    await page.fill("#confirmPassword", "newPassword123!@#");
     await page.click('button:has-text("Update Password")');
 
     await expect(
@@ -122,7 +122,7 @@ test.describe("Change password (authenticated)", () => {
     await expect(page).toHaveURL(/\/account/);
 
     await page.fill("#currentPassword", "originalpass");
-    await page.fill("#newPassword", "newPassword123!");
+    await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "different");
     await page.click('button:has-text("Update Password")');
 

@@ -300,7 +300,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newcomer@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'New',
                 'familyName' => 'Comer',
                 'inviteToken' => $token,
@@ -337,7 +337,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'attacker@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'Mal',
                 'familyName' => 'Actor',
                 'inviteToken' => $token,
@@ -367,7 +367,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newcomer@example.com',
-                'plainPassword' => 'Password123!',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'New',
                 'familyName' => 'Comer',
             ],
@@ -433,7 +433,7 @@ class UserInviteTest extends ApiTestCase
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');
-        $user->setPassword($hasher->hashPassword($user, 'Password123!'));
+        $user->setPassword($hasher->hashPassword($user, 'Password123!@#'));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();
