@@ -192,10 +192,20 @@ const InviteSignup = ({ token, next }: Props) => {
         signedInEmail={user?.email ?? ""}
         onSignOutAndAccept={async () => {
           await logout();
-          // Re-render the page once the auth context clears; the URL
-          // stays put so the same token re-fetches as pending instead
-          // of mismatch.
-          router.replace(router.asPath);
+          // Re-mount the signup page so the auth context clears and the
+          // invite re-fetches as `pending` instead of `mismatch`. Built
+          // from known-safe inputs — literal pathname, the `token` prop
+          // we already validated above, and the same `next` we
+          // sanitize through `isSafeNextPath` everywhere else — rather
+          // than re-issuing `router.asPath`, which CodeQL traces back
+          // to the URL bar and treats as untrusted (CWE-79 / CWE-601).
+          router.replace({
+            pathname: "/signup",
+            query: {
+              invite: token,
+              ...(isSafeNextPath(next) ? { next } : {}),
+            },
+          });
         }}
         onIgnore={() => {
           // safeNextPath returns either `next` or "/account" — same
