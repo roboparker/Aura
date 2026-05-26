@@ -245,7 +245,7 @@ class ActivityHistoryTest extends ApiTestCase
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');
-        $user->setPassword($hasher->hashPassword($user, 'password123'));
+        $user->setPassword($hasher->hashPassword($user, 'Password123!@#'));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();

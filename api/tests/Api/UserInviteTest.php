@@ -185,9 +185,15 @@ class UserInviteTest extends ApiTestCase
         $client->request('GET', '/invites/' . $token);
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains([
+            'status' => 'pending',
             'email' => 'newcomer@example.com',
+            'inviter' => ['email' => 'alice@example.com'],
             'groups' => [
-                ['title' => 'Backend', 'invitedBy' => 'alice@example.com'],
+                [
+                    'title' => 'Backend',
+                    'memberCount' => 1,
+                    'invitedBy' => ['email' => 'alice@example.com'],
+                ],
             ],
         ]);
     }
@@ -300,7 +306,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newcomer@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'New',
                 'familyName' => 'Comer',
                 'inviteToken' => $token,
@@ -337,7 +343,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'attacker@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'Mal',
                 'familyName' => 'Actor',
                 'inviteToken' => $token,
@@ -367,7 +373,7 @@ class UserInviteTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'newcomer@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'New',
                 'familyName' => 'Comer',
             ],
@@ -433,7 +439,7 @@ class UserInviteTest extends ApiTestCase
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');
-        $user->setPassword($hasher->hashPassword($user, 'password123'));
+        $user->setPassword($hasher->hashPassword($user, 'Password123!@#'));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();

@@ -55,7 +55,7 @@ test.describe("Auth redirect", () => {
     request,
   }) => {
     const email = uniqueEmail("redirect");
-    const password = "password123";
+    const password = "Password123!@#";
 
     // Pre-create the account via the API so we can sign in cleanly.
     const res = await request.post(`${BASE_URL}/users`, {
@@ -88,7 +88,7 @@ test.describe("Auth redirect", () => {
     page,
   }) => {
     const email = uniqueEmail("signup-redirect");
-    const password = "password123";
+    const password = "Password123!@#";
 
     // Land on /signin?next=/tasks, then follow the footer "Create an
     // account" link. The auth card no longer renders tabs — switching
@@ -102,12 +102,17 @@ test.describe("Auth redirect", () => {
     await page.fill('input[name="familyName"]', "User");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
-    await page.fill('input[name="confirmPassword"]', password);
-    await page.getByRole("button", { name: "Sign Up" }).click();
+    await page.getByRole("button", { name: "Create account" }).click();
 
-    // Registration redirects to /signin with both `registered=true` and the
-    // preserved next. Sign in to land on /tasks.
-    await expect(page).toHaveURL(/\/signin\?.*registered=true.*next=%2Ftasks/);
+    // Step 2 — avatar color picker. Commit the random seed.
+    await page.getByTestId("signup-color-continue").click();
+
+    // Step 3 — provisioning animation, then /signin with `registered=true`
+    // + the preserved `next`. Sign in to land on /tasks.
+    await expect(page).toHaveURL(
+      /\/signin\?.*registered=true.*next=%2Ftasks/,
+      { timeout: 10_000 },
+    );
     await page.fill("#email", email);
     await page.fill("#password", password);
     await page.click('button[type="submit"]');
@@ -156,7 +161,7 @@ test.describe("Auth redirect", () => {
   for (const { label, value } of HOSTILE_NEXT_VALUES) {
     test(`hostile ?next is ignored: ${label}`, async ({ page, request }) => {
       const email = uniqueEmail("safe-next");
-      const password = "password123";
+      const password = "Password123!@#";
       await request.post(`${BASE_URL}/users`, {
         headers: { "Content-Type": "application/ld+json" },
         data: {

@@ -63,7 +63,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private string $password = '';
 
     #[Assert\NotBlank(groups: ['user:create'])]
-    #[Assert\Length(min: 6, minMessage: 'Password must be at least {{ limit }} characters.')]
+    // NIST SP 800-63B: length wins over complexity rules. 8 chars is the
+    // hard floor (matching `App\Controller\PasswordController::MIN_PASSWORD_LENGTH`).
+    // PasswordStrength's MEDIUM floor (entropy >= 80 bits) blocks
+    // bottom-tier offenders ("password", "12345678", "Password1!") and
+    // pushes users toward ~12+ char passwords with character variety —
+    // closer to what a "good password" guide expects. The PWA meter
+    // shows the same 0-4 score Symfony computes so meter and server
+    // can't disagree.
+    #[Assert\Length(min: 8, minMessage: 'Password must be at least {{ limit }} characters.')]
+    #[Assert\PasswordStrength(
+        minScore: Assert\PasswordStrength::STRENGTH_MEDIUM,
+        message: 'This password is too easy to guess — try mixing in more characters or making it longer.',
+    )]
     #[Groups(['user:create'])]
     private ?string $plainPassword = null;
 
@@ -108,8 +120,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read'])]
+    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
+
+    /**
+     * Set to true once the setter has been called, so
+     * {@see \App\State\UserPasswordHasherProcessor} can tell a
+     * user-supplied color apart from the entity's default. Transient
+     * (not persisted) — every fresh request rebuilds the entity and the
+     * flag goes back to false until a setter call flips it.
+     */
+    private bool $personalizedColorExplicit = false;
 
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -301,9 +322,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         return $this->personalizedColor;
     }
 
+    public function isPersonalizedColorExplicitlySet(): bool
+    {
+        return $this->personalizedColorExplicit;
+    }
+
     public function setPersonalizedColor(string $personalizedColor): static
     {
         $this->personalizedColor = $personalizedColor;
+        $this->personalizedColorExplicit = true;
         return $this;
     }
 

@@ -37,7 +37,7 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/change-password', [
             'json' => [
                 'currentPassword' => 'oldpassword',
-                'newPassword' => 'newpassword123',
+                'newPassword' => 'newPassword123!@#',
             ],
         ]);
 
@@ -46,7 +46,7 @@ class PasswordTest extends ApiTestCase
         // Verify the password actually changed (re-fetch from a fresh EM)
         $refreshed = $this->reloadUser('change@example.com');
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
-        $this->assertTrue($hasher->isPasswordValid($refreshed, 'newpassword123'));
+        $this->assertTrue($hasher->isPasswordValid($refreshed, 'newPassword123!@#'));
         $this->assertFalse($hasher->isPasswordValid($refreshed, 'oldpassword'));
     }
 
@@ -60,7 +60,7 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/change-password', [
             'json' => [
                 'currentPassword' => 'wrongpassword',
-                'newPassword' => 'newpassword123',
+                'newPassword' => 'newPassword123!@#',
             ],
         ]);
 
@@ -106,7 +106,7 @@ class PasswordTest extends ApiTestCase
         static::createClient()->request('POST', '/auth/change-password', [
             'json' => [
                 'currentPassword' => 'oldpassword',
-                'newPassword' => 'newpassword123',
+                'newPassword' => 'newPassword123!@#',
             ],
         ]);
 
@@ -117,7 +117,7 @@ class PasswordTest extends ApiTestCase
 
     public function testForgotPasswordValidEmail(): void
     {
-        $this->createTestUser('forgot@example.com', 'password123');
+        $this->createTestUser('forgot@example.com', 'Password123!@#');
 
         $client = static::createClient();
         $client->request('POST', '/auth/forgot-password', [
@@ -149,7 +149,7 @@ class PasswordTest extends ApiTestCase
 
     public function testForgotPasswordInvalidatesPriorTokens(): void
     {
-        $this->createTestUser('forgot@example.com', 'password123');
+        $this->createTestUser('forgot@example.com', 'Password123!@#');
 
         $client = static::createClient();
 
@@ -179,7 +179,7 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/reset-password', [
             'json' => [
                 'token' => $plainToken,
-                'newPassword' => 'brandnewpass',
+                'newPassword' => 'BrandNewPass1!',
             ],
         ]);
 
@@ -187,7 +187,7 @@ class PasswordTest extends ApiTestCase
 
         $refreshed = $this->reloadUser('reset@example.com');
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
-        $this->assertTrue($hasher->isPasswordValid($refreshed, 'brandnewpass'));
+        $this->assertTrue($hasher->isPasswordValid($refreshed, 'BrandNewPass1!'));
     }
 
     public function testResetPasswordInvalidToken(): void
@@ -196,7 +196,7 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/reset-password', [
             'json' => [
                 'token' => 'nonexistent-token',
-                'newPassword' => 'brandnewpass',
+                'newPassword' => 'BrandNewPass1!',
             ],
         ]);
 
@@ -212,7 +212,7 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/reset-password', [
             'json' => [
                 'token' => $plainToken,
-                'newPassword' => 'brandnewpass',
+                'newPassword' => 'BrandNewPass1!',
             ],
         ]);
 
@@ -230,16 +230,18 @@ class PasswordTest extends ApiTestCase
         $client->request('POST', '/auth/reset-password', [
             'json' => [
                 'token' => $plainToken,
-                'newPassword' => 'brandnewpass',
+                'newPassword' => 'BrandNewPass1!',
             ],
         ]);
         $this->assertResponseIsSuccessful();
 
-        // Second use fails
+        // Second use fails — strength must clear MEDIUM so we hit the
+        // token-already-used branch (400) rather than the strength
+        // branch (422) that fires before it.
         $client->request('POST', '/auth/reset-password', [
             'json' => [
                 'token' => $plainToken,
-                'newPassword' => 'anothernewpass',
+                'newPassword' => 'AnotherNewPass1!',
             ],
         ]);
         $this->assertResponseStatusCodeSame(400);

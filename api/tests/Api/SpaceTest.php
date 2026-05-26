@@ -38,7 +38,7 @@ class SpaceTest extends ApiTestCase
         $client->request('POST', '/users', [
             'json' => [
                 'email' => 'alice@example.com',
-                'plainPassword' => 'password123',
+                'plainPassword' => 'Password123!@#',
                 'givenName' => 'Alice',
                 'familyName' => 'Doe',
             ],
@@ -253,7 +253,7 @@ class SpaceTest extends ApiTestCase
             ->setGivenName('Test')
             ->setFamilyName('User')
             ->setPersonalizedColor('#0369a1');
-        $user->setPassword($hasher->hashPassword($user, 'password123'));
+        $user->setPassword($hasher->hashPassword($user, 'Password123!@#'));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();

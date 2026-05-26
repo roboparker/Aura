@@ -21,6 +21,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "alert", name: "Alert", category: "Primitive", description: "Inline message panel for notices and errors." },
   { slug: "badge", name: "Badge", category: "Primitive", description: "Small label for statuses and counts." },
   { slug: "button", name: "Button", category: "Primitive", description: "Variants, sizes, and icon-only buttons." },
+  { slug: "callout-badge", name: "CalloutBadge", category: "Primitive", description: "Square tinted box used as the headline icon/label for status callouts." },
   { slug: "calendar", name: "Calendar", category: "Form", description: "Date picker built on react-day-picker." },
   { slug: "card", name: "Card", category: "Primitive", description: "Surface container with header, content, and footer slots." },
   { slug: "checkbox", name: "Checkbox", category: "Form", description: "Boolean input with controlled and indeterminate states." },

@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
-import { safeNextPath } from "@/lib/authRedirect";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
+import { AVATAR_PALETTE } from "@/lib/avatarPalette";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -11,8 +14,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import AuraWordmark from "./AuraWordmark";
+import AvatarColorPicker from "./AvatarColorPicker";
+import InviteSignup from "./InviteSignup";
 import SignInForm from "./SignInForm";
-import SignUpForm from "./SignUpForm";
+import SignUpForm, { type SignUpFormValues } from "./SignUpForm";
+import SignUpProvisioning from "./SignUpProvisioning";
 import TwoFactorChallengeForm, {
   type TwoFactorMode,
 } from "./TwoFactorChallengeForm";
@@ -25,11 +31,19 @@ interface Props {
 }
 
 /**
- * Current step of the sign-in/up flow. The 2FA modes are reached only via
- * the credentials step — they're tracked here (not inside SignInForm) so
- * the footer can swap in lockstep with the form body.
+ * Current step of the sign-in/up flow. The 2FA modes are reached only
+ * via the credentials step. The signup substeps (form → color →
+ * provisioning) are tracked here so the card header/footer can swap
+ * in lockstep with the body, and so the collected form payload can
+ * live in one place across the multi-step transition.
  */
-type AuthStep = "credentials" | "signup" | "totp" | "backup";
+type AuthStep =
+  | "credentials"
+  | "signup-form"
+  | "signup-color"
+  | "signup-provisioning"
+  | "totp"
+  | "backup";
 
 interface CopyEntry {
   title: string;
@@ -47,12 +61,19 @@ const COPY: Record<Tab, { title: string; subtitle: string; switchLabel: string; 
     switchPath: "/signup",
   },
   signup: {
-    title: "Create your account",
-    subtitle: "Get started with Aura in seconds.",
+    title: "Create your Aura account",
+    subtitle: "Free for individual use. Add teammates anytime.",
     switchLabel: "Already have an account?",
     switchCta: "Sign in",
     switchPath: "/signin",
   },
+};
+
+/** Title/subtitle for the avatar-color step of sign-up. */
+const SIGNUP_COLOR_COPY: { title: string; subtitle: string } = {
+  title: "Pick your avatar color",
+  subtitle:
+    "Your initials show up everywhere in Aura. Pick a color you'll recognize at a glance — you can change it later.",
 };
 
 /**
@@ -80,16 +101,25 @@ const twoFactorCopy = (mode: TwoFactorMode, email: string | null): CopyEntry => 
 
 const AuthCard = ({ defaultTab }: Props) => {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
-  // The credentials step keeps the form's existing two-tab feel; the
-  // 2FA steps are reachable only from a successful password submission.
+  const { isAuthenticated, isLoading, register } = useAuth();
   const [step, setStep] = useState<AuthStep>(
-    defaultTab === "signup" ? "signup" : "credentials",
+    defaultTab === "signup" ? "signup-form" : "credentials",
   );
-  // Email captured at the password step so the 2FA challenge can show
-  // "Signing in as X · not you?" without the server having to include
-  // identity fields in the half-auth response.
   const [twoFactorEmail, setTwoFactorEmail] = useState<string | null>(null);
+
+  // Sign-up multi-step state. The form payload is captured on step 1
+  // and held here so step 2 can POST it with the chosen color; the
+  // initial color seed is a random palette pick so the preview cards
+  // on step 2 don't look empty before the user clicks anything.
+  const [signupPayload, setSignupPayload] = useState<{
+    values: SignUpFormValues;
+    inviteToken?: string;
+  } | null>(null);
+  const [signupColor, setSignupColor] = useState<string>(
+    () => AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)],
+  );
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const next = typeof router.query.next === "string" ? router.query.next : undefined;
   const inviteToken =
@@ -97,39 +127,144 @@ const AuthCard = ({ defaultTab }: Props) => {
   const registered = router.query.registered === "true";
   const reset = router.query.reset === "true";
 
-  // If a logged-in user lands on /signin or /signup (e.g. via an old
-  // bookmark), bounce them straight to wherever `next` points so they
-  // don't have to look at a sign-in form they don't need.
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
+    // Authenticated users normally don't need /signin or /signup, so
+    // we bounce them to wherever `next` points. The one exception is
+    // /signup with an `?invite=` token — that user might be signed in
+    // as the wrong account and needs to see the email-mismatch screen
+    // (or accept-as-current-user if they happen to match). InviteSignup
+    // handles the branching internally.
+    if (!isLoading && isAuthenticated && !inviteToken) {
       router.replace(safeNextPath(next));
     }
-  }, [isLoading, isAuthenticated, next, router]);
+  }, [isLoading, isAuthenticated, next, router, inviteToken]);
 
   const queryIndex = router.asPath.indexOf("?");
   const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
 
-  // Pick the title/subtitle/footer copy for the current step. The
-  // signin/signup tabs share the COPY map shape; the 2FA steps come from
-  // twoFactorCopy() (built per render because the subtitle includes the
-  // captured email).
-  const tabCopy = COPY[step === "signup" ? "signup" : "signin"];
+  const initials = useMemo(() => {
+    if (!signupPayload) return "";
+    const g = signupPayload.values.givenName.trim()[0] ?? "";
+    const f = signupPayload.values.familyName.trim()[0] ?? "";
+    return (g + f).toUpperCase() || "?";
+  }, [signupPayload]);
+
+  // Resolve the card header copy from whichever step we're in. Signup
+  // has three substeps: the form (re-uses the `signup` COPY entry),
+  // the color picker (its own copy), and the provisioning animation
+  // (no card header — the success summary lives in the body instead,
+  // so we hand back null and the renderer hides the CardHeader).
+  const tabCopy = COPY[step === "credentials" ? "signin" : "signup"];
   const isTwoFactor = step === "totp" || step === "backup";
   const tfCopy = isTwoFactor ? twoFactorCopy(step, twoFactorEmail) : null;
-  const cardCopy = tfCopy ?? { title: tabCopy.title, subtitle: tabCopy.subtitle };
+
+  const cardCopy: { title: string; subtitle: string } | null = (() => {
+    if (tfCopy) return { title: tfCopy.title, subtitle: tfCopy.subtitle };
+    if (step === "signup-color") return SIGNUP_COLOR_COPY;
+    if (step === "signup-provisioning") return null;
+    return { title: tabCopy.title, subtitle: tabCopy.subtitle };
+  })();
+
+  const submitSignup = async (color: string) => {
+    if (!signupPayload) return;
+    setIsRegistering(true);
+    setSignupError(null);
+    try {
+      await register({
+        email: signupPayload.values.email,
+        password: signupPayload.values.password,
+        givenName: signupPayload.values.givenName,
+        familyName: signupPayload.values.familyName,
+        inviteToken: signupPayload.inviteToken,
+        personalizedColor: color,
+      });
+      setStep("signup-provisioning");
+    } catch (err) {
+      setSignupError(err instanceof Error ? err.message : "Registration failed.");
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const onProvisioningDone = () => {
+    const params = new URLSearchParams({ registered: "true" });
+    if (isSafeNextPath(next)) params.set("next", next);
+    router.push(`/signin?${params.toString()}`);
+  };
+
+  // Invite signup runs in its own component — it owns its own card
+  // header (varies per outcome: expired / accepted / mismatch / form)
+  // and footer (none — its CTAs cover the alt actions), so AuthCard
+  // just provides the Card chrome around it.
+  const isInviteSignup = step === "signup-form" && Boolean(inviteToken);
+
+  // Footer hidden on signup-color (no relevant alt action),
+  // signup-provisioning (we're routing away on a timer — offering an
+  // out would just confuse the moment), and the entire invite flow
+  // (each invite state has its own CTAs in the body).
+  const showFooter =
+    step !== "signup-color" &&
+    step !== "signup-provisioning" &&
+    !isInviteSignup;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
       <AuraWordmark />
       <Card className="w-full max-w-lg overflow-hidden p-0">
-        <CardHeader className="p-8 pb-6">
-          <CardTitle className="text-3xl font-bold">{cardCopy.title}</CardTitle>
-          <CardDescription className="text-base">{cardCopy.subtitle}</CardDescription>
-        </CardHeader>
-        <CardContent className="p-8 pt-2">
-          {step === "signup" ? (
-            <SignUpForm inviteToken={inviteToken} next={next} />
-          ) : step === "credentials" ? (
+        {cardCopy && !isInviteSignup && (
+          <CardHeader className="p-8 pb-6">
+            <CardTitle className="text-3xl font-bold">{cardCopy.title}</CardTitle>
+            <CardDescription className="text-base">{cardCopy.subtitle}</CardDescription>
+          </CardHeader>
+        )}
+        {isInviteSignup && inviteToken ? (
+          <InviteSignup token={inviteToken} next={next} />
+        ) : (
+        <CardContent className={cardCopy ? "p-8 pt-2" : "p-8"}>
+          {step === "signup-form" && (
+            <SignUpForm
+              inviteToken={inviteToken}
+              onCollected={(values, token) => {
+                setSignupPayload({ values, inviteToken: token });
+                setSignupError(null);
+                setStep("signup-color");
+              }}
+            />
+          )}
+
+          {step === "signup-color" && signupPayload && (
+            <div className="space-y-5">
+              {signupError && (
+                <Alert variant="destructive" data-testid="signup-error">
+                  <AlertDescription>{signupError}</AlertDescription>
+                </Alert>
+              )}
+              <AvatarColorPicker
+                initials={initials}
+                selected={signupColor}
+                onChange={setSignupColor}
+              />
+              <Button
+                type="button"
+                className="w-full"
+                disabled={isRegistering}
+                onClick={() => submitSignup(signupColor)}
+                data-testid="signup-color-continue"
+              >
+                {isRegistering ? "Creating account…" : "Continue"}
+              </Button>
+            </div>
+          )}
+
+          {step === "signup-provisioning" && signupPayload && (
+            <SignUpProvisioning
+              initials={initials}
+              color={signupColor}
+              onDone={onProvisioningDone}
+            />
+          )}
+
+          {step === "credentials" && (
             <SignInForm
               next={next}
               registered={registered}
@@ -139,7 +274,9 @@ const AuthCard = ({ defaultTab }: Props) => {
                 setStep("totp");
               }}
             />
-          ) : (
+          )}
+
+          {isTwoFactor && (
             <TwoFactorChallengeForm
               next={next}
               mode={step}
@@ -151,28 +288,31 @@ const AuthCard = ({ defaultTab }: Props) => {
             />
           )}
         </CardContent>
-        <div className="border-t border-border bg-background px-8 py-5 text-center text-sm text-muted-foreground">
-          {isTwoFactor && tfCopy ? (
-            <button
-              type="button"
-              onClick={() => setStep(step === "totp" ? "backup" : "totp")}
-              className="text-primary font-semibold hover:text-foreground"
-              data-testid="2fa-mode-toggle"
-            >
-              {tfCopy.switchCta}
-            </button>
-          ) : (
-            <>
-              {tabCopy.switchLabel}{" "}
-              <Link
-                href={`${tabCopy.switchPath}${search}`}
+        )}
+        {showFooter && (
+          <div className="border-t border-border bg-background px-8 py-5 text-center text-sm text-muted-foreground">
+            {isTwoFactor && tfCopy ? (
+              <button
+                type="button"
+                onClick={() => setStep(step === "totp" ? "backup" : "totp")}
                 className="text-primary font-semibold hover:text-foreground"
+                data-testid="2fa-mode-toggle"
               >
-                {tabCopy.switchCta}
-              </Link>
-            </>
-          )}
-        </div>
+                {tfCopy.switchCta}
+              </button>
+            ) : (
+              <>
+                {tabCopy.switchLabel}{" "}
+                <Link
+                  href={`${tabCopy.switchPath}${search}`}
+                  className="text-primary font-semibold hover:text-foreground"
+                >
+                  {tabCopy.switchCta}
+                </Link>
+              </>
+            )}
+          </div>
+        )}
       </Card>
       <p className="text-xs text-muted-foreground tracking-wide">
         <a href="/privacy" className="hover:text-foreground">privacy</a>

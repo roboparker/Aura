@@ -13,6 +13,26 @@ class UserFixtures extends Fixture
 {
     public const ADMIN_REFERENCE = 'user-admin';
     public const USER_REFERENCE = 'user-uma';
+    public const TEAM_USER_REFERENCES = [
+        'user-noah',
+        'user-emma',
+        'user-liam',
+        'user-ava',
+    ];
+
+    /**
+     * Demo team members beyond Uma. Same password hashed once at load
+     * time to keep fixture reload time bounded — production hashing on
+     * five users would dominate the load runtime otherwise.
+     *
+     * @var list<array{reference: string, email: string, given: string, family: string}>
+     */
+    private const TEAM_USERS = [
+        ['reference' => 'user-noah', 'email' => 'noah@team.aura.test',  'given' => 'Noah',  'family' => 'Kim'],
+        ['reference' => 'user-emma', 'email' => 'emma@team.aura.test',  'given' => 'Emma',  'family' => 'Reyes'],
+        ['reference' => 'user-liam', 'email' => 'liam@team.aura.test',  'given' => 'Liam',  'family' => 'Patel'],
+        ['reference' => 'user-ava',  'email' => 'ava@team.aura.test',   'given' => 'Ava',   'family' => 'Okafor'],
+    ];
 
     /**
      * Hardcoded TOTP secret for the Uma fixture user so dev / E2E flows can
@@ -86,9 +106,28 @@ class UserFixtures extends Fixture
 
         $manager->persist($user);
 
+        // Hash the shared team password once and reuse — saves four bcrypt
+        // rounds per fixture load.
+        $teamPasswordHash = $this->passwordHasher->hashPassword($user, 'team123');
+        $teamUsers = [];
+        foreach (self::TEAM_USERS as $spec) {
+            $member = new User();
+            $member->setEmail($spec['email']);
+            $member->setRoles(['ROLE_USER']);
+            $member->setGivenName($spec['given']);
+            $member->setFamilyName($spec['family']);
+            $member->setPersonalizedColor($this->colorService->pick());
+            $member->setPassword($teamPasswordHash);
+            $manager->persist($member);
+            $teamUsers[$spec['reference']] = $member;
+        }
+
         $manager->flush();
 
         $this->addReference(self::ADMIN_REFERENCE, $admin);
         $this->addReference(self::USER_REFERENCE, $user);
+        foreach ($teamUsers as $reference => $member) {
+            $this->addReference($reference, $member);
+        }
     }
 }
