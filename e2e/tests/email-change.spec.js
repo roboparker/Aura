@@ -7,7 +7,7 @@ const MAILPIT_URL = process.env.MAILPIT_URL || "http://localhost:8025";
 const uniqueEmail = (prefix = "email-change") =>
   `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}@example.com`;
 
-async function registerAndSignIn(page, request, email, password = "password123") {
+async function registerAndSignIn(page, request, email, password = "Password123!") {
   const res = await request.post(`${BASE_URL}/users`, {
     headers: { "Content-Type": "application/ld+json" },
     data: { email, plainPassword: password, givenName: "E2e", familyName: "User" },
@@ -89,7 +89,7 @@ test.describe("Change email (authenticated)", () => {
     // API (both endpoints are public), but it exercises refreshUser().
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", newEmail);
-    await page.fill("#password", "password123");
+    await page.fill("#password", "Password123!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
 
@@ -100,7 +100,7 @@ test.describe("Change email (authenticated)", () => {
     // The old email should once again be the working credential
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", oldEmail);
-    await page.fill("#password", "password123");
+    await page.fill("#password", "Password123!");
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/account/);
   });
@@ -115,7 +115,7 @@ test.describe("Change email (authenticated)", () => {
     // Register a second user via the API so `b` is taken
     await request.post(`${BASE_URL}/users`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { email: b, plainPassword: "password123", givenName: "Other", familyName: "User" },
+      data: { email: b, plainPassword: "Password123!", givenName: "Other", familyName: "User" },
     });
 
     await clearMailpit(request);

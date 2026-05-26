@@ -15,7 +15,7 @@ const AVATAR_FIXTURE = {
 test.describe("Avatar", () => {
   test("initials fallback renders when no avatar is set", async ({ page }) => {
     const email = uniqueEmail("avatar-fallback");
-    await registerAndSignIn(page, email, "password123", {
+    await registerAndSignIn(page, email, "Password123!", {
       givenName: "Pat",
       familyName: "Quinn",
     });
@@ -32,7 +32,7 @@ test.describe("Avatar", () => {
 
   test("uploaded avatar renders as an image after upload", async ({ page }) => {
     const email = uniqueEmail("avatar-upload");
-    await registerAndSignIn(page, email, "password123", {
+    await registerAndSignIn(page, email, "Password123!", {
       givenName: "Pat",
       familyName: "Quinn",
     });

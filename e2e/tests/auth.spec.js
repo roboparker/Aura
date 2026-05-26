@@ -15,8 +15,8 @@ test.describe("Authentication", () => {
     await page.fill("#givenName", "E2e");
     await page.fill("#familyName", "User");
     await page.fill("#email", email);
-    await page.fill("#password", "password123");
-    await page.fill("#confirmPassword", "password123");
+    await page.fill("#password", "Password123!");
+    await page.fill("#confirmPassword", "Password123!");
     await page.click('button[type="submit"]');
 
     // Should redirect to sign-in with success message
@@ -37,7 +37,7 @@ test.describe("Authentication", () => {
     await page.goto(`${BASE_URL}/signup`);
 
     await page.fill("#email", uniqueEmail());
-    await page.fill("#password", "password123");
+    await page.fill("#password", "Password123!");
     await page.fill("#confirmPassword", "different");
     await page.click('button[type="submit"]');
 
@@ -49,7 +49,7 @@ test.describe("Authentication", () => {
     const email = uniqueEmail();
     const res = await page.request.post(`${BASE_URL}/users`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { email, plainPassword: "password123", givenName: "E2e", familyName: "User" },
+      data: { email, plainPassword: "Password123!", givenName: "E2e", familyName: "User" },
     });
     expect(res.ok()).toBeTruthy();
 
@@ -58,7 +58,7 @@ test.describe("Authentication", () => {
     await expect(page).toHaveTitle("Sign In - Aura");
 
     await page.fill("#email", email);
-    await page.fill("#password", "password123");
+    await page.fill("#password", "Password123!");
     await page.click('button[type="submit"]');
 
     // Should redirect to account page. The email now appears in two
