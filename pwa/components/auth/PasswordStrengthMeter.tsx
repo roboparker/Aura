@@ -11,15 +11,16 @@ interface Props {
 }
 
 /**
- * Three-bar meter that visualizes the Symfony PasswordStrength score
- * (0..4) the backend computes — see `pwa/lib/passwordStrength.ts` for
- * why it has to match exactly. Each bar fills proportionally to the
- * score; the label and color reflect both the bucket and whether it
- * clears `MIN_PASSWORD_STRENGTH` (the gate the server enforces).
+ * Four-segment meter that visualizes the Symfony PasswordStrength score
+ * the backend computes — see `pwa/lib/passwordStrength.ts` for why the
+ * meter and the server have to agree. Score 0 lights no bars; 1..4
+ * light bars 1..4 left-to-right, so each segment maps cleanly onto one
+ * Symfony bucket (WEAK / MEDIUM / STRONG / VERY_STRONG).
  *
- * Below-floor scores render in destructive red; at-or-above floor in
- * the brand teal. The label text comes from `STRENGTH_LABELS` so the
- * meter stays a thin wrapper over the shared scoring helper.
+ * Below `MIN_PASSWORD_STRENGTH` the lit bars and label render in
+ * destructive red; at-or-above the floor they render in the brand
+ * teal. Label sits below the bars on the left to keep the meter
+ * row a single horizontal element under the password input.
  */
 const PasswordStrengthMeter = ({ password }: Props) => {
   const empty = password.length === 0;
@@ -28,25 +29,22 @@ const PasswordStrengthMeter = ({ password }: Props) => {
   // placeholder is doing the work in that state.
   const score: PasswordStrengthScore = empty ? 0 : estimatePasswordStrength(password);
   const passes = score >= MIN_PASSWORD_STRENGTH;
-
-  // Three segments because the mockup shows three bars. Map the 0..4
-  // score onto how many bars light up: 0 → 0, 1 → 1, 2 → 2, 3-4 → 3.
-  const litBars = empty ? 0 : Math.min(3, Math.max(1, score));
+  const litBars = empty ? 0 : score;
 
   return (
     <div
-      className="flex items-center gap-2"
+      className="space-y-1"
       data-testid="password-strength-meter"
       data-score={score}
       aria-live="polite"
     >
-      <div className="flex flex-1 gap-1">
-        {[0, 1, 2].map((idx) => (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4].map((idx) => (
           <div
             key={idx}
             className={[
               "h-1 flex-1 rounded-full transition-colors duration-150",
-              idx < litBars
+              idx <= litBars
                 ? passes
                   ? "bg-primary"
                   : "bg-destructive"
@@ -55,9 +53,9 @@ const PasswordStrengthMeter = ({ password }: Props) => {
           />
         ))}
       </div>
-      <span
+      <p
         className={[
-          "text-[10px] font-semibold uppercase tracking-wider tabular-nums w-20 text-right",
+          "text-[10px] font-semibold uppercase tracking-wider tabular-nums min-h-[14px]",
           empty
             ? "text-muted-foreground"
             : passes
@@ -66,7 +64,7 @@ const PasswordStrengthMeter = ({ password }: Props) => {
         ].join(" ")}
       >
         {empty ? "" : STRENGTH_LABELS[score]}
-      </span>
+      </p>
     </div>
   );
 };

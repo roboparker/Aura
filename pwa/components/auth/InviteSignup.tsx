@@ -2,9 +2,10 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { Formik, Form } from "formik";
-import { Lock } from "lucide-react";
+import { Check, Clock, Lock, UsersRound } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { deterministicPaletteColor } from "@/lib/avatarPalette";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import {
@@ -20,6 +21,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { CalloutBadge } from "@/components/ui/callout-badge";
 import { FormikField } from "@/components/ui/formik-field";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
 
@@ -258,26 +260,28 @@ const ExpiredCard = ({
   return (
     <>
       <CardContent className="p-8 space-y-5 text-center" data-testid="invite-expired">
-        <StatusBadge tone="destructive">
-          <div className="h-3 w-3 rounded-full bg-destructive" aria-hidden />
-        </StatusBadge>
+        <CalloutBadge tone="destructive">
+          <Clock className="h-5 w-5" aria-hidden />
+        </CalloutBadge>
         <div className="space-y-2">
           <h2 className="text-2xl font-bold">This invite has expired</h2>
           <p className="text-sm text-muted-foreground">
-            Invites are valid for 7 days.{" "}
             {invite && expired ? (
               <>
-                The one to{" "}
+                Invite to{" "}
                 <code className="font-mono text-foreground">{invite.email}</code>{" "}
-                expired on <span className="text-foreground">{expired}</span>.{" "}
+                expired on <span className="text-foreground">{expired}</span>. Ask
+                the sender to send another link.
               </>
             ) : (
-              <>This link is no longer valid. </>
+              <>
+                This link is no longer valid. Invites are valid for 7 days — ask
+                the sender to send another link.
+              </>
             )}
-            Ask the sender to send a fresh link.
           </p>
         </div>
-        {invite?.inviter && <InviterPill chip={invite.inviter} prefix="invited by" />}
+        {invite?.inviter && <InviterBox chip={invite.inviter} />}
         <div className="space-y-2">
           {invite?.inviter && mailtoFor(invite.inviter.email) && (
             // Only surface "Request a new invite" when we actually know
@@ -315,9 +319,9 @@ const AlreadyUsedCard = ({
 }) => (
   <>
     <CardContent className="p-8 space-y-5 text-center" data-testid="invite-accepted">
-      <StatusBadge tone="primary">
-        <div className="h-3 w-3 rounded-full bg-primary" aria-hidden />
-      </StatusBadge>
+      <CalloutBadge tone="primary">
+        <Check className="h-5 w-5" aria-hidden />
+      </CalloutBadge>
       <div className="space-y-2">
         <h2 className="text-2xl font-bold">This invite was already used</h2>
         <p className="text-sm text-muted-foreground">
@@ -555,21 +559,30 @@ const InviterPill = ({ chip, prefix }: { chip: InviterChip; prefix: string }) =>
   </div>
 );
 
-const StatusBadge = ({
-  tone,
-  children,
-}: {
-  tone: "destructive" | "primary";
-  children: React.ReactNode;
-}) => (
+/**
+ * Standalone bordered card showing who issued the invite. Used on the
+ * expired / already-used screens where the inviter context is its own
+ * block (the form-mode `InviterPill` is an inline header instead).
+ */
+const InviterBox = ({ chip }: { chip: InviterChip }) => (
   <div
-    className={[
-      "mx-auto flex h-12 w-12 items-center justify-center rounded-md",
-      tone === "destructive" ? "bg-destructive/10" : "bg-primary/10",
-    ].join(" ")}
-    aria-hidden
+    className="rounded-md border border-border bg-muted/30 px-3 py-2.5 text-left flex items-center gap-3"
+    data-testid="invite-inviter-box"
   >
-    {children}
+    <span
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold text-white"
+      style={{ backgroundColor: chip.color }}
+      aria-hidden
+    >
+      {chip.initials}
+    </span>
+    <div className="min-w-0 flex-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Invited by
+      </p>
+      <p className="text-sm font-semibold truncate">{chip.name}</p>
+      <p className="text-xs text-muted-foreground truncate">{chip.email}</p>
+    </div>
   </div>
 );
 
@@ -580,50 +593,66 @@ const AttachmentList = ({
   invite: Extract<InviteResponse, { status: "pending" }>;
   compact?: boolean;
 }) => (
-  <ul
-    className={[
-      "rounded-md border border-border divide-y divide-border",
-      compact ? "text-xs" : "text-sm",
-    ].join(" ")}
-  >
+  <ul className={["space-y-1.5", compact ? "text-xs" : "text-sm"].join(" ")}>
     {invite.spaces.map((space) => (
       <li
         key={`space-${space.id}`}
         data-testid="invite-attachment-space"
-        className="flex items-center gap-3 px-3 py-2"
+        className="flex items-center gap-3 rounded-md border border-border bg-muted px-3 py-2"
       >
-        <span
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-xs font-semibold"
-          aria-hidden
-        >
+        <AttachmentTile seed={`space-${space.id}`}>
           {space.name[0]?.toUpperCase() ?? "S"}
-        </span>
+        </AttachmentTile>
         <span className="flex-1 font-medium">{space.name}</span>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Space · {space.role}
-        </span>
       </li>
     ))}
     {invite.groups.map((group) => (
       <li
         key={`group-${group.id}`}
         data-testid="invite-attachment-group"
-        className="flex items-center gap-3 px-3 py-2"
+        className="flex items-center gap-3 rounded-md border border-border bg-muted px-3 py-2"
       >
-        <span
-          className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-xs font-semibold"
-          aria-hidden
-        >
-          {group.title[0]?.toUpperCase() ?? "G"}
-        </span>
+        <AttachmentTile seed={`group-${group.id}`}>
+          <UsersRound className="h-3.5 w-3.5" aria-hidden />
+        </AttachmentTile>
         <span className="flex-1 font-medium">{group.title}</span>
-        <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-          Group · {group.memberCount} ppl
-        </span>
       </li>
     ))}
   </ul>
 );
+
+/**
+ * Colored square that fronts each attachment row. Background colour
+ * is derived deterministically from `seed` (the entity id) so the
+ * same space / group always gets the same swatch across sign-ins
+ * without a `color` column on either entity. Glow mirrors the
+ * CalloutBadge pattern — tight 1px halo + soft outer bloom in the
+ * same hue — so it reads as a focused tile rather than a bleed.
+ */
+const AttachmentTile = ({
+  seed,
+  children,
+}: {
+  seed: string;
+  children: React.ReactNode;
+}) => {
+  const color = deterministicPaletteColor(seed);
+  return (
+    <span
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold text-white"
+      style={{
+        backgroundColor: color,
+        boxShadow: [
+          `0 0 0 1px color-mix(in oklab, ${color} 80%, transparent)`,
+          `0 0 18px 2px color-mix(in oklab, ${color} 65%, transparent)`,
+        ].join(", "),
+      }}
+      aria-hidden
+    >
+      {children}
+    </span>
+  );
+};
 
 const MismatchRow = ({
   label,
