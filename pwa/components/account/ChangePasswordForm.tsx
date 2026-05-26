@@ -20,8 +20,8 @@ const validate = (values: ChangePasswordValues) => {
 
   if (!values.newPassword) {
     errors.newPassword = "New password is required.";
-  } else if (values.newPassword.length < 6) {
-    errors.newPassword = "New password must be at least 6 characters.";
+  } else if (values.newPassword.length < 8) {
+    errors.newPassword = "New password must be at least 8 characters.";
   }
 
   if (!values.confirmPassword) {
@@ -81,7 +81,7 @@ const ChangePasswordForm = () => {
               name="newPassword"
               type="password"
               label="New Password"
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
             />
 
             <FormikField

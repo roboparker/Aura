@@ -49,8 +49,8 @@ const validate = (values: SignUpValues) => {
 
   if (!values.password) {
     errors.password = "Password is required.";
-  } else if (values.password.length < 6) {
-    errors.password = "Password must be at least 6 characters.";
+  } else if (values.password.length < 8) {
+    errors.password = "Password must be at least 8 characters.";
   }
 
   if (!values.confirmPassword) {
@@ -234,7 +234,7 @@ const SignUpForm = ({ inviteToken, next }: Props) => {
               name="password"
               type="password"
               label="Password"
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               autoComplete="new-password"
             />
 

@@ -19,7 +19,11 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 class PasswordController extends AbstractController
 {
     private const RESET_TOKEN_TTL_HOURS = 1;
-    private const MIN_PASSWORD_LENGTH = 6;
+    // Mirrors the `Assert\Length(min: 8)` on `App\Entity\User::$plainPassword`
+    // so signup, password-change, and password-reset all gate at the same
+    // floor. NIST SP 800-63B: length is the primary factor, complexity
+    // rules are user-hostile.
+    private const MIN_PASSWORD_LENGTH = 8;
 
     public function __construct(
         private EntityManagerInterface $em,

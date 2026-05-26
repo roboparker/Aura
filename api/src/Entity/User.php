@@ -63,7 +63,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private string $password = '';
 
     #[Assert\NotBlank(groups: ['user:create'])]
-    #[Assert\Length(min: 6, minMessage: 'Password must be at least {{ limit }} characters.')]
+    // NIST SP 800-63B: length wins over complexity rules. 8 chars is the
+    // floor (matching `App\Controller\PasswordController::MIN_PASSWORD_LENGTH`);
+    // the PWA strength meter nudges users toward longer/varied passwords
+    // but the only hard backend rule is length.
+    #[Assert\Length(min: 8, minMessage: 'Password must be at least {{ limit }} characters.')]
     #[Groups(['user:create'])]
     private ?string $plainPassword = null;
 
