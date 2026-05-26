@@ -7,6 +7,7 @@ import { Formik, Form } from "formik";
 import QRCode from "qrcode/lib/browser";
 import { Check, Copy, Download, Loader2, ShieldCheck } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +61,7 @@ const TwoFactorSetupDialog = ({ open, onOpenChange, onEnabled }: Props) => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`${ENTRYPOINT}/me/2fa/setup`, {
+        const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/setup`, {
           method: "POST",
           credentials: "include",
         });
@@ -176,7 +177,7 @@ const ScanStep = ({ qrDataUri, secret, onVerified }: ScanStepProps) => (
       validate={({ code }) => (code.trim() ? {} : { code: "Enter the code from your app." })}
       onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
         try {
-          const res = await fetch(`${ENTRYPOINT}/me/2fa/verify`, {
+          const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/verify`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },

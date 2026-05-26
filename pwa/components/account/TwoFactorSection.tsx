@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FormikField } from "@/components/ui/formik-field";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import TwoFactorSetupDialog from "./TwoFactorSetupDialog";
 
 /**
@@ -49,7 +50,7 @@ const TwoFactorSection = () => {
   const fetchCodes = useCallback(async () => {
     setCodesError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
+      const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
         credentials: "include",
       });
       if (!res.ok) {
@@ -259,7 +260,7 @@ const PasswordConfirmDialog = ({
         }
         onSubmit={async ({ currentPassword }, { setSubmitting, setStatus, resetForm }) => {
           try {
-            const res = await fetch(endpoint, {
+            const res = await fetchWithTimeout(endpoint, {
               method,
               credentials: "include",
               headers: { "Content-Type": "application/json" },
@@ -369,7 +370,7 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
             }
             onSubmit={async ({ currentPassword }, { setSubmitting, setStatus }) => {
               try {
-                const res = await fetch(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
+                const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
                   method: "POST",
                   credentials: "include",
                   headers: { "Content-Type": "application/json" },
@@ -444,7 +445,7 @@ const RevealConfirmDialog = ({ open, onOpenChange, onRevealed }: RevealProps) =>
         }
         onSubmit={async ({ currentPassword }, { setSubmitting, setStatus, resetForm }) => {
           try {
-            const res = await fetch(`${ENTRYPOINT}/me/2fa/recovery-codes/reveal`, {
+            const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/recovery-codes/reveal`, {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
