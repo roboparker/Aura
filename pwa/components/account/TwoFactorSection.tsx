@@ -187,11 +187,11 @@ const TwoFactorSection = () => {
         onEnabled={refreshUser}
       />
 
-      <PasswordConfirmDialog
+      <TotpConfirmDialog
         open={disableOpen}
         onOpenChange={setDisableOpen}
         title="Disable two-factor authentication"
-        description="Confirm with your current password. Disabling 2FA removes your TOTP secret and recovery codes."
+        description="Enter the current 6-digit code from your authenticator app. Disabling 2FA removes your TOTP secret and recovery codes."
         confirmLabel="Disable"
         confirmVariant="destructive"
         endpoint={`${ENTRYPOINT}/me/2fa`}
@@ -223,7 +223,7 @@ const TwoFactorSection = () => {
   );
 };
 
-interface PasswordConfirmDialogProps {
+interface TotpConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
@@ -235,7 +235,7 @@ interface PasswordConfirmDialogProps {
   onSuccess: () => void;
 }
 
-const PasswordConfirmDialog = ({
+const TotpConfirmDialog = ({
   open,
   onOpenChange,
   title,
@@ -245,35 +245,26 @@ const PasswordConfirmDialog = ({
   endpoint,
   method,
   onSuccess,
-}: PasswordConfirmDialogProps) => (
+}: TotpConfirmDialogProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent
-      className="sm:max-w-md"
-      // Don't auto-focus the password input on open: Chrome's saved-
-      // password popup appears under the focused field and eats the
-      // first click anywhere outside (including the X close button),
-      // so the dialog needs two X clicks to dismiss. With auto-focus
-      // suppressed the user clicks into the input deliberately and
-      // the close button works on the first try.
-      onOpenAutoFocus={(event) => event.preventDefault()}
-    >
+    <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
 
-      <Formik<{ currentPassword: string }>
-        initialValues={{ currentPassword: "" }}
-        validate={({ currentPassword }) =>
-          currentPassword ? {} : { currentPassword: "Password is required." }
+      <Formik<{ totpCode: string }>
+        initialValues={{ totpCode: "" }}
+        validate={({ totpCode }) =>
+          totpCode ? {} : { totpCode: "Authentication code is required." }
         }
-        onSubmit={async ({ currentPassword }, { setSubmitting, setStatus, resetForm }) => {
+        onSubmit={async ({ totpCode }, { setSubmitting, setStatus, resetForm }) => {
           try {
             const res = await fetchWithTimeout(endpoint, {
               method,
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ currentPassword }),
+              body: JSON.stringify({ totpCode }),
             });
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
@@ -297,11 +288,14 @@ const PasswordConfirmDialog = ({
               </Alert>
             )}
             <FormikField
-              name="currentPassword"
-              type="password"
-              label="Current password"
-              autoComplete="current-password"
-              data-testid="2fa-confirm-password"
+              name="totpCode"
+              type="text"
+              label="Authentication code"
+              placeholder="6-digit code"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              data-testid="2fa-confirm-totp"
             />
             <Button
               type="submit"
@@ -336,16 +330,7 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
         onOpenChange(next);
       }}
     >
-      <DialogContent
-      className="sm:max-w-md"
-      // Don't auto-focus the password input on open: Chrome's saved-
-      // password popup appears under the focused field and eats the
-      // first click anywhere outside (including the X close button),
-      // so the dialog needs two X clicks to dismiss. With auto-focus
-      // suppressed the user clicks into the input deliberately and
-      // the close button works on the first try.
-      onOpenAutoFocus={(event) => event.preventDefault()}
-    >
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
             {codes ? "New recovery codes" : "Regenerate recovery codes"}
@@ -353,7 +338,7 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
           <DialogDescription>
             {codes
               ? "Save these somewhere safe. Your old codes no longer work."
-              : "This invalidates your existing codes. Confirm with your password to continue."}
+              : "This invalidates your existing codes. Enter the current 6-digit code from your authenticator app to continue."}
           </DialogDescription>
         </DialogHeader>
 
@@ -381,18 +366,18 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
             </Button>
           </div>
         ) : (
-          <Formik<{ currentPassword: string }>
-            initialValues={{ currentPassword: "" }}
-            validate={({ currentPassword }) =>
-              currentPassword ? {} : { currentPassword: "Password is required." }
+          <Formik<{ totpCode: string }>
+            initialValues={{ totpCode: "" }}
+            validate={({ totpCode }) =>
+              totpCode ? {} : { totpCode: "Authentication code is required." }
             }
-            onSubmit={async ({ currentPassword }, { setSubmitting, setStatus }) => {
+            onSubmit={async ({ totpCode }, { setSubmitting, setStatus }) => {
               try {
                 const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/recovery-codes`, {
                   method: "POST",
                   credentials: "include",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ currentPassword }),
+                  body: JSON.stringify({ totpCode }),
                 });
                 if (!res.ok) {
                   const data = await res.json().catch(() => ({}));
@@ -415,10 +400,13 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
                   </Alert>
                 )}
                 <FormikField
-                  name="currentPassword"
-                  type="password"
-                  label="Current password"
-                  autoComplete="current-password"
+                  name="totpCode"
+                  type="text"
+                  label="Authentication code"
+                  placeholder="6-digit code"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                 />
                 <Button type="submit" disabled={isSubmitting} className="w-full">
                   {isSubmitting ? "Working..." : "Regenerate"}
@@ -440,43 +428,36 @@ interface RevealProps {
 }
 
 /**
- * Password-gated step-up dialog: the cookie session alone isn't enough
- * to reveal unused codes (they're real credentials and a stolen cookie
- * shouldn't yield a portable 2FA bypass), so we re-prompt for the
- * password and hand the response back to the parent for one-time render.
+ * TOTP-gated step-up dialog: the cookie session alone isn't enough to
+ * reveal unused codes (they're real credentials and a stolen cookie
+ * shouldn't yield a portable 2FA bypass), so we require a fresh code
+ * from the authenticator device and hand the response back to the parent
+ * for one-time render.
  */
 const RevealConfirmDialog = ({ open, onOpenChange, onRevealed }: RevealProps) => (
   <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent
-      className="sm:max-w-md"
-      // Don't auto-focus the password input on open: Chrome's saved-
-      // password popup appears under the focused field and eats the
-      // first click anywhere outside (including the X close button),
-      // so the dialog needs two X clicks to dismiss. With auto-focus
-      // suppressed the user clicks into the input deliberately and
-      // the close button works on the first try.
-      onOpenAutoFocus={(event) => event.preventDefault()}
-    >
+    <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>Reveal recovery codes</DialogTitle>
         <DialogDescription>
-          Confirm with your current password to display your recovery codes.
-          They'll only stay visible while this page is open.
+          Enter the current 6-digit code from your authenticator app to
+          display your recovery codes. They'll only stay visible while
+          this page is open.
         </DialogDescription>
       </DialogHeader>
 
-      <Formik<{ currentPassword: string }>
-        initialValues={{ currentPassword: "" }}
-        validate={({ currentPassword }) =>
-          currentPassword ? {} : { currentPassword: "Password is required." }
+      <Formik<{ totpCode: string }>
+        initialValues={{ totpCode: "" }}
+        validate={({ totpCode }) =>
+          totpCode ? {} : { totpCode: "Authentication code is required." }
         }
-        onSubmit={async ({ currentPassword }, { setSubmitting, setStatus, resetForm }) => {
+        onSubmit={async ({ totpCode }, { setSubmitting, setStatus, resetForm }) => {
           try {
             const res = await fetchWithTimeout(`${ENTRYPOINT}/me/2fa/recovery-codes/reveal`, {
               method: "POST",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ currentPassword }),
+              body: JSON.stringify({ totpCode }),
             });
             if (!res.ok) {
               const data = await res.json().catch(() => ({}));
@@ -501,11 +482,14 @@ const RevealConfirmDialog = ({ open, onOpenChange, onRevealed }: RevealProps) =>
               </Alert>
             )}
             <FormikField
-              name="currentPassword"
-              type="password"
-              label="Current password"
-              autoComplete="current-password"
-              data-testid="2fa-reveal-password"
+              name="totpCode"
+              type="text"
+              label="Authentication code"
+              placeholder="6-digit code"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              data-testid="2fa-reveal-totp"
             />
             <Button
               type="submit"

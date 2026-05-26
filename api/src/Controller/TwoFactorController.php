@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\SensitiveActionVerifier;
 use App\Service\TwoFactorSetupService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
@@ -21,16 +21,19 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * /auth/2fa-check; everything here is for the *settings* surface
  * (enable, confirm, disable, rotate recovery codes).
  *
- * Disable + recovery-rotation both require the current password to be
- * re-entered — that protects users whose session is stolen from having
- * 2FA silently turned off without the underlying password.
+ * Disable, recovery rotation, and recovery reveal all run through
+ * {@see SensitiveActionVerifier}: since reaching these endpoints requires
+ * 2FA to already be on, the step-up is always a fresh TOTP code from the
+ * authenticator app (rate-limited per user). That protects users whose
+ * session is stolen from having 2FA silently turned off — a stolen cookie
+ * doesn't grant access to the authenticator device.
  */
 class TwoFactorController extends AbstractController
 {
     public function __construct(
         private TwoFactorSetupService $setup,
         private EntityManagerInterface $em,
-        private UserPasswordHasherInterface $hasher,
+        private SensitiveActionVerifier $verifier,
         private RateLimiterFactoryInterface $twoFactorVerifyLimiter,
     ) {
     }
@@ -97,10 +100,9 @@ class TwoFactorController extends AbstractController
             return $this->json(['error' => '2FA is not enabled.'], 409);
         }
 
-        $body = $this->jsonBody($request);
-        $password = $this->stringField($body, 'currentPassword');
-        if (!$this->hasher->isPasswordValid($user, $password)) {
-            return $this->json(['error' => 'Current password is incorrect.'], 400);
+        $err = $this->verifier->verify($user, $this->jsonBody($request));
+        if (null !== $err) {
+            return $this->json(['error' => $err[1]], $err[0]);
         }
 
         $this->setup->disable($user);
@@ -119,10 +121,9 @@ class TwoFactorController extends AbstractController
             return $this->json(['error' => '2FA is not enabled.'], 409);
         }
 
-        $body = $this->jsonBody($request);
-        $password = $this->stringField($body, 'currentPassword');
-        if (!$this->hasher->isPasswordValid($user, $password)) {
-            return $this->json(['error' => 'Current password is incorrect.'], 400);
+        $err = $this->verifier->verify($user, $this->jsonBody($request));
+        if (null !== $err) {
+            return $this->json(['error' => $err[1]], $err[0]);
         }
 
         $codes = $this->setup->regenerateRecoveryCodes($user);
@@ -159,10 +160,9 @@ class TwoFactorController extends AbstractController
         // Step-up auth: unused codes are real credentials. Cookie session
         // alone isn't enough — a stolen cookie shouldn't yield a portable
         // 2FA bypass that survives password rotation.
-        $body = $this->jsonBody($request);
-        $password = $this->stringField($body, 'currentPassword');
-        if (!$this->hasher->isPasswordValid($user, $password)) {
-            return $this->json(['error' => 'Current password is incorrect.'], 400);
+        $err = $this->verifier->verify($user, $this->jsonBody($request));
+        if (null !== $err) {
+            return $this->json(['error' => $err[1]], $err[0]);
         }
 
         return $this->json([

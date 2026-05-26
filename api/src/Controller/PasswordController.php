@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\PasswordResetToken;
 use App\Entity\User;
 use App\Repository\PasswordResetTokenRepository;
+use App\Service\SensitiveActionVerifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -36,6 +37,7 @@ class PasswordController extends AbstractController
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $hasher,
         private PasswordResetTokenRepository $tokenRepository,
+        private SensitiveActionVerifier $verifier,
         private MailerInterface $mailer,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
@@ -52,11 +54,14 @@ class PasswordController extends AbstractController
         }
 
         $data = $request->toArray();
-        $currentPassword = self::stringField($data, 'currentPassword');
         $newPassword = self::stringField($data, 'newPassword');
 
-        if (!$this->hasher->isPasswordValid($user, $currentPassword)) {
-            return $this->json(['error' => 'Current password is incorrect.'], 400);
+        // Step-up confirmation: TOTP when 2FA is on, current password
+        // otherwise. Owning the cookie alone isn't enough to silently
+        // rotate the password out from under the legitimate owner.
+        $err = $this->verifier->verify($user, $data);
+        if (null !== $err) {
+            return $this->json(['error' => $err[1]], $err[0]);
         }
 
         if (strlen($newPassword) < self::MIN_PASSWORD_LENGTH) {
@@ -71,7 +76,7 @@ class PasswordController extends AbstractController
             ], 422);
         }
 
-        if ($currentPassword === $newPassword) {
+        if ($this->hasher->isPasswordValid($user, $newPassword)) {
             return $this->json([
                 'error' => 'New password must be different from current password.',
             ], 422);

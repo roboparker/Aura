@@ -74,7 +74,15 @@ interface AuthContextType {
   submitTwoFactorCode: (code: string) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
-  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /**
+   * Confirms the current owner's identity (TOTP if 2FA is on, password
+   * otherwise) and rotates the password. The PWA chooses the right
+   * confirmation field based on the user's twoFactor.enabled status.
+   */
+  changePassword: (
+    confirmation: { currentPassword: string } | { totpCode: string },
+    newPassword: string,
+  ) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -219,12 +227,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+  const changePassword = useCallback(async (
+    confirmation: { currentPassword: string } | { totpCode: string },
+    newPassword: string,
+  ) => {
     const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/change-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ ...confirmation, newPassword }),
     });
 
     if (!res.ok) {
