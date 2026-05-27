@@ -16,7 +16,6 @@ use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use Symfony\Component\Validator\Constraints\PasswordStrength;
 use Symfony\Component\Validator\Constraints\PasswordStrengthValidator;
 
 class PasswordController extends AbstractController
@@ -27,11 +26,6 @@ class PasswordController extends AbstractController
     // floor. NIST SP 800-63B: length is the primary factor, complexity
     // rules are user-hostile.
     private const MIN_PASSWORD_LENGTH = 8;
-    // Pairs with the `Assert\PasswordStrength` on the User entity; the
-    // signup form runs the validator stack so it picks that up via
-    // attribute, but change-password and reset-password are plain
-    // controller actions and re-check by hand.
-    private const MIN_PASSWORD_STRENGTH = PasswordStrength::STRENGTH_MEDIUM;
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -41,6 +35,11 @@ class PasswordController extends AbstractController
         private MailerInterface $mailer,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
+        // Pairs with `App\Validator\PasswordPolicy` on the User entity so
+        // signup, change-password, and reset-password gate at the same
+        // env-driven floor (VERY_WEAK in dev/test, MEDIUM in staging/prod).
+        #[Autowire('%app.password_min_strength%')]
+        private int $minPasswordStrength = 2,
         #[Autowire('%env(default::MAILER_FROM)%')]
         private ?string $mailerFrom = null,
     ) {
@@ -70,7 +69,7 @@ class PasswordController extends AbstractController
             ], 422);
         }
 
-        if (PasswordStrengthValidator::estimateStrength($newPassword) < self::MIN_PASSWORD_STRENGTH) {
+        if (PasswordStrengthValidator::estimateStrength($newPassword) < $this->minPasswordStrength) {
             return $this->json([
                 'error' => 'This password is too easy to guess — try mixing in more characters or making it longer.',
             ], 422);
@@ -141,7 +140,7 @@ class PasswordController extends AbstractController
             ], 422);
         }
 
-        if (PasswordStrengthValidator::estimateStrength($newPassword) < self::MIN_PASSWORD_STRENGTH) {
+        if (PasswordStrengthValidator::estimateStrength($newPassword) < $this->minPasswordStrength) {
             return $this->json([
                 'error' => 'This password is too easy to guess — try mixing in more characters or making it longer.',
             ], 422);

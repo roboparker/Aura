@@ -4,6 +4,11 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Minimum `Symfony\Component\Validator\Constraints\PasswordStrength` score
+    # required for signup, change-password, and reset-password. 0 =
+    # VERY_WEAK, 2 = MEDIUM, 4 = VERY_STRONG. Staging + production stay at
+    # MEDIUM; dev + test relax to VERY_WEAK (see `when@dev` / `when@test`).
+    app.password_min_strength: 2
 
 services:
     # default configuration for services in *this* file
@@ -66,10 +71,24 @@ services:
 
     App\Push\PushSenderInterface: '@App\Push\WebPushSender'
 
+    App\Validator\PasswordPolicyValidator:
+        arguments:
+            $minStrength: '%app.password_min_strength%'
+
+when@dev:
+    parameters:
+        # Local dev: don't make the engineer think up a 12-char password
+        # every time fixtures rebuild. Backend still enforces 8-char min.
+        app.password_min_strength: 0
+
 # In test the dispatcher must not open real sockets to FCM/Mozilla — alias
 # the interface to an in-memory recorder the test suite can inspect and
 # pre-arm with "expired" endpoints to exercise the prune-dead-rows path.
 when@test:
+    parameters:
+        # Test fixtures use trivial passwords; the gate is unit-tested in
+        # `PasswordPolicyValidatorTest` independent of this default.
+        app.password_min_strength: 0
     services:
         App\Tests\Push\InMemoryPushSender:
             public: true
