@@ -150,8 +150,26 @@ class PasswordController extends AbstractController
         $tokenHash = hash('sha256', $plainToken);
         $resetToken = $this->tokenRepository->findByTokenHash($tokenHash);
 
-        if (null === $resetToken || !$resetToken->isValid()) {
-            return $this->json(['error' => 'Invalid or expired token.'], 400);
+        // Distinguish the three rejection cases so the PWA can show the
+        // right "this link can't be used" card. All three still return
+        // 400 — the `code` field is the contract the client switches on.
+        if (null === $resetToken) {
+            return $this->json([
+                'error' => 'This reset link is invalid.',
+                'code' => 'token_invalid',
+            ], 400);
+        }
+        if (null !== $resetToken->getUsedAt()) {
+            return $this->json([
+                'error' => 'This reset link has already been used.',
+                'code' => 'token_used',
+            ], 400);
+        }
+        if (!$resetToken->isValid()) {
+            return $this->json([
+                'error' => 'This reset link has expired.',
+                'code' => 'token_expired',
+            ], 400);
         }
 
         $user = $resetToken->getUser();

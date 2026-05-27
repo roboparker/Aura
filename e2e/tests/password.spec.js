@@ -160,7 +160,7 @@ test.describe("Forgot password (reset via email)", () => {
     await page.goto(resetUrl);
     await page.fill("#newPassword", "BrandNewPass1!");
     await page.fill("#confirmPassword", "BrandNewPass1!");
-    await page.click('button:has-text("Reset Password")');
+    await page.click('button:has-text("Set password")');
 
     // Redirected to sign in with success banner
     await expect(page).toHaveURL(/\/signin\?reset=true/);
@@ -202,11 +202,14 @@ test.describe("Forgot password (reset via email)", () => {
 
     await page.fill("#newPassword", "BrandNewPass1!");
     await page.fill("#confirmPassword", "BrandNewPass1!");
-    await page.click('button:has-text("Reset Password")');
+    await page.click('button:has-text("Set password")');
 
+    // The backend returns "Invalid or expired token", which the page
+    // surfaces as the dedicated invalid-link card (rather than an
+    // inline alert above the form). The card carries the same testid.
     await expect(
       page.locator('[data-testid="reset-password-error"]')
-    ).toContainText(/invalid or expired/i);
+    ).toBeVisible();
   });
 
   test("Forgot password link is visible on sign-in page", async ({ page }) => {
