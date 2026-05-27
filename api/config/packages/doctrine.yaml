@@ -7,7 +7,6 @@ doctrine:
         #server_version: '16'
 
         profiling_collect_backtrace: '%kernel.debug%'
-        use_savepoints: true
         # doctrine/dbal 4 dropped the legacy `array` type. Gedmo's
         # AbstractLogEntry still declares its `data` column as
         # `array`, so we re-register it as a JSON-backed alias.
@@ -16,34 +15,35 @@ doctrine:
         types:
             array: Doctrine\DBAL\Types\JsonType
     orm:
-        auto_generate_proxy_classes: true
-        enable_lazy_ghost_objects: true
-        # Required when symfony/var-exporter is v8+, which dropped
-        # ProxyHelper::generateLazyGhost(). PHP 8.4 ships native lazy objects.
+        # PHP 8.4 native lazy objects replace the old proxy-generation pipeline,
+        # so doctrine-bundle 3.x dropped auto_generate_proxy_classes / proxy_dir
+        # along with enable_lazy_ghost_objects and report_fields_where_declared
+        # (the last two are always-on now).
         enable_native_lazy_objects: true
-        report_fields_where_declared: true
-        validate_xml_mapping: true
-        naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
-        identity_generation_preferences:
-            Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
-        auto_mapping: true
-        mappings:
-            App:
-                type: attribute
-                is_bundle: false
-                dir: '%kernel.project_dir%/src/Entity'
-                prefix: 'App\Entity'
-                alias: App
         controller_resolver:
             auto_mapping: false
-        # Postgres-specific full-text search wrappers used by
-        # App\Filter\TaskSearchFilter. Registered as string functions
-        # because they return scalar values (boolean / float) that DQL
-        # treats as string-position expressions in WHERE/ORDER BY.
-        dql:
-            string_functions:
-                SEARCH_VECTOR_MATCH: App\Doctrine\Functions\SearchVectorMatch
-                SEARCH_VECTOR_RANK: App\Doctrine\Functions\SearchVectorRank
+        entity_managers:
+            default:
+                validate_xml_mapping: true
+                naming_strategy: doctrine.orm.naming_strategy.underscore_number_aware
+                identity_generation_preferences:
+                    Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
+                auto_mapping: true
+                mappings:
+                    App:
+                        type: attribute
+                        is_bundle: false
+                        dir: '%kernel.project_dir%/src/Entity'
+                        prefix: 'App\Entity'
+                        alias: App
+                # Postgres-specific full-text search wrappers used by
+                # App\Filter\TaskSearchFilter. Registered as string functions
+                # because they return scalar values (boolean / float) that DQL
+                # treats as string-position expressions in WHERE/ORDER BY.
+                dql:
+                    string_functions:
+                        SEARCH_VECTOR_MATCH: App\Doctrine\Functions\SearchVectorMatch
+                        SEARCH_VECTOR_RANK: App\Doctrine\Functions\SearchVectorRank
 
 when@test:
     doctrine:
@@ -54,14 +54,14 @@ when@test:
 when@prod:
     doctrine:
         orm:
-            auto_generate_proxy_classes: false
-            proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'
-            query_cache_driver:
-                type: pool
-                pool: doctrine.system_cache_pool
-            result_cache_driver:
-                type: pool
-                pool: doctrine.result_cache_pool
+            entity_managers:
+                default:
+                    query_cache_driver:
+                        type: pool
+                        pool: doctrine.system_cache_pool
+                    result_cache_driver:
+                        type: pool
+                        pool: doctrine.result_cache_pool
 
     framework:
         cache:
