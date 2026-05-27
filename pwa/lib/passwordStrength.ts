@@ -33,8 +33,20 @@ export type PasswordStrengthScore = 0 | 1 | 2 | 3 | 4;
 
 /** Floor enforced by both `User::$plainPassword` and `PasswordController`. */
 export const MIN_PASSWORD_LENGTH = 8;
-/** Backend rejects below this; meter mirrors. Adjust both in lockstep. */
-export const MIN_PASSWORD_STRENGTH: PasswordStrengthScore = STRENGTH_MEDIUM;
+/**
+ * Backend rejects below this; meter mirrors. Sourced from
+ * `NEXT_PUBLIC_PASSWORD_MIN_STRENGTH` so dev builds can relax to
+ * VERY_WEAK while staging/prod builds keep the MEDIUM default — must
+ * stay in lockstep with the API's `app.password_min_strength` parameter.
+ */
+const parsedEnvFloor = Number.parseInt(
+  process.env.NEXT_PUBLIC_PASSWORD_MIN_STRENGTH ?? "",
+  10,
+);
+export const MIN_PASSWORD_STRENGTH: PasswordStrengthScore =
+  Number.isInteger(parsedEnvFloor) && parsedEnvFloor >= 0 && parsedEnvFloor <= 4
+    ? (parsedEnvFloor as PasswordStrengthScore)
+    : STRENGTH_MEDIUM;
 
 export function estimatePasswordStrength(password: string): PasswordStrengthScore {
   const length = password.length;

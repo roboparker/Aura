@@ -127,28 +127,11 @@ class UserTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    /**
-     * `Assert\PasswordStrength` on User::$plainPassword rejects passwords
-     * whose entropy is below MEDIUM (80 bits). "password" passes the
-     * 8-char length floor but is the textbook example of what the
-     * strength gate is supposed to catch.
-     */
-    public function testRegisterWeakPassword(): void
-    {
-        static::createClient()->request('POST', '/users', [
-            'json' => [
-                'email' => 'weak@example.com',
-                'plainPassword' => 'password',
-                'givenName' => 'Foo',
-                'familyName' => 'Bar',
-            ],
-            'headers' => [
-                'Content-Type' => 'application/ld+json',
-            ],
-        ]);
-
-        $this->assertResponseStatusCodeSame(422);
-    }
+    // The signup-time strength gate is exercised in
+    // PasswordPolicyValidatorTest — the test env runs at VERY_WEAK
+    // (so "password" registers cleanly here) and the validator's
+    // strict-floor behaviour is covered as a unit test independent of
+    // the env-driven default.
 
     public function testRegisterBlankGivenName(): void
     {
