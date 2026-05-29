@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import AvatarColorPicker from "@/components/auth/AvatarColorPicker";
+import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "./SpaceTile";
 
 /**
@@ -80,10 +80,11 @@ const SpaceColorPicker = ({ space, onSaved }: Props) => {
           </div>
         </div>
 
-        <AvatarColorPicker
-          initials={(space.name.trim()[0] ?? "?").toUpperCase()}
-          selected={draftEffective}
+        <ColorSwatchPicker
+          value={draftEffective}
           onChange={(color) => setDraft(color)}
+          ariaLabel="Space color"
+          disabled={isSaving}
         />
 
         {error && (

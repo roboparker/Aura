@@ -1,11 +1,10 @@
 import { useRef, useState } from "react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { useAuth } from "@/contexts/AuthContext";
-import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { uploadAvatar } from "@/lib/uploadAvatar";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 
 const ACCEPTED = "image/jpeg,image/png,image/webp,image/gif";
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -105,35 +104,14 @@ const AvatarSection = () => {
             (used when you have no picture)
           </span>
         </legend>
-        <div
-          role="radiogroup"
-          aria-label="Avatar color"
-          className="flex flex-wrap gap-2"
-          data-testid="avatar-color-palette"
-        >
-          {AVATAR_PALETTE.map((color) => {
-            const isSelected = user.personalizedColor === color;
-            const isSaving = savingColor === color;
-            return (
-              <button
-                key={color}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                aria-label={color}
-                disabled={!!savingColor}
-                onClick={() => onPickColor(color)}
-                className={cn(
-                  "h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:cursor-not-allowed",
-                  isSelected
-                    ? "ring-2 ring-offset-2 ring-ring scale-110"
-                    : "hover:scale-105",
-                  isSaving && "animate-pulse",
-                )}
-                style={{ backgroundColor: color }}
-              />
-            );
-          })}
+        <div data-testid="avatar-color-palette">
+          <ColorSwatchPicker
+            value={user.personalizedColor}
+            onChange={onPickColor}
+            savingColor={savingColor}
+            disabled={!!savingColor}
+            ariaLabel="Avatar color"
+          />
         </div>
         {colorError && (
           <p role="alert" className="text-sm text-destructive">

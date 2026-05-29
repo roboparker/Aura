@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
-import { Lock, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import SpaceSwitcher from "./SpaceSwitcher";
 
 // Personal section — things scoped to the signed-in user themselves.
 // Lives in its own block at the top of the sidebar with a divider
@@ -52,7 +52,6 @@ interface SidebarNavProps {
  */
 const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { spaces } = useActiveSpace();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
@@ -84,6 +83,10 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
 
       <Separator className="my-2" />
 
+      <div className="px-2 pb-2">
+        <SpaceSwitcher />
+      </div>
+
       <nav className="flex flex-col gap-0.5 px-2 pb-4 flex-1 overflow-y-auto">
         {PERSONAL_NAV_LINKS.map((link) => {
           const active = router.pathname.startsWith(link.href);
@@ -105,64 +108,6 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
             </span>
           );
         })}
-
-        <Separator className="my-2" />
-
-        {/* All Spaces (management) + a flat list of every space the
-            caller belongs to. Each space link goes to the tabbed
-            detail page where the actual content (projects /
-            discussions / pages / tasks) lives. */}
-        <span>
-          {wrap(
-            <Button
-              asChild
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "justify-start w-full",
-                router.pathname === "/spaces" && "bg-accent text-accent-foreground",
-              )}
-            >
-              <Link href="/spaces">All Spaces</Link>
-            </Button>,
-          )}
-        </span>
-
-        {spaces.length > 0 && (
-          <ul className="flex flex-col gap-0.5">
-            {spaces.map((s) => {
-              const href = `/spaces/${s.id}`;
-              const active =
-                router.pathname.startsWith("/spaces/") &&
-                router.query.id === s.id;
-              return (
-                <li key={s["@id"]}>
-                  {wrap(
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className={cn(
-                        "justify-start w-full font-normal",
-                        active && "bg-accent text-accent-foreground",
-                      )}
-                    >
-                      <Link href={href} className="flex items-center gap-1.5">
-                        {s.isPersonal && (
-                          <Lock
-                            className="h-3 w-3 shrink-0 text-muted-foreground"
-                            aria-hidden
-                          />
-                        )}
-                        <span className="truncate">{s.name}</span>
-                      </Link>
-                    </Button>,
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
 
         {isAdmin && (
           <>

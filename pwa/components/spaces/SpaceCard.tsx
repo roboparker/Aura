@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText, FolderKanban, Lock, LockOpen, Users } from "lucide-react";
+import { FileText, FolderKanban, Lock, Users } from "lucide-react";
 import type { Space } from "@/contexts/ActiveSpaceContext";
 import { resolveSpaceColor } from "@/lib/avatarPalette";
 import { formatRelative } from "@/lib/relativeTime";
@@ -54,26 +54,7 @@ const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold truncate">{space.name}</h3>
-                {space.isPersonal ? (
-                  <Badge
-                    variant="outline"
-                    className="font-normal text-muted-foreground gap-1"
-                  >
-                    <Lock className="h-3 w-3" aria-hidden />
-                    personal
-                  </Badge>
-                ) : (
-                  <Badge
-                    variant="outline"
-                    className="font-normal text-muted-foreground gap-1"
-                  >
-                    <LockOpen className="h-3 w-3" aria-hidden />
-                    shared
-                  </Badge>
-                )}
-              </div>
+              <h3 className="font-semibold truncate min-w-0">{space.name}</h3>
               {role && (
                 <Badge
                   variant="outline"

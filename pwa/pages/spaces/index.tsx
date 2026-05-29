@@ -200,18 +200,22 @@ const SpacesIndex = () => {
                   size="sm"
                   variant={active ? "default" : "outline"}
                   onClick={() => setFilter(key)}
-                  className="gap-1.5"
+                  className="gap-3"
                 >
                   {label}
-                  <Badge
-                    variant="secondary"
+                  {/* Inline span instead of <Badge> so the count
+                      doesn't pick up the badge's own hover styles —
+                      the surrounding button already provides the
+                      hover signal. */}
+                  <span
+                    aria-hidden
                     className={cn(
-                      "px-1.5 font-mono text-xs",
-                      active && "bg-background/20 text-current",
+                      "inline-flex items-center justify-center rounded px-1.5 py-0.5 font-mono text-xs",
+                      active ? "bg-background/20" : "bg-muted text-muted-foreground",
                     )}
                   >
                     {counts[key]}
-                  </Badge>
+                  </span>
                 </Button>
               );
             })}
