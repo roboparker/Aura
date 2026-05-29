@@ -10,7 +10,9 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\SpaceRepository;
 use App\State\SpaceCreateProcessor;
+use App\State\SpaceUpdateProcessor;
 use App\Validator\ValidSpaceAttachments;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -47,6 +49,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user))",
             securityMessage: 'Only space admins can edit a space.',
+            processor: SpaceUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user)) and not object.getIsPersonal()",
@@ -78,6 +81,21 @@ class Space
     public const ALLOWED_ROLES = [
         self::ROLE_ADMIN,
         self::ROLE_MEMBER,
+    ];
+
+    /**
+     * Visibility is orthogonal to membership role: it controls whether
+     * additional users can be added at all. Private spaces are
+     * single-occupant (creator only); shared spaces accept invites and
+     * group memberships. Personal spaces are always private — enforced
+     * by {@see validatePersonalIsPrivate()}.
+     */
+    public const VISIBILITY_PRIVATE = 'private';
+    public const VISIBILITY_SHARED = 'shared';
+
+    public const ALLOWED_VISIBILITIES = [
+        self::VISIBILITY_PRIVATE,
+        self::VISIBILITY_SHARED,
     ];
 
     public const MAX_NAME_LENGTH = 255;
@@ -119,6 +137,22 @@ class Space
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     #[Groups(['space:read'])]
     private bool $isPersonal = false;
+
+    /**
+     * Controls whether the space accepts additional members. `private`
+     * spaces are creator-only — invite endpoints and add-member reject
+     * with 409, and {@see SpaceUpdateProcessor} kicks every other
+     * membership on a shared → private transition. `shared` is the
+     * default for new spaces; personal spaces are always `private`,
+     * enforced by {@see validatePersonalIsPrivate()}.
+     */
+    #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_SHARED])]
+    #[Assert\Choice(
+        choices: self::ALLOWED_VISIBILITIES,
+        message: 'Visibility must be "private" or "shared".',
+    )]
+    #[Groups(['space:read', 'space:write'])]
+    private string $visibility = self::VISIBILITY_SHARED;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['space:read'])]
@@ -238,6 +272,38 @@ class Space
     {
         $this->isPersonal = $isPersonal;
         return $this;
+    }
+
+    public function getVisibility(): string
+    {
+        return $this->visibility;
+    }
+
+    public function setVisibility(string $visibility): static
+    {
+        $this->visibility = $visibility;
+        return $this;
+    }
+
+    public function isPrivate(): bool
+    {
+        return self::VISIBILITY_PRIVATE === $this->visibility;
+    }
+
+    /**
+     * Class-level invariant enforced after standard property validation:
+     * personal spaces must always be private. Prevents a payload (or a
+     * mistaken service-layer call) from leaving a user's auto-provisioned
+     * personal bucket open to invites.
+     */
+    #[Assert\Callback]
+    public function validatePersonalIsPrivate(ExecutionContextInterface $context): void
+    {
+        if ($this->isPersonal && self::VISIBILITY_PRIVATE !== $this->visibility) {
+            $context->buildViolation('Personal spaces must be private.')
+                ->atPath('visibility')
+                ->addViolation();
+        }
     }
 
     public function getCreatedAt(): \DateTimeImmutable

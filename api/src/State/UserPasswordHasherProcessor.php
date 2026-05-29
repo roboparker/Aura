@@ -89,6 +89,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         $space = (new Space())
             ->setName(Space::PERSONAL_SPACE_NAME)
             ->setIsPersonal(true)
+            ->setVisibility(Space::VISIBILITY_PRIVATE)
             ->setCreatedBy($user);
 
         $membership = (new SpaceMembership())

@@ -66,6 +66,16 @@ class SpaceMemberController extends AbstractController
             return $this->json(['error' => 'Only space admins can add members.'], 403);
         }
 
+        if ($space->isPrivate()) {
+            // Visibility is the structural gate here; surfacing the
+            // 409 before payload validation keeps the response shape
+            // independent of whatever the client sent.
+            return $this->json(
+                ['error' => 'Cannot add members to a private space. Switch it to shared first.'],
+                409,
+            );
+        }
+
         $payload = $request->toArray();
         $email = is_string($payload['email'] ?? null) ? trim($payload['email']) : '';
         if ('' === $email) {
