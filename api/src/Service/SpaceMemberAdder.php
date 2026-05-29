@@ -40,13 +40,9 @@ final class SpaceMemberAdder
     }
 
     /**
-     * @return array{
-     *   status: 'added'|'invited'|'already_member',
-     *   email: string,
-     *   user?: User,
-     *   invite?: UserInvite,
-     *   plainToken?: string,
-     * }
+     * @return array{status: 'already_member', email: string, user: User}
+     *     |array{status: 'added', email: string, user: User}
+     *     |array{status: 'invited', email: string, invite: UserInvite, plainToken: string}
      */
     public function add(Space $space, string $email, User $invitedBy): array
     {
