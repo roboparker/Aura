@@ -105,6 +105,8 @@ class Space
 
     public const PERSONAL_SPACE_NAME = 'Private';
 
+    public const MAX_INITIAL_INVITES = 50;
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -256,6 +258,27 @@ class Space
     private Collection $attachments;
 
     /**
+     * Transient list of email addresses to invite at creation time —
+     * consumed by {@see SpaceCreateProcessor}, never persisted. Validated
+     * inline so a single bad address fails the whole create with 422
+     * (atomic batch invite — partial success would leave the UX in a
+     * state nobody asked for). All-personal duplicates and the creator's
+     * own address are dropped in the processor without erroring.
+     *
+     * @var list<string>
+     */
+    #[Assert\All([
+        new Assert\Email(message: '"{{ value }}" is not a valid email address.'),
+        new Assert\Length(max: 180),
+    ])]
+    #[Assert\Count(
+        max: self::MAX_INITIAL_INVITES,
+        maxMessage: 'You can invite at most {{ limit }} people at once.',
+    )]
+    #[Groups(['space:write'])]
+    private array $invites = [];
+
+    /**
      * Inverse side for projects rooted in this space. EXTRA_LAZY means
      * `->count()` runs a single SELECT COUNT query without hydrating
      * rows, so {@see getProjectsCount()} stays cheap even on the
@@ -381,6 +404,23 @@ class Space
     public function setColor(?string $color): static
     {
         $this->color = $color;
+        return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getInvites(): array
+    {
+        return $this->invites;
+    }
+
+    /**
+     * @param list<string> $invites
+     */
+    public function setInvites(array $invites): static
+    {
+        $this->invites = $invites;
         return $this;
     }
 
