@@ -212,8 +212,10 @@
 .doc-content em { @apply italic; }
 .doc-content blockquote { @apply border-l-4 border-border pl-4 my-4 text-muted-foreground italic; }
 .doc-content code { @apply bg-muted rounded px-1.5 py-0.5 text-[0.875em] font-mono; }
-.doc-content pre { @apply bg-muted rounded-md p-4 my-4 overflow-x-auto; }
-.doc-content pre code { @apply bg-transparent p-0 text-sm; }
+/* `>` selectors so CodeFence's own <pre> (wrapped in a styled <div>)
+ * isn't doubled up with default padding / background. */
+.doc-content > pre { @apply bg-muted rounded-md p-4 my-4 overflow-x-auto; }
+.doc-content > pre > code { @apply bg-transparent p-0 text-sm; }
 .doc-content hr { @apply my-6 border-border; }
 .doc-content table { @apply border-collapse my-4 w-full text-sm; }
 .doc-content th, .doc-content td { @apply border border-border px-3 py-2 align-top; }

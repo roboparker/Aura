@@ -1,11 +1,32 @@
+import { Children, isValidElement, type ReactElement } from "react";
 import type { GetStaticPaths, GetStaticProps } from "next";
 import Head from "next/head";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import CodeFence from "@/components/editor/CodeFence";
 import { getAllDocs, loadDoc, type LoadedDoc } from "@/lib/docs";
+
+// `<pre>` override: react-markdown wraps a fenced code block as
+// `<pre><code className="language-xxx">{code}</code></pre>`. Unwrap it
+// to extract the language + raw source and hand off to CodeFence, which
+// runs Prism. Plain `<pre>` (no language) falls back to default styling.
+const renderPre: Components["pre"] = ({ children }) => {
+  const only = Children.toArray(children).find(isValidElement) as
+    | ReactElement<{ className?: string; children?: unknown }>
+    | undefined;
+  const className = only?.props.className ?? "";
+  const match = /language-([\w+-]+)/.exec(className);
+  if (only && match) {
+    const code = String(only.props.children ?? "").replace(/\n$/, "");
+    return <CodeFence code={code} language={match[1]} />;
+  }
+  return <pre>{children}</pre>;
+};
+
+const MARKDOWN_COMPONENTS: Components = { pre: renderPre };
 
 interface Props {
   doc: LoadedDoc;
@@ -45,7 +66,12 @@ const GuidePage = ({ doc, sectionLabel }: Props) => (
         </header>
 
         <article className="doc-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{doc.body}</ReactMarkdown>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={MARKDOWN_COMPONENTS}
+          >
+            {doc.body}
+          </ReactMarkdown>
         </article>
       </div>
     </main>
