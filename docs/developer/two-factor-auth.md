@@ -2,7 +2,7 @@
 
 This document describes how 2FA is wired up in the codebase: which packages, where state lives, how the firewall handles the second step, how the lost-device recovery flow works, and the trade-offs behind the design.
 
-End users should read [two-factor-auth-user-guide.md](two-factor-auth-user-guide.md) instead.
+End users should read [../user/two-factor-auth.md](../user/two-factor-auth.md) instead.
 
 ## Packages
 
@@ -10,15 +10,15 @@ End users should read [two-factor-auth-user-guide.md](two-factor-auth-user-guide
 - `scheb/2fa-totp` — TOTP provider (delegates to [`spomky-labs/otphp`](https://github.com/Spomky-Labs/otphp)).
 - `scheb/2fa-backup-code` — backup-code provider; calls into our entity's `isBackupCode()` / `invalidateBackupCode()` methods.
 
-Config: [api/config/packages/scheb_2fa.yaml](../api/config/packages/scheb_2fa.yaml). TOTP `leeway` is 15s (covers the "started typing at the rollover" race without exceeding the 30-second TOTP period).
+Config: [api/config/packages/scheb_2fa.yaml](../../api/config/packages/scheb_2fa.yaml). TOTP `leeway` is 15s (covers the "started typing at the rollover" race without exceeding the 30-second TOTP period).
 
 ## Entity model
 
 `App\Entity\User` implements `Scheb\TwoFactorBundle\Model\Totp\TwoFactorInterface` and `Scheb\TwoFactorBundle\Model\BackupCodeInterface`. Storage fields:
 
 - `totpEnabled: bool` — flips true only after `/me/2fa/verify` confirms the first code. False during setup, false after `disable()`.
-- `totpSecretEncrypted: ?string` — sodium-secretbox-encrypted TOTP secret. Key is derived from `APP_SECRET` by [`App\Service\TwoFactorSecretCipher`](../api/src/Service/TwoFactorSecretCipher.php).
-- `totpSecretCache: ?string` — transient (not persisted) plaintext, populated on Doctrine `postLoad` by [`App\EventListener\UserTotpCipherInjector`](../api/src/EventListener/UserTotpCipherInjector.php). Scheb reads this through `getTotpAuthenticationConfiguration()`.
+- `totpSecretEncrypted: ?string` — sodium-secretbox-encrypted TOTP secret. Key is derived from `APP_SECRET` by [`App\Service\TwoFactorSecretCipher`](../../api/src/Service/TwoFactorSecretCipher.php).
+- `totpSecretCache: ?string` — transient (not persisted) plaintext, populated on Doctrine `postLoad` by [`App\EventListener\UserTotpCipherInjector`](../../api/src/EventListener/UserTotpCipherInjector.php). Scheb reads this through `getTotpAuthenticationConfiguration()`.
 - `totpEnabledAt: ?DateTimeImmutable` — telemetry only.
 - `recoveryCodes: list<array{hash: string, encrypted?: string, consumedAt: ?string, consumedCode?: ?string}>` — JSON. `hash` is the source of truth for verification; `encrypted` is the sodium-encrypted plaintext used by the GitHub-style "reveal codes" flow. Spent entries are kept (with `consumedAt`) so the UI can show "X of 10 used."
 
@@ -40,7 +40,7 @@ All under the `main` firewall (authenticated session required) except the login 
 | `/me/2fa/status` | GET | session | Light status check (`{enabled, recoveryCodesRemaining, enabledAt}`). The user payload at `/api/me` already inlines `twoFactor`, so this endpoint exists mostly for completeness. |
 | `/auth/2fa-check` | POST | half-auth (`TwoFactorToken`) | The login challenge. Owned by Scheb's firewall listener — we configure it but don't route here ourselves. |
 
-All routes live in [`App\Controller\TwoFactorController`](../api/src/Controller/TwoFactorController.php). The login challenge is owned by Scheb but its JSON request/response shape is shimmed by [`App\Security\TwoFactorJsonHandler`](../api/src/Security/TwoFactorJsonHandler.php).
+All routes live in [`App\Controller\TwoFactorController`](../../api/src/Controller/TwoFactorController.php). The login challenge is owned by Scheb but its JSON request/response shape is shimmed by [`App\Security\TwoFactorJsonHandler`](../../api/src/Security/TwoFactorJsonHandler.php).
 
 ## Login flow
 
@@ -87,15 +87,15 @@ POST /auth/2fa-check {code}
 
 The `two_factor_verify` limiter (5/minute token bucket, per user) is shared across:
 
-- The `/auth/2fa-check` login challenge, enforced by [`App\EventSubscriber\TwoFactorChallengeRateLimiter`](../api/src/EventSubscriber/TwoFactorChallengeRateLimiter.php) on `TwoFactorAuthenticationEvents::ATTEMPT`. Throws `TooManyTwoFactorAttemptsException`, which `TwoFactorJsonHandler::onAuthenticationFailure` maps to a 429 + `Retry-After` header.
+- The `/auth/2fa-check` login challenge, enforced by [`App\EventSubscriber\TwoFactorChallengeRateLimiter`](../../api/src/EventSubscriber/TwoFactorChallengeRateLimiter.php) on `TwoFactorAuthenticationEvents::ATTEMPT`. Throws `TooManyTwoFactorAttemptsException`, which `TwoFactorJsonHandler::onAuthenticationFailure` maps to a 429 + `Retry-After` header.
 - The setup-confirm path (`/me/2fa/verify`) inside the controller itself.
-- The step-up path in [`App\Service\SensitiveActionVerifier`](../api/src/Service/SensitiveActionVerifier.php).
+- The step-up path in [`App\Service\SensitiveActionVerifier`](../../api/src/Service/SensitiveActionVerifier.php).
 
 One bucket across all three so a password-compromised attacker can't double their budget by alternating endpoints.
 
 ## Step-up: SensitiveActionVerifier
 
-Disable, regenerate recovery codes, reveal recovery codes, change password, and re-enroll all route through [`App\Service\SensitiveActionVerifier`](../api/src/Service/SensitiveActionVerifier.php). It branches on the user's 2FA status and the recovery flag:
+Disable, regenerate recovery codes, reveal recovery codes, change password, and re-enroll all route through [`App\Service\SensitiveActionVerifier`](../../api/src/Service/SensitiveActionVerifier.php). It branches on the user's 2FA status and the recovery flag:
 
 ```
 isTotpEnabled && !recoveryPending → expects `totpCode` (TOTP authenticator)
@@ -133,7 +133,7 @@ The flag is exposed on the user payload at every entry point:
 - `TwoFactorJsonHandler::onAuthenticationSuccess` (so the body returned by `/auth/2fa-check` shows `recoveryPending: true` on the same response).
 - `AuthController::serializeUser` (so `/api/me` keeps surfacing it after the page reloads).
 
-The PWA's [`TwoFactorRecoveryInterstitial`](../pwa/components/auth/TwoFactorRecoveryInterstitial.tsx) — mounted in [`Layout.tsx`](../pwa/components/common/Layout.tsx) — reads `user.twoFactor.recoveryPending` and renders a forced modal (no close X, Escape blocked, outside-click blocked) until the user chooses one of two paths:
+The PWA's [`TwoFactorRecoveryInterstitial`](../../pwa/components/auth/TwoFactorRecoveryInterstitial.tsx) — mounted in [`Layout.tsx`](../../pwa/components/common/Layout.tsx) — reads `user.twoFactor.recoveryPending` and renders a forced modal (no close X, Escape blocked, outside-click blocked) until the user chooses one of two paths:
 
 ### Re-enroll
 
@@ -180,7 +180,7 @@ The user can re-enable later from settings via the normal flow.
 
 ### Flag lifecycle
 
-[`App\Service\TwoFactorRecoveryState`](../api/src/Service/TwoFactorRecoveryState.php) is a thin wrapper over a session attribute (`_2fa_recovery_pending`). Reasons for storing it on the session rather than the entity:
+[`App\Service\TwoFactorRecoveryState`](../../api/src/Service/TwoFactorRecoveryState.php) is a thin wrapper over a session attribute (`_2fa_recovery_pending`). Reasons for storing it on the session rather than the entity:
 
 - It's a property of *this login*, not a permanent account state. A parallel session on another device is unaffected.
 - Logout invalidates the session and the flag with it. There's no way for a half-completed recovery to leak to the next sign-in.
@@ -188,7 +188,7 @@ The user can re-enable later from settings via the normal flow.
 
 ## Notification emails
 
-[`App\Service\TwoFactorRecoveryMailer`](../api/src/Service/TwoFactorRecoveryMailer.php) ships three messages:
+[`App\Service\TwoFactorRecoveryMailer`](../../api/src/Service/TwoFactorRecoveryMailer.php) ships three messages:
 
 | Method | Trigger | Why |
 | - | - | - |
@@ -206,11 +206,11 @@ We deliberately do *not* send a notification on regular setup/disable/regenerate
 
 | Component | File | Purpose |
 | - | - | - |
-| `TwoFactorSection` | [pwa/components/account/TwoFactorSection.tsx](../pwa/components/account/TwoFactorSection.tsx) | Account-settings card. Shows enable/disable, recovery-code count, reveal + regenerate dialogs. All step-up dialogs render a TOTP input because they're only reachable when 2FA is on. |
-| `TwoFactorSetupDialog` | [pwa/components/account/TwoFactorSetupDialog.tsx](../pwa/components/account/TwoFactorSetupDialog.tsx) | Two-step modal for initial enrollment (scan → verify → show recovery codes). QR is rendered client-side from `qrcode/lib/browser`. |
-| `TwoFactorChallengeForm` | [pwa/components/auth/TwoFactorChallengeForm.tsx](../pwa/components/auth/TwoFactorChallengeForm.tsx) | The post-login 6-digit code input. Accepts both TOTP and recovery codes. Handles the 429 rate-limit response with a countdown. |
-| `TwoFactorRecoveryInterstitial` | [pwa/components/auth/TwoFactorRecoveryInterstitial.tsx](../pwa/components/auth/TwoFactorRecoveryInterstitial.tsx) | The forced modal that mounts when `user.twoFactor.recoveryPending` is true. Re-enroll vs Disable. No close button, no outside-click, Escape blocked. |
-| `ChangePasswordForm` | [pwa/components/account/ChangePasswordForm.tsx](../pwa/components/account/ChangePasswordForm.tsx) | Swaps the password field for a TOTP field when 2FA is enabled. |
+| `TwoFactorSection` | [pwa/components/account/TwoFactorSection.tsx](../../pwa/components/account/TwoFactorSection.tsx) | Account-settings card. Shows enable/disable, recovery-code count, reveal + regenerate dialogs. All step-up dialogs render a TOTP input because they're only reachable when 2FA is on. |
+| `TwoFactorSetupDialog` | [pwa/components/account/TwoFactorSetupDialog.tsx](../../pwa/components/account/TwoFactorSetupDialog.tsx) | Two-step modal for initial enrollment (scan → verify → show recovery codes). QR is rendered client-side from `qrcode/lib/browser`. |
+| `TwoFactorChallengeForm` | [pwa/components/auth/TwoFactorChallengeForm.tsx](../../pwa/components/auth/TwoFactorChallengeForm.tsx) | The post-login 6-digit code input. Accepts both TOTP and recovery codes. Handles the 429 rate-limit response with a countdown. |
+| `TwoFactorRecoveryInterstitial` | [pwa/components/auth/TwoFactorRecoveryInterstitial.tsx](../../pwa/components/auth/TwoFactorRecoveryInterstitial.tsx) | The forced modal that mounts when `user.twoFactor.recoveryPending` is true. Re-enroll vs Disable. No close button, no outside-click, Escape blocked. |
+| `ChangePasswordForm` | [pwa/components/account/ChangePasswordForm.tsx](../../pwa/components/account/ChangePasswordForm.tsx) | Swaps the password field for a TOTP field when 2FA is enabled. |
 
 `AuthContext` exposes the relevant state:
 
@@ -240,8 +240,8 @@ The interstitial reads `user.twoFactor.recoveryPending` directly. Other componen
 
 ## Testing
 
-- [`api/tests/Api/TwoFactorTest.php`](../api/tests/Api/TwoFactorTest.php) — setup, verify, login challenge, disable, regenerate, reveal. All with a working authenticator.
-- [`api/tests/Api/TwoFactorRecoveryTest.php`](../api/tests/Api/TwoFactorRecoveryTest.php) — backup-code login flags the session, `/api/me` reflects it, disable accepts password during recovery, wrong password still rejected, reenroll rotates the secret and verify clears the flag + fires the reconfigured email, reenroll outside recovery still demands TOTP.
+- [`api/tests/Api/TwoFactorTest.php`](../../api/tests/Api/TwoFactorTest.php) — setup, verify, login challenge, disable, regenerate, reveal. All with a working authenticator.
+- [`api/tests/Api/TwoFactorRecoveryTest.php`](../../api/tests/Api/TwoFactorRecoveryTest.php) — backup-code login flags the session, `/api/me` reflects it, disable accepts password during recovery, wrong password still rejected, reenroll rotates the secret and verify clears the flag + fires the reconfigured email, reenroll outside recovery still demands TOTP.
 
 `assertEmailCount` resets between requests in Symfony tests — assert email counts immediately after the request that should send. The tests pin this with the email assertion right after the relevant POST/DELETE.
 

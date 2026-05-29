@@ -40,7 +40,7 @@ scripts/worktree-env.sh    # writes ./.env with a unique project name and port b
 docker compose up -d
 ```
 
-See [`docs/deployment.md`](docs/deployment.md) for details.
+See [`docs/developer/deployment.md`](docs/developer/deployment.md) for details.
 
 ## Local development
 
@@ -72,10 +72,20 @@ npx playwright test
 
 ## Documentation
 
-- [Architecture](docs/architecture.md) — how the API, PWA, and Mercure fit together.
-- [API guide](docs/api-guide.md) — entity, resource, and serialization conventions.
-- [Branching and releases](docs/branching-and-releases.md) — branch naming, conventional commits, release tags.
-- [Deployment](docs/deployment.md) — Docker, Helm, and parallel-worktree setup.
+Developer:
+- [Architecture](docs/developer/architecture.md) — how the API, PWA, and Mercure fit together.
+- [API guide](docs/developer/api-guide.md) — entity, resource, and serialization conventions.
+- [Branching and releases](docs/developer/branching-and-releases.md) — branch naming, conventional commits, release tags.
+- [Deployment](docs/developer/deployment.md) — Docker, Helm, and parallel-worktree setup.
+- [MCP server](docs/developer/mcp-server.md) — `POST /mcp` endpoint, token auth, tool catalog.
+- [Two-factor auth](docs/developer/two-factor-auth.md) — TOTP, recovery codes, lost-device flow.
+- [Password reset](docs/developer/password-reset.md) — forgot/reset flow, token model, enumeration mitigations.
+
+End-user guides:
+- [Two-factor auth](docs/user/two-factor-auth.md) — how to enable, sign in with, and recover 2FA.
+- [Password reset](docs/user/password-reset.md) — how to reset a forgotten password.
+
+Community:
 - [Contributing](.github/CONTRIBUTING.md), [Code of Conduct](CODE_OF_CONDUCT.md), [Security](.github/SECURITY.md).
 
 ## License
