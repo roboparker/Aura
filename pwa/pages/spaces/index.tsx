@@ -1,27 +1,58 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownAZ, Clock, Filter, ListFilter, Plus, Search, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import PageHeader from "@/components/common/PageHeader";
+import SpaceCard from "@/components/spaces/SpaceCard";
+import CreateSpaceDialog from "@/components/spaces/CreateSpaceDialog";
+
+type FilterKey = "all" | "shared" | "personal" | "owned";
+type SortKey = "recent" | "name" | "members";
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "shared", label: "Shared" },
+  { key: "personal", label: "Personal" },
+  { key: "owned", label: "Owned by me" },
+];
+
+const SORTS: { key: SortKey; label: string; icon: typeof Clock }[] = [
+  { key: "recent", label: "Recent", icon: Clock },
+  { key: "name", label: "Name", icon: ArrowDownAZ },
+  { key: "members", label: "Members", icon: Users },
+];
+
+const effectiveMemberCount = (space: Space): number => {
+  const direct = new Set(space.userMemberships.map((m) => m.user.id));
+  // Group members aren't expanded on the list endpoint — counts that
+  // include group-inherited users would require a separate roundtrip
+  // per space. For now show the direct count; UI copy says "members"
+  // which is honest about what's counted.
+  return direct.size;
+};
 
 const SpacesIndex = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { spaces, refresh, isLoading: spacesLoading } = useActiveSpace();
+  const { spaces, isLoading: spacesLoading } = useActiveSpace();
   const router = useRouter();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [sort, setSort] = useState<SortKey>("recent");
+  const [search, setSearch] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -29,169 +60,206 @@ const SpacesIndex = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!name.trim()) return;
+  const isOwned = (space: Space) =>
+    !!user && space.createdBy?.id === user.id;
 
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/spaces`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description ||
-            data.detail ||
-            data["hydra:description"] ||
-            "Failed to create space.",
-        );
-      }
-      setName("");
-      setDescription("");
-      // Reload the user's space list so the new entry shows up in the
-      // list AND becomes available in the navbar switcher.
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create space.");
-    } finally {
-      setIsSubmitting(false);
+  const counts = useMemo(
+    () => ({
+      all: spaces.length,
+      shared: spaces.filter((s) => !s.isPersonal).length,
+      personal: spaces.filter((s) => s.isPersonal).length,
+      owned: spaces.filter(isOwned).length,
+    }),
+    // user is captured by isOwned closure; spaces drives recompute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [spaces, user?.id],
+  );
+
+  const filteredSpaces = useMemo(() => {
+    let out = spaces;
+    if (filter === "shared") out = out.filter((s) => !s.isPersonal);
+    if (filter === "personal") out = out.filter((s) => s.isPersonal);
+    if (filter === "owned") out = out.filter(isOwned);
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      out = out.filter(
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          (s.description ?? "").toLowerCase().includes(q),
+      );
     }
+
+    const sorted = [...out];
+    if (sort === "recent") {
+      sorted.sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      );
+    } else if (sort === "name") {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "members") {
+      sorted.sort(
+        (a, b) => effectiveMemberCount(b) - effectiveMemberCount(a),
+      );
+    }
+    return sorted;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaces, filter, sort, search, user?.id]);
+
+  const roleFor = (space: Space): "admin" | "member" | null => {
+    if (!user) return null;
+    const m = space.userMemberships.find((x) => x.user.id === user.id);
+    return m?.role ?? null;
   };
 
   if (authLoading || !isAuthenticated || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted">
+      <div className="min-h-screen flex items-center justify-center">
         <p className="text-muted-foreground">Loading…</p>
       </div>
     );
   }
 
-  // Personal space first, then shared by created date (the API already
-  // sorts that way; preserve it on the client).
-  const ordered = [...spaces].sort((a, b) =>
-    a.isPersonal === b.isPersonal ? 0 : a.isPersonal ? -1 : 1,
-  );
+  const sortLabel = SORTS.find((s) => s.key === sort)?.label ?? "Recent";
 
   return (
     <>
       <Head>
         <title>Spaces - Aura</title>
       </Head>
-      <main className="min-h-screen bg-muted px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-2">Spaces</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            A space is the home for a set of projects, discussions, and
-            members. Your private space comes with your account; create
-            shared spaces to collaborate.
-          </p>
 
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <form onSubmit={handleCreate} className="space-y-4" data-testid="create-space-form">
-                <div className="space-y-1.5">
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    maxLength={255}
-                    placeholder="Backend team"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="description">
-                    Description{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <Input
-                    id="description"
-                    type="text"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    maxLength={500}
-                  />
-                </div>
-                <Button type="submit" disabled={isSubmitting || !name.trim()}>
-                  {isSubmitting ? "Creating…" : "Create space"}
+      <main className="px-6 py-8 max-w-7xl mx-auto">
+        <PageHeader
+          title="Spaces"
+          subtitle="Workspaces and shared rooms you belong to. Each space has its own members, projects, and pages."
+          actions={
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => {
+                  // Mobile fallback that surfaces the filter chips
+                  // when they collapse out of view. On desktop the
+                  // chips below are always visible, so this is
+                  // primarily a hint label.
+                  document
+                    .getElementById("spaces-filter-row")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                Filter
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <ListFilter className="h-3.5 w-3.5" />
+                    Sort: {sortLabel.toLowerCase()}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {SORTS.map(({ key, label, icon: Icon }) => (
+                    <DropdownMenuItem
+                      key={key}
+                      onSelect={() => setSort(key)}
+                      className={cn("gap-2", sort === key && "font-semibold")}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                size="sm"
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                New space
+              </Button>
+            </>
+          }
+        />
+
+        {/* Filter chips + search input row. */}
+        <div
+          id="spaces-filter-row"
+          className="flex flex-wrap items-center justify-between gap-3 mb-4"
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {FILTERS.map(({ key, label }) => {
+              const active = filter === key;
+              return (
+                <Button
+                  key={key}
+                  type="button"
+                  size="sm"
+                  variant={active ? "default" : "outline"}
+                  onClick={() => setFilter(key)}
+                  className="gap-1.5"
+                >
+                  {label}
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "px-1.5 font-mono text-xs",
+                      active && "bg-background/20 text-current",
+                    )}
+                  >
+                    {counts[key]}
+                  </Badge>
                 </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {spacesLoading && spaces.length === 0 ? (
-            <p className="text-muted-foreground">Loading spaces…</p>
-          ) : (
-            <ul className="space-y-2" data-testid="space-list">
-              {ordered.map((space) => {
-                const isAdmin = space.userMemberships.some(
-                  (m) => m.user.id === user.id && m.role === "admin",
-                );
-                return (
-                  <li key={space["@id"]} data-testid="space-item">
-                    <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h2 className="font-semibold">
-                              <Link
-                                href={`/spaces/${space.id}`}
-                                className="text-primary hover:underline no-underline"
-                              >
-                                {space.name}
-                              </Link>
-                            </h2>
-                            {space.description && (
-                              <p className="mt-1 text-sm text-muted-foreground">
-                                {space.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex gap-1 shrink-0">
-                            {space.isPersonal && (
-                              <Badge variant="secondary">Private</Badge>
-                            )}
-                            {isAdmin && !space.isPersonal && (
-                              <Badge variant="secondary">Admin</Badge>
-                            )}
-                          </div>
-                        </div>
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          {space.userMemberships.length}{" "}
-                          {space.userMemberships.length === 1 ? "member" : "members"}
-                          {space.groupMemberships.length > 0 && (
-                            <>
-                              {" · "}
-                              {space.groupMemberships.length}{" "}
-                              {space.groupMemberships.length === 1 ? "group" : "groups"}
-                            </>
-                          )}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+              );
+            })}
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search spaces…"
+              className="pl-8"
+            />
+          </div>
         </div>
+
+        {/* Section label + grid. */}
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Your spaces
+          <span className="text-muted-foreground/70">{filteredSpaces.length}</span>
+        </div>
+
+        {spacesLoading && spaces.length === 0 ? (
+          <p className="text-muted-foreground">Loading spaces…</p>
+        ) : filteredSpaces.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+            {search.trim() || filter !== "all"
+              ? "No spaces match those filters."
+              : "You don't belong to any spaces yet."}
+          </div>
+        ) : (
+          <ul
+            data-testid="space-list"
+            className="grid gap-3 sm:grid-cols-1 lg:grid-cols-2"
+          >
+            {filteredSpaces.map((space) => (
+              <li key={space["@id"]} data-testid="space-item">
+                <SpaceCard
+                  space={space}
+                  role={roleFor(space)}
+                  effectiveMemberCount={effectiveMemberCount(space)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
       </main>
+
+      <CreateSpaceDialog open={createOpen} onOpenChange={setCreateOpen} />
     </>
   );
 };

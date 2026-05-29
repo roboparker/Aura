@@ -50,10 +50,16 @@ export interface Space {
   name: string;
   description: string | null;
   isPersonal: boolean;
+  visibility: "private" | "shared";
   createdAt: string;
+  updatedAt: string;
   createdBy: { "@id": string; id: string; email: string } | null;
   userMemberships: SpaceMembershipRow[];
   groupMemberships: SpaceGroupMembershipRow[];
+  /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
+  projectsCount: number;
+  /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */
+  pagesCount: number;
   /** Shared files attached at the space level. Present on the detail
    *  endpoint; may be undefined on the list endpoint when the
    *  collection isn't expanded. */
