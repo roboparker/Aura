@@ -82,12 +82,12 @@ class SpaceMemberController extends AbstractController
         $this->em->flush();
 
         if ('added' === $result['status']) {
-            $candidate = $result['user'] ?? null;
+            $candidate = $result['user'];
             return $this->json([
                 'status' => 'added',
-                'id' => (string) $candidate?->getId(),
-                '@id' => '/users/' . $candidate?->getId(),
-                'email' => $candidate?->getEmail(),
+                'id' => (string) $candidate->getId(),
+                '@id' => '/users/' . $candidate->getId(),
+                'email' => $candidate->getEmail(),
             ], 200);
         }
 
