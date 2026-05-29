@@ -9,6 +9,7 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
+import Footer from "./Footer";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
@@ -35,15 +36,18 @@ const Layout = ({
         <HydrationBoundary state={dehydratedState}>
           <AuthProvider>
             <ActiveSpaceProvider>
-              <Navbar />
-              {/* Persistent left sidebar (`md:` and up) when signed
-                  in; the navbar's mobile Sheet handles the small-
-                  screen case. Sidebar renders nothing for
-                  unauthenticated visitors so the marketing/auth
-                  screens keep their original full-width layout. */}
-              <div className="flex">
-                <Sidebar />
-                <div className="flex-1 min-w-0">{children}</div>
+              <div className="flex min-h-screen flex-col">
+                <Navbar />
+                {/* Persistent left sidebar (`md:` and up) when signed
+                    in; the navbar's mobile Sheet handles the small-
+                    screen case. Sidebar renders nothing for
+                    unauthenticated visitors so the marketing/auth
+                    screens keep their original full-width layout. */}
+                <div className="flex flex-1">
+                  <Sidebar />
+                  <div className="flex-1 min-w-0">{children}</div>
+                </div>
+                <Footer />
               </div>
               {/* Forced modal that appears the moment the API signals
                   this session signed in with a backup code. See

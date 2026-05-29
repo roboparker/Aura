@@ -1,13 +1,7 @@
 import Link from "next/link";
-import { ChevronDown, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetClose,
@@ -35,22 +29,9 @@ const Navbar = () => {
           >
             Aura
           </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1">
-                Docs
-                <ChevronDown className="h-3.5 w-3.5" aria-hidden />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-              <DropdownMenuItem asChild>
-                <a href="/docs">API</a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dev/components">Components</Link>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Developer-facing doc links (API reference, component
+              library, guides) live in the page Footer to keep the navbar
+              focused on the active session. */}
         </div>
 
         {/* SearchBar stretches into the empty space between the
