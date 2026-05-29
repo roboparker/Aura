@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Highlight,
-  themes,
   type Language,
   type PrismTheme,
 } from "prism-react-renderer";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CODE_THEME_PRESETS } from "@/lib/codeThemes";
 
 interface CodeFenceProps {
   code: string;
@@ -65,12 +65,14 @@ const Highlighted = ({ code, language, theme }: HighlightedProps) => (
   </Highlight>
 );
 
-// Code fence renderer for the `/guides` markdown pages. Renders BOTH
-// light + dark Prism outputs server-side and lets CSS show the right
-// one based on the `dark` class next-themes paints onto <html> before
-// hydration. Reading the theme via `useTheme()` would race the
-// hydration cycle and produce a brief flash of the wrong palette on
-// every refresh, since `resolvedTheme` is undefined during SSR.
+// Renders every preset's light + dark variants up-front and tags each
+// pane with `data-pane-theme` + `data-pane-mode`. CSS in globals.css
+// (.cf-pane rules) shows only the pane that matches the active
+// combination of `html[data-code-theme]` and `html.dark`. Doing it
+// statically — rather than reading the active preset via React state —
+// means SSR-rendered HTML already contains the right pane for every
+// possible (preset, mode) combination, so a refresh paints the user's
+// saved choice with zero flash.
 const CodeFence = ({ code, language, className }: CodeFenceProps) => {
   const [copied, setCopied] = useState(false);
 
@@ -112,14 +114,24 @@ const CodeFence = ({ code, language, className }: CodeFenceProps) => {
         </button>
       </div>
       {prismLanguage ? (
-        <>
-          <div className="dark:hidden">
-            <Highlighted code={code} language={prismLanguage} theme={themes.github} />
-          </div>
-          <div className="hidden dark:block">
-            <Highlighted code={code} language={prismLanguage} theme={themes.vsDark} />
-          </div>
-        </>
+        CODE_THEME_PRESETS.map((preset) => (
+          <Fragment key={preset.id}>
+            <div
+              className="cf-pane"
+              data-pane-theme={preset.id}
+              data-pane-mode="light"
+            >
+              <Highlighted code={code} language={prismLanguage} theme={preset.light} />
+            </div>
+            <div
+              className="cf-pane"
+              data-pane-theme={preset.id}
+              data-pane-mode="dark"
+            >
+              <Highlighted code={code} language={prismLanguage} theme={preset.dark} />
+            </div>
+          </Fragment>
+        ))
       ) : (
         <pre className="m-0 overflow-x-auto bg-muted p-4 text-sm leading-relaxed">
           <code>{code}</code>

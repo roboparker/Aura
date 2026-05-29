@@ -226,6 +226,27 @@
  * inside the body when it duplicates the filename-derived title. */
 .doc-content > h1:first-child { @apply hidden; }
 
+/* Code-fence theme switching — all preset variants are SSR'd by
+ * CodeFence; CSS keeps only the one matching the active
+ * `html[data-code-theme]` + `html.dark` combination visible. The
+ * inline script in `_document.tsx` stamps `data-code-theme` before
+ * React hydrates, so refreshes paint the right pane without flash. */
+.cf-pane { display: none; }
+html:not(.dark)[data-code-theme="vs"] .cf-pane[data-pane-theme="vs"][data-pane-mode="light"],
+html.dark[data-code-theme="vs"] .cf-pane[data-pane-theme="vs"][data-pane-mode="dark"],
+html:not(.dark)[data-code-theme="github"] .cf-pane[data-pane-theme="github"][data-pane-mode="light"],
+html.dark[data-code-theme="github"] .cf-pane[data-pane-theme="github"][data-pane-mode="dark"],
+html:not(.dark)[data-code-theme="nightowl"] .cf-pane[data-pane-theme="nightowl"][data-pane-mode="light"],
+html.dark[data-code-theme="nightowl"] .cf-pane[data-pane-theme="nightowl"][data-pane-mode="dark"],
+html:not(.dark)[data-code-theme="dracula"] .cf-pane[data-pane-theme="dracula"][data-pane-mode="light"],
+html.dark[data-code-theme="dracula"] .cf-pane[data-pane-theme="dracula"][data-pane-mode="dark"],
+html:not(.dark)[data-code-theme="palenight"] .cf-pane[data-pane-theme="palenight"][data-pane-mode="light"],
+html.dark[data-code-theme="palenight"] .cf-pane[data-pane-theme="palenight"][data-pane-mode="dark"],
+html:not(.dark)[data-code-theme="oceanic"] .cf-pane[data-pane-theme="oceanic"][data-pane-mode="light"],
+html.dark[data-code-theme="oceanic"] .cf-pane[data-pane-theme="oceanic"][data-pane-mode="dark"] {
+    display: block;
+}
+
 /* BlockNote owns its own background; just round the outer container. */
 .bn-container {
     @apply rounded-md;
