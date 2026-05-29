@@ -16,6 +16,15 @@ import {
   isKnownCodeThemeId,
 } from "@/lib/codeThemes";
 
+interface CodeThemeSwitcherProps {
+  /**
+   * `full` — labelled outline button (page-level use).
+   * `compact` — icon-only trigger sized to sit inside the CodeFence
+   * header bar next to the copy button.
+   */
+  variant?: "full" | "compact";
+}
+
 const readActive = (): string => {
   if (typeof document === "undefined") return DEFAULT_CODE_THEME_ID;
   const attr = document.documentElement.dataset.codeTheme;
@@ -27,7 +36,7 @@ const readActive = (): string => {
 // (the CSS rules in globals.css handle the rest) and persisted to
 // localStorage so the inline bootstrap script in `_document.tsx` can
 // restore it on the next page load.
-const CodeThemeSwitcher = () => {
+const CodeThemeSwitcher = ({ variant = "full" }: CodeThemeSwitcherProps) => {
   const [active, setActive] = useState<string>(DEFAULT_CODE_THEME_ID);
 
   // Sync from the DOM after mount — the inline bootstrap script has
@@ -54,10 +63,21 @@ const CodeThemeSwitcher = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Palette className="h-4 w-4" aria-hidden />
-          <span>{activeLabel}</span>
-        </Button>
+        {variant === "compact" ? (
+          <button
+            type="button"
+            aria-label={`Code theme: ${activeLabel}`}
+            title={`Code theme: ${activeLabel}`}
+            className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+          >
+            <Palette className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        ) : (
+          <Button variant="outline" size="sm" className="gap-2">
+            <Palette className="h-4 w-4" aria-hidden />
+            <span>{activeLabel}</span>
+          </Button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>Code theme</DropdownMenuLabel>

@@ -7,7 +7,6 @@ import remarkGfm from "remark-gfm";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CodeFence from "@/components/editor/CodeFence";
-import CodeThemeSwitcher from "@/components/editor/CodeThemeSwitcher";
 import { getAllDocs, loadDoc, type LoadedDoc } from "@/lib/docs";
 
 // `<pre>` override: react-markdown wraps a fenced code block as
@@ -50,15 +49,12 @@ const GuidePage = ({ doc, sectionLabel }: Props) => (
     </Head>
     <main className="bg-background">
       <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
-        <div className="mb-6 flex items-center justify-between">
-          <Button asChild variant="ghost" size="sm" className="-ml-2 gap-1">
-            <Link href="/guides">
-              <ChevronLeft className="h-4 w-4" aria-hidden />
-              All guides
-            </Link>
-          </Button>
-          <CodeThemeSwitcher />
-        </div>
+        <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2 gap-1">
+          <Link href="/guides">
+            <ChevronLeft className="h-4 w-4" aria-hidden />
+            All guides
+          </Link>
+        </Button>
 
         <header className="mb-8 border-b pb-6">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">

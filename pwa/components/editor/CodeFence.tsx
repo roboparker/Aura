@@ -7,6 +7,7 @@ import {
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CODE_THEME_PRESETS } from "@/lib/codeThemes";
+import CodeThemeSwitcher from "./CodeThemeSwitcher";
 
 interface CodeFenceProps {
   code: string;
@@ -100,18 +101,21 @@ const CodeFence = ({ code, language, className }: CodeFenceProps) => {
         <span className="font-mono uppercase tracking-wide text-muted-foreground">
           {language || "code"}
         </span>
-        <button
-          type="button"
-          onClick={handleCopy}
-          aria-label="Copy code"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-        </button>
+        <div className="flex items-center gap-1">
+          <CodeThemeSwitcher variant="compact" />
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy code"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+          >
+            {copied ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
       </div>
       {prismLanguage ? (
         CODE_THEME_PRESETS.map((preset) => (
