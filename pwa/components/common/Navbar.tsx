@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import OverdueBadge from "@/components/tasks/OverdueBadge";
+import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
 import ThemeToggle from "./ThemeToggle";
@@ -23,24 +24,32 @@ const Navbar = () => {
     <nav className="border-b bg-background">
       <div className="px-4 py-3 flex items-center gap-3">
         <div className="flex items-center gap-1 shrink-0">
-          <Link
-            href="/"
-            className="font-bold text-lg no-underline text-foreground mr-2"
-          >
-            Aura
-          </Link>
-          {/* Developer-facing doc links (API reference, component
-              library, guides) live in the page Footer to keep the navbar
-              focused on the active session. */}
+          {/* Signed-out viewers get the Aura wordmark as the home
+              anchor; signed-in viewers get the Breadcrumbs trail
+              below (with its own Home icon), so the wordmark would
+              be redundant. Developer-facing doc links (API reference,
+              component library, guides) live in the page Footer to
+              keep the navbar focused on the active session. */}
+          {!isAuthenticated && (
+            <Link
+              href="/"
+              className="font-bold text-lg no-underline text-foreground mr-2"
+            >
+              Aura
+            </Link>
+          )}
         </div>
 
-        {/* SearchBar stretches into the empty space between the
-            wordmark/Docs group and the right-side action cluster.
-            `max-w-3xl` keeps it from looking comical on very wide
-            viewports. Hidden on small screens via SearchBar's own
-            `hidden sm:block`. */}
+        {/* When signed in, the breadcrumb trail sits left of the
+            search bar and replaces the wordmark as the home anchor.
+            Both trail and search share the flexible middle column —
+            the breadcrumb shrinks first so the search bar keeps a
+            usable footprint on narrow viewports. */}
         {isAuthenticated && (
-          <SearchBar className="flex-1 min-w-0 max-w-3xl" />
+          <>
+            <Breadcrumbs className="hidden md:flex flex-1 min-w-0" />
+            <SearchBar className="flex-1 min-w-0 max-w-3xl" />
+          </>
         )}
 
         <div className="flex items-center gap-1 shrink-0 ml-auto">
