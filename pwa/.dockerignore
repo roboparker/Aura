@@ -1,5 +1,6 @@
 **/*.log
 **/*.md
+!.content/docs/**/*.md
 **/._*
 **/.dockerignore
 **/.DS_Store

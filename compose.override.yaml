@@ -64,6 +64,9 @@ services:
       # See note on `/app/vendor` above — keeps pnpm's symlinked store
       # off the host filesystem so installs don't corrupt the WSL share.
       - pwa_node_modules:/srv/app/node_modules
+      # Repo-root docs/ surfaced inside the container so scripts/sync-docs.mjs
+      # can find a source when predev / prebuild runs from /srv/app.
+      - ./docs:/srv/docs:ro
     environment:
       API_PLATFORM_CREATE_CLIENT_ENTRYPOINT: http://php
       API_PLATFORM_CREATE_CLIENT_OUTPUT: .

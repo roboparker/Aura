@@ -12,6 +12,9 @@
 /.next/
 /out/
 
+# Mirrored by scripts/sync-docs.mjs from the repo-root docs/ tree
+/.content/
+
 # production
 /build
 
