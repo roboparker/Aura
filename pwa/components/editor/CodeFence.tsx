@@ -1,6 +1,10 @@
 import { useState } from "react";
-import { Highlight, themes, type Language } from "prism-react-renderer";
-import { useTheme } from "next-themes";
+import {
+  Highlight,
+  themes,
+  type Language,
+  type PrismTheme,
+} from "prism-react-renderer";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,12 +36,42 @@ const normalise = (raw: string): Language | null => {
   return KNOWN_LANGUAGES.has(k as Language) ? (k as Language) : null;
 };
 
-// Code fence renderer for the `/guides` markdown pages. Mirrors the
-// component-library CodeBlock (theme-aware, copy button), but takes its
-// code + language as plain strings so it can be slotted in as react-
-// markdown's `<pre>` override.
+interface HighlightedProps {
+  code: string;
+  language: Language;
+  theme: PrismTheme;
+}
+
+const Highlighted = ({ code, language, theme }: HighlightedProps) => (
+  <Highlight code={code} language={language} theme={theme}>
+    {({ className: hlClass, style, tokens, getLineProps, getTokenProps }) => (
+      <pre
+        className={cn(hlClass, "m-0 overflow-x-auto p-4 text-sm leading-relaxed")}
+        style={style}
+      >
+        {tokens.map((line, i) => {
+          const lineProps = getLineProps({ line });
+          return (
+            <div key={i} {...lineProps}>
+              {line.map((token, key) => {
+                const tokenProps = getTokenProps({ token });
+                return <span key={key} {...tokenProps} />;
+              })}
+            </div>
+          );
+        })}
+      </pre>
+    )}
+  </Highlight>
+);
+
+// Code fence renderer for the `/guides` markdown pages. Renders BOTH
+// light + dark Prism outputs server-side and lets CSS show the right
+// one based on the `dark` class next-themes paints onto <html> before
+// hydration. Reading the theme via `useTheme()` would race the
+// hydration cycle and produce a brief flash of the wrong palette on
+// every refresh, since `resolvedTheme` is undefined during SSR.
 const CodeFence = ({ code, language, className }: CodeFenceProps) => {
-  const { resolvedTheme } = useTheme();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -52,7 +86,6 @@ const CodeFence = ({ code, language, className }: CodeFenceProps) => {
   };
 
   const prismLanguage = normalise(language);
-  const prismTheme = resolvedTheme === "dark" ? themes.vsDark : themes.github;
 
   return (
     <div
@@ -79,28 +112,16 @@ const CodeFence = ({ code, language, className }: CodeFenceProps) => {
         </button>
       </div>
       {prismLanguage ? (
-        <Highlight code={code} language={prismLanguage} theme={prismTheme}>
-          {({ className: hlClass, style, tokens, getLineProps, getTokenProps }) => (
-            <pre
-              className={cn(hlClass, "overflow-x-auto p-4 text-sm leading-relaxed")}
-              style={style}
-            >
-              {tokens.map((line, i) => {
-                const lineProps = getLineProps({ line });
-                return (
-                  <div key={i} {...lineProps}>
-                    {line.map((token, key) => {
-                      const tokenProps = getTokenProps({ token });
-                      return <span key={key} {...tokenProps} />;
-                    })}
-                  </div>
-                );
-              })}
-            </pre>
-          )}
-        </Highlight>
+        <>
+          <div className="dark:hidden">
+            <Highlighted code={code} language={prismLanguage} theme={themes.github} />
+          </div>
+          <div className="hidden dark:block">
+            <Highlighted code={code} language={prismLanguage} theme={themes.vsDark} />
+          </div>
+        </>
       ) : (
-        <pre className="overflow-x-auto bg-muted p-4 text-sm leading-relaxed">
+        <pre className="m-0 overflow-x-auto bg-muted p-4 text-sm leading-relaxed">
           <code>{code}</code>
         </pre>
       )}
