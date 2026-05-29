@@ -205,6 +205,8 @@ npx playwright test
 - `docs/branching-and-releases.md` - Branch naming, PR workflow, conventional commits, and release process
 - `docs/deployment.md` - Deployment and infrastructure guide
 - `docs/mcp-server.md` - MCP server endpoint, token auth, tool catalog, client config
+- `docs/two-factor-auth-user-guide.md` - End-user guide for enabling, using, and recovering 2FA
+- `docs/two-factor-auth-internals.md` - Developer reference for the 2FA implementation (entity model, endpoints, recovery flow, threat model)
 
 ### GitHub Community Files (`.github/`)
 - `.github/CONTRIBUTING.md` - Contribution guidelines
