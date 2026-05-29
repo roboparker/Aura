@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\TwoFactorRecoveryState;
 use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -12,8 +13,10 @@ use App\Entity\User;
 
 class AuthController extends AbstractController
 {
-    public function __construct(private Security $security)
-    {
+    public function __construct(
+        private Security $security,
+        private TwoFactorRecoveryState $recoveryState,
+    ) {
     }
 
     #[Route('/auth/login', name: 'auth_login', methods: ['POST'])]
@@ -38,7 +41,7 @@ class AuthController extends AbstractController
             ], 401);
         }
 
-        return $this->json(self::serializeUser($user));
+        return $this->json($this->serializeUser($user));
     }
 
     #[Route('/api/me', name: 'api_me', methods: ['GET'])]
@@ -48,13 +51,13 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
 
-        return $this->json(self::serializeUser($user));
+        return $this->json($this->serializeUser($user));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private static function serializeUser(User $user): array
+    private function serializeUser(User $user): array
     {
         return [
             'id' => (string) $user->getId(),
@@ -74,6 +77,10 @@ class AuthController extends AbstractController
             'twoFactor' => [
                 'enabled' => $user->isTotpEnabled(),
                 'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+                // Surfaced so the PWA can mount the recovery interstitial
+                // immediately after a backup-code login — see
+                // {@see \App\EventSubscriber\TwoFactorRecoveryListener}.
+                'recoveryPending' => $this->recoveryState->isPending(),
             ],
         ];
     }

@@ -20,6 +20,14 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  *   - 2FA off → expects `currentPassword` and re-hashes against the
  *               stored hash (legacy single-factor flow).
  *
+ * Recovery override: when {@see TwoFactorRecoveryState::isPending()} is
+ * true (the session just logged in with a backup code), the verifier
+ * falls through to the password path even if 2FA is still flipped on —
+ * the user has just proven they don't have the authenticator, so
+ * demanding a TOTP would pin them out of the disable / re-enroll
+ * endpoints. The password floor stays: a stolen backup code alone is
+ * not enough to rotate 2FA.
+ *
  * Returns null on success; on failure returns `[httpStatus, message]`
  * for the caller to surface as a `JsonResponse`.
  */
@@ -29,6 +37,7 @@ final class SensitiveActionVerifier
         private TwoFactorSetupService $setup,
         private UserPasswordHasherInterface $hasher,
         private RateLimiterFactoryInterface $twoFactorVerifyLimiter,
+        private TwoFactorRecoveryState $recoveryState,
     ) {
     }
 
@@ -39,7 +48,7 @@ final class SensitiveActionVerifier
      */
     public function verify(User $user, array $body): ?array
     {
-        if ($user->isTotpEnabled()) {
+        if ($user->isTotpEnabled() && !$this->recoveryState->isPending()) {
             $limit = $this->twoFactorVerifyLimiter->create('user-' . $user->getId())->consume();
             if (!$limit->isAccepted()) {
                 return [429, 'Too many attempts. Try again later.'];
