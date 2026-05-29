@@ -102,7 +102,7 @@ class Project
      * Owner-based access is still in force in PR 1; PR 2 (#185) swaps
      * the access predicates to scope by space membership.
      */
-    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'projects')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['project:read', 'project:write'])]
     private ?Space $space = null;

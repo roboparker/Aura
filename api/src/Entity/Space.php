@@ -16,6 +16,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -159,6 +160,20 @@ class Space
     private \DateTimeImmutable $createdAt;
 
     /**
+     * Maintained by Gedmo Timestampable on every UPDATE. Powers the
+     * "edited 2h ago" / "updated yesterday" line on the spaces grid
+     * — it tracks edits to the space row itself (name, description,
+     * visibility), not activity on its contained projects / pages.
+     *
+     * Stored as `datetime` rather than `datetime_immutable` so Gedmo
+     * can mutate the field in place on update.
+     */
+    #[ORM\Column(type: 'datetime')]
+    #[Gedmo\Timestampable(on: 'update')]
+    #[Groups(['space:read'])]
+    private \DateTimeInterface $updatedAt;
+
+    /**
      * Audit-only — the user who originally created the space. Kept
      * nullable so user deletion doesn't take shared spaces with it
      * (control comes from membership, not creation). For personal
@@ -223,12 +238,47 @@ class Space
     #[Groups(['space:read', 'space:write'])]
     private Collection $attachments;
 
+    /**
+     * Inverse side for projects rooted in this space. EXTRA_LAZY means
+     * `->count()` runs a single SELECT COUNT query without hydrating
+     * rows, so {@see getProjectsCount()} stays cheap even on the
+     * spaces-list endpoint. Off the wire — only the count getter is
+     * serialized.
+     *
+     * @var Collection<int, Project>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'space',
+        targetEntity: Project::class,
+        fetch: 'EXTRA_LAZY',
+    )]
+    private Collection $projects;
+
+    /**
+     * Inverse side for pages rooted in this space. Same EXTRA_LAZY
+     * shape as {@see $projects} — only the count is exposed.
+     *
+     * @var Collection<int, Page>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'space',
+        targetEntity: Page::class,
+        fetch: 'EXTRA_LAZY',
+    )]
+    private Collection $pages;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        // Timestampable populates this on update; seed it at construct
+        // time so newly-built rows have a valid value before the first
+        // flush (the column is NOT NULL).
+        $this->updatedAt = new \DateTime();
         $this->userMemberships = new ArrayCollection();
         $this->groupMemberships = new ArrayCollection();
         $this->attachments = new ArrayCollection();
+        $this->projects = new ArrayCollection();
+        $this->pages = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -309,6 +359,32 @@ class Space
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    /**
+     * Project count rooted in this space. EXTRA_LAZY makes this a
+     * single COUNT query — no row hydration.
+     */
+    #[Groups(['space:read'])]
+    public function getProjectsCount(): int
+    {
+        return $this->projects->count();
+    }
+
+    /**
+     * Page count rooted in this space. Includes every level of the page
+     * tree (root pages + descendants) since access is by space, not by
+     * parent — the grid copy reads "N pages" so all pages matter.
+     */
+    #[Groups(['space:read'])]
+    public function getPagesCount(): int
+    {
+        return $this->pages->count();
     }
 
     public function getCreatedBy(): ?User
