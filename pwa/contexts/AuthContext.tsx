@@ -16,6 +16,18 @@ export interface UserPreferences {
 export interface TwoFactorStatus {
   enabled: boolean;
   recoveryCodesRemaining: number;
+  /**
+   * True when this session signed in with a backup recovery code. Set by
+   * the API's TwoFactorRecoveryListener on /auth/2fa-check, cleared once
+   * the user either re-enrolls a new authenticator (POST /me/2fa/reenroll
+   * + /me/2fa/verify) or disables 2FA (DELETE /me/2fa). The PWA mounts
+   * `TwoFactorRecoveryInterstitial` while this is true so the user can't
+   * get lost on a session that has no working authenticator.
+   *
+   * Optional on the wire — older /api/me responses (pre-recovery flow)
+   * won't include it; treat missing as false.
+   */
+  recoveryPending?: boolean;
 }
 
 export interface User {

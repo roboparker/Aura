@@ -149,7 +149,7 @@ git push origin 2026.04.12.1
 4. Tag the release and push the tag
 5. Optionally create a GitHub release with changelog notes
 
-See `docs/branching-and-releases.md` for the full release strategy.
+See [`branching-and-releases.md`](branching-and-releases.md) for the full release strategy.
 
 ## Dependency Updates
 

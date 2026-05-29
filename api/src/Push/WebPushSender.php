@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Real Web Push sender backed by minishlink/web-push. VAPID keys are
- * pulled from env vars (see docs/deployment.md). When any of the three
+ * pulled from env vars (see docs/developer/deployment.md). When any of the three
  * VAPID slots is empty the sender no-ops with a warning so a freshly
  * checked-out dev environment doesn't crash the dispatcher cron — the
  * in-app notifications still land, just no push leaves the box.

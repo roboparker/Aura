@@ -6,6 +6,7 @@ namespace App\Security;
 
 use App\Entity\User;
 use App\Security\TooManyTwoFactorAttemptsException;
+use App\Service\TwoFactorRecoveryState;
 use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,6 +35,10 @@ final class TwoFactorJsonHandler implements
     AuthenticationSuccessHandlerInterface,
     AuthenticationFailureHandlerInterface
 {
+    public function __construct(private TwoFactorRecoveryState $recoveryState)
+    {
+    }
+
     public function onAuthenticationRequired(Request $request, TokenInterface $token): Response
     {
         $providers = $token instanceof TwoFactorTokenInterface
@@ -53,7 +58,7 @@ final class TwoFactorJsonHandler implements
             return new JsonResponse(['error' => 'Authentication state is invalid.'], 500);
         }
 
-        return new JsonResponse(self::serializeUser($user));
+        return new JsonResponse($this->serializeUser($user));
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
@@ -96,7 +101,7 @@ final class TwoFactorJsonHandler implements
      *
      * @return array<string, mixed>
      */
-    private static function serializeUser(User $user): array
+    private function serializeUser(User $user): array
     {
         return [
             'id' => (string) $user->getId(),
@@ -111,6 +116,7 @@ final class TwoFactorJsonHandler implements
             'twoFactor' => [
                 'enabled' => $user->isTotpEnabled(),
                 'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+                'recoveryPending' => $this->recoveryState->isPending(),
             ],
         ];
     }

@@ -6,11 +6,16 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\SensitiveActionVerifier;
+use App\Service\TwoFactorRecoveryMailer;
+use App\Service\TwoFactorRecoveryState;
 use App\Service\TwoFactorSetupService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
@@ -35,6 +40,10 @@ class TwoFactorController extends AbstractController
         private EntityManagerInterface $em,
         private SensitiveActionVerifier $verifier,
         private RateLimiterFactoryInterface $twoFactorVerifyLimiter,
+        private TwoFactorRecoveryState $recoveryState,
+        private TwoFactorRecoveryMailer $recoveryMailer,
+        #[Autowire(service: 'logger')]
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -46,6 +55,46 @@ class TwoFactorController extends AbstractController
         }
         if ($user->isTotpEnabled()) {
             return $this->json(['error' => '2FA is already enabled.'], 409);
+        }
+
+        $secret = $this->setup->startSetup($user);
+        $this->em->flush();
+
+        return $this->json([
+            'secret' => $secret,
+            'provisioningUri' => $this->setup->buildProvisioningUri($user),
+        ]);
+    }
+
+    /**
+     * Re-enrollment for users who lost their authenticator. Distinct from
+     * setup because 2FA is currently *on* — same shape on the wire
+     * (returns a fresh secret + provisioning URI), but step-up auth is
+     * required and the call invalidates the existing TOTP secret + every
+     * remaining recovery code atomically. The user follows up by POSTing
+     * the new TOTP to {@see verify()}; if they abandon the flow,
+     * `isTotpEnabled` stays false until they do — recovery flag is held
+     * open so the next page load re-prompts.
+     *
+     * Auth: when the session has the recovery flag set (just logged in
+     * with a backup code), the verifier accepts `currentPassword`;
+     * otherwise demands a current TOTP from the still-working
+     * authenticator. Either way password/code is single-factor floor —
+     * a stolen cookie alone can't silently rotate the second factor.
+     */
+    #[Route('/me/2fa/reenroll', name: 'me_2fa_reenroll', methods: ['POST'])]
+    public function reenroll(Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (null === $user) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$user->isTotpEnabled()) {
+            return $this->json(['error' => '2FA is not enabled.'], 409);
+        }
+
+        $err = $this->verifier->verify($user, $this->jsonBody($request));
+        if (null !== $err) {
+            return $this->json(['error' => $err[1]], $err[0]);
         }
 
         $secret = $this->setup->startSetup($user);
@@ -82,7 +131,29 @@ class TwoFactorController extends AbstractController
 
         $user->setTotpEnabled(true);
         $recoveryCodes = $this->setup->regenerateRecoveryCodes($user);
+
+        // Re-enrollment (the recovery interstitial path) ends here: clear
+        // the session flag so the PWA stops mounting the interstitial,
+        // and notify the account holder out-of-band that the secret has
+        // been rotated. Mail failures are swallowed so a flaky SMTP
+        // doesn't block the user from re-securing their account.
+        $wasRecovery = $this->recoveryState->isPending();
+        if ($wasRecovery) {
+            $this->recoveryState->clear();
+        }
+
         $this->em->flush();
+
+        if ($wasRecovery) {
+            try {
+                $this->recoveryMailer->sendReconfigured($user);
+            } catch (TransportExceptionInterface $e) {
+                $this->logger->warning('Failed to send 2FA reconfigured notification email.', [
+                    'userId' => (string) $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return $this->json([
             'enabled' => true,
@@ -106,7 +177,24 @@ class TwoFactorController extends AbstractController
         }
 
         $this->setup->disable($user);
+
+        $wasRecovery = $this->recoveryState->isPending();
+        if ($wasRecovery) {
+            $this->recoveryState->clear();
+        }
+
         $this->em->flush();
+
+        if ($wasRecovery) {
+            try {
+                $this->recoveryMailer->sendDisabled($user);
+            } catch (TransportExceptionInterface $e) {
+                $this->logger->warning('Failed to send 2FA disabled notification email.', [
+                    'userId' => (string) $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return $this->json(['enabled' => false]);
     }

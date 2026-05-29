@@ -37,7 +37,7 @@ Use lowercase `kebab-case` for branch names.
 - **PHP**: Follow [Symfony coding standards](https://symfony.com/doc/current/contributing/code/standards.html)
 - **TypeScript/React**: Follow the existing patterns in the codebase
 
-See `docs/branching-and-releases.md` for the full branching and release strategy.
+See `docs/developer/branching-and-releases.md` for the full branching and release strategy.
 
 ## License
 

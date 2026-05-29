@@ -8,6 +8,7 @@ import {
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
+import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
@@ -44,6 +45,11 @@ const Layout = ({
                 <Sidebar />
                 <div className="flex-1 min-w-0">{children}</div>
               </div>
+              {/* Forced modal that appears the moment the API signals
+                  this session signed in with a backup code. See
+                  TwoFactorRecoveryInterstitial for the flow. Renders
+                  nothing when not pending so it costs no DOM. */}
+              <TwoFactorRecoveryInterstitial />
             </ActiveSpaceProvider>
           </AuthProvider>
         </HydrationBoundary>
