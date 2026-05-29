@@ -105,8 +105,7 @@ class TwoFactorRecoveryTest extends ApiTestCase
         // /api/me now reports recoveryPending=false because the flag was
         // cleared on the way out of disable().
         $client->request('GET', '/api/me');
-        $body = $client->getResponse()?->toArray(false);
-        self::assertNotNull($body);
+        $body = $client->getResponse()->toArray(false);
         $twoFactor = $body['twoFactor'];
         $this->assertIsArray($twoFactor);
         $this->assertFalse($twoFactor['recoveryPending']);
@@ -149,8 +148,7 @@ class TwoFactorRecoveryTest extends ApiTestCase
             'json' => ['currentPassword' => 'Password123!@#'],
         ]);
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()?->toArray(false);
-        self::assertNotNull($body);
+        $body = $client->getResponse()->toArray(false);
         $secret = $body['secret'];
         $this->assertIsString($secret);
         $this->assertNotSame('', $secret);
@@ -180,8 +178,7 @@ class TwoFactorRecoveryTest extends ApiTestCase
         // Flag clears on the verify call so the PWA stops mounting the
         // interstitial.
         $client->request('GET', '/api/me');
-        $meBody = $client->getResponse()?->toArray(false);
-        self::assertNotNull($meBody);
+        $meBody = $client->getResponse()->toArray(false);
         $twoFactor = $meBody['twoFactor'];
         $this->assertIsArray($twoFactor);
         $this->assertFalse($twoFactor['recoveryPending']);
