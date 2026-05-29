@@ -1,4 +1,5 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownAZ, Clock, Filter, ListFilter, Plus, Search, Users } from "lucide-react";
@@ -17,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/common/PageHeader";
 import SpaceCard from "@/components/spaces/SpaceCard";
-import CreateSpaceDialog from "@/components/spaces/CreateSpaceDialog";
 
 type FilterKey = "all" | "shared" | "personal" | "owned";
 type SortKey = "recent" | "name" | "members";
@@ -52,7 +52,6 @@ const SpacesIndex = () => {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [sort, setSort] = useState<SortKey>("recent");
   const [search, setSearch] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -173,12 +172,14 @@ const SpacesIndex = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
               <Button
+                asChild
                 size="sm"
                 className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-                onClick={() => setCreateOpen(true)}
               >
-                <Plus className="h-3.5 w-3.5" />
-                New space
+                <Link href="/spaces/new">
+                  <Plus className="h-3.5 w-3.5" />
+                  New space
+                </Link>
               </Button>
             </>
           }
@@ -258,8 +259,6 @@ const SpacesIndex = () => {
           </ul>
         )}
       </main>
-
-      <CreateSpaceDialog open={createOpen} onOpenChange={setCreateOpen} />
     </>
   );
 };
