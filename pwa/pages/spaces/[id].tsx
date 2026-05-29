@@ -23,6 +23,7 @@ import {
   SpaceProjectsList,
   SpaceTasksList,
 } from "@/components/spaces/SpaceContentTabs";
+import SpaceColorPicker from "@/components/spaces/SpaceColorPicker";
 
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
@@ -437,6 +438,16 @@ const SpaceDetail = () => {
                         </p>
                       </CardContent>
                     </Card>
+                  )}
+
+                  {/* Color override is admin-only but works for both
+                      personal and shared spaces (personal owners are
+                      admins of their own bucket). */}
+                  {isAdmin && (
+                    <SpaceColorPicker space={space} onSaved={async () => {
+                      await load();
+                      await refresh();
+                    }} />
                   )}
 
                   <Card>

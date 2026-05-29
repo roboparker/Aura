@@ -51,9 +51,18 @@ export interface Space {
   description: string | null;
   isPersonal: boolean;
   visibility: "private" | "shared";
+  /** Optional override for the avatar tile color. `null` means
+   *  "inherit from the creator's `personalizedColor`" — the PWA
+   *  resolves this in {@link resolveSpaceColor}. */
+  color: string | null;
   createdAt: string;
   updatedAt: string;
-  createdBy: { "@id": string; id: string; email: string } | null;
+  createdBy: {
+    "@id": string;
+    id: string;
+    email: string;
+    personalizedColor?: string;
+  } | null;
   userMemberships: SpaceMembershipRow[];
   groupMemberships: SpaceGroupMembershipRow[];
   /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */

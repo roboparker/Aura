@@ -1,5 +1,4 @@
 import { Lock } from "lucide-react";
-import { deterministicPaletteColor } from "@/lib/avatarPalette";
 import { cn } from "@/lib/utils";
 
 type Size = "sm" | "md" | "lg";
@@ -18,25 +17,24 @@ const ICON_SIZE: Record<Size, string> = {
 
 /**
  * Square colored tile for a Space, mirroring the look of UserAvatar
- * but rounded instead of circular and keyed off the space (name + id)
- * via the deterministic palette so the same space always gets the
- * same color.
+ * but rounded instead of circular. Color is resolved by the caller
+ * (see `resolveSpaceColor` in `@/lib/avatarPalette`) so this stays a
+ * pure presentation component — same code path for personal and
+ * shared spaces.
  *
- * Personal spaces render the same colored letter tile as shared
- * spaces, with a dark overlay + Lock icon stacked on top so they're
- * still recognisable as "owned by you, nobody else can see this."
+ * Personal spaces stack a dark overlay + Lock icon on top of the
+ * colored tile so they're still recognisable as "owned by you,
+ * nobody else can see this."
  */
 interface Props {
   name: string;
-  /** Stable seed for color pick — pass the space `id` so the swatch
-   *  survives renames. */
-  seed: string;
+  color: string;
   isPersonal: boolean;
   size?: Size;
   className?: string;
 }
 
-const SpaceTile = ({ name, seed, isPersonal, size = "md", className }: Props) => {
+const SpaceTile = ({ name, color, isPersonal, size = "md", className }: Props) => {
   const px = SIZE_PX[size];
   const initial = name.trim().charAt(0).toUpperCase() || "?";
 
@@ -49,11 +47,7 @@ const SpaceTile = ({ name, seed, isPersonal, size = "md", className }: Props) =>
         SIZE_TEXT[size],
         className,
       )}
-      style={{
-        backgroundColor: deterministicPaletteColor(seed),
-        width: px,
-        height: px,
-      }}
+      style={{ backgroundColor: color, width: px, height: px }}
     >
       {initial}
       {isPersonal && (

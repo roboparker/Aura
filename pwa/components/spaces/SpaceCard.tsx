@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileText, FolderKanban, Lock, LockOpen, Users } from "lucide-react";
 import type { Space } from "@/contexts/ActiveSpaceContext";
+import { resolveSpaceColor } from "@/lib/avatarPalette";
 import { formatRelative } from "@/lib/relativeTime";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +48,7 @@ const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
         <div className="flex items-start gap-3">
           <SpaceTile
             name={space.name}
-            seed={space.id}
+            color={resolveSpaceColor(space)}
             isPersonal={space.isPersonal}
             size="md"
           />

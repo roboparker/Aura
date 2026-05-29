@@ -9,6 +9,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\SpaceRepository;
+use App\Service\AvatarColorService;
 use App\State\SpaceCreateProcessor;
 use App\State\SpaceUpdateProcessor;
 use App\Validator\ValidSpaceAttachments;
@@ -154,6 +155,22 @@ class Space
     )]
     #[Groups(['space:read', 'space:write'])]
     private string $visibility = self::VISIBILITY_SHARED;
+
+    /**
+     * Override color for the space avatar tile. When null the UI falls
+     * back to the creator's `personalizedColor` — same swatch on the
+     * person and their personal space by default, with the option to
+     * pick a different one for shared spaces (or override the personal
+     * one). Constrained to the same WCAG-AA palette as user avatars so
+     * white initials always render legibly.
+     */
+    #[ORM\Column(length: 7, nullable: true)]
+    #[Assert\Choice(
+        choices: AvatarColorService::PALETTE,
+        message: 'Color must be one of the supported avatar palette values.',
+    )]
+    #[Groups(['space:read', 'space:write'])]
+    private ?string $color = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['space:read'])]
@@ -354,6 +371,17 @@ class Space
                 ->atPath('visibility')
                 ->addViolation();
         }
+    }
+
+    public function getColor(): ?string
+    {
+        return $this->color;
+    }
+
+    public function setColor(?string $color): static
+    {
+        $this->color = $color;
+        return $this;
     }
 
     public function getCreatedAt(): \DateTimeImmutable
