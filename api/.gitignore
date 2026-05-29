@@ -10,6 +10,12 @@
 /vendor/
 ###< symfony/framework-bundle ###
 
+# Symfony auto-generated container-config reference (header literally
+# says "auto-generated... for apps only"). Regenerates on every
+# cache:warmup and drifts with bundle/Symfony patch bumps, producing
+# noisy diffs whenever dependabot lands a Symfony update.
+/config/reference.php
+
 ###> friendsofphp/php-cs-fixer ###
 /.php-cs-fixer.php
 /.php-cs-fixer.cache
