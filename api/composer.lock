@@ -8,7 +8,7 @@
     "packages": [
         {
             "name": "api-platform/doctrine-common",
-            "version": "v4.3.6",
+            "version": "v4.3.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-common.git",
@@ -92,13 +92,13 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-common/tree/v4.3.6"
+                "source": "https://github.com/api-platform/doctrine-common/tree/v4.3.7"
             },
             "time": "2026-05-04T13:25:58+00:00"
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v4.3.6",
+            "version": "v4.3.7",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
@@ -181,7 +181,7 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.6"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v4.3.7"
             },
             "time": "2026-05-07T11:45:31+00:00"
         },
