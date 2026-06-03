@@ -44,7 +44,7 @@ interface PendingInvite {
 
 const SpaceDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { refresh } = useActiveSpace();
+  const { refresh, spaces, activeSpace, setActiveSpace } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const spaceId = typeof id === "string" ? id : null;
@@ -191,6 +191,17 @@ const SpaceDetail = () => {
       void load();
     }
   }, [isAuthenticated, spaceId, load]);
+
+  // Viewing a space's detail page makes it the active space, so the
+  // sidebar switcher tracks where you are — whether you arrived via a
+  // card on /spaces, a direct link, or the switcher itself. Gated on
+  // the context's space list so a space the user can't access (404)
+  // never becomes active.
+  useEffect(() => {
+    if (!spaceId || activeSpace?.id === spaceId) return;
+    const match = spaces.find((s) => s.id === spaceId);
+    if (match) setActiveSpace(match);
+  }, [spaceId, spaces, activeSpace?.id, setActiveSpace]);
 
   const handleSaveMeta = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
