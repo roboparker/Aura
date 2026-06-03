@@ -1,8 +1,8 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Settings, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Settings } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -11,8 +11,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AttachmentsPanel, {
   type Attachment,
@@ -23,7 +21,6 @@ import {
   SpaceProjectsList,
   SpaceTasksList,
 } from "@/components/spaces/SpaceContentTabs";
-import SpaceColorPicker from "@/components/spaces/SpaceColorPicker";
 
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
@@ -33,40 +30,18 @@ type TabKey = (typeof TABS)[number];
 const isTabKey = (v: unknown): v is TabKey =>
   typeof v === "string" && (TABS as readonly string[]).includes(v);
 
-interface PendingInvite {
-  id: string;
-  email: string;
-  invitedBy: string;
-  role: string;
-  createdAt: string;
-  expiresAt: string;
-}
 
 const SpaceDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { refresh, spaces, activeSpace, setActiveSpace } = useActiveSpace();
+  const { spaces, activeSpace, setActiveSpace } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const spaceId = typeof id === "string" ? id : null;
 
   const [space, setSpace] = useState<Space | null>(null);
-  const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Edit metadata (admin-only)
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [isSavingMeta, setIsSavingMeta] = useState(false);
-
-  // Member add (admin-only)
-  const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [isAddingMember, setIsAddingMember] = useState(false);
-  const [memberMessage, setMemberMessage] = useState<{
-    text: string;
-    kind: "success" | "error";
-  } | null>(null);
 
   const handleAttach = async (mediaObjectIri: string) => {
     if (!space) return;
@@ -158,33 +133,12 @@ const SpaceDetail = () => {
       if (!res.ok) throw new Error("Failed to load space.");
       const data: Space = await res.json();
       setSpace(data);
-      setEditName(data.name);
-      setEditDescription(data.description ?? "");
-
-      // Pending invites are admin-only on the API; non-admins still
-      // hit the endpoint cleanly (it returns 403/404), so guard here
-      // to avoid spurious errors in the console.
-      const isMembershipAdmin = data.userMemberships.some(
-        (m) => user && m.user.id === user.id && m.role === "admin",
-      );
-      if (isMembershipAdmin) {
-        const inviteRes = await fetch(
-          `${ENTRYPOINT}/spaces/${encodeURIComponent(spaceId)}/invites`,
-          { credentials: "include", headers: { Accept: "application/json" } },
-        );
-        if (inviteRes.ok) {
-          const inviteData: { invites: PendingInvite[] } = await inviteRes.json();
-          setInvites(inviteData.invites);
-        }
-      } else {
-        setInvites([]);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load space.");
     } finally {
       setIsLoading(false);
     }
-  }, [spaceId, user]);
+  }, [spaceId]);
 
   useEffect(() => {
     if (isAuthenticated && spaceId) {
@@ -202,139 +156,6 @@ const SpaceDetail = () => {
     const match = spaces.find((s) => s.id === spaceId);
     if (match) setActiveSpace(match);
   }, [spaceId, spaces, activeSpace?.id, setActiveSpace]);
-
-  const handleSaveMeta = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!space || !editName.trim()) return;
-    setIsSavingMeta(true);
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.detail || data["hydra:description"] || "Failed to save changes.",
-        );
-      }
-      await load();
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save changes.");
-    } finally {
-      setIsSavingMeta(false);
-    }
-  };
-
-  const handleAddMember = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!space || !newMemberEmail.trim()) return;
-    setIsAddingMember(true);
-    setMemberMessage(null);
-    try {
-      const res = await fetch(
-        `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: newMemberEmail.trim() }),
-        },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to add member.");
-      }
-      // The endpoint returns either status=added or status=invited;
-      // surface the right confirmation either way so the admin
-      // doesn't have to guess whether an email went out.
-      const confirmation =
-        data.status === "added"
-          ? `${data.email} is now a member of this space.`
-          : `Sent a sign-up invitation to ${data.email}.`;
-      setMemberMessage({ text: confirmation, kind: "success" });
-      setNewMemberEmail("");
-      await load();
-    } catch (err) {
-      setMemberMessage({
-        text: err instanceof Error ? err.message : "Failed to add member.",
-        kind: "error",
-      });
-    } finally {
-      setIsAddingMember(false);
-    }
-  };
-
-  const handleRevokeInvite = async (invite: PendingInvite) => {
-    if (!space) return;
-    if (
-      !window.confirm(
-        `Revoke the pending invitation for ${invite.email}? They won't be able to use the existing sign-up link.`,
-      )
-    ) {
-      return;
-    }
-    const res = await fetch(
-      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/invites/${encodeURIComponent(invite.id)}`,
-      { method: "DELETE", credentials: "include" },
-    );
-    if (!res.ok) {
-      setError("Failed to revoke invitation.");
-      return;
-    }
-    setInvites((prev) => prev.filter((i) => i.id !== invite.id));
-  };
-
-  const handleDeleteSpace = async () => {
-    if (!space) return;
-    if (
-      !window.confirm(
-        `Delete "${space.name}"? Every project, discussion, and custom field in this space goes with it. This can't be undone.`,
-      )
-    ) {
-      return;
-    }
-    const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.detail || "Failed to delete space.");
-      return;
-    }
-    await refresh();
-    router.push("/spaces");
-  };
-
-  const handleRemoveMembership = async (membershipIri: string, label: string) => {
-    if (!space) return;
-    if (!window.confirm(`Remove ${label} from this space?`)) {
-      return;
-    }
-    const res = await fetch(`${ENTRYPOINT}${membershipIri}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      // SpaceMembership isn't an API resource yet — the action will
-      // probably 405; surface that so the user knows the UI hook is
-      // ahead of the API. PR follow-up will add the endpoint.
-      setError(
-        "Removing members directly isn't supported yet. Until then, ask the member to leave the space themselves.",
-      );
-      return;
-    }
-    await load();
-    await refresh();
-  };
 
   if (authLoading || !isAuthenticated || !user) {
     return (
@@ -423,55 +244,17 @@ const SpaceDetail = () => {
                 </TabsList>
 
                 <TabsContent value="overview" className="space-y-6 mt-0">
-                  {isAdmin && !space.isPersonal && (
+                  {/* Read-only overview. All management (edit metadata,
+                      color, members, invites, delete) lives on the
+                      admin-only Settings page reachable from the header. */}
+                  {space.description && (
                     <Card>
                       <CardContent className="pt-6">
-                        <form onSubmit={handleSaveMeta} className="space-y-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="space-name">Name</Label>
-                            <Input
-                              id="space-name"
-                              type="text"
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              maxLength={255}
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="space-description">Description</Label>
-                            <Input
-                              id="space-description"
-                              type="text"
-                              value={editDescription}
-                              onChange={(e) => setEditDescription(e.target.value)}
-                              maxLength={500}
-                            />
-                          </div>
-                          <Button type="submit" size="sm" disabled={isSavingMeta}>
-                            {isSavingMeta ? "Saving…" : "Save"}
-                          </Button>
-                        </form>
-                      </CardContent>
-                    </Card>
-                  )}
-                  {(!isAdmin || space.isPersonal) && space.description && (
-                    <Card>
-                      <CardContent className="pt-6">
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                           {space.description}
                         </p>
                       </CardContent>
                     </Card>
-                  )}
-
-                  {/* Color override is admin-only but works for both
-                      personal and shared spaces (personal owners are
-                      admins of their own bucket). */}
-                  {isAdmin && (
-                    <SpaceColorPicker space={space} onSaved={async () => {
-                      await load();
-                      await refresh();
-                    }} />
                   )}
 
                   <Card>
@@ -493,18 +276,6 @@ const SpaceDetail = () => {
                               )}
                               {isSelf && <span className="ml-1 text-xs opacity-70">(you)</span>}
                             </span>
-                            {isAdmin && !isSelf && !space.isPersonal && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleRemoveMembership(membership["@id"], label)
-                                }
-                                aria-label={`Remove ${label}`}
-                                className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            )}
                           </Badge>
                         </li>
                       );
@@ -528,99 +299,8 @@ const SpaceDetail = () => {
                     </>
                   )}
 
-                  {isAdmin && !space.isPersonal && (
-                    <form
-                      onSubmit={handleAddMember}
-                      className="flex items-center gap-2"
-                      data-testid="add-space-member-form"
-                    >
-                      <Input
-                        type="email"
-                        value={newMemberEmail}
-                        onChange={(e) => setNewMemberEmail(e.target.value)}
-                        placeholder="member@example.com"
-                        aria-label="New member email"
-                        required
-                        className="flex-1"
-                      />
-                      <Button
-                        type="submit"
-                        size="sm"
-                        disabled={isAddingMember || !newMemberEmail.trim()}
-                      >
-                        {isAddingMember ? "Sending…" : "Add"}
-                      </Button>
-                    </form>
-                  )}
-
-                  {memberMessage && (
-                    <p
-                      role="alert"
-                      className={
-                        "mt-2 text-sm " +
-                        (memberMessage.kind === "success"
-                          ? "text-muted-foreground"
-                          : "text-destructive")
-                      }
-                    >
-                      {memberMessage.text}
-                    </p>
-                  )}
                 </CardContent>
               </Card>
-
-              {isAdmin && invites.length > 0 && (
-                <Card className="mb-6">
-                  <CardContent className="pt-6">
-                    <h2 className="text-lg font-semibold mb-3">
-                      Pending invitations
-                    </h2>
-                    <ul className="space-y-2" data-testid="space-pending-invites">
-                      {invites.map((invite) => (
-                        <li
-                          key={invite.id}
-                          className="flex items-center justify-between text-sm"
-                          data-testid="space-pending-invite"
-                        >
-                          <span>
-                            <span className="font-medium">{invite.email}</span>{" "}
-                            <span className="text-muted-foreground">
-                              · invited by {invite.invitedBy}
-                            </span>
-                          </span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRevokeInvite(invite)}
-                          >
-                            Revoke
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-
-              {isAdmin && !space.isPersonal && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <h2 className="text-lg font-semibold mb-2">Danger zone</h2>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Deleting a space removes every project, discussion,
-                      and custom field that lives in it. This can&apos;t be
-                      undone.
-                    </p>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleDeleteSpace}
-                    >
-                      Delete space
-                    </Button>
-                  </CardContent>
-                </Card>
-              )}
                 </TabsContent>
 
                 <TabsContent value="projects" className="mt-0">
