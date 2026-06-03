@@ -42,12 +42,48 @@ import {
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
+interface ProjectOwner {
+  email: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  personalizedColor?: string;
+  avatarUrls?: { thumb?: string; profile?: string } | null;
+}
+
 interface ProjectPreview {
   "@id": string;
   id: string;
   title: string;
-  owner?: { email: string } | null;
+  owner?: ProjectOwner | null;
   createdOn: string;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
+interface ActivityActor {
+  "@id": string;
+  id: string;
+  email: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  personalizedColor?: string;
+  avatarUrls?: { thumb?: string; profile?: string } | null;
+}
+
+interface ActivityItem {
+  id: number;
+  action: string;
+  loggedAt: string;
+  objectClass: string;
+  objectId: string;
+  actor: string | null;
+  data: Record<string, unknown>;
+}
+
+interface ActivityFeed {
+  items: ActivityItem[];
+  totalItems: number;
+  actors: Record<string, ActivityActor>;
 }
 
 /** SpaceMember.personalizedColor is optional; UserAvatar needs a string. */
@@ -55,6 +91,40 @@ const toAvatarUser = (m: SpaceMember): AvatarUser => ({
   ...m,
   personalizedColor: m.personalizedColor ?? "#64748b",
 });
+
+const ownerToAvatar = (o: ProjectOwner | ActivityActor): AvatarUser => ({
+  email: o.email,
+  givenName: o.givenName,
+  familyName: o.familyName,
+  personalizedColor: o.personalizedColor ?? "#64748b",
+  avatarUrls: o.avatarUrls,
+});
+
+const actorName = (a: ActivityActor | undefined): string => {
+  if (!a) return "Someone";
+  const full = `${a.givenName ?? ""} ${a.familyName ?? ""}`.trim();
+  return full || a.email;
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+};
+
+/** Short, uppercase file-type label from a filename / mime type. */
+const fileLabel = (name: string, mime: string): string => {
+  const ext = name.includes(".") ? name.split(".").pop() ?? "" : "";
+  if (ext) return ext.slice(0, 4).toUpperCase();
+  const sub = mime.split("/")[1] ?? mime;
+  return sub.slice(0, 4).toUpperCase();
+};
 
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
@@ -83,6 +153,7 @@ const SpaceDetail = () => {
   const [discussionsCount, setDiscussionsCount] = useState<number | null>(null);
   const [tasksCount, setTasksCount] = useState<number | null>(null);
   const [projectsPreview, setProjectsPreview] = useState<ProjectPreview[]>([]);
+  const [activity, setActivity] = useState<ActivityFeed | null>(null);
 
   const handleAttach = async (mediaObjectIri: string) => {
     if (!space) return;
@@ -242,6 +313,20 @@ const SpaceDetail = () => {
         if (!cancelled) setProjectsPreview(list);
       } catch {
         /* preview is best-effort */
+      }
+    })();
+    void (async () => {
+      const sid = spaceIri.split("/").pop() ?? "";
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/spaces/${encodeURIComponent(sid)}/activity?itemsPerPage=6`,
+          { credentials: "include", headers: { Accept: "application/json" } },
+        );
+        if (!res.ok) return;
+        const data: ActivityFeed = await res.json();
+        if (!cancelled) setActivity(data);
+      } catch {
+        /* feed is best-effort */
       }
     })();
     return () => {
@@ -405,13 +490,45 @@ const SpaceDetail = () => {
                       <Card>
                         <CardContent className="pt-6">
                           <h2 className="font-semibold mb-4">Recent activity</h2>
-                          {/* No space-level activity feed yet — render the
-                              empty state until the backend lands. */}
-                          <EmptyState
-                            icon={Clock}
-                            title="No activity yet"
-                            hint="Create a project or page and the team's activity will show up here."
-                          />
+                          {!activity || activity.items.length === 0 ? (
+                            <EmptyState
+                              icon={Clock}
+                              title="No activity yet"
+                              hint="Create a project or page and the team's activity will show up here."
+                            />
+                          ) : (
+                            <ul className="space-y-3.5">
+                              {activity.items.map((it) => {
+                                const actor = it.actor
+                                  ? activity.actors[it.actor]
+                                  : undefined;
+                                return (
+                                  <li
+                                    key={it.id}
+                                    className="flex items-start gap-2.5"
+                                  >
+                                    {actor ? (
+                                      <UserAvatar
+                                        user={ownerToAvatar(actor)}
+                                        size="sm"
+                                      />
+                                    ) : (
+                                      <span className="h-8 w-8 rounded-full bg-muted shrink-0" />
+                                    )}
+                                    <p className="min-w-0 flex-1 text-sm leading-snug">
+                                      <span className="font-medium">
+                                        {actorName(actor)}
+                                      </span>{" "}
+                                      <ActivityVerb item={it} />
+                                    </p>
+                                    <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                                      {formatRelative(it.loggedAt)}
+                                    </span>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          )}
                         </CardContent>
                       </Card>
 
@@ -444,21 +561,49 @@ const SpaceDetail = () => {
                             />
                           ) : (
                             <ul className="divide-y divide-border rounded-md border">
-                              {projectsPreview.map((p) => (
-                                <li key={p["@id"]} className="px-3 py-2.5">
-                                  <Link
-                                    href={`/projects/${p.id}`}
-                                    className="font-medium hover:underline"
-                                  >
-                                    {p.title}
-                                  </Link>
-                                  <p className="text-xs text-muted-foreground">
-                                    {p.owner?.email}
-                                    {p.owner?.email ? " · " : ""}
-                                    {formatRelative(p.createdOn)}
-                                  </p>
-                                </li>
-                              ))}
+                              {projectsPreview.map((p) => {
+                                const total = p.taskCount ?? 0;
+                                const done = p.completedTaskCount ?? 0;
+                                const pct =
+                                  total > 0
+                                    ? Math.round((done / total) * 100)
+                                    : 0;
+                                return (
+                                  <li key={p["@id"]}>
+                                    <Link
+                                      href={`/projects/${p.id}`}
+                                      className="flex items-center gap-3 px-3 py-3 hover:bg-accent"
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-medium truncate">
+                                          {p.title}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1.5">
+                                          <span className="h-1.5 flex-1 max-w-[180px] rounded-full bg-muted overflow-hidden">
+                                            <span
+                                              className="block h-full rounded-full bg-emerald-500"
+                                              style={{ width: `${pct}%` }}
+                                            />
+                                          </span>
+                                          <span className="text-xs text-muted-foreground shrink-0">
+                                            {done}/{total} tasks
+                                          </span>
+                                        </div>
+                                      </div>
+                                      {p.owner && (
+                                        <UserAvatar
+                                          user={ownerToAvatar(p.owner)}
+                                          size="sm"
+                                        />
+                                      )}
+                                      <ChevronRight
+                                        className="h-4 w-4 text-muted-foreground/60 shrink-0"
+                                        aria-hidden
+                                      />
+                                    </Link>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
                         </CardContent>
@@ -526,12 +671,23 @@ const SpaceDetail = () => {
 
                       <Card>
                         <CardContent className="pt-6">
-                          <h2 className="font-semibold mb-3">
-                            Shared files{" "}
-                            <span className="text-muted-foreground font-normal">
-                              {(space.attachments ?? []).length}
-                            </span>
-                          </h2>
+                          <div className="flex items-center justify-between mb-3">
+                            <h2 className="font-semibold">
+                              Shared files{" "}
+                              <span className="text-muted-foreground font-normal">
+                                {(space.attachments ?? []).length}
+                              </span>
+                            </h2>
+                            {(space.attachments ?? []).length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleTabChange("files")}
+                                className="text-sm text-emerald-600 hover:underline"
+                              >
+                                All files
+                              </button>
+                            )}
+                          </div>
                           {(space.attachments ?? []).length === 0 ? (
                             <EmptyState
                               icon={Paperclip}
@@ -539,19 +695,29 @@ const SpaceDetail = () => {
                               hint="Drag files onto any task or page to share them with the space."
                             />
                           ) : (
-                            <ul className="space-y-1.5">
-                              {(space.attachments ?? []).slice(0, 5).map((a) => (
+                            <ul className="space-y-2.5">
+                              {(space.attachments ?? []).slice(0, 4).map((a) => (
                                 <li
                                   key={a["@id"]}
-                                  className="flex items-center gap-2 text-sm"
+                                  className="flex items-center gap-2.5"
                                 >
-                                  <Paperclip
-                                    className="h-3.5 w-3.5 text-muted-foreground shrink-0"
-                                    aria-hidden
-                                  />
-                                  <span className="truncate">
-                                    {a.originalName}
+                                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                                    {fileLabel(a.originalName, a.mimeType)}
                                   </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm truncate">
+                                      {a.originalName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground truncate">
+                                      {formatBytes(a.byteSize)}
+                                      {a.owner
+                                        ? ` · ${a.owner.givenName ?? a.owner.email}`
+                                        : ""}
+                                      {a.createdOn
+                                        ? ` · ${formatRelative(a.createdOn)}`
+                                        : ""}
+                                    </p>
+                                  </div>
                                 </li>
                               ))}
                             </ul>
@@ -687,6 +853,36 @@ const EmptyState = ({
     <p className="text-xs text-muted-foreground mt-1 max-w-xs">{hint}</p>
   </div>
 );
+
+/** Renders the verb phrase for an activity row, e.g. "created the project Foo". */
+const ActivityVerb = ({ item }: { item: ActivityItem }) => {
+  const type = item.objectClass.toLowerCase();
+  const noun = type === "project" ? "project" : type === "page" ? "page" : "task";
+  const rawTitle = item.data?.title;
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : null;
+  const titleNode = title ? (
+    <span className="font-medium">{title}</span>
+  ) : null;
+
+  if (item.action === "create") {
+    return (
+      <>
+        created the {noun}
+        {titleNode ? <> {titleNode}</> : ""}
+      </>
+    );
+  }
+  if (item.action === "remove") {
+    return (
+      <>
+        deleted a {noun}
+        {titleNode ? <> {titleNode}</> : ""}
+      </>
+    );
+  }
+  return titleNode ? <>edited {titleNode}</> : <>updated a {noun}</>;
+};
 
 const QuickAction = ({
   icon: Icon,

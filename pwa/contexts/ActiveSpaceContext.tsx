@@ -42,6 +42,12 @@ export interface SpaceAttachment {
   byteSize: number;
   variantUrls: { original?: string };
   downloadUrl?: string | null;
+  createdOn?: string;
+  owner?: {
+    email: string;
+    givenName?: string | null;
+    familyName?: string | null;
+  } | null;
 }
 
 export interface Space {
