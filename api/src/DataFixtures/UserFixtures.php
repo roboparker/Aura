@@ -146,6 +146,7 @@ class UserFixtures extends Fixture
     {
         $space = (new Space())
             ->setName(Space::PERSONAL_SPACE_NAME)
+            ->setDescription('Your private space — only you can see what lives in here.')
             ->setIsPersonal(true)
             ->setVisibility(Space::VISIBILITY_PRIVATE)
             ->setCreatedBy($user);
