@@ -38,6 +38,7 @@ import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
+import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
 type Visibility = "private" | "shared";
@@ -153,6 +154,8 @@ const SpaceSettings = () => {
     text: string;
     kind: "success" | "error";
   } | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!spaceId) return;
@@ -359,26 +362,10 @@ const SpaceSettings = () => {
     setInvites((prev) => prev.filter((i) => i.id !== invite.id));
   };
 
-  const handleDeleteSpace = async () => {
-    if (!space) return;
-    if (
-      !window.confirm(
-        `Delete "${space.name}"? Every project, discussion, and page in this space goes with it. This can't be undone.`,
-      )
-    ) {
-      return;
-    }
-    const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.detail || "Failed to delete space.");
-      return;
-    }
+  const handleSpaceDeleted = async () => {
+    setDeleteOpen(false);
     await refresh();
-    router.push("/spaces");
+    void router.push("/spaces");
   };
 
   if (authLoading || !isAuthenticated || !user) {
@@ -738,7 +725,7 @@ const SpaceSettings = () => {
                   variant="destructive"
                   size="sm"
                   className="gap-1.5"
-                  onClick={handleDeleteSpace}
+                  onClick={() => setDeleteOpen(true)}
                 >
                   <Trash2 className="h-4 w-4" aria-hidden />
                   Delete space
@@ -775,6 +762,16 @@ const SpaceSettings = () => {
           </div>
         </div>
       </div>
+
+      {!space.isPersonal && (
+        <DeleteSpaceDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          space={space}
+          twoFactorEnabled={user.twoFactor?.enabled ?? false}
+          onDeleted={handleSpaceDeleted}
+        />
+      )}
     </>
   );
 };

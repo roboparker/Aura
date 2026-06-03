@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\Post;
 use App\Repository\SpaceRepository;
 use App\Service\AvatarColorService;
 use App\State\SpaceCreateProcessor;
+use App\State\SpaceDeleteProcessor;
 use App\State\SpaceUpdateProcessor;
 use App\Validator\ValidSpaceAttachments;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
@@ -56,6 +57,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user)) and not object.getIsPersonal()",
             securityMessage: 'Personal spaces cannot be deleted; shared spaces can only be deleted by an admin.',
+            processor: SpaceDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['space:read']],
