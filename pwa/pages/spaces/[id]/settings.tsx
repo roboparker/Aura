@@ -39,9 +39,9 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
+import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
-type Visibility = "private" | "shared";
 type Role = "admin" | "member";
 
 interface PendingInvite {
@@ -52,26 +52,6 @@ interface PendingInvite {
   createdAt: string;
   expiresAt: string;
 }
-
-const VISIBILITY_OPTIONS: {
-  key: Visibility;
-  label: string;
-  description: string;
-  icon: typeof Lock;
-}[] = [
-  {
-    key: "private",
-    label: "Private",
-    description: "Only you can see this space and everything in it.",
-    icon: Lock,
-  },
-  {
-    key: "shared",
-    label: "Shared",
-    description: "Invited members can access projects, pages, and tasks.",
-    icon: LockOpen,
-  },
-];
 
 const toAvatarUser = (m: SpaceMember): AvatarUser => ({
   ...m,
@@ -135,12 +115,10 @@ const SpaceSettings = () => {
   // Dirty-tracked metadata form.
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [visibility, setVisibility] = useState<Visibility>("shared");
   const [color, setColor] = useState<string | null>(null);
   const [initial, setInitial] = useState({
     name: "",
     description: "",
-    visibility: "shared" as Visibility,
     color: null as string | null,
   });
   const formInitialized = useRef(false);
@@ -156,6 +134,7 @@ const SpaceSettings = () => {
   } | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!spaceId) return;
@@ -180,12 +159,10 @@ const SpaceSettings = () => {
         const snap = {
           name: data.name,
           description: data.description ?? "",
-          visibility: data.visibility,
           color: data.color,
         };
         setName(snap.name);
         setDescription(snap.description);
-        setVisibility(snap.visibility);
         setColor(snap.color);
         setInitial(snap);
         formInitialized.current = true;
@@ -236,10 +213,11 @@ const SpaceSettings = () => {
     }
   }, [space, user, isAdmin, spaceId, router]);
 
+  const isCreator = !!space && !!user && space.createdBy?.id === user.id;
+
   const isDirty =
     name !== initial.name ||
     description !== initial.description ||
-    visibility !== initial.visibility ||
     color !== initial.color;
 
   const handleSave = async () => {
@@ -254,7 +232,6 @@ const SpaceSettings = () => {
         body: JSON.stringify({
           name: name.trim(),
           description: description.trim() || null,
-          visibility,
           color,
         }),
       });
@@ -264,7 +241,7 @@ const SpaceSettings = () => {
           data.detail || data["hydra:description"] || "Failed to save changes.",
         );
       }
-      setInitial({ name: name.trim(), description, visibility, color });
+      setInitial({ name: name.trim(), description, color });
       setName(name.trim());
       await refresh();
     } catch (err) {
@@ -368,6 +345,12 @@ const SpaceSettings = () => {
     void router.push("/spaces");
   };
 
+  const handleVisibilityChanged = async () => {
+    setVisibilityOpen(false);
+    await load();
+    await refresh();
+  };
+
   if (authLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -452,50 +435,6 @@ const SpaceSettings = () => {
                 onChange={setDescription}
               />
             </div>
-
-            <div className="space-y-1.5">
-              <Label>Visibility</Label>
-              <div
-                role="radiogroup"
-                aria-label="Visibility"
-                className="grid grid-cols-2 gap-2"
-              >
-                {VISIBILITY_OPTIONS.map(({ key, label, description: desc, icon: Icon }) => {
-                  const selected = visibility === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => setVisibility(key)}
-                      className={cn(
-                        "flex items-start gap-2 rounded-md border p-3 text-left transition-colors",
-                        selected
-                          ? "border-emerald-500/60 bg-emerald-500/5"
-                          : "border-input hover:bg-muted/50",
-                      )}
-                    >
-                      <Icon
-                        className={cn(
-                          "h-4 w-4 mt-0.5 shrink-0",
-                          selected
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : "text-muted-foreground",
-                        )}
-                        aria-hidden
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{label}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {desc}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           </CardContent>
         </Card>
 
@@ -536,6 +475,9 @@ const SpaceSettings = () => {
           </CardContent>
         </Card>
 
+        {/* Member management only applies to shared spaces. */}
+        {space.visibility === "shared" && (
+          <>
         {/* Members */}
         <Card className="mb-6">
           <CardContent className="pt-6 space-y-4">
@@ -688,6 +630,8 @@ const SpaceSettings = () => {
             )}
           </CardContent>
         </Card>
+          </>
+        )}
 
         {/* Danger zone */}
         <Card className="mb-6 border-destructive/40">
@@ -711,26 +655,71 @@ const SpaceSettings = () => {
                 </Button>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-destructive">Delete this space</p>
-                  <p className="text-sm text-muted-foreground">
-                    Permanently removes {space.name} and all {space.projectsCount}{" "}
-                    project{space.projectsCount === 1 ? "" : "s"} and{" "}
-                    {space.pagesCount} page{space.pagesCount === 1 ? "" : "s"}.
-                    This can&apos;t be undone.
-                  </p>
+              <>
+                {isCreator && (
+                  <div className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
+                    <div className="min-w-0">
+                      <p className="font-medium flex items-center gap-1.5">
+                        {space.visibility === "shared" ? (
+                          <Lock className="h-4 w-4" aria-hidden />
+                        ) : (
+                          <LockOpen className="h-4 w-4" aria-hidden />
+                        )}
+                        {space.visibility === "shared"
+                          ? "Make this space private"
+                          : "Make this space shared"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {space.visibility === "shared"
+                          ? "Removes every member and pending invite — only you keep access. Content stays, but becomes visible to you alone."
+                          : "Re-opens this space so you can invite members again."}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setVisibilityOpen(true)}
+                    >
+                      {space.visibility === "shared" ? (
+                        <>
+                          <Lock className="h-4 w-4" aria-hidden />
+                          Make private
+                        </>
+                      ) : (
+                        <>
+                          <LockOpen className="h-4 w-4" aria-hidden />
+                          Make shared
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-destructive">
+                      Delete this space
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently removes {space.name} and all{" "}
+                      {space.projectsCount} project
+                      {space.projectsCount === 1 ? "" : "s"} and{" "}
+                      {space.pagesCount} page
+                      {space.pagesCount === 1 ? "" : "s"}. This can&apos;t be
+                      undone.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                    Delete space
+                  </Button>
                 </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => setDeleteOpen(true)}
-                >
-                  <Trash2 className="h-4 w-4" aria-hidden />
-                  Delete space
-                </Button>
-              </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -770,6 +759,17 @@ const SpaceSettings = () => {
           space={space}
           twoFactorEnabled={user.twoFactor?.enabled ?? false}
           onDeleted={handleSpaceDeleted}
+        />
+      )}
+
+      {!space.isPersonal && isCreator && (
+        <ChangeVisibilityDialog
+          open={visibilityOpen}
+          onOpenChange={setVisibilityOpen}
+          space={space}
+          target={space.visibility === "shared" ? "private" : "shared"}
+          pendingInviteCount={invites.length}
+          onChanged={handleVisibilityChanged}
         />
       )}
     </>
