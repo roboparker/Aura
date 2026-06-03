@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Settings, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -391,10 +391,23 @@ const SpaceDetail = () => {
                   the Overview tab below. */}
               <div className="flex items-start justify-between gap-2 mb-4">
                 <h1 className="text-2xl font-bold">{space.name}</h1>
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1">
                   {space.isPersonal && <Badge variant="secondary">Private</Badge>}
                   {isAdmin && !space.isPersonal && (
                     <Badge variant="secondary">Admin</Badge>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="ml-1 gap-1.5"
+                    >
+                      <Link href={`/spaces/${space.id}/settings`}>
+                        <Settings className="h-4 w-4" aria-hidden />
+                        Settings
+                      </Link>
+                    </Button>
                   )}
                 </div>
               </div>
