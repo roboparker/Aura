@@ -2,11 +2,29 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { Settings } from "lucide-react";
+import {
+  CheckSquare,
+  ChevronRight,
+  Clock,
+  FileText,
+  FolderKanban,
+  MessageSquare,
+  Paperclip,
+  Plus,
+  Settings,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
+import {
+  useActiveSpace,
+  type Space,
+  type SpaceMember,
+} from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { resolveSpaceColor } from "@/lib/avatarPalette";
+import { formatRelative } from "@/lib/relativeTime";
+import { displayName } from "@/lib/userDisplay";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +39,22 @@ import {
   SpaceProjectsList,
   SpaceTasksList,
 } from "@/components/spaces/SpaceContentTabs";
+import SpaceTile from "@/components/spaces/SpaceTile";
+import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+
+interface ProjectPreview {
+  "@id": string;
+  id: string;
+  title: string;
+  owner?: { email: string } | null;
+  createdOn: string;
+}
+
+/** SpaceMember.personalizedColor is optional; UserAvatar needs a string. */
+const toAvatarUser = (m: SpaceMember): AvatarUser => ({
+  ...m,
+  personalizedColor: m.personalizedColor ?? "#64748b",
+});
 
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
@@ -42,6 +76,13 @@ const SpaceDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Dashboard (Overview) data. Projects + pages counts ride on the
+  // space object; discussions + tasks counts come from the list
+  // endpoints' totalItems. `null` = still loading / unavailable.
+  const [discussionsCount, setDiscussionsCount] = useState<number | null>(null);
+  const [tasksCount, setTasksCount] = useState<number | null>(null);
+  const [projectsPreview, setProjectsPreview] = useState<ProjectPreview[]>([]);
 
   const handleAttach = async (mediaObjectIri: string) => {
     if (!space) return;
@@ -157,6 +198,57 @@ const SpaceDetail = () => {
     if (match) setActiveSpace(match);
   }, [spaceId, spaces, activeSpace?.id, setActiveSpace]);
 
+  // Overview dashboard data: discussions/tasks counts (via totalItems)
+  // and a short projects preview. Kept separate from the main space
+  // load so it refreshes when the space changes without blocking the
+  // header render.
+  const spaceIri = space?.["@id"] ?? null;
+  useEffect(() => {
+    if (!spaceIri) return;
+    let cancelled = false;
+    const opts = {
+      credentials: "include" as const,
+      headers: { Accept: "application/ld+json" },
+    };
+    const totalOf = async (url: string): Promise<number | null> => {
+      try {
+        const res = await fetch(url, opts);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data["hydra:totalItems"] ?? data.totalItems ?? 0;
+      } catch {
+        return null;
+      }
+    };
+    const enc = encodeURIComponent(spaceIri);
+    void (async () => {
+      const [d, t] = await Promise.all([
+        totalOf(`${ENTRYPOINT}/discussions?space=${enc}&itemsPerPage=1`),
+        totalOf(`${ENTRYPOINT}/tasks?project.space=${enc}&itemsPerPage=1`),
+      ]);
+      if (cancelled) return;
+      setDiscussionsCount(d);
+      setTasksCount(t);
+    })();
+    void (async () => {
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/projects?space=${enc}&itemsPerPage=5&order[createdOn]=desc`,
+          opts,
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const list: ProjectPreview[] = data["hydra:member"] ?? data.member ?? [];
+        if (!cancelled) setProjectsPreview(list);
+      } catch {
+        /* preview is best-effort */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [spaceIri]);
+
   if (authLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -188,8 +280,8 @@ const SpaceDetail = () => {
       <Head>
         <title>{space ? `${space.name} - Aura` : "Space - Aura"}</title>
       </Head>
-      <main className="min-h-screen bg-muted px-4 py-12">
-        <div className="max-w-2xl mx-auto">
+      <main className="min-h-screen bg-muted px-4 py-8">
+        <div className="max-w-6xl mx-auto">
           <Link
             href="/spaces"
             className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
@@ -207,30 +299,93 @@ const SpaceDetail = () => {
                 </Alert>
               )}
 
-              {/* Space header sits OUTSIDE the tab strip — name + role
-                  badges are global context. Edit-metadata moves into
-                  the Overview tab below. */}
-              <div className="flex items-start justify-between gap-2 mb-4">
-                <h1 className="text-2xl font-bold">{space.name}</h1>
-                <div className="flex items-center gap-1">
-                  {space.isPersonal && <Badge variant="secondary">Private</Badge>}
-                  {isAdmin && !space.isPersonal && (
-                    <Badge variant="secondary">Admin</Badge>
+              {/* Dashboard header — space identity + membership glance,
+                  with the admin edit entry point. */}
+              <div className="flex items-start gap-4 mb-6">
+                <SpaceTile
+                  name={space.name}
+                  color={resolveSpaceColor(space)}
+                  isPersonal={space.isPersonal}
+                  size="lg"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl font-bold truncate">{space.name}</h1>
+                    <Badge variant="secondary">
+                      {space.isPersonal ? "Private" : "Shared"}
+                    </Badge>
+                    {isAdmin && !space.isPersonal && (
+                      <Badge variant="secondary">Admin</Badge>
+                    )}
+                  </div>
+                  {space.description && (
+                    <p className="text-sm text-muted-foreground mt-1 max-w-2xl line-clamp-2">
+                      {space.description}
+                    </p>
                   )}
-                  {isAdmin && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="ml-1 gap-1.5"
-                    >
-                      <Link href={`/spaces/${space.id}/settings`}>
-                        <Settings className="h-4 w-4" aria-hidden />
-                        Settings
-                      </Link>
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex -space-x-2">
+                      {space.userMemberships.slice(0, 4).map((m) => (
+                        <UserAvatar
+                          key={m["@id"]}
+                          user={toAvatarUser(m.user)}
+                          size="sm"
+                          className="ring-2 ring-background"
+                        />
+                      ))}
+                    </div>
+                    {space.userMemberships.length > 4 && (
+                      <span className="inline-flex h-6 items-center rounded-full bg-muted px-2 text-xs text-muted-foreground">
+                        +{space.userMemberships.length - 4}
+                      </span>
+                    )}
+                    <span className="text-sm text-muted-foreground">
+                      {space.userMemberships.length} member
+                      {space.userMemberships.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </div>
+                {isAdmin && (
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 shrink-0"
+                  >
+                    <Link href={`/spaces/${space.id}/settings`}>
+                      <Settings className="h-4 w-4" aria-hidden />
+                      Edit space
+                    </Link>
+                  </Button>
+                )}
+              </div>
+
+              {/* Stat cards — clicking jumps to the matching tab. */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <StatCard
+                  icon={FolderKanban}
+                  label="Projects"
+                  count={space.projectsCount}
+                  onClick={() => handleTabChange("projects")}
+                />
+                <StatCard
+                  icon={FileText}
+                  label="Pages"
+                  count={space.pagesCount}
+                  onClick={() => handleTabChange("pages")}
+                />
+                <StatCard
+                  icon={MessageSquare}
+                  label="Discussions"
+                  count={discussionsCount}
+                  onClick={() => handleTabChange("discussions")}
+                />
+                <StatCard
+                  icon={CheckSquare}
+                  label="Tasks"
+                  count={tasksCount}
+                  onClick={() => handleTabChange("tasks")}
+                />
               </div>
 
               <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -243,64 +398,191 @@ const SpaceDetail = () => {
                   <TabsTrigger value="files">Files</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="overview" className="space-y-6 mt-0">
-                  {/* Read-only overview. All management (edit metadata,
-                      color, members, invites, delete) lives on the
-                      admin-only Settings page reachable from the header. */}
-                  {space.description && (
-                    <Card>
-                      <CardContent className="pt-6">
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {space.description}
-                        </p>
-                      </CardContent>
-                    </Card>
-                  )}
+                <TabsContent value="overview" className="mt-0">
+                  <div className="grid gap-6 lg:grid-cols-3">
+                    {/* Main column */}
+                    <div className="lg:col-span-2 space-y-6">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h2 className="font-semibold mb-4">Recent activity</h2>
+                          {/* No space-level activity feed yet — render the
+                              empty state until the backend lands. */}
+                          <EmptyState
+                            icon={Clock}
+                            title="No activity yet"
+                            hint="Create a project or page and the team's activity will show up here."
+                          />
+                        </CardContent>
+                      </Card>
 
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h2 className="text-lg font-semibold mb-3">Members</h2>
-                  <ul className="flex flex-wrap items-center gap-1 mb-3" data-testid="space-member-list">
-                    {space.userMemberships.map((membership) => {
-                      const isSelf = membership.user.id === user.id;
-                      const label = membership.user.email;
-                      return (
-                        <li key={membership["@id"]} data-testid="space-member">
-                          <Badge variant="secondary" className="gap-1">
-                            <span>
-                              {label}
-                              {membership.role === "admin" && (
-                                <span className="ml-1 text-xs uppercase tracking-wide opacity-70">
-                                  admin
-                                </span>
-                              )}
-                              {isSelf && <span className="ml-1 text-xs opacity-70">(you)</span>}
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className="font-semibold">
+                              Projects{" "}
+                              <span className="text-muted-foreground font-normal">
+                                {space.projectsCount}
+                              </span>
+                            </h2>
+                            <Button
+                              asChild
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-emerald-600 hover:text-emerald-500"
+                            >
+                              <Link href="/projects">
+                                New project
+                                <Plus className="h-3.5 w-3.5" aria-hidden />
+                              </Link>
+                            </Button>
+                          </div>
+                          {projectsPreview.length === 0 ? (
+                            <EmptyState
+                              icon={FolderKanban}
+                              title="No projects yet"
+                              hint="Projects organize tasks and timelines for a piece of the launch."
+                            />
+                          ) : (
+                            <ul className="divide-y divide-border rounded-md border">
+                              {projectsPreview.map((p) => (
+                                <li key={p["@id"]} className="px-3 py-2.5">
+                                  <Link
+                                    href={`/projects/${p.id}`}
+                                    className="font-medium hover:underline"
+                                  >
+                                    {p.title}
+                                  </Link>
+                                  <p className="text-xs text-muted-foreground">
+                                    {p.owner?.email}
+                                    {p.owner?.email ? " · " : ""}
+                                    {formatRelative(p.createdOn)}
+                                  </p>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Rail */}
+                    <div className="space-y-6">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-3">
+                            <h2 className="font-semibold">
+                              Members{" "}
+                              <span className="text-muted-foreground font-normal">
+                                {space.userMemberships.length}
+                              </span>
+                            </h2>
+                            {isAdmin && (
+                              <Link
+                                href={`/spaces/${space.id}/settings`}
+                                className="text-sm text-emerald-600 hover:underline"
+                              >
+                                Manage
+                              </Link>
+                            )}
+                          </div>
+                          <ul
+                            className="space-y-2.5"
+                            data-testid="space-member-list"
+                          >
+                            {space.userMemberships.map((m) => {
+                              const isSelf = m.user.id === user.id;
+                              return (
+                                <li
+                                  key={m["@id"]}
+                                  className="flex items-center gap-2"
+                                  data-testid="space-member"
+                                >
+                                  <UserAvatar
+                                    user={toAvatarUser(m.user)}
+                                    size="sm"
+                                  />
+                                  <span className="text-sm font-medium truncate flex-1">
+                                    {displayName(m.user)}
+                                    {isSelf && (
+                                      <span className="ml-1 text-xs text-muted-foreground">
+                                        you
+                                      </span>
+                                    )}
+                                  </span>
+                                  <Badge
+                                    variant={
+                                      m.role === "admin" ? "secondary" : "outline"
+                                    }
+                                    className="shrink-0"
+                                  >
+                                    {m.role}
+                                  </Badge>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h2 className="font-semibold mb-3">
+                            Shared files{" "}
+                            <span className="text-muted-foreground font-normal">
+                              {(space.attachments ?? []).length}
                             </span>
-                          </Badge>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                          </h2>
+                          {(space.attachments ?? []).length === 0 ? (
+                            <EmptyState
+                              icon={Paperclip}
+                              title="No files yet"
+                              hint="Drag files onto any task or page to share them with the space."
+                            />
+                          ) : (
+                            <ul className="space-y-1.5">
+                              {(space.attachments ?? []).slice(0, 5).map((a) => (
+                                <li
+                                  key={a["@id"]}
+                                  className="flex items-center gap-2 text-sm"
+                                >
+                                  <Paperclip
+                                    className="h-3.5 w-3.5 text-muted-foreground shrink-0"
+                                    aria-hidden
+                                  />
+                                  <span className="truncate">
+                                    {a.originalName}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </CardContent>
+                      </Card>
 
-                  {space.groupMemberships.length > 0 && (
-                    <>
-                      <p className="text-xs text-muted-foreground mt-3 mb-1">
-                        Groups
-                      </p>
-                      <ul className="flex flex-wrap gap-1 mb-3">
-                        {space.groupMemberships.map((groupMembership) => (
-                          <li key={groupMembership["@id"]}>
-                            <Badge variant="outline">
-                              {groupMembership.userGroup.title ?? groupMembership.userGroup.id}
-                            </Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-
-                </CardContent>
-              </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <h2 className="font-semibold mb-3">Quick actions</h2>
+                          <div className="space-y-2">
+                            <QuickAction
+                              icon={FolderKanban}
+                              label="New project"
+                              href="/projects"
+                            />
+                            <QuickAction
+                              icon={FileText}
+                              label="New page"
+                              href="/pages"
+                            />
+                            <QuickAction
+                              icon={MessageSquare}
+                              label="New discussion"
+                              href="/discussions"
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="projects" className="mt-0">
@@ -355,5 +637,76 @@ const SpaceDetail = () => {
     </>
   );
 };
+
+const StatCard = ({
+  icon: Icon,
+  label,
+  count,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number | null;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className="group flex items-center gap-3 rounded-lg border bg-card p-4 text-left transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring"
+  >
+    <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <Icon className="h-4 w-4" aria-hidden />
+    </span>
+    <span className="min-w-0 flex-1">
+      <span className="block text-lg font-semibold leading-tight">
+        {count ?? "—"}
+      </span>
+      <span className="block text-xs text-muted-foreground">{label}</span>
+    </span>
+    <ChevronRight
+      className="h-4 w-4 text-muted-foreground/60 group-hover:text-muted-foreground shrink-0"
+      aria-hidden
+    />
+  </button>
+);
+
+const EmptyState = ({
+  icon: Icon,
+  title,
+  hint,
+}: {
+  icon: LucideIcon;
+  title: string;
+  hint: string;
+}) => (
+  <div className="flex flex-col items-center justify-center rounded-md border border-dashed py-10 px-4 text-center">
+    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground mb-3">
+      <Icon className="h-5 w-5" aria-hidden />
+    </span>
+    <p className="font-medium text-sm">{title}</p>
+    <p className="text-xs text-muted-foreground mt-1 max-w-xs">{hint}</p>
+  </div>
+);
+
+const QuickAction = ({
+  icon: Icon,
+  label,
+  href,
+}: {
+  icon: LucideIcon;
+  label: string;
+  href: string;
+}) => (
+  <Button
+    asChild
+    variant="outline"
+    className="w-full justify-start gap-2 font-normal"
+  >
+    <Link href={href}>
+      <Icon className="h-4 w-4" aria-hidden />
+      {label}
+    </Link>
+  </Button>
+);
 
 export default SpaceDetail;
