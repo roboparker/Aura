@@ -44,8 +44,12 @@ final class SpaceMemberAdder
      *     |array{status: 'added', email: string, user: User}
      *     |array{status: 'invited', email: string, invite: UserInvite, plainToken: string}
      */
-    public function add(Space $space, string $email, User $invitedBy): array
-    {
+    public function add(
+        Space $space,
+        string $email,
+        User $invitedBy,
+        string $role = Space::ROLE_MEMBER,
+    ): array {
         $candidate = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
 
         if (null !== $candidate) {
@@ -61,7 +65,7 @@ final class SpaceMemberAdder
 
             $membership = (new SpaceMembership())
                 ->setUser($candidate)
-                ->setRole(Space::ROLE_MEMBER);
+                ->setRole($role);
             $space->addUserMembership($membership);
             $this->em->persist($membership);
 
@@ -72,14 +76,18 @@ final class SpaceMemberAdder
             ];
         }
 
-        return $this->upsertInvite($space, $email, $invitedBy);
+        return $this->upsertInvite($space, $email, $invitedBy, $role);
     }
 
     /**
      * @return array{status: 'invited', email: string, invite: UserInvite, plainToken: string}
      */
-    private function upsertInvite(Space $space, string $email, User $invitedBy): array
-    {
+    private function upsertInvite(
+        Space $space,
+        string $email,
+        User $invitedBy,
+        string $role = Space::ROLE_MEMBER,
+    ): array {
         $invite = $this->userInviteRepository->findByEmail($email);
 
         // Re-treat a previously-accepted UserInvite row as a fresh
@@ -107,7 +115,10 @@ final class SpaceMemberAdder
         if (null === $existing) {
             // Constructor wires the SpaceInvite into the parent's
             // collection so cascade=persist picks it up on flush.
-            new SpaceInvite($invite, $space, $invitedBy);
+            new SpaceInvite($invite, $space, $invitedBy, $role);
+        } else {
+            // Re-inviting an already-attached email can change the role.
+            $existing->setRole($role);
         }
 
         return [

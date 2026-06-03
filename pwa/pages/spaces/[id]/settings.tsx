@@ -1,8 +1,16 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Archive, Mail, Pencil, Search, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ChevronDown,
+  Lock,
+  LockOpen,
+  Mail,
+  Trash2,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useActiveSpace,
@@ -14,22 +22,26 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { resolveSpaceColor } from "@/lib/avatarPalette";
 import { formatRelative } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import EmailChipInput from "@/components/common/EmailChipInput";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import MarkdownView from "@/components/editor/MarkdownView";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
-const MAX_INVITES = 25;
+type Visibility = "private" | "shared";
+type Role = "admin" | "member";
 
 interface PendingInvite {
   id: string;
@@ -40,35 +52,71 @@ interface PendingInvite {
   expiresAt: string;
 }
 
-type RoleFilter = "all" | "admin" | "member";
+const VISIBILITY_OPTIONS: {
+  key: Visibility;
+  label: string;
+  description: string;
+  icon: typeof Lock;
+}[] = [
+  {
+    key: "private",
+    label: "Private",
+    description: "Only you can see this space and everything in it.",
+    icon: Lock,
+  },
+  {
+    key: "shared",
+    label: "Shared",
+    description: "Invited members can access projects, pages, and tasks.",
+    icon: LockOpen,
+  },
+];
 
-/** Absolute, human date — the header/at-a-glance want "Nov 14, 2024", not "2 days ago". */
-const formatDate = (iso: string): string =>
-  new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-
-/** SpaceMember.personalizedColor is optional; UserAvatar needs a string. */
 const toAvatarUser = (m: SpaceMember): AvatarUser => ({
   ...m,
   personalizedColor: m.personalizedColor ?? "#64748b",
 });
 
+/** Compact role picker (Admin / Member) — used per member row and on invite. */
+const RoleSelect = ({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: Role;
+  onChange: (role: Role) => void;
+  disabled?: boolean;
+}) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button
+        type="button"
+        disabled={disabled}
+        className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium capitalize hover:bg-accent disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+      >
+        <span
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            value === "admin" ? "bg-violet-500" : "bg-emerald-500",
+          )}
+        />
+        {value}
+        <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="min-w-[120px]">
+      <DropdownMenuItem onSelect={() => onChange("admin")}>Admin</DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => onChange("member")}>Member</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>
+);
+
 /**
- * Admin-only settings surface for a space (`/spaces/{id}/settings`).
- * Mirrors the management blocks that used to live inline on the space
- * detail page, restructured into a dedicated two-column page: members,
- * group memberships, invites, and the danger zone in the main column;
- * about + at-a-glance facts in the rail.
- *
- * First cut wires only what the API already supports — add member /
- * invite, list + revoke invites, edit name/description/color, and
- * delete. Controls that need new endpoints (change a member's role,
- * remove a member, attach a group, resend an invite, archive the
- * space) are rendered read-only or marked unavailable rather than
- * faked.
+ * Admin-only space settings (`/spaces/{id}/settings`). A single inline
+ * form for the space's details, appearance, and members, with a sticky
+ * save bar for the metadata fields. Member role changes, removals, and
+ * invites apply immediately (they're their own API calls); only name /
+ * description / visibility / color are batched behind "Save changes".
  */
 const SpaceSettings = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -83,24 +131,28 @@ const SpaceSettings = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Edit dialog (name / description / color)
-  const [editOpen, setEditOpen] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editColor, setEditColor] = useState<string | null>(null);
-  const [isSavingMeta, setIsSavingMeta] = useState(false);
+  // Dirty-tracked metadata form.
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState<Visibility>("shared");
+  const [color, setColor] = useState<string | null>(null);
+  const [initial, setInitial] = useState({
+    name: "",
+    description: "",
+    visibility: "shared" as Visibility,
+    color: null as string | null,
+  });
+  const formInitialized = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Invite-by-email
-  const [inviteEmails, setInviteEmails] = useState<string[]>([]);
-  const [isSendingInvites, setIsSendingInvites] = useState(false);
+  // Invite-by-email.
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<Role>("member");
+  const [isInviting, setIsInviting] = useState(false);
   const [inviteMessage, setInviteMessage] = useState<{
     text: string;
     kind: "success" | "error";
   } | null>(null);
-
-  // Member list filters (client-side)
-  const [memberQuery, setMemberQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
 
   const load = useCallback(async () => {
     if (!spaceId) return;
@@ -118,9 +170,23 @@ const SpaceSettings = () => {
       if (!res.ok) throw new Error("Failed to load space.");
       const data: Space = await res.json();
       setSpace(data);
-      setEditName(data.name);
-      setEditDescription(data.description ?? "");
-      setEditColor(data.color);
+
+      // Initialise the metadata form once so a background reload (after
+      // a member change) doesn't clobber in-progress edits.
+      if (!formInitialized.current) {
+        const snap = {
+          name: data.name,
+          description: data.description ?? "",
+          visibility: data.visibility,
+          color: data.color,
+        };
+        setName(snap.name);
+        setDescription(snap.description);
+        setVisibility(snap.visibility);
+        setColor(snap.color);
+        setInitial(snap);
+        formInitialized.current = true;
+      }
 
       const isMembershipAdmin = data.userMemberships.some(
         (m) => user && m.user.id === user.id && m.role === "admin",
@@ -161,17 +227,21 @@ const SpaceSettings = () => {
       (m) => m.user.id === user.id && m.role === "admin",
     );
 
-  // Settings is an admin surface — non-admins get bounced to the
-  // space detail page once we know they aren't an admin.
   useEffect(() => {
     if (space && user && !isAdmin && spaceId) {
       router.replace(`/spaces/${spaceId}`);
     }
   }, [space, user, isAdmin, spaceId, router]);
 
-  const handleSaveMeta = async () => {
-    if (!space || !editName.trim()) return;
-    setIsSavingMeta(true);
+  const isDirty =
+    name !== initial.name ||
+    description !== initial.description ||
+    visibility !== initial.visibility ||
+    color !== initial.color;
+
+  const handleSave = async () => {
+    if (!space || !name.trim()) return;
+    setIsSaving(true);
     setError(null);
     try {
       const res = await fetch(`${ENTRYPOINT}${space["@id"]}`, {
@@ -179,9 +249,10 @@ const SpaceSettings = () => {
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
         body: JSON.stringify({
-          name: editName.trim(),
-          description: editDescription.trim() || null,
-          color: editColor,
+          name: name.trim(),
+          description: description.trim() || null,
+          visibility,
+          color,
         }),
       });
       if (!res.ok) {
@@ -190,69 +261,93 @@ const SpaceSettings = () => {
           data.detail || data["hydra:description"] || "Failed to save changes.",
         );
       }
-      setEditOpen(false);
-      await load();
+      setInitial({ name: name.trim(), description, visibility, color });
+      setName(name.trim());
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save changes.");
     } finally {
-      setIsSavingMeta(false);
+      setIsSaving(false);
     }
   };
 
-  const handleSendInvites = async () => {
-    if (!space || inviteEmails.length === 0) return;
-    setIsSendingInvites(true);
-    setInviteMessage(null);
-    let added = 0;
-    let invited = 0;
-    const failures: string[] = [];
-    for (const email of inviteEmails) {
-      try {
-        const res = await fetch(
-          `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members`,
-          {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-          },
-        );
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          failures.push(`${email} (${data.error ?? "failed"})`);
-          continue;
-        }
-        if (data.status === "added") added += 1;
-        else invited += 1;
-      } catch {
-        failures.push(`${email} (network error)`);
-      }
+  const handleChangeRole = async (membership: { id: string }, role: Role) => {
+    if (!space) return;
+    setError(null);
+    const res = await fetch(
+      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to change role.");
+      return;
     }
-    const parts: string[] = [];
-    if (added) parts.push(`${added} added`);
-    if (invited) parts.push(`${invited} invited`);
-    setInviteMessage({
-      text: failures.length
-        ? `${parts.join(", ") || "Nothing sent"} · couldn't reach: ${failures.join(", ")}`
-        : parts.join(", ") || "Done",
-      kind: failures.length ? "error" : "success",
-    });
-    setInviteEmails([]);
     await load();
     await refresh();
-    setIsSendingInvites(false);
+  };
+
+  const handleRemoveMember = async (membership: { id: string }, label: string) => {
+    if (!space) return;
+    if (!window.confirm(`Remove ${label} from this space?`)) return;
+    setError(null);
+    const res = await fetch(
+      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
+      { method: "DELETE", credentials: "include" },
+    );
+    if (!res.ok && res.status !== 204) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to remove member.");
+      return;
+    }
+    await load();
+    await refresh();
+  };
+
+  const handleInvite = async () => {
+    if (!space || !inviteEmail.trim()) return;
+    setIsInviting(true);
+    setInviteMessage(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to invite.");
+      setInviteMessage({
+        text:
+          data.status === "added"
+            ? `${data.email} is now a member.`
+            : `Invitation sent to ${data.email}.`,
+        kind: "success",
+      });
+      setInviteEmail("");
+      await load();
+      await refresh();
+    } catch (err) {
+      setInviteMessage({
+        text: err instanceof Error ? err.message : "Failed to invite.",
+        kind: "error",
+      });
+    } finally {
+      setIsInviting(false);
+    }
   };
 
   const handleRevokeInvite = async (invite: PendingInvite) => {
     if (!space) return;
-    if (
-      !window.confirm(
-        `Revoke the pending invitation for ${invite.email}? Their existing sign-up link stops working.`,
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(`Revoke the invitation for ${invite.email}?`)) return;
     const res = await fetch(
       `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/invites/${encodeURIComponent(invite.id)}`,
       { method: "DELETE", credentials: "include" },
@@ -268,7 +363,7 @@ const SpaceSettings = () => {
     if (!space) return;
     if (
       !window.confirm(
-        `Delete "${space.name}"? Every project, discussion, and custom field in this space goes with it. This can't be undone.`,
+        `Delete "${space.name}"? Every project, discussion, and page in this space goes with it. This can't be undone.`,
       )
     ) {
       return;
@@ -318,44 +413,20 @@ const SpaceSettings = () => {
     );
   }
 
-  // Non-admins are redirected by the effect above; render nothing in
-  // the gap so we don't flash the admin UI.
   if (!isAdmin) return null;
-
-  const memberCount = space.userMemberships.length;
-  const adminCount = space.userMemberships.filter(
-    (m) => m.role === "admin",
-  ).length;
-
-  const filteredMembers = space.userMemberships
-    .filter((m) => roleFilter === "all" || m.role === roleFilter)
-    .filter((m) => {
-      const q = memberQuery.trim().toLowerCase();
-      if (!q) return true;
-      return (
-        displayName(m.user).toLowerCase().includes(q) ||
-        m.user.email.toLowerCase().includes(q)
-      );
-    });
-
-  const roleFilters: { key: RoleFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "admin", label: "Admins" },
-    { key: "member", label: "Members" },
-  ];
 
   return (
     <>
       <Head>
         <title>Space settings · {space.name}</title>
       </Head>
-      <main className="mx-auto max-w-6xl px-4 py-8">
-        <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2 gap-1.5">
-          <Link href={`/spaces/${space.id}`}>
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back to {space.name}
-          </Link>
-        </Button>
+      <main className="mx-auto max-w-3xl px-4 py-8 pb-24">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Space settings</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage the details, appearance, and members of this space.
+          </p>
+        </div>
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -363,456 +434,349 @@ const SpaceSettings = () => {
           </Alert>
         )}
 
-        {/* Header */}
-        <div className="flex items-start gap-4 mb-8">
-          <SpaceTile
-            name={space.name}
-            color={resolveSpaceColor(space)}
-            isPersonal={space.isPersonal}
-            size="lg"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold truncate">{space.name}</h1>
-              <Badge variant="secondary" className="shrink-0">
-                admin
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {memberCount} member{memberCount === 1 ? "" : "s"} ·{" "}
-              {space.projectsCount} project{space.projectsCount === 1 ? "" : "s"}{" "}
-              · {space.pagesCount} page{space.pagesCount === 1 ? "" : "s"} ·
-              created {formatDate(space.createdAt)}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setEditOpen(true)}
-            >
-              <Pencil className="h-4 w-4" aria-hidden />
-              Edit
-            </Button>
-            {!space.isPersonal && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="gap-1.5"
-                onClick={handleDeleteSpace}
-              >
-                <Trash2 className="h-4 w-4" aria-hidden />
-                Delete
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Main column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Members */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-baseline justify-between gap-2 mb-1">
-                  <h2 className="text-lg font-semibold">
-                    Members{" "}
-                    <span className="text-muted-foreground font-normal">
-                      {memberCount}
-                    </span>
-                  </h2>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  People with access to this space.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <div className="relative flex-1 min-w-[180px]">
-                    <Search
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                      aria-hidden
-                    />
-                    <Input
-                      value={memberQuery}
-                      onChange={(e) => setMemberQuery(e.target.value)}
-                      placeholder="Search members…"
-                      aria-label="Search members"
-                      className="pl-8"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1">
-                    {roleFilters.map((f) => (
-                      <Button
-                        key={f.key}
-                        type="button"
-                        size="sm"
-                        variant={roleFilter === f.key ? "default" : "outline"}
-                        onClick={() => setRoleFilter(f.key)}
-                      >
-                        {f.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <ul
-                  className="divide-y divide-border rounded-md border"
-                  data-testid="settings-member-list"
-                >
-                  {filteredMembers.map((m) => {
-                    const isSelf = m.user.id === user.id;
-                    return (
-                      <li
-                        key={m["@id"]}
-                        className="flex items-center gap-3 px-3 py-2.5"
-                        data-testid="settings-member"
-                      >
-                        <UserAvatar user={toAvatarUser(m.user)} size="sm" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-medium truncate">
-                              {displayName(m.user)}
-                            </span>
-                            {isSelf && (
-                              <span className="text-xs text-muted-foreground">
-                                you
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {m.user.email}
-                          </p>
-                        </div>
-                        {/* Role change isn't wired yet — show the role as
-                            a static badge rather than a dropdown that
-                            can't do anything. */}
-                        <Badge
-                          variant={m.role === "admin" ? "secondary" : "outline"}
-                          className="shrink-0"
-                        >
-                          {m.role}
-                        </Badge>
-                      </li>
-                    );
-                  })}
-                  {filteredMembers.length === 0 && (
-                    <li className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      No members match.
-                    </li>
-                  )}
-                </ul>
-              </CardContent>
-            </Card>
-
-            {/* Group memberships (read-only for now) */}
-            {space.groupMemberships.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h2 className="text-lg font-semibold mb-1">
-                    Group memberships{" "}
-                    <span className="text-muted-foreground font-normal">
-                      {space.groupMemberships.length}
-                    </span>
-                  </h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Groups attached to this space — everyone in the group gets
-                    the role below.
-                  </p>
-                  <ul className="divide-y divide-border rounded-md border">
-                    {space.groupMemberships.map((g) => (
-                      <li
-                        key={g["@id"]}
-                        className="flex items-center gap-3 px-3 py-2.5"
-                      >
-                        <span className="font-medium truncate flex-1">
-                          {g.userGroup.title ?? g.userGroup.id}
-                        </span>
-                        <Badge
-                          variant={g.role === "admin" ? "secondary" : "outline"}
-                          className="shrink-0"
-                        >
-                          {g.role}
-                        </Badge>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Invite by email */}
-            <Card>
-              <CardContent className="pt-6">
-                <h2 className="text-lg font-semibold mb-1">Invite by email</h2>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Send an invitation link directly to one or more email
-                  addresses. Press ↵ to add, up to {MAX_INVITES} at a time.
-                </p>
-                <EmailChipInput
-                  inputId="space-settings-invites"
-                  value={inviteEmails}
-                  onChange={setInviteEmails}
-                  maxItems={MAX_INVITES}
-                />
-                {inviteMessage && (
-                  <Alert
-                    variant={
-                      inviteMessage.kind === "error" ? "destructive" : "default"
-                    }
-                    className="mt-3"
-                  >
-                    <AlertDescription>{inviteMessage.text}</AlertDescription>
-                  </Alert>
-                )}
-                <div className="flex justify-end mt-3">
-                  <Button
-                    type="button"
-                    className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-                    disabled={isSendingInvites || inviteEmails.length === 0}
-                    onClick={handleSendInvites}
-                  >
-                    <Mail className="h-4 w-4" aria-hidden />
-                    {isSendingInvites ? "Sending…" : "Send invite"}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Pending invitations */}
-            {invites.length > 0 && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h2 className="text-lg font-semibold mb-1">
-                    Pending invitations{" "}
-                    <span className="text-muted-foreground font-normal">
-                      {invites.length}
-                    </span>
-                  </h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Invites that haven&apos;t been accepted yet.
-                  </p>
-                  <ul className="divide-y divide-border rounded-md border">
-                    {invites.map((invite) => (
-                      <li
-                        key={invite.id}
-                        className="flex items-center gap-3 px-3 py-2.5"
-                      >
-                        <Mail
-                          className="h-4 w-4 text-muted-foreground shrink-0"
-                          aria-hidden
-                        />
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium truncate">{invite.email}</p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            invited by {invite.invitedBy} · expires{" "}
-                            {formatRelative(invite.expiresAt)}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={
-                            invite.role === "admin" ? "secondary" : "outline"
-                          }
-                          className="shrink-0"
-                        >
-                          {invite.role}
-                        </Badge>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleRevokeInvite(invite)}
-                        >
-                          Revoke
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Danger zone */}
-            {!space.isPersonal && (
-              <Card className="border-destructive/40">
-                <CardContent className="pt-6">
-                  <h2 className="text-lg font-semibold text-destructive mb-1">
-                    Danger zone
-                  </h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Destructive actions. You can&apos;t undo these.
-                  </p>
-
-                  {/* Archive isn't built yet — show the intent but keep it
-                      disabled so it can't be mistaken for working. */}
-                  <div className="flex items-center justify-between gap-3 rounded-md border px-4 py-3 mb-2">
-                    <div className="min-w-0">
-                      <p className="font-medium flex items-center gap-1.5">
-                        <Archive className="h-4 w-4" aria-hidden />
-                        Archive space
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Hide the space while keeping its contents. Coming soon.
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm" disabled>
-                      Archive…
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-destructive">Delete space</p>
-                      <p className="text-sm text-muted-foreground">
-                        Permanently removes the space and everything in it. All
-                        members lose access.
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={handleDeleteSpace}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                      Delete space…
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Rail */}
-          <div className="space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                  About
-                </h2>
-                {space.description ? (
-                  <MarkdownView
-                    source={space.description}
-                    className="text-sm"
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No description yet.
-                  </p>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 gap-1.5"
-                  onClick={() => setEditOpen(true)}
-                >
-                  <Pencil className="h-3.5 w-3.5" aria-hidden />
-                  Edit description
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="pt-6">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                  At a glance
-                </h2>
-                <dl className="space-y-2 text-sm">
-                  <GlanceRow label="Kind" value={space.visibility} />
-                  <GlanceRow label="Members" value={String(memberCount)} />
-                  <GlanceRow label="Admins" value={String(adminCount)} />
-                  <GlanceRow
-                    label="Created"
-                    value={formatDate(space.createdAt)}
-                  />
-                  <GlanceRow
-                    label="Created by"
-                    value={space.createdBy?.email ?? "—"}
-                  />
-                </dl>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </main>
-
-      {/* Edit dialog: name / description / color */}
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold">Edit space</h2>
+        {/* Details */}
+        <Card className="mb-6">
+          <CardContent className="pt-6 space-y-5">
+            <h2 className="font-semibold">Details</h2>
 
             <div className="space-y-1.5">
-              <Label htmlFor="edit-space-name">Name</Label>
+              <Label htmlFor="space-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
               <Input
-                id="edit-space-name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+                id="space-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 maxLength={120}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="edit-space-description">Description</Label>
+              <Label htmlFor="space-description">
+                Description{" "}
+                <span className="text-muted-foreground font-normal">
+                  Markdown supported
+                </span>
+              </Label>
               <MarkdownEditor
-                id="edit-space-description"
+                id="space-description"
                 ariaLabel="Description"
-                value={editDescription}
-                onChange={setEditDescription}
+                value={description}
+                onChange={setDescription}
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Color</Label>
-              <div className="flex items-center gap-3">
+              <Label>Visibility</Label>
+              <div
+                role="radiogroup"
+                aria-label="Visibility"
+                className="grid grid-cols-2 gap-2"
+              >
+                {VISIBILITY_OPTIONS.map(({ key, label, description: desc, icon: Icon }) => {
+                  const selected = visibility === key;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      onClick={() => setVisibility(key)}
+                      className={cn(
+                        "flex items-start gap-2 rounded-md border p-3 text-left transition-colors",
+                        selected
+                          ? "border-emerald-500/60 bg-emerald-500/5"
+                          : "border-input hover:bg-muted/50",
+                      )}
+                    >
+                      <Icon
+                        className={cn(
+                          "h-4 w-4 mt-0.5 shrink-0",
+                          selected
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-muted-foreground",
+                        )}
+                        aria-hidden
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {desc}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Appearance */}
+        <Card className="mb-6">
+          <CardContent className="pt-6 space-y-3">
+            <h2 className="font-semibold">Appearance</h2>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-2">
+                <Label>
+                  Color{" "}
+                  <span className="text-muted-foreground font-normal">
+                    Used for the tile and accents
+                  </span>
+                </Label>
+                <ColorSwatchPicker
+                  value={color ?? resolveSpaceColor(space)}
+                  onChange={(c) => setColor(c)}
+                  ariaLabel="Space color"
+                  disabled={isSaving}
+                />
+              </div>
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2 shrink-0">
                 <SpaceTile
-                  name={editName || space.name}
-                  color={editColor ?? resolveSpaceColor(space)}
+                  name={name || space.name}
+                  color={color ?? resolveSpaceColor(space)}
                   isPersonal={space.isPersonal}
                   size="md"
                 />
-                <ColorSwatchPicker
-                  value={editColor ?? resolveSpaceColor(space)}
-                  onChange={(c) => setEditColor(c)}
-                  ariaLabel="Space color"
-                  disabled={isSavingMeta}
-                />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate max-w-[120px]">
+                    {name || space.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">preview</p>
+                </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <Separator />
+        {/* Members */}
+        <Card className="mb-6">
+          <CardContent className="pt-6 space-y-4">
+            <h2 className="font-semibold">
+              Members{" "}
+              <span className="text-muted-foreground font-normal">
+                {space.userMemberships.length}
+              </span>
+            </h2>
 
-            <div className="flex justify-end gap-2">
+            <form
+              className="flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleInvite();
+              }}
+            >
+              <div className="relative flex-1 min-w-[180px]">
+                <Mail
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                  aria-hidden
+                />
+                <Input
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="Invite by email…"
+                  aria-label="Invite by email"
+                  className="pl-8"
+                />
+              </div>
+              <RoleSelect value={inviteRole} onChange={setInviteRole} />
               <Button
-                type="button"
-                variant="outline"
-                onClick={() => setEditOpen(false)}
-                disabled={isSavingMeta}
+                type="submit"
+                size="sm"
+                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                disabled={isInviting || !inviteEmail.trim()}
               >
-                Cancel
+                <UserPlus className="h-4 w-4" aria-hidden />
+                {isInviting ? "Adding…" : "Add"}
               </Button>
-              <Button
-                type="button"
-                className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                disabled={isSavingMeta || !editName.trim()}
-                onClick={handleSaveMeta}
+            </form>
+            {inviteMessage && (
+              <p
+                role="alert"
+                className={cn(
+                  "text-sm",
+                  inviteMessage.kind === "success"
+                    ? "text-muted-foreground"
+                    : "text-destructive",
+                )}
               >
-                {isSavingMeta ? "Saving…" : "Save changes"}
-              </Button>
-            </div>
+                {inviteMessage.text}
+              </p>
+            )}
+
+            <ul className="divide-y divide-border rounded-md border">
+              {space.userMemberships.map((m) => {
+                const isSelf = m.user.id === user.id;
+                const label = displayName(m.user);
+                return (
+                  <li
+                    key={m["@id"]}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
+                    <UserAvatar user={toAvatarUser(m.user)} size="sm" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-medium truncate">{label}</span>
+                        {isSelf && (
+                          <span className="text-xs text-muted-foreground">you</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {m.user.email}
+                      </p>
+                    </div>
+                    <RoleSelect
+                      value={m.role}
+                      onChange={(role) => void handleChangeRole(m, role)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleRemoveMember(m, label)}
+                      aria-label={`Remove ${label}`}
+                      className="text-muted-foreground hover:text-destructive p-1"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* Pending invites */}
+        <Card className="mb-6">
+          <CardContent className="pt-6 space-y-3">
+            <h2 className="font-semibold">
+              Pending invites{" "}
+              <span className="text-muted-foreground font-normal">
+                {invites.length}
+              </span>
+            </h2>
+            {invites.length === 0 ? (
+              <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                No pending invitations — invited teammates will appear here until
+                they accept.
+              </div>
+            ) : (
+              <ul className="divide-y divide-border rounded-md border">
+                {invites.map((invite) => (
+                  <li
+                    key={invite.id}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
+                    <Mail
+                      className="h-4 w-4 text-muted-foreground shrink-0"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{invite.email}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        invited by {invite.invitedBy} · expires{" "}
+                        {formatRelative(invite.expiresAt)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={invite.role === "admin" ? "secondary" : "outline"}
+                      className="shrink-0 capitalize"
+                    >
+                      {invite.role}
+                    </Badge>
+                    <Badge variant="outline" className="shrink-0">
+                      Sent
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => void handleRevokeInvite(invite)}
+                    >
+                      Revoke
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Danger zone */}
+        <Card className="mb-6 border-destructive/40">
+          <CardContent className="pt-6 space-y-3">
+            <h2 className="font-semibold text-destructive">Danger zone</h2>
+            {space.isPersonal ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium flex items-center gap-1.5">
+                    <Lock className="h-4 w-4" aria-hidden />
+                    Personal spaces can&apos;t be deleted
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Your Private space is always available and stays with your
+                    account.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" disabled className="gap-1.5">
+                  <Lock className="h-4 w-4" aria-hidden />
+                  Locked
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-destructive">Delete this space</p>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently removes {space.name} and all {space.projectsCount}{" "}
+                    project{space.projectsCount === 1 ? "" : "s"} and{" "}
+                    {space.pagesCount} page{space.pagesCount === 1 ? "" : "s"}.
+                    This can&apos;t be undone.
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={handleDeleteSpace}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Delete space
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+
+      {/* Sticky save bar for the metadata form. */}
+      <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur">
+        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between gap-3">
+          <span className="text-sm text-muted-foreground">
+            {isDirty ? "Unsaved changes" : "All changes saved"}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              disabled={isSaving}
+            >
+              <Link href={`/spaces/${space.id}`}>Cancel</Link>
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              disabled={!isDirty || !name.trim() || isSaving}
+              onClick={handleSave}
+            >
+              {isSaving ? "Saving…" : "Save changes"}
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
     </>
   );
 };
-
-const GlanceRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-center justify-between gap-3">
-    <dt className="text-muted-foreground">{label}</dt>
-    <dd className="font-medium truncate text-right">{value}</dd>
-  </div>
-);
 
 export default SpaceSettings;
