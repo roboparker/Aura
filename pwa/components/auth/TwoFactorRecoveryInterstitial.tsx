@@ -155,11 +155,11 @@ const ChooseStep = ({ onPick }: ChooseStepProps) => (
       <Button
         type="button"
         onClick={() => onPick("reenroll-password")}
-        className="w-full justify-start gap-3 h-auto py-3"
+        className="w-full justify-start gap-3 h-auto py-3 whitespace-normal"
         data-testid="2fa-recovery-reenroll"
       >
         <RotateCcw className="h-4 w-4 shrink-0" />
-        <div className="text-left">
+        <div className="text-left min-w-0">
           <div className="font-medium">Set up a new authenticator</div>
           <div className="text-xs opacity-80">
             Recommended. Scan a fresh QR code and keep two-factor on.
@@ -170,11 +170,11 @@ const ChooseStep = ({ onPick }: ChooseStepProps) => (
         type="button"
         variant="outline"
         onClick={() => onPick("disable")}
-        className="w-full justify-start gap-3 h-auto py-3"
+        className="w-full justify-start gap-3 h-auto py-3 whitespace-normal"
         data-testid="2fa-recovery-disable"
       >
         <ShieldOff className="h-4 w-4 shrink-0" />
-        <div className="text-left">
+        <div className="text-left min-w-0">
           <div className="font-medium">Turn off two-factor authentication</div>
           <div className="text-xs text-muted-foreground">
             Less secure. You can turn it back on any time from your account
