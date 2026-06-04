@@ -49,7 +49,7 @@ final class TaskRepository extends ServiceEntityRepository
             SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s reorder_group JOIN reorder_group.userGroup reorder_group_obj JOIN reorder_group_obj.members reorder_group_member WHERE reorder_group.space = p.space AND reorder_group_member = :user',
+            'SELECT 1 FROM %s reorder_group JOIN reorder_group.userGroup reorder_group_obj JOIN reorder_group_obj.memberships reorder_group_member WHERE reorder_group.space = p.space AND reorder_group_member.user = :user',
             SpaceGroupMembership::class,
         );
         return $this->createQueryBuilder('t')

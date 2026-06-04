@@ -66,7 +66,7 @@ final class UserGroupAccessExtension implements QueryCollectionExtensionInterfac
         // Also OR on `owner` so a freshly transferred owner who hasn't been
         // added to members yet still sees their group.
         $subQuery = sprintf(
-            'SELECT 1 FROM %s user_group_access_probe JOIN user_group_access_probe.members user_group_access_member WHERE user_group_access_probe = %s AND user_group_access_member = :currentUser',
+            'SELECT 1 FROM %s user_group_access_probe JOIN user_group_access_probe.memberships user_group_access_member WHERE user_group_access_probe = %s AND user_group_access_member.user = :currentUser',
             UserGroup::class,
             $rootAlias,
         );

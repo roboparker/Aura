@@ -45,8 +45,8 @@ final class SpaceMembershipDql
         $group = sprintf(
             'SELECT 1 FROM %s %s_grp '
             . 'JOIN %s_grp.userGroup %s_grp_obj '
-            . 'JOIN %s_grp_obj.members %s_grp_member '
-            . 'WHERE %s_grp.space = %s.space AND %s_grp_member = :%s',
+            . 'JOIN %s_grp_obj.memberships %s_grp_member '
+            . 'WHERE %s_grp.space = %s.space AND %s_grp_member.user = :%s',
             SpaceGroupMembership::class,
             $aliasPrefix,
             $aliasPrefix,

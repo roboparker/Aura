@@ -77,7 +77,7 @@ final class SpaceAccessExtension implements
         // Group-inherited membership: any SpaceGroupMembership where the
         // attached UserGroup contains the current user.
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s space_access_group JOIN space_access_group.userGroup space_access_group_obj JOIN space_access_group_obj.members space_access_group_member WHERE space_access_group.space = %s AND space_access_group_member = :currentUser',
+            'SELECT 1 FROM %s space_access_group JOIN space_access_group.userGroup space_access_group_obj JOIN space_access_group_obj.memberships space_access_group_member WHERE space_access_group.space = %s AND space_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
             $rootAlias,
         );

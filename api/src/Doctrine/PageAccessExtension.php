@@ -73,7 +73,7 @@ final class PageAccessExtension implements
             $rootAlias,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s page_access_group JOIN page_access_group.userGroup page_access_group_obj JOIN page_access_group_obj.members page_access_group_member WHERE page_access_group.space = %s.space AND page_access_group_member = :currentUser',
+            'SELECT 1 FROM %s page_access_group JOIN page_access_group.userGroup page_access_group_obj JOIN page_access_group_obj.memberships page_access_group_member WHERE page_access_group.space = %s.space AND page_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
             $rootAlias,
         );

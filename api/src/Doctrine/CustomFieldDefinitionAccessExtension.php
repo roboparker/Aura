@@ -68,7 +68,7 @@ final class CustomFieldDefinitionAccessExtension implements
             $rootAlias,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s cfd_access_group JOIN cfd_access_group.userGroup cfd_access_group_obj JOIN cfd_access_group_obj.members cfd_access_group_member WHERE cfd_access_group.space = %s.space AND cfd_access_group_member = :currentUser',
+            'SELECT 1 FROM %s cfd_access_group JOIN cfd_access_group.userGroup cfd_access_group_obj JOIN cfd_access_group_obj.memberships cfd_access_group_member WHERE cfd_access_group.space = %s.space AND cfd_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
             $rootAlias,
         );

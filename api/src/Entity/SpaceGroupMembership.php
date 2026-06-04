@@ -36,7 +36,7 @@ class SpaceGroupMembership
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?Space $space = null;
 
-    #[ORM\ManyToOne(targetEntity: UserGroup::class)]
+    #[ORM\ManyToOne(targetEntity: UserGroup::class, inversedBy: 'spaceMemberships')]
     #[ORM\JoinColumn(name: 'user_group_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     #[Groups(['space:read'])]
     private ?UserGroup $userGroup = null;

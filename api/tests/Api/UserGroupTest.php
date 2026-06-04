@@ -169,9 +169,14 @@ class UserGroupTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/groups/' . $group->getId(), [
-            'json' => ['owner' => '/users/' . $bob->getId()],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        // Transfer is a dedicated, step-up-protected endpoint. With 2FA
+        // off the step-up falls back to the current password.
+        $client->request('POST', '/groups/' . $group->getId() . '/transfer', [
+            'json' => [
+                'newOwner' => '/users/' . $bob->getId(),
+                'currentPassword' => 'Password123!@#',
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
 
         $this->assertResponseIsSuccessful();
@@ -182,6 +187,50 @@ class UserGroupTest extends ApiTestCase
         $this->assertTrue($bob->getId()?->equals($reloaded->getOwner()?->getId()));
     }
 
+    public function testTransferOwnershipRejectsWrongPassword(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $group = $this->createGroup($alice, 'Shared', [$alice, $bob]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/groups/' . $group->getId() . '/transfer', [
+            'json' => [
+                'newOwner' => '/users/' . $bob->getId(),
+                'currentPassword' => 'wrong-password',
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+
+        $this->entityManager->clear();
+        $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
+        // Ownership unchanged.
+        $this->assertTrue($alice->getId()?->equals($reloaded->getOwner()?->getId()));
+    }
+
+    public function testTransferOwnershipToNonMemberFails(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $group = $this->createGroup($alice, 'Solo', [$alice]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/groups/' . $group->getId() . '/transfer', [
+            'json' => [
+                'newOwner' => '/users/' . $bob->getId(),
+                'currentPassword' => 'Password123!@#',
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testNonOwnerCannotTransferOwnership(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -190,9 +239,12 @@ class UserGroupTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('PATCH', '/groups/' . $group->getId(), [
-            'json' => ['owner' => '/users/' . $bob->getId()],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        $client->request('POST', '/groups/' . $group->getId() . '/transfer', [
+            'json' => [
+                'newOwner' => '/users/' . $bob->getId(),
+                'currentPassword' => 'Password123!@#',
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
 
         $this->assertResponseStatusCodeSame(403);
@@ -253,7 +305,7 @@ class UserGroupTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testOwnerCanRemoveMemberViaPatch(): void
+    public function testOwnerCanRemoveMember(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
@@ -262,22 +314,87 @@ class UserGroupTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PATCH', '/groups/' . $group->getId(), [
-            'json' => [
-                'members' => [
-                    '/users/' . $alice->getId(),
-                    '/users/' . $carol->getId(),
-                ],
-            ],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
-        ]);
+        $client->request('DELETE', '/groups/' . $group->getId() . '/members/' . $bob->getId());
 
-        $this->assertResponseIsSuccessful();
+        $this->assertResponseStatusCodeSame(204);
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
         $this->assertNotNull($reloaded);
         $this->assertCount(2, $reloaded->getMembers());
+    }
+
+    public function testOwnerCannotRemoveSelfViaMembers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $group = $this->createGroup($alice, 'Shared', [$alice, $bob]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('DELETE', '/groups/' . $group->getId() . '/members/' . $alice->getId());
+
+        $this->assertResponseStatusCodeSame(409);
+    }
+
+    public function testNonOwnerCannotRemoveMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+        $group = $this->createGroup($alice, 'Three', [$alice, $bob, $carol]);
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('DELETE', '/groups/' . $group->getId() . '/members/' . $carol->getId());
+
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testMemberCanLeaveGroup(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $group = $this->createGroup($alice, 'Shared', [$alice, $bob]);
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('POST', '/groups/' . $group->getId() . '/leave');
+
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $reloaded = $this->entityManager->getRepository(UserGroup::class)->find($group->getId());
+        $this->assertNotNull($reloaded);
+        $this->assertCount(1, $reloaded->getMembers());
+    }
+
+    public function testOwnerCannotLeaveGroup(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $group = $this->createGroup($alice, 'Shared', [$alice, $bob]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/groups/' . $group->getId() . '/leave');
+
+        $this->assertResponseStatusCodeSame(409);
+    }
+
+    public function testCreateGroupGeneratesSlug(): void
+    {
+        $user = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($user);
+        $client->request('POST', '/groups', [
+            'json' => ['title' => 'Creative Team'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertJsonContains(['slug' => 'creative-team']);
     }
 
     /**
@@ -310,6 +427,11 @@ class UserGroupTest extends ApiTestCase
         $group = new UserGroup();
         $group->setOwner($owner);
         $group->setTitle($title);
+        // Direct persist bypasses UserGroupOwnerProcessor, so set a slug
+        // by hand (the column is NOT NULL). Titles are distinct within a
+        // test, so a slugified title is collision-free here.
+        $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+        $group->setSlug('' === $slug ? 'group' : $slug);
         foreach ($members as $member) {
             $group->addMember($member);
         }

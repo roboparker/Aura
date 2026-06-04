@@ -69,7 +69,7 @@ final class DiscussionAccessExtension implements
             $rootAlias,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s disc_access_group JOIN disc_access_group.userGroup disc_access_group_obj JOIN disc_access_group_obj.members disc_access_group_member WHERE disc_access_group.space = %s.space AND disc_access_group_member = :currentUser',
+            'SELECT 1 FROM %s disc_access_group JOIN disc_access_group.userGroup disc_access_group_obj JOIN disc_access_group_obj.memberships disc_access_group_member WHERE disc_access_group.space = %s.space AND disc_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
             $rootAlias,
         );

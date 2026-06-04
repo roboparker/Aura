@@ -74,7 +74,7 @@ final class ProjectAccessExtension implements QueryCollectionExtensionInterface,
             $rootAlias,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s project_access_group JOIN project_access_group.userGroup project_access_group_obj JOIN project_access_group_obj.members project_access_group_member WHERE project_access_group.space = %s.space AND project_access_group_member = :currentUser',
+            'SELECT 1 FROM %s project_access_group JOIN project_access_group.userGroup project_access_group_obj JOIN project_access_group_obj.memberships project_access_group_member WHERE project_access_group.space = %s.space AND project_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
             $rootAlias,
         );

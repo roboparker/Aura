@@ -78,7 +78,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceMembership::class,
         );
         $taskSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_t_grp JOIN ca_t_grp.userGroup ca_t_grp_obj JOIN ca_t_grp_obj.members ca_t_grp_member WHERE ca_t_grp.space = ca_project.space AND ca_t_grp_member = :currentUser',
+            'SELECT 1 FROM %s ca_t_grp JOIN ca_t_grp.userGroup ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp.space = ca_project.space AND ca_t_grp_member.user = :currentUser',
             SpaceGroupMembership::class,
         );
 
@@ -89,7 +89,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceMembership::class,
         );
         $pageSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_p_grp JOIN ca_p_grp.userGroup ca_p_grp_obj JOIN ca_p_grp_obj.members ca_p_grp_member WHERE ca_p_grp.space = ca_page.space AND ca_p_grp_member = :currentUser',
+            'SELECT 1 FROM %s ca_p_grp JOIN ca_p_grp.userGroup ca_p_grp_obj JOIN ca_p_grp_obj.memberships ca_p_grp_member WHERE ca_p_grp.space = ca_page.space AND ca_p_grp_member.user = :currentUser',
             SpaceGroupMembership::class,
         );
 
