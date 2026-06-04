@@ -5,6 +5,17 @@
 
 const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 
+/**
+ * True when `iso` is within `withinMs` of now. Lives here (rather than
+ * inline in a component) so callers don't trip the react-hooks purity
+ * rule by calling `Date.now()` during render.
+ */
+export function isRecent(iso: string | Date, withinMs: number): boolean {
+  const ts = iso instanceof Date ? iso.getTime() : new Date(iso).getTime();
+  if (Number.isNaN(ts)) return false;
+  return Date.now() - ts < withinMs;
+}
+
 export function formatRelative(iso: string | Date): string {
   const ts = iso instanceof Date ? iso.getTime() : new Date(iso).getTime();
   if (Number.isNaN(ts)) return "";
