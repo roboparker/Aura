@@ -20,6 +20,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   group: Group;
+  /** When true the step-up requires a TOTP code; otherwise a password. */
+  twoFactorEnabled: boolean;
   /** Called after a successful delete (e.g. to navigate away). */
   onDeleted: () => void;
 }
@@ -43,14 +45,22 @@ const formatDate = (iso: string): string => {
  * members from every attached space, with the caveat that members who
  * also belong to a space directly keep their access there.
  */
-const DeleteGroupDialog = ({ open, onOpenChange, group, onDeleted }: Props) => {
+const DeleteGroupDialog = ({
+  open,
+  onOpenChange,
+  group,
+  twoFactorEnabled,
+  onDeleted,
+}: Props) => {
   const [nameInput, setNameInput] = useState("");
+  const [credential, setCredential] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setNameInput("");
+    setCredential("");
     setError(null);
     setIsDeleting(false);
   }, [open]);
@@ -58,7 +68,7 @@ const DeleteGroupDialog = ({ open, onOpenChange, group, onDeleted }: Props) => {
   const memberCount = group.memberships.length;
   const spaces = group.attachedSpaces;
   const nameMatches = nameInput === group.title;
-  const canDelete = nameMatches && !isDeleting;
+  const canDelete = nameMatches && credential.trim() !== "" && !isDeleting;
 
   const handleDelete = async () => {
     if (!canDelete) return;
@@ -68,6 +78,12 @@ const DeleteGroupDialog = ({ open, onOpenChange, group, onDeleted }: Props) => {
       const res = await fetch(`${ENTRYPOINT}${group["@id"]}`, {
         method: "DELETE",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          twoFactorEnabled
+            ? { totpCode: credential.trim() }
+            : { currentPassword: credential },
+        ),
       });
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
@@ -172,6 +188,26 @@ const DeleteGroupDialog = ({ open, onOpenChange, group, onDeleted }: Props) => {
               waiting for exact match…
             </p>
           )}
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="delete-group-credential">
+            {twoFactorEnabled ? "Authentication code" : "Current password"}{" "}
+            <span className="text-muted-foreground font-normal">
+              {twoFactorEnabled
+                ? "From your authenticator app"
+                : "Confirm it's really you"}
+            </span>
+          </Label>
+          <Input
+            id="delete-group-credential"
+            value={credential}
+            onChange={(e) => setCredential(e.target.value)}
+            type={twoFactorEnabled ? "text" : "password"}
+            inputMode={twoFactorEnabled ? "numeric" : undefined}
+            autoComplete={twoFactorEnabled ? "one-time-code" : "current-password"}
+            placeholder={twoFactorEnabled ? "123 456" : undefined}
+          />
         </div>
 
         {error && (

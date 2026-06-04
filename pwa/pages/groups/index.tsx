@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
 import UserAvatar from "@/components/user/UserAvatar";
 
@@ -64,6 +65,7 @@ const Groups = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -111,27 +113,6 @@ const Groups = () => {
     }
     return { owned, memberOf };
   }, [filtered, user]);
-
-  const handleDelete = async (group: Group) => {
-    if (
-      !window.confirm(
-        `Delete group "${group.title}"? This removes it for all members.`,
-      )
-    ) {
-      return;
-    }
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${group["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to delete group.");
-      await loadGroups();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete group.");
-    }
-  };
 
   const handleLeave = async (group: Group) => {
     if (!window.confirm(`Leave "${group.title}"?`)) return;
@@ -229,7 +210,7 @@ const Groups = () => {
                 hint="You can add or remove members and rename or delete these."
                 groups={owned}
                 currentUserId={user.id}
-                onDelete={handleDelete}
+                onDelete={setDeleteTarget}
                 onLeave={handleLeave}
               />
             )}
@@ -240,11 +221,26 @@ const Groups = () => {
                 hint="Groups other people own that include you."
                 groups={memberOf}
                 currentUserId={user.id}
-                onDelete={handleDelete}
+                onDelete={setDeleteTarget}
                 onLeave={handleLeave}
               />
             )}
           </div>
+        )}
+
+        {deleteTarget && (
+          <DeleteGroupDialog
+            open={!!deleteTarget}
+            onOpenChange={(o) => {
+              if (!o) setDeleteTarget(null);
+            }}
+            group={deleteTarget}
+            twoFactorEnabled={user.twoFactor?.enabled ?? false}
+            onDeleted={() => {
+              setDeleteTarget(null);
+              void loadGroups();
+            }}
+          />
         )}
       </main>
     </>

@@ -156,9 +156,50 @@ class UserGroupTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/groups/' . $group->getId());
+        // Delete is step-up protected; with 2FA off the password confirms.
+        $client->request('DELETE', '/groups/' . $group->getId(), [
+            'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
 
         $this->assertResponseStatusCodeSame(204);
+    }
+
+    public function testDeleteWithoutCredentialFails(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $group = $this->createGroup($alice, 'Solo', [$alice]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('DELETE', '/groups/' . $group->getId());
+
+        $this->assertResponseStatusCodeSame(400);
+
+        $this->entityManager->clear();
+        $this->assertNotNull(
+            $this->entityManager->getRepository(UserGroup::class)->find($group->getId()),
+        );
+    }
+
+    public function testDeleteRejectsWrongPassword(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $group = $this->createGroup($alice, 'Solo', [$alice]);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('DELETE', '/groups/' . $group->getId(), [
+            'json' => ['currentPassword' => 'wrong-password'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
+
+        $this->entityManager->clear();
+        $this->assertNotNull(
+            $this->entityManager->getRepository(UserGroup::class)->find($group->getId()),
+        );
     }
 
     public function testOwnerCanTransferOwnership(): void

@@ -851,6 +851,7 @@ const GroupDetail = () => {
               open={deleteOpen}
               onOpenChange={setDeleteOpen}
               group={group}
+              twoFactorEnabled={user.twoFactor?.enabled ?? false}
               onDeleted={() => {
                 setDeleteOpen(false);
                 void router.push("/groups");

@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\UserGroupRepository;
 use App\Service\AvatarColorService;
+use App\State\UserGroupDeleteProcessor;
 use App\State\UserGroupOwnerProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -55,6 +56,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
             securityMessage: 'Only the group owner can delete the group.',
+            processor: UserGroupDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['group:read']],
