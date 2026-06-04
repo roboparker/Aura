@@ -35,6 +35,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
+import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
 import TransferOwnershipDialog from "@/components/groups/TransferOwnershipDialog";
 import SpaceTile from "@/components/spaces/SpaceTile";
@@ -74,6 +75,7 @@ const GroupDetail = () => {
 
   const [pendingInvites, setPendingInvites] = useState<GroupPendingInvite[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -291,28 +293,6 @@ const GroupDetail = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!group) return;
-    if (
-      !window.confirm(
-        `Delete group "${group.title}"? This removes it for all members and detaches it from every space.`,
-      )
-    ) {
-      return;
-    }
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${group["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok && res.status !== 204) throw new Error("Failed to delete group.");
-      await router.push("/groups");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete group.");
-    }
-  };
-
   if (authLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -404,7 +384,7 @@ const GroupDetail = () => {
                       variant="outline"
                       size="sm"
                       className="gap-1.5 text-destructive hover:text-destructive"
-                      onClick={handleDelete}
+                      onClick={() => setDeleteOpen(true)}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden />
                       Delete
@@ -728,7 +708,7 @@ const GroupDetail = () => {
                             variant="destructive"
                             size="sm"
                             className="gap-1.5"
-                            onClick={handleDelete}
+                            onClick={() => setDeleteOpen(true)}
                           >
                             <Trash2 className="h-3.5 w-3.5" aria-hidden />
                             Delete group
@@ -864,6 +844,16 @@ const GroupDetail = () => {
               onTransferred={() => {
                 setTransferOpen(false);
                 void load();
+              }}
+            />
+
+            <DeleteGroupDialog
+              open={deleteOpen}
+              onOpenChange={setDeleteOpen}
+              group={group}
+              onDeleted={() => {
+                setDeleteOpen(false);
+                void router.push("/groups");
               }}
             />
           </>
