@@ -224,16 +224,53 @@ class SpaceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(403);
     }
 
-    public function testAdminCanDeleteSharedSpace(): void
+    public function testAdminCanDeleteSharedSpaceWithPassword(): void
     {
         $alice = $this->createUserWithPersonalSpace('alice@example.com');
         $shared = $this->createSharedSpace($alice, 'Shared');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/spaces/' . $shared->getId());
+        // Step-up: 2FA off → the action requires the current password.
+        $client->request('DELETE', '/spaces/' . $shared->getId(), [
+            'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
 
         $this->assertResponseStatusCodeSame(204);
+    }
+
+    public function testDeleteWithoutStepUpCredentialIsRejected(): void
+    {
+        $alice = $this->createUserWithPersonalSpace('alice@example.com');
+        $shared = $this->createSharedSpace($alice, 'Shared');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        // No password in the body — the step-up gate blocks the delete.
+        $client->request('DELETE', '/spaces/' . $shared->getId());
+        $this->assertResponseStatusCodeSame(400);
+
+        // The space is still there.
+        $this->entityManager->clear();
+        $this->assertNotNull(
+            $this->entityManager->getRepository(Space::class)->find($shared->getId()),
+        );
+    }
+
+    public function testDeleteWithWrongPasswordIsRejected(): void
+    {
+        $alice = $this->createUserWithPersonalSpace('alice@example.com');
+        $shared = $this->createSharedSpace($alice, 'Shared');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('DELETE', '/spaces/' . $shared->getId(), [
+            'json' => ['currentPassword' => 'wrong-password'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(400);
     }
 
     /**

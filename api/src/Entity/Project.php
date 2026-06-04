@@ -14,6 +14,7 @@ use App\Repository\ProjectRepository;
 use App\State\ProjectOwnerProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\Criteria;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -102,7 +103,7 @@ class Project
      * Owner-based access is still in force in PR 1; PR 2 (#185) swaps
      * the access predicates to scope by space membership.
      */
-    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'projects')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['project:read', 'project:write'])]
     private ?Space $space = null;
@@ -136,7 +137,7 @@ class Project
     /**
      * @var Collection<int, Task>
      */
-    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class)]
+    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, fetch: 'EXTRA_LAZY')]
     private Collection $tasks;
 
     public function __construct()
@@ -205,6 +206,30 @@ class Project
     public function getTasks(): Collection
     {
         return $this->tasks;
+    }
+
+    /**
+     * Total task count, surfaced on the wire for list/dashboard rows.
+     * EXTRA_LAZY makes this a COUNT query rather than hydrating the
+     * whole collection.
+     */
+    #[Groups(['project:read'])]
+    public function getTaskCount(): int
+    {
+        return $this->tasks->count();
+    }
+
+    /**
+     * Count of completed tasks (those with a `completedOn` timestamp).
+     * Criteria on an EXTRA_LAZY collection runs a filtered COUNT in SQL
+     * without loading the rows.
+     */
+    #[Groups(['project:read'])]
+    public function getCompletedTaskCount(): int
+    {
+        return $this->tasks
+            ->matching(Criteria::create()->where(Criteria::expr()->neq('completedOn', null)))
+            ->count();
     }
 
     /**

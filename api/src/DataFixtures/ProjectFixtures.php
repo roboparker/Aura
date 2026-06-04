@@ -68,6 +68,10 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
 
         $sharedSpace = (new Space())
             ->setName('Launch team')
+            ->setDescription(
+                'Everything for the Spring 2026 product launch — campaign, web, '
+                . 'PR, and content, in one shared room.',
+            )
             ->setCreatedBy($uma);
         $manager->persist($sharedSpace);
         $manager->flush();
@@ -88,6 +92,10 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         // content, without putting admin in the team space.
         $adminSpace = (new Space())
             ->setName('Admin desk')
+            ->setDescription(
+                'Housekeeping, account chores, and one-off admin tasks — the '
+                . 'workspace that keeps the lights on.',
+            )
             ->setCreatedBy($ada);
         $manager->persist($adminSpace);
         $manager->flush();

@@ -42,6 +42,12 @@ export interface SpaceAttachment {
   byteSize: number;
   variantUrls: { original?: string };
   downloadUrl?: string | null;
+  createdOn?: string;
+  owner?: {
+    email: string;
+    givenName?: string | null;
+    familyName?: string | null;
+  } | null;
 }
 
 export interface Space {
@@ -50,10 +56,25 @@ export interface Space {
   name: string;
   description: string | null;
   isPersonal: boolean;
+  visibility: "private" | "shared";
+  /** Optional override for the avatar tile color. `null` means
+   *  "inherit from the creator's `personalizedColor`" — the PWA
+   *  resolves this in {@link resolveSpaceColor}. */
+  color: string | null;
   createdAt: string;
-  createdBy: { "@id": string; id: string; email: string } | null;
+  updatedAt: string;
+  createdBy: {
+    "@id": string;
+    id: string;
+    email: string;
+    personalizedColor?: string;
+  } | null;
   userMemberships: SpaceMembershipRow[];
   groupMemberships: SpaceGroupMembershipRow[];
+  /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
+  projectsCount: number;
+  /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */
+  pagesCount: number;
   /** Shared files attached at the space level. Present on the detail
    *  endpoint; may be undefined on the list endpoint when the
    *  collection isn't expanded. */

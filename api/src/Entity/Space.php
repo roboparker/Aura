@@ -9,11 +9,16 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\SpaceRepository;
+use App\Service\AvatarColorService;
 use App\State\SpaceCreateProcessor;
+use App\State\SpaceDeleteProcessor;
+use App\State\SpaceUpdateProcessor;
 use App\Validator\ValidSpaceAttachments;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -47,10 +52,12 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user))",
             securityMessage: 'Only space admins can edit a space.',
+            processor: SpaceUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user)) and not object.getIsPersonal()",
             securityMessage: 'Personal spaces cannot be deleted; shared spaces can only be deleted by an admin.',
+            processor: SpaceDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['space:read']],
@@ -80,10 +87,27 @@ class Space
         self::ROLE_MEMBER,
     ];
 
+    /**
+     * Visibility is orthogonal to membership role: it controls whether
+     * additional users can be added at all. Private spaces are
+     * single-occupant (creator only); shared spaces accept invites and
+     * group memberships. Personal spaces are always private — enforced
+     * by {@see validatePersonalIsPrivate()}.
+     */
+    public const VISIBILITY_PRIVATE = 'private';
+    public const VISIBILITY_SHARED = 'shared';
+
+    public const ALLOWED_VISIBILITIES = [
+        self::VISIBILITY_PRIVATE,
+        self::VISIBILITY_SHARED,
+    ];
+
     public const MAX_NAME_LENGTH = 255;
     public const MAX_DESCRIPTION_LENGTH = 100_000;
 
     public const PERSONAL_SPACE_NAME = 'Private';
+
+    public const MAX_INITIAL_INVITES = 50;
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -120,9 +144,55 @@ class Space
     #[Groups(['space:read'])]
     private bool $isPersonal = false;
 
+    /**
+     * Controls whether the space accepts additional members. `private`
+     * spaces are creator-only — invite endpoints and add-member reject
+     * with 409, and {@see SpaceUpdateProcessor} kicks every other
+     * membership on a shared → private transition. `shared` is the
+     * default for new spaces; personal spaces are always `private`,
+     * enforced by {@see validatePersonalIsPrivate()}.
+     */
+    #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_SHARED])]
+    #[Assert\Choice(
+        choices: self::ALLOWED_VISIBILITIES,
+        message: 'Visibility must be "private" or "shared".',
+    )]
+    #[Groups(['space:read', 'space:write'])]
+    private string $visibility = self::VISIBILITY_SHARED;
+
+    /**
+     * Override color for the space avatar tile. When null the UI falls
+     * back to the creator's `personalizedColor` — same swatch on the
+     * person and their personal space by default, with the option to
+     * pick a different one for shared spaces (or override the personal
+     * one). Constrained to the same WCAG-AA palette as user avatars so
+     * white initials always render legibly.
+     */
+    #[ORM\Column(length: 7, nullable: true)]
+    #[Assert\Choice(
+        choices: AvatarColorService::PALETTE,
+        message: 'Color must be one of the supported avatar palette values.',
+    )]
+    #[Groups(['space:read', 'space:write'])]
+    private ?string $color = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['space:read'])]
     private \DateTimeImmutable $createdAt;
+
+    /**
+     * Maintained by Gedmo Timestampable on every UPDATE. Powers the
+     * "edited 2h ago" / "updated yesterday" line on the spaces grid
+     * — it tracks edits to the space row itself (name, description,
+     * visibility), not activity on its contained projects / pages.
+     *
+     * Stored as `datetime` rather than `datetime_immutable` so Gedmo
+     * can mutate the field in place on update.
+     */
+    #[ORM\Column(type: 'datetime')]
+    #[Gedmo\Timestampable(on: 'update')]
+    #[Groups(['space:read'])]
+    private \DateTimeInterface $updatedAt;
 
     /**
      * Audit-only — the user who originally created the space. Kept
@@ -189,12 +259,68 @@ class Space
     #[Groups(['space:read', 'space:write'])]
     private Collection $attachments;
 
+    /**
+     * Transient list of email addresses to invite at creation time —
+     * consumed by {@see SpaceCreateProcessor}, never persisted. Validated
+     * inline so a single bad address fails the whole create with 422
+     * (atomic batch invite — partial success would leave the UX in a
+     * state nobody asked for). All-personal duplicates and the creator's
+     * own address are dropped in the processor without erroring.
+     *
+     * @var list<string>
+     */
+    #[Assert\All([
+        new Assert\Email(message: '"{{ value }}" is not a valid email address.'),
+        new Assert\Length(max: 180),
+    ])]
+    #[Assert\Count(
+        max: self::MAX_INITIAL_INVITES,
+        maxMessage: 'You can invite at most {{ limit }} people at once.',
+    )]
+    #[Groups(['space:write'])]
+    private array $invites = [];
+
+    /**
+     * Inverse side for projects rooted in this space. EXTRA_LAZY means
+     * `->count()` runs a single SELECT COUNT query without hydrating
+     * rows, so {@see getProjectsCount()} stays cheap even on the
+     * spaces-list endpoint. Off the wire — only the count getter is
+     * serialized.
+     *
+     * @var Collection<int, Project>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'space',
+        targetEntity: Project::class,
+        fetch: 'EXTRA_LAZY',
+    )]
+    private Collection $projects;
+
+    /**
+     * Inverse side for pages rooted in this space. Same EXTRA_LAZY
+     * shape as {@see $projects} — only the count is exposed.
+     *
+     * @var Collection<int, Page>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'space',
+        targetEntity: Page::class,
+        fetch: 'EXTRA_LAZY',
+    )]
+    private Collection $pages;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        // Timestampable populates this on update; seed it at construct
+        // time so newly-built rows have a valid value before the first
+        // flush (the column is NOT NULL).
+        $this->updatedAt = new \DateTime();
         $this->userMemberships = new ArrayCollection();
         $this->groupMemberships = new ArrayCollection();
         $this->attachments = new ArrayCollection();
+        $this->projects = new ArrayCollection();
+        $this->pages = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -240,9 +366,95 @@ class Space
         return $this;
     }
 
+    public function getVisibility(): string
+    {
+        return $this->visibility;
+    }
+
+    public function setVisibility(string $visibility): static
+    {
+        $this->visibility = $visibility;
+        return $this;
+    }
+
+    public function isPrivate(): bool
+    {
+        return self::VISIBILITY_PRIVATE === $this->visibility;
+    }
+
+    /**
+     * Class-level invariant enforced after standard property validation:
+     * personal spaces must always be private. Prevents a payload (or a
+     * mistaken service-layer call) from leaving a user's auto-provisioned
+     * personal bucket open to invites.
+     */
+    #[Assert\Callback]
+    public function validatePersonalIsPrivate(ExecutionContextInterface $context): void
+    {
+        if ($this->isPersonal && self::VISIBILITY_PRIVATE !== $this->visibility) {
+            $context->buildViolation('Personal spaces must be private.')
+                ->atPath('visibility')
+                ->addViolation();
+        }
+    }
+
+    public function getColor(): ?string
+    {
+        return $this->color;
+    }
+
+    public function setColor(?string $color): static
+    {
+        $this->color = $color;
+        return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getInvites(): array
+    {
+        return $this->invites;
+    }
+
+    /**
+     * @param list<string> $invites
+     */
+    public function setInvites(array $invites): static
+    {
+        $this->invites = $invites;
+        return $this;
+    }
+
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    /**
+     * Project count rooted in this space. EXTRA_LAZY makes this a
+     * single COUNT query — no row hydration.
+     */
+    #[Groups(['space:read'])]
+    public function getProjectsCount(): int
+    {
+        return $this->projects->count();
+    }
+
+    /**
+     * Page count rooted in this space. Includes every level of the page
+     * tree (root pages + descendants) since access is by space, not by
+     * parent — the grid copy reads "N pages" so all pages matter.
+     */
+    #[Groups(['space:read'])]
+    public function getPagesCount(): int
+    {
+        return $this->pages->count();
     }
 
     public function getCreatedBy(): ?User

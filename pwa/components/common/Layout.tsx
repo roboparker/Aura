@@ -36,18 +36,24 @@ const Layout = ({
         <HydrationBoundary state={dehydratedState}>
           <AuthProvider>
             <ActiveSpaceProvider>
-              <div className="flex min-h-screen flex-col">
-                <Navbar />
-                {/* Persistent left sidebar (`md:` and up) when signed
-                    in; the navbar's mobile Sheet handles the small-
-                    screen case. Sidebar renders nothing for
-                    unauthenticated visitors so the marketing/auth
-                    screens keep their original full-width layout. */}
-                <div className="flex flex-1">
-                  <Sidebar />
-                  <div className="flex-1 min-w-0">{children}</div>
+              {/* Persistent left sidebar (`md:` and up) when signed
+                  in; the navbar's mobile Sheet handles the small-
+                  screen case. Sidebar renders nothing for
+                  unauthenticated visitors so the marketing/auth
+                  screens keep their original full-width layout.
+
+                  Sidebar sits outside the navbar+content column so
+                  it spans the full viewport height — the navbar
+                  starts where the sidebar ends. The Footer rides at
+                  the bottom of the content column, right of the
+                  sidebar. */}
+              <div className="flex min-h-screen">
+                <Sidebar />
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <Navbar />
+                  <div className="flex-1">{children}</div>
+                  <Footer />
                 </div>
-                <Footer />
               </div>
               {/* Forced modal that appears the moment the API signals
                   this session signed in with a backup code. See

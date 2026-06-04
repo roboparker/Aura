@@ -2,6 +2,8 @@
 
 namespace App\DataFixtures;
 
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Service\AvatarColorService;
 use App\Service\TwoFactorSecretCipher;
@@ -122,6 +124,15 @@ class UserFixtures extends Fixture
             $teamUsers[$spec['reference']] = $member;
         }
 
+        // Personal "Private" space for every fixture user. Production
+        // signups get this from {@see UserPasswordHasherProcessor};
+        // fixtures bypass that processor (we persist Users directly to
+        // avoid hashing through the API layer), so we mirror the same
+        // provisioning here to keep the dev DB shape honest.
+        foreach ([$admin, $user, ...array_values($teamUsers)] as $u) {
+            $this->createPersonalSpace($manager, $u);
+        }
+
         $manager->flush();
 
         $this->addReference(self::ADMIN_REFERENCE, $admin);
@@ -129,5 +140,21 @@ class UserFixtures extends Fixture
         foreach ($teamUsers as $reference => $member) {
             $this->addReference($reference, $member);
         }
+    }
+
+    private function createPersonalSpace(ObjectManager $manager, User $user): void
+    {
+        $space = (new Space())
+            ->setName(Space::PERSONAL_SPACE_NAME)
+            ->setDescription('Your private space — only you can see what lives in here.')
+            ->setIsPersonal(true)
+            ->setVisibility(Space::VISIBILITY_PRIVATE)
+            ->setCreatedBy($user);
+        $space->addUserMembership(
+            (new SpaceMembership())
+                ->setUser($user)
+                ->setRole(Space::ROLE_ADMIN),
+        );
+        $manager->persist($space);
     }
 }

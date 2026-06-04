@@ -101,7 +101,7 @@ class Page
      * Owning space — gates read/list via `PageAccessExtension` and
      * drives the security expressions for write/delete. Required.
      */
-    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'pages')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Space is required.')]
     #[Groups(['page:read', 'page:write'])]

@@ -25,8 +25,8 @@ export const AVATAR_PALETTE: readonly string[] = [
  * Deterministic palette pick keyed on a string (name, id — anything
  * stable for the entity in question). Use for surfaces that need a
  * persistent color but don't have a `personalizedColor` column to read
- * from — spaces, groups, anywhere we want the avatar tile to feel
- * "owned" by the entity without a schema change.
+ * from — groups, anywhere we want the avatar tile to feel "owned" by
+ * the entity without a schema change.
  *
  * Hash is intentionally simple: a Tailwind palette of 16 means a fancy
  * hash buys us nothing; the goal is "same string → same swatch every
@@ -39,4 +39,24 @@ export function deterministicPaletteColor(seed: string): string {
     h = (h * 31 + seed.charCodeAt(i)) % AVATAR_PALETTE.length;
   }
   return AVATAR_PALETTE[h];
+}
+
+/**
+ * Resolve the color to render for a Space's avatar tile, following the
+ * spec: explicit `space.color` wins; otherwise inherit the creator's
+ * `personalizedColor`; otherwise fall back to the first palette entry
+ * so we never render a transparent tile.
+ *
+ * Same behavior for personal and shared spaces — no branching — so the
+ * tile can stay a pure presentation prop.
+ */
+export function resolveSpaceColor(space: {
+  color: string | null;
+  createdBy: { personalizedColor?: string } | null;
+}): string {
+  return (
+    space.color ??
+    space.createdBy?.personalizedColor ??
+    AVATAR_PALETTE[0]
+  );
 }
