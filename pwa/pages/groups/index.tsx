@@ -1,40 +1,61 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  BookOpen,
+  LayoutGrid,
+  MoreHorizontal,
+  Plus,
+  Search,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import MarkdownView from "@/components/editor/MarkdownView";
+import { resolveGroupColor } from "@/lib/avatarPalette";
+import { formatRelative, isRecent } from "@/lib/relativeTime";
+import { displayName } from "@/lib/userDisplay";
+import {
+  type Group,
+  type GroupCollection,
+  toGroupAvatarUser,
+} from "@/lib/groupTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
+import GroupTile from "@/components/groups/GroupTile";
+import UserAvatar from "@/components/user/UserAvatar";
 
-interface Member {
-  "@id": string;
-  id: string;
-  email: string;
-}
+// Updates within this window get a green "edited" dot; older ones read
+// as a muted "updated".
+const RECENT_MS = 7 * 24 * 60 * 60 * 1000;
 
-interface Group {
-  "@id": string;
-  id: string;
-  title: string;
-  description: string | null;
-  createdOn: string;
-  owner: Member;
-  members: Member[];
-}
-
-interface GroupCollection {
-  member?: Group[];
-  "hydra:member"?: Group[];
-}
+const ONBOARDING_STEPS: { n: string; title: string; hint: string }[] = [
+  {
+    n: "01",
+    title: "Name it",
+    hint: 'e.g. "Creative team" or "Q3 vendors"',
+  },
+  {
+    n: "02",
+    title: "Add members",
+    hint: "Existing teammates or invite by email",
+  },
+  {
+    n: "03",
+    title: "Attach to a space",
+    hint: "Everyone in the group joins at once",
+  },
+];
 
 const Groups = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -43,18 +64,8 @@ const Groups = () => {
   const [groups, setGroups] = useState<Group[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [editorResetKey, setEditorResetKey] = useState(0);
-
-  // Pending member invites collected before submit. We resolve them server-side
-  // (POST /groups/{id}/members) once the group exists, since that's where the
-  // email -> user lookup lives.
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [pendingInvites, setPendingInvites] = useState<string[]>([]);
-  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -69,9 +80,7 @@ const Groups = () => {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
       });
-      if (!res.ok) {
-        throw new Error("Failed to load groups.");
-      }
+      if (!res.ok) throw new Error("Failed to load groups.");
       const data: GroupCollection = await res.json();
       setGroups(data.member ?? data["hydra:member"] ?? []);
     } catch (err) {
@@ -82,129 +91,51 @@ const Groups = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadGroups();
-    }
+    if (isAuthenticated) void loadGroups();
   }, [isAuthenticated, loadGroups]);
 
-  const queueInvite = () => {
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email) return;
-    if (email === user?.email.toLowerCase()) {
-      setInviteError("You're already added as the owner.");
-      return;
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return groups;
+    return groups.filter(
+      (g) =>
+        g.title.toLowerCase().includes(q) ||
+        g.slug.toLowerCase().includes(q),
+    );
+  }, [groups, search]);
+
+  const { owned, memberOf } = useMemo(() => {
+    const owned: Group[] = [];
+    const memberOf: Group[] = [];
+    for (const g of filtered) {
+      if (user && g.owner.id === user.id) owned.push(g);
+      else memberOf.push(g);
     }
-    if (pendingInvites.includes(email)) {
-      setInviteError("That email is already in the invite list.");
-      return;
-    }
-    setPendingInvites((prev) => [...prev, email]);
-    setInviteEmail("");
-    setInviteError(null);
-  };
+    return { owned, memberOf };
+  }, [filtered, user]);
 
-  const removeInvite = (email: string) => {
-    setPendingInvites((prev) => prev.filter((e) => e !== email));
-  };
-
-  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!title.trim()) return;
-
-    setIsSubmitting(true);
+  const handleLeave = async (group: Group) => {
+    if (!window.confirm(`Leave "${group.title}"?`)) return;
     setError(null);
-    setInviteError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/groups`, {
+      const res = await fetch(`${ENTRYPOINT}/groups/${group.id}/leave`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-        }),
       });
-      if (!res.ok) {
+      if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create group.",
-        );
-      }
-      const created: { id: string } = await res.json();
-
-      // Fan out member adds. The API handles existing users (added now)
-      // and unknown emails (an invite is emailed). We surface counts so
-      // the owner can see what landed; only network/validation errors
-      // become a "failed" list.
-      let addedCount = 0;
-      let invitedCount = 0;
-      const failedInvites: string[] = [];
-      for (const email of pendingInvites) {
-        const inviteRes = await fetch(`${ENTRYPOINT}/groups/${created.id}/members`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-        if (!inviteRes.ok) {
-          failedInvites.push(email);
-          continue;
-        }
-        const data = await inviteRes.json().catch(() => ({}));
-        if (data.status === "added") addedCount += 1;
-        else if (data.status === "invited") invitedCount += 1;
-      }
-
-      setTitle("");
-      setDescription("");
-      setPendingInvites([]);
-      setInviteEmail("");
-      setEditorResetKey((k) => k + 1);
-      if (failedInvites.length > 0) {
-        const summary: string[] = [];
-        if (addedCount > 0) summary.push(`${addedCount} added`);
-        if (invitedCount > 0) summary.push(`${invitedCount} invited`);
-        const summaryText = summary.length > 0 ? ` (${summary.join(", ")} succeeded)` : "";
-        setError(
-          `Group created, but couldn't reach: ${failedInvites.join(", ")}${summaryText}.`,
-        );
+        throw new Error(data.error || "Failed to leave group.");
       }
       await loadGroups();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create group.");
-    } finally {
-      setIsSubmitting(false);
+      setError(err instanceof Error ? err.message : "Failed to leave group.");
     }
   };
 
-  const handleDelete = async (group: Group) => {
-    if (
-      !window.confirm(
-        `Delete group "${group.title}"? This removes it for all members.`,
-      )
-    ) {
-      return;
-    }
-
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${group["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error("Failed to delete group.");
-      }
-      await loadGroups();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete group.");
-    }
-  };
-
-  if (authLoading || !isAuthenticated) {
+  if (authLoading || !isAuthenticated || !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Loading…</p>
       </div>
     );
   }
@@ -214,182 +145,324 @@ const Groups = () => {
       <Head>
         <title>Groups - Aura</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">Groups</h1>
 
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="description">
-                    Description{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <MarkdownEditor
-                    key={editorResetKey}
-                    id="description"
-                    ariaLabel="Description"
-                    value={description}
-                    onChange={setDescription}
-                  />
-                </div>
-                <div className="space-y-1.5" data-testid="invite-members-section">
-                  <Label htmlFor="invite-email">
-                    Invite members{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="invite-email"
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      onKeyDown={(e) => {
-                        // Enter inside a nested input would otherwise submit the
-                        // outer form; treat it as "add to invite list" instead.
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          queueInvite();
-                        }
-                      }}
-                      placeholder="member@example.com"
-                      className="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={queueInvite}
-                      disabled={!inviteEmail.trim()}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  {inviteError && (
-                    <p role="alert" className="text-sm text-destructive">
-                      {inviteError}
-                    </p>
-                  )}
-                  {pendingInvites.length > 0 && (
-                    <ul
-                      className="flex flex-wrap items-center gap-1"
-                      data-testid="pending-invites"
-                    >
-                      {pendingInvites.map((email) => (
-                        <li key={email} data-testid="pending-invite">
-                          <Badge variant="secondary" className="gap-1">
-                            <span>{email}</span>
-                            <button
-                              type="button"
-                              onClick={() => removeInvite(email)}
-                              aria-label={`Remove ${email} from invites`}
-                              className="ml-0.5 text-muted-foreground hover:text-destructive bg-transparent border-0 cursor-pointer"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    You&apos;ll be added as the owner automatically. Existing users join
-                    immediately; others get an email invite to sign up.
-                  </p>
-                </div>
-                <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                  {isSubmitting ? "Adding..." : "Add Group"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+      <main className="px-6 py-8 max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-wrap items-end justify-between gap-4 pb-6 mb-6 border-b">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
+              <LayoutGrid className="h-6 w-6 text-emerald-600" aria-hidden />
+              Groups
+              {groups.length > 0 && (
+                <span className="text-base font-normal text-muted-foreground">
+                  {groups.length}
+                </span>
+              )}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Reusable named sets of people you can drop into any space.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search groups…"
+                className="pl-8"
+              />
+            </div>
+            <Button
+              asChild
+              size="sm"
+              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+            >
+              <Link href="/groups/new">
+                <Plus className="h-3.5 w-3.5" />
+                New group
+              </Link>
+            </Button>
+          </div>
+        </div>
 
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          {isLoading ? (
-            <p className="text-muted-foreground">Loading groups...</p>
-          ) : groups.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground">
-                  No groups yet. Create one above to organize people.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <ul className="space-y-2" data-testid="group-list">
-              {groups.map((group) => {
-                const isOwner = group.owner.id === user?.id;
-                return (
-                  <li key={group["@id"]} data-testid="group-item">
-                    <Card>
-                      <CardContent className="pt-4 pb-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <h2 className="font-semibold">
-                            <Link
-                              href={`/groups/${group.id}`}
-                              className="text-primary hover:underline no-underline"
-                            >
-                              {group.title}
-                            </Link>
-                          </h2>
-                          {isOwner && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(group)}
-                              aria-label={`Delete "${group.title}"`}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                        {group.description && (
-                          <MarkdownView source={group.description} className="mt-1" />
-                        )}
-                        {group.members.length > 0 && (
-                          <div
-                            className="mt-2 flex flex-wrap items-center gap-1"
-                            data-testid="group-members"
-                          >
-                            <span className="text-xs text-muted-foreground">Members:</span>
-                            {group.members.map((member) => (
-                              <Badge
-                                key={member["@id"]}
-                                variant="secondary"
-                                data-testid="group-member"
-                              >
-                                {member.email}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
+        {isLoading ? (
+          <p className="text-muted-foreground">Loading groups…</p>
+        ) : groups.length === 0 ? (
+          <EmptyState />
+        ) : filtered.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+            No groups match “{search}”.
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {owned.length > 0 && (
+              <GroupSection
+                label="Owned by you"
+                count={owned.length}
+                hint="You can add or remove members and rename or delete these."
+                groups={owned}
+                currentUserId={user.id}
+                onDelete={setDeleteTarget}
+                onLeave={handleLeave}
+              />
+            )}
+            {memberOf.length > 0 && (
+              <GroupSection
+                label="Member of"
+                count={memberOf.length}
+                hint="Groups other people own that include you."
+                groups={memberOf}
+                currentUserId={user.id}
+                onDelete={setDeleteTarget}
+                onLeave={handleLeave}
+              />
+            )}
+          </div>
+        )}
+
+        {deleteTarget && (
+          <DeleteGroupDialog
+            open={!!deleteTarget}
+            onOpenChange={(o) => {
+              if (!o) setDeleteTarget(null);
+            }}
+            group={deleteTarget}
+            twoFactorEnabled={user.twoFactor?.enabled ?? false}
+            onDeleted={() => {
+              setDeleteTarget(null);
+              void loadGroups();
+            }}
+          />
+        )}
+      </main>
+    </>
+  );
+};
+
+const EmptyState = () => (
+  <div className="rounded-xl border bg-card px-6 py-12">
+    <div className="mx-auto max-w-xl text-center">
+      <div className="flex justify-center gap-3 mb-5" aria-hidden>
+        {["#15803d", "#1d4ed8", "#7e22ce"].map((c) => (
+          <GroupTile key={c} color={c} size="md" />
+        ))}
+      </div>
+      <h2 className="text-lg font-semibold">No groups yet</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Groups are <span className="font-medium text-foreground">reusable
+        named sets of people</span> you can drop into any space — instead of
+        inviting the same five teammates by email each time.
+      </p>
+      <div className="mt-6 flex items-center justify-center gap-2">
+        <Button
+          asChild
+          size="sm"
+          className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+        >
+          <Link href="/groups/new">
+            <Plus className="h-3.5 w-3.5" />
+            Create your first group
+          </Link>
+        </Button>
+        <Button asChild size="sm" variant="outline" className="gap-1.5">
+          <Link href="/guides">
+            <BookOpen className="h-3.5 w-3.5" />
+            How groups work
+          </Link>
+        </Button>
+      </div>
+
+      <div className="mt-10 grid gap-6 sm:grid-cols-3 text-left border-t pt-6">
+        {ONBOARDING_STEPS.map((step) => (
+          <div key={step.n}>
+            <div className="font-mono text-xs text-emerald-600">{step.n}</div>
+            <div className="mt-1 font-medium text-sm">{step.title}</div>
+            <p className="mt-0.5 text-xs text-muted-foreground">{step.hint}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const GroupSection = ({
+  label,
+  count,
+  hint,
+  groups,
+  currentUserId,
+  onDelete,
+  onLeave,
+}: {
+  label: string;
+  count: number;
+  hint: string;
+  groups: Group[];
+  currentUserId: string;
+  onDelete: (g: Group) => void;
+  onLeave: (g: Group) => void;
+}) => (
+  <section>
+    <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      {label}
+      <span className="text-muted-foreground/70">{count}</span>
+    </div>
+    <p className="mb-3 text-xs text-muted-foreground">{hint}</p>
+    <div className="overflow-hidden rounded-lg border">
+      {/* Column header (hidden on small screens) */}
+      <div className="hidden sm:grid grid-cols-[1fr_140px_180px_150px_40px] gap-3 border-b bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span>Group</span>
+        <span>Members</span>
+        <span>Owner</span>
+        <span>Last updated</span>
+        <span className="sr-only">Actions</span>
+      </div>
+      <ul className="divide-y" data-testid="group-list">
+        {groups.map((group) => (
+          <GroupRow
+            key={group["@id"]}
+            group={group}
+            currentUserId={currentUserId}
+            onDelete={onDelete}
+            onLeave={onLeave}
+          />
+        ))}
+      </ul>
+    </div>
+  </section>
+);
+
+const GroupRow = ({
+  group,
+  currentUserId,
+  onDelete,
+  onLeave,
+}: {
+  group: Group;
+  currentUserId: string;
+  onDelete: (g: Group) => void;
+  onLeave: (g: Group) => void;
+}) => {
+  const isOwner = group.owner.id === currentUserId;
+  const members = group.memberships;
+  const spaceCount = group.attachedSpaces.length;
+  const recent = isRecent(group.updatedAt, RECENT_MS);
+
+  return (
+    <li
+      className="grid grid-cols-1 sm:grid-cols-[1fr_140px_180px_150px_40px] items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+      data-testid="group-item"
+    >
+      {/* Group */}
+      <div className="flex items-center gap-3 min-w-0">
+        <GroupTile color={resolveGroupColor(group)} size="sm" />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/groups/${group.id}`}
+              className="font-semibold truncate hover:underline no-underline"
+            >
+              {group.title}
+            </Link>
+            {spaceCount > 0 && (
+              <Badge variant="outline" className="font-normal shrink-0">
+                {spaceCount} {spaceCount === 1 ? "space" : "spaces"}
+              </Badge>
+            )}
+          </div>
+          <div className="font-mono text-xs text-muted-foreground truncate">
+            g-{group.slug}
+          </div>
         </div>
       </div>
-    </>
+
+      {/* Members */}
+      <div className="flex items-center gap-2">
+        <div className="flex -space-x-2">
+          {members.slice(0, 4).map((m) => (
+            <UserAvatar
+              key={m["@id"]}
+              user={toGroupAvatarUser(m.user)}
+              size="sm"
+              className="ring-2 ring-background"
+            />
+          ))}
+        </div>
+        <span className="text-sm text-muted-foreground">{members.length}</span>
+      </div>
+
+      {/* Owner */}
+      <div className="flex items-center gap-2 min-w-0">
+        <UserAvatar user={toGroupAvatarUser(group.owner)} size="sm" />
+        <span className="text-sm truncate">{displayName(group.owner)}</span>
+        {isOwner && (
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            you
+          </span>
+        )}
+      </div>
+
+      {/* Last updated */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        {recent && (
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-emerald-500"
+            aria-hidden
+          />
+        )}
+        {recent ? "edited" : "updated"} {formatRelative(group.updatedAt)}
+      </div>
+
+      {/* Actions */}
+      <div className="flex justify-end">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label={`Actions for ${group.title}`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <Link href={`/groups/${group.id}`}>Open group</Link>
+            </DropdownMenuItem>
+            {isOwner ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => onDelete(group)}
+                >
+                  Delete group
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => onLeave(group)}
+                >
+                  Leave group
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </li>
   );
 };
 

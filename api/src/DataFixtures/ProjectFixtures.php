@@ -4,6 +4,7 @@ namespace App\DataFixtures;
 
 use App\Entity\Project;
 use App\Entity\Space;
+use App\Entity\SpaceGroupMembership;
 use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
@@ -117,12 +118,35 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $engineering = new UserGroup();
         $engineering->setOwner($uma);
         $engineering->setTitle('Engineering');
+        $engineering->setSlug('eng');
+        $engineering->setColor('#0369a1');
         $engineering->addMember($uma);
         foreach ($teamUsers as $member) {
             $engineering->addMember($member);
         }
         $manager->persist($engineering);
         $this->addReference(self::ENGINEERING_GROUP_REFERENCE, $engineering);
+
+        // Attach the engineering group to the shared space so the group
+        // detail's "Attached to" card and the index "N spaces" badge have
+        // something to show.
+        $manager->persist((new SpaceGroupMembership())
+            ->setSpace($sharedSpace)
+            ->setUserGroup($engineering));
+
+        // A second group owned by a teammate that still includes Uma — so a
+        // Uma sign-in sees both the "Owned by you" and "Member of" sections
+        // on /groups.
+        $noah = $teamUsers['user-noah'];
+        $designCrew = new UserGroup();
+        $designCrew->setOwner($noah);
+        $designCrew->setTitle('Design crew');
+        $designCrew->setSlug('design');
+        $designCrew->setColor('#7e22ce');
+        $designCrew->addMember($noah);
+        $designCrew->addMember($uma);
+        $designCrew->addMember($teamUsers['user-emma']);
+        $manager->persist($designCrew);
 
         $project = new Project();
         $project->setOwner($uma);

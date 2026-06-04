@@ -455,6 +455,11 @@ class UserInviteTest extends ApiTestCase
         $group = new UserGroup();
         $group->setOwner($owner);
         $group->setTitle($title);
+        // Direct persist bypasses UserGroupOwnerProcessor, so set a unique
+        // slug by hand (the column is NOT NULL + unique). A monotonic
+        // counter keeps it collision-free even when titles repeat.
+        $base = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
+        $group->setSlug(('' === $base ? 'group' : $base) . '-' . (++self::$slugCounter));
         foreach ($members as $member) {
             $group->addMember($member);
         }
@@ -464,4 +469,6 @@ class UserInviteTest extends ApiTestCase
 
         return $group;
     }
+
+    private static int $slugCounter = 0;
 }

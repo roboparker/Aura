@@ -60,3 +60,20 @@ export function resolveSpaceColor(space: {
     AVATAR_PALETTE[0]
   );
 }
+
+/**
+ * Resolve the color to render for a group's avatar tile: explicit
+ * `group.color` wins; otherwise inherit the owner's `personalizedColor`;
+ * otherwise fall back to the first palette entry. Mirrors
+ * {@link resolveSpaceColor} so groups and spaces feel of-a-piece.
+ */
+export function resolveGroupColor(group: {
+  color?: string | null;
+  owner?: { personalizedColor?: string | null } | null;
+}): string {
+  return (
+    group.color ??
+    group.owner?.personalizedColor ??
+    AVATAR_PALETTE[0]
+  );
+}

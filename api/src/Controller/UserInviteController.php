@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Entity\UserGroup;
 use App\Repository\GroupInviteRepository;
 use App\Repository\UserInviteRepository;
+use App\Service\InviteMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,10 +31,13 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 class UserInviteController extends AbstractController
 {
+    private const INVITE_TTL_DAYS = 14;
+
     public function __construct(
         private EntityManagerInterface $em,
         private UserInviteRepository $userInviteRepository,
         private GroupInviteRepository $groupInviteRepository,
+        private InviteMailer $inviteMailer,
     ) {
     }
 
@@ -79,7 +83,7 @@ class UserInviteController extends AbstractController
             $groups[] = [
                 'id' => (string) $group->getId(),
                 'title' => $group->getTitle(),
-                'memberCount' => $group->getMembers()->count(),
+                'memberCount' => $group->getMemberships()->count(),
                 'invitedBy' => self::inviterChip($groupInvite->getInvitedBy()),
             ];
         }
@@ -156,7 +160,7 @@ class UserInviteController extends AbstractController
 
         if (!$this->isOwnerOrAdmin($group, $user)) {
             // Hide existence from non-members; non-owner members get 403.
-            if (!$group->getMembers()->contains($user)) {
+            if (!$group->hasMember($user)) {
                 return $this->json(['error' => 'Group not found.'], 404);
             }
             return $this->json(['error' => 'Only the group owner can view invites.'], 403);
@@ -193,7 +197,7 @@ class UserInviteController extends AbstractController
         }
 
         if (!$this->isOwnerOrAdmin($group, $user)) {
-            if (!$group->getMembers()->contains($user)) {
+            if (!$group->hasMember($user)) {
                 return $this->json(['error' => 'Group not found.'], 404);
             }
             return $this->json(['error' => 'Only the group owner can revoke invites.'], 403);
@@ -217,6 +221,59 @@ class UserInviteController extends AbstractController
         }
 
         return new JsonResponse(null, 204);
+    }
+
+    /**
+     * Owner-only: re-send the signup email for a pending GroupInvite. The
+     * parent UserInvite's token is rotated and its expiry refreshed (so
+     * the most recent email is always the authoritative link) and the
+     * mail is dispatched with the full set of groups/spaces attached to
+     * that address — same shape as the original send.
+     */
+    #[Route(
+        '/groups/{id}/invites/{groupInviteId}/resend',
+        name: 'user_invite_resend',
+        methods: ['POST'],
+    )]
+    public function resend(
+        string $id,
+        string $groupInviteId,
+        #[CurrentUser] ?User $user,
+    ): JsonResponse {
+        if (null === $user) {
+            return $this->json(['error' => 'Not authenticated.'], 401);
+        }
+
+        $group = $this->em->getRepository(UserGroup::class)->find($id);
+        if (null === $group) {
+            return $this->json(['error' => 'Group not found.'], 404);
+        }
+
+        if (!$this->isOwnerOrAdmin($group, $user)) {
+            if (!$group->hasMember($user)) {
+                return $this->json(['error' => 'Group not found.'], 404);
+            }
+            return $this->json(['error' => 'Only the group owner can resend invites.'], 403);
+        }
+
+        $groupInvite = $this->groupInviteRepository->find($groupInviteId);
+        if (null === $groupInvite || true !== $groupInvite->getGroup()->getId()?->equals($group->getId())) {
+            return $this->json(['error' => 'Invite not found.'], 404);
+        }
+
+        $invite = $groupInvite->getUserInvite();
+        $plainToken = bin2hex(random_bytes(32));
+        $invite->setTokenHash(hash('sha256', $plainToken));
+        $invite->setExpiresAt(new \DateTimeImmutable(sprintf('+%d days', self::INVITE_TTL_DAYS)));
+        $this->em->flush();
+
+        $this->inviteMailer->sendSignupLink($invite, $plainToken, self::INVITE_TTL_DAYS);
+
+        return $this->json([
+            'status' => 'resent',
+            'email' => $invite->getEmail(),
+            'expiresAt' => $invite->getExpiresAt()->format(\DateTimeInterface::ATOM),
+        ], 200);
     }
 
     private function isOwnerOrAdmin(UserGroup $group, User $user): bool

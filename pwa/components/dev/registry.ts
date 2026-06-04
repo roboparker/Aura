@@ -11,7 +11,8 @@ export type RegistryEntry = {
     | "Theme"
     | "Layout"
     | "Discussions"
-    | "Custom fields";
+    | "Custom fields"
+    | "Groups";
   description: string;
 };
 
@@ -50,5 +51,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "space-switcher", name: "SpaceSwitcher", category: "Layout", description: "Active-space dropdown that persists the choice via ActiveSpaceContext." },
   { slug: "discussions-panel", name: "DiscussionsPanel", category: "Discussions", description: "Project discussion board with list, filter, create, edit, pin/lock." },
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
+  { slug: "group-tile", name: "GroupTile", category: "Groups", description: "Square colored tile with a grid glyph for a UserGroup avatar." },
   { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },
 ];

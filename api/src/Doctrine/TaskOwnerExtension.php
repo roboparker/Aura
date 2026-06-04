@@ -79,7 +79,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
             SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s task_access_group JOIN task_access_group.userGroup task_access_group_obj JOIN task_access_group_obj.members task_access_group_member WHERE task_access_group.space = tp_access.space AND task_access_group_member = :currentUser',
+            'SELECT 1 FROM %s task_access_group JOIN task_access_group.userGroup task_access_group_obj JOIN task_access_group_obj.memberships task_access_group_member WHERE task_access_group.space = tp_access.space AND task_access_group_member.user = :currentUser',
             SpaceGroupMembership::class,
         );
         $queryBuilder

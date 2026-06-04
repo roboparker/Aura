@@ -4,11 +4,26 @@ const {
   BASE_URL,
   uniqueEmail: shared,
   registerAndSignIn,
-  fillDescription,
   openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("groups");
+const PASSWORD = "Password123!@#";
+
+// Create a group through the full-page composer at /groups/new. Optionally
+// seeds invite chips (existing users join immediately; unknown emails get a
+// pending invite). Lands on the new group's detail page.
+async function createGroup(page, title, { invites = [] } = {}) {
+  await page.goto(`${BASE_URL}/groups/new`);
+  await page.fill("#group-title", title);
+  for (const email of invites) {
+    await page.fill("#group-invites", email);
+    await page.press("#group-invites", "Enter");
+  }
+  await page.locator('button[type="submit"]', { hasText: /Create group/ }).click();
+  await expect(page).toHaveURL(/\/groups\/[\w-]+/);
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+}
 
 test.describe("Groups", () => {
   test("unauthenticated visitors are redirected to sign in", async ({ page }) => {
@@ -16,11 +31,10 @@ test.describe("Groups", () => {
     await expect(page).toHaveURL(/\/signin/);
   });
 
-  test("user can create a group, add a member, and delete it", async ({ browser }) => {
+  test("owner can create a group, add a member, and delete it", async ({ browser }) => {
     const ownerEmail = uniqueEmail();
     const memberEmail = uniqueEmail();
-    const suffix = Date.now();
-    const title = `Backend team ${suffix}`;
+    const title = `Backend team ${Date.now()}`;
 
     // Member is created up-front so the owner can add them by email.
     const memberContext = await browser.newContext({ ignoreHTTPSErrors: true });
@@ -36,43 +50,55 @@ test.describe("Groups", () => {
     await expect(ownerPage).toHaveTitle("Groups - Aura");
     await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
 
-    // Create
-    await ownerPage.fill("#title", title);
-    await fillDescription(ownerPage, undefined, "PHP folks");
-    await ownerPage.locator('button[type="submit"]', { hasText: /Add Group/ }).click();
+    // Create via the empty-state call to action → /groups/new.
+    await ownerPage.getByRole("link", { name: /Create your first group/ }).click();
+    await expect(ownerPage).toHaveURL(/\/groups\/new/);
+    await ownerPage.fill("#group-title", title);
+    await ownerPage.locator('button[type="submit"]', { hasText: /Create group/ }).click();
 
-    const item = ownerPage.locator('[data-testid="group-item"]', { hasText: title });
-    await expect(item).toBeVisible();
-    await expect(item.locator("text=PHP folks")).toBeVisible();
-    // Creator is auto-added as a member.
-    await expect(item.locator('[data-testid="group-member"]')).toContainText(ownerEmail);
-
-    // Open detail page and add a member.
-    await item.locator(`a:has-text("${title}")`).click();
+    // Lands on the detail page as owner.
     await expect(ownerPage).toHaveURL(/\/groups\/[\w-]+/);
-    await expect(ownerPage.locator('[data-testid="group-owner"]')).toContainText(ownerEmail);
+    await expect(ownerPage.getByRole("heading", { name: title })).toBeVisible();
+    await expect(ownerPage.locator('[data-testid="member-row"]')).toContainText(ownerEmail);
 
+    // Add a member by email.
     await ownerPage.locator('[data-testid="add-member-form"] input').fill(memberEmail);
-    await ownerPage.locator('[data-testid="add-member-form"] button[type="submit"]').click();
-    await expect(ownerPage.locator('[data-testid="member-pill"]', { hasText: memberEmail })).toBeVisible();
+    await ownerPage
+      .locator('[data-testid="add-member-form"] button[type="submit"]')
+      .click();
+    await expect(
+      ownerPage.locator('[data-testid="member-row"]', { hasText: memberEmail }),
+    ).toBeVisible();
 
-    // Delete from the list page.
+    // It shows up on the index.
     await ownerPage.goto(`${BASE_URL}/groups`);
-    const listItem = ownerPage.locator('[data-testid="group-item"]', { hasText: title });
-    ownerPage.once("dialog", (dialog) => dialog.accept());
-    await listItem.getByRole("button", { name: /Delete "/ }).click();
+    await expect(
+      ownerPage.locator('[data-testid="group-item"]', { hasText: title }),
+    ).toBeVisible();
+
+    // Delete from the detail page — step-up dialog requires the name + password.
+    await ownerPage
+      .locator('[data-testid="group-item"]', { hasText: title })
+      .getByRole("link", { name: title })
+      .click();
+    await ownerPage.getByRole("button", { name: /^Delete$/ }).click();
+    const dialog = ownerPage.getByRole("dialog");
+    await expect(dialog.getByText("Delete this group?")).toBeVisible();
+    await dialog.locator("#delete-group-name").fill(title);
+    await dialog.locator("#delete-group-credential").fill(PASSWORD);
+    await dialog.getByRole("button", { name: /Delete group/ }).click();
+
+    await expect(ownerPage).toHaveURL(/\/groups$/);
     await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
 
     await ownerContext.close();
   });
 
-  test("non-owner members see read-only detail view", async ({ browser }) => {
+  test("non-owner members see a read-only detail view", async ({ browser }) => {
     const ownerEmail = uniqueEmail();
     const memberEmail = uniqueEmail();
-    const suffix = Date.now();
-    const title = `Read-only ${suffix}`;
+    const title = `Read-only ${Date.now()}`;
 
-    // Pre-create the member account so the owner can add them.
     const memberContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const memberPage = await memberContext.newPage();
     await registerAndSignIn(memberPage, memberEmail);
@@ -80,40 +106,34 @@ test.describe("Groups", () => {
     const ownerContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const ownerPage = await ownerContext.newPage();
     await registerAndSignIn(ownerPage, ownerEmail);
-    await ownerPage.goto(`${BASE_URL}/groups`);
-    await ownerPage.fill("#title", title);
-    await ownerPage.locator('button[type="submit"]', { hasText: /Add Group/ }).click();
-    const ownerItem = ownerPage.locator('[data-testid="group-item"]', { hasText: title });
-    await ownerItem.locator(`a:has-text("${title}")`).click();
-    await ownerPage.locator('[data-testid="add-member-form"] input').fill(memberEmail);
-    await ownerPage.locator('[data-testid="add-member-form"] button[type="submit"]').click();
-    await expect(ownerPage.locator('[data-testid="member-pill"]', { hasText: memberEmail })).toBeVisible();
+    // Seed the member via invite-on-create (existing user → immediate member).
+    await createGroup(ownerPage, title, { invites: [memberEmail] });
+    await expect(
+      ownerPage.locator('[data-testid="member-row"]', { hasText: memberEmail }),
+    ).toBeVisible();
     await ownerContext.close();
 
-    // Now the member visits — they should see the group but no editing UI.
+    // The member sees the group but none of the management affordances.
     await memberPage.goto(`${BASE_URL}/groups`);
     const memberItem = memberPage.locator('[data-testid="group-item"]', { hasText: title });
     await expect(memberItem).toBeVisible();
-    // No Delete button on the list for non-owners.
-    await expect(memberItem.getByRole("button", { name: /Delete "/ })).toHaveCount(0);
 
-    await memberItem.locator(`a:has-text("${title}")`).click();
-    // No edit/delete/transfer/add-member affordances on the detail page either.
+    await memberItem.getByRole("link", { name: title }).click();
+    await expect(memberPage.getByRole("heading", { name: title })).toBeVisible();
     await expect(memberPage.getByRole("button", { name: /^Edit$/ })).toHaveCount(0);
     await expect(memberPage.getByRole("button", { name: /^Delete$/ })).toHaveCount(0);
     await expect(memberPage.locator('[data-testid="add-member-form"]')).toHaveCount(0);
-    await expect(memberPage.locator('[data-testid="transfer-ownership-form"]')).toHaveCount(0);
+    // Members get a Leave control instead of the danger zone.
+    await expect(memberPage.getByRole("button", { name: /Leave group/ })).toBeVisible();
 
     await memberContext.close();
   });
 
-  test("owner can invite members during group creation", async ({ browser }) => {
+  test("owner can invite an existing user during group creation", async ({ browser }) => {
     const ownerEmail = uniqueEmail();
     const memberEmail = uniqueEmail();
-    const suffix = Date.now();
-    const title = `Invite-on-create ${suffix}`;
+    const title = `Invite-on-create ${Date.now()}`;
 
-    // Member must exist so the email lookup resolves.
     const memberContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const memberPage = await memberContext.newPage();
     await registerAndSignIn(memberPage, memberEmail);
@@ -122,50 +142,31 @@ test.describe("Groups", () => {
     const ownerContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const ownerPage = await ownerContext.newPage();
     await registerAndSignIn(ownerPage, ownerEmail);
-    await ownerPage.goto(`${BASE_URL}/groups`);
 
-    await ownerPage.fill("#title", title);
-
-    // Queue an invite before submitting the form.
-    await ownerPage.fill("#invite-email", memberEmail);
-    await ownerPage.locator('[data-testid="invite-members-section"] button', { hasText: /^Add$/ }).click();
+    await createGroup(ownerPage, title, { invites: [memberEmail] });
+    // The invitee already appears as a member without a second step.
     await expect(
-      ownerPage.locator('[data-testid="pending-invite"]', { hasText: memberEmail }),
+      ownerPage.locator('[data-testid="member-row"]', { hasText: memberEmail }),
     ).toBeVisible();
-
-    await ownerPage.locator('button[type="submit"]', { hasText: /Add Group/ }).click();
-
-    const item = ownerPage.locator('[data-testid="group-item"]', { hasText: title });
-    await expect(item).toBeVisible();
-    // The invitee should already appear as a member without a second step.
-    await expect(item.locator('[data-testid="group-member"]', { hasText: memberEmail })).toBeVisible();
 
     await ownerContext.close();
   });
 
-  test("inviting an unknown email creates the group with a pending invite", async ({ page }) => {
+  test("inviting an unknown email records a pending invite", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await page.goto(`${BASE_URL}/groups`);
 
     const ghost = `ghost-${Date.now()}@example.invalid`;
     const title = `Pending invite ${Date.now()}`;
-    await page.fill("#title", title);
-    await page.fill("#invite-email", ghost);
-    await page.locator('[data-testid="invite-members-section"] button', { hasText: /^Add$/ }).click();
-    await page.locator('button[type="submit"]', { hasText: /Add Group/ }).click();
+    await createGroup(page, title, { invites: [ghost] });
 
-    const item = page.locator('[data-testid="group-item"]', { hasText: title });
-    await expect(item).toBeVisible();
-
-    // The unknown email is not a member (no Aura account yet) but the
-    // invite is recorded — visit the detail page to see the pending chip.
-    await item.locator(`a:has-text("${title}")`).click();
+    // The unknown email isn't a member yet, but the pending invite shows on
+    // the owner's detail view.
     await expect(
-      page.locator('[data-testid="pending-invite-pill"]', { hasText: ghost }),
+      page.locator('[data-testid="pending-invite-row"]', { hasText: ghost }),
     ).toBeVisible();
   });
 
-  test("account menu shows Groups link when authenticated", async ({ page }) => {
+  test("sidebar shows Groups link when authenticated", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     await openAccountMenu(page);
     await expect(page.locator("nav >> text=Groups")).toBeVisible();
