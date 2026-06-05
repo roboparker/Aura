@@ -4,7 +4,7 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const CustomFieldsManagerPage = () => (
   <ComponentDoc
     name="CustomFieldsManager"
-    description="Per-project custom field definition manager. Kind-aware (#227): each CFD is a (kind, subtype, config) triple — boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page,discussion}. Per-kind config editors live in kind-editors.tsx. Inline composer for create / edit and a delete action. Space-admin only mutations — for non-admins the list is read-only. Mounted at /projects/[id]/custom-fields."
+    description="Per-project custom field definition manager. Kind-aware (#227): each CFD is a (kind, subtype, config) triple — boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,project,page,discussion}. Renders the fields as a drag-to-reorder table (NAME · KIND · REQUIRED · FOOTER · FILLED) with a right-side CustomFieldSheet drawer for create / edit / delete and a project-scoped change-log drawer. Per-kind config editors (money preview, live URL pattern check, date-range pickers, select options with colors + usage counts, reference target cards) live in kind-editors.tsx. Space-admin only mutations — for non-admins the table is read-only. Mounted at /projects/[id]/custom-fields."
     importPath={`import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";`}
     examples={[
       {

@@ -8,67 +8,61 @@ const {
 
 const uniqueEmail = () => shared("custom-fields");
 
+const openCustomFields = async (page, projectTitle) => {
+  await page.goto(`${BASE_URL}/projects`);
+  await page.fill("#title", projectTitle);
+  await page.click('button[type="submit"]');
+  const projectItem = page.locator('[data-testid="project-item"]', {
+    hasText: projectTitle,
+  });
+  await expect(projectItem).toBeVisible();
+  await projectItem.locator(`a[href^="/projects/"]`).first().click();
+  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+  await page.click('[data-testid="project-custom-fields-link"]');
+  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/custom-fields$/);
+};
+
 test.describe("Custom field definitions (kind-aware, #227)", () => {
-  test("project owner can create a select.single field, edit it, and delete it", async ({
+  test("create a select.single field in the drawer, edit it, and delete it", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
+    await openCustomFields(page, `CF-host-${Date.now()}`);
 
-    // Create a project to host the schema.
-    await page.goto(`${BASE_URL}/projects`);
-    const projectTitle = `CF-host-${Date.now()}`;
-    await page.fill("#title", projectTitle);
-    await page.click('button[type="submit"]');
-    const projectItem = page.locator('[data-testid="project-item"]', {
-      hasText: projectTitle,
-    });
-    await expect(projectItem).toBeVisible();
-
-    // Open the project, follow the Custom fields link.
-    await projectItem.locator(`a[href^="/projects/"]`).first().click();
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await page.click('[data-testid="project-custom-fields-link"]');
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/custom-fields$/);
-
-    // Empty state has the add button visible.
+    // Open the create drawer.
     await page.getByTestId("custom-field-add").click();
-    const composer = page.getByTestId("custom-field-composer");
-    await expect(composer).toBeVisible();
+    const sheet = page.getByTestId("custom-field-sheet");
+    await expect(sheet).toBeVisible();
 
-    // Switch kind to select; subtype defaults to "single". The options
-    // editor appears.
-    await composer.getByTestId("custom-field-kind-input").selectOption("select");
-    const options = composer.getByTestId("custom-field-options");
+    // Switch kind to select; subtype defaults to "single". Options editor appears.
+    await sheet.getByTestId("custom-field-kind-input").selectOption("select");
+    const options = sheet.getByTestId("custom-field-options");
     await expect(options).toBeVisible();
 
-    // Fill name + two options.
-    await composer
-      .getByTestId("custom-field-name-input")
-      .fill("Severity");
-    const optionInputs = composer.getByTestId("custom-field-option-input");
+    // Name + two options.
+    await sheet.getByTestId("custom-field-name-input").fill("Severity");
+    const optionInputs = sheet.getByTestId("custom-field-option-input");
     await optionInputs.first().fill("low");
-    await composer.getByTestId("custom-field-option-add").click();
+    await sheet.getByTestId("custom-field-option-add").click();
     await optionInputs.nth(1).fill("high");
 
-    // Mark required and save.
-    await composer.getByTestId("custom-field-required-input").click();
-    await composer.getByTestId("custom-field-save").click();
+    // Toggle Required on, then save.
+    await sheet.getByTestId("custom-field-required-input").click();
+    await sheet.getByTestId("custom-field-save").click();
 
     const item = page.locator('[data-testid="custom-field-item"]', {
       hasText: "Severity",
     });
     await expect(item).toBeVisible();
-    // The badge shows the human label for `select.single`.
-    await expect(item.locator("text=Single choice")).toBeVisible();
+    await expect(item.locator("text=select · single-select")).toBeVisible();
     await expect(item.locator("text=Required")).toBeVisible();
-    await expect(item.locator("text=Options: low, high")).toBeVisible();
 
-    // Edit — rename to "Priority" and drop the "required" flag.
+    // Edit — rename to "Priority" and drop the Required flag.
     await item.getByTestId("custom-field-edit").click();
-    const editComposer = page.getByTestId("custom-field-composer");
-    await editComposer.getByTestId("custom-field-name-input").fill("Priority");
-    await editComposer.getByTestId("custom-field-required-input").click();
-    await editComposer.getByTestId("custom-field-save").click();
+    const editSheet = page.getByTestId("custom-field-sheet");
+    await editSheet.getByTestId("custom-field-name-input").fill("Priority");
+    await editSheet.getByTestId("custom-field-required-input").click();
+    await editSheet.getByTestId("custom-field-save").click();
 
     const renamed = page.locator('[data-testid="custom-field-item"]', {
       hasText: "Priority",
@@ -76,57 +70,80 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     await expect(renamed).toBeVisible();
     await expect(renamed.locator("text=Required")).toHaveCount(0);
 
-    // Delete — accept the confirm dialog.
+    // Delete from the edit drawer — accept the confirm dialog.
+    await renamed.getByTestId("custom-field-edit").click();
     page.once("dialog", (dialog) => dialog.accept());
-    await renamed.getByTestId("custom-field-delete").click();
+    await page.getByTestId("custom-field-sheet").getByTestId("custom-field-delete").click();
     await expect(
-      page.locator('[data-testid="custom-field-item"]', {
-        hasText: "Priority",
-      }),
+      page.locator('[data-testid="custom-field-item"]', { hasText: "Priority" }),
     ).toHaveCount(0);
   });
 
-  test("composer surfaces per-kind config — money currency, numeric min/max", async ({
+  test("drawer surfaces per-kind config — money currency + footer pill", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
-
-    await page.goto(`${BASE_URL}/projects`);
-    const projectTitle = `CF-kinds-${Date.now()}`;
-    await page.fill("#title", projectTitle);
-    await page.click('button[type="submit"]');
-    const projectItem = page.locator('[data-testid="project-item"]', {
-      hasText: projectTitle,
-    });
-    await expect(projectItem).toBeVisible();
-    await projectItem.locator(`a[href^="/projects/"]`).first().click();
-    await page.click('[data-testid="project-custom-fields-link"]');
+    await openCustomFields(page, `CF-kinds-${Date.now()}`);
 
     await page.getByTestId("custom-field-add").click();
-    const composer = page.getByTestId("custom-field-composer");
+    const sheet = page.getByTestId("custom-field-sheet");
 
-    // Pick numeric > money → currency input shows up.
-    await composer.getByTestId("custom-field-kind-input").selectOption("numeric");
-    await composer
-      .getByTestId("custom-field-subtype-input")
-      .selectOption("money");
-    await expect(composer.getByTestId("custom-field-currency-input")).toBeVisible();
-    await composer.getByTestId("custom-field-currency-input").fill("EUR");
+    // numeric > money → currency combobox shows up.
+    await sheet.getByTestId("custom-field-kind-input").selectOption("numeric");
+    await sheet.getByTestId("custom-field-subtype-input").selectOption("money");
+    const currency = sheet.getByTestId("custom-field-currency-input");
+    await expect(currency).toBeVisible();
+    await currency.fill("EUR");
+    await page.getByRole("option", { name: /Euro/i }).first().click();
 
-    await composer.getByTestId("custom-field-name-input").fill("Budget");
-    // Money supports footer aggregations (sum/avg/min/max/count).
-    await composer.getByTestId("custom-field-footer-input").selectOption("sum");
-    await composer.getByTestId("custom-field-save").click();
+    await sheet.getByTestId("custom-field-name-input").fill("Budget");
+    // Money supports footer aggregations — pick the Sum pill.
+    await sheet
+      .getByTestId("custom-field-footer-pills")
+      .getByRole("button", { name: "Sum" })
+      .click();
+    await sheet.getByTestId("custom-field-save").click();
 
     const item = page.locator('[data-testid="custom-field-item"]', {
       hasText: "Budget",
     });
     await expect(item).toBeVisible();
-    await expect(item.locator("text=Money")).toBeVisible();
-    await expect(item.locator("text=Footer: sum")).toBeVisible();
+    await expect(item.locator("text=numeric · money")).toBeVisible();
+    await expect(item.locator("text=SUM")).toBeVisible();
+  });
+
+  test("reference field offers the project target and the change log opens", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await openCustomFields(page, `CF-ref-${Date.now()}`);
+
+    await page.getByTestId("custom-field-add").click();
+    const sheet = page.getByTestId("custom-field-sheet");
+    await sheet.getByTestId("custom-field-kind-input").selectOption("reference");
+
+    // Target-type cards include Project (the strategy added this round).
+    await sheet.getByTestId("custom-field-reference-project").click();
+    await expect(sheet.getByTestId("custom-field-subtype-input")).toHaveValue(
+      "project",
+    );
+    await sheet.getByTestId("custom-field-name-input").fill("Related project");
+    await sheet.getByTestId("custom-field-save").click();
+
+    const item = page.locator('[data-testid="custom-field-item"]', {
+      hasText: "Related project",
+    });
+    await expect(item).toBeVisible();
+    await expect(item.locator("text=reference · project")).toBeVisible();
+
+    // Change log drawer opens and lists the create entry.
+    await page.getByTestId("custom-fields-changelog").click();
+    const log = page.getByTestId("custom-fields-changelog-sheet");
+    await expect(log).toBeVisible();
+    await expect(log.locator("text=Related project")).toBeVisible();
   });
 });
 
-// API-side authorization (members can read, only space admins can write)
-// is covered by CustomFieldDefinitionTest in PHPUnit; the access
-// extension also has direct coverage there.
+// API-side authorization (members can read, only space admins can write),
+// the reorder endpoint, fill/option stats, and the Loggable change feed are
+// covered by PHPUnit (CustomField* tests under api/tests/Api/).

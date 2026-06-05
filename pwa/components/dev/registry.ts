@@ -38,6 +38,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "popover", name: "Popover", category: "Overlay", description: "Floating content anchored to a trigger." },
   { slug: "separator", name: "Separator", category: "Primitive", description: "Horizontal or vertical divider." },
   { slug: "sheet", name: "Sheet", category: "Overlay", description: "Side-anchored drawer." },
+  { slug: "switch", name: "Switch", category: "Form", description: "On/off toggle built on @base-ui/react." },
   { slug: "table", name: "Table", category: "Data", description: "Styled HTML table primitives." },
   { slug: "tabs", name: "Tabs", category: "Primitive", description: "Tab list + panels." },
   { slug: "textarea", name: "Textarea", category: "Form", description: "Multi-line text input." },

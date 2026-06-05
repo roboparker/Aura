@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -10,18 +10,22 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import type { Space } from "@/contexts/ActiveSpaceContext";
 
-const isProjectSpaceAdmin = (
+const resolveProjectSpace = (
   project: { space: string | { "@id": string } },
-  userId: string,
   spaces: Space[],
-): boolean => {
+): Space | undefined => {
   const iri =
     typeof project.space === "string" ? project.space : project.space["@id"];
-  const space = spaces.find((s) => s["@id"] === iri);
-  return !!space?.userMemberships.some(
+  return spaces.find((s) => s["@id"] === iri);
+};
+
+const isSpaceAdminFor = (
+  space: Space | undefined,
+  userId: string,
+): boolean =>
+  !!space?.userMemberships.some(
     (m) => m.user.id === userId && m.role === "admin",
   );
-};
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -106,7 +110,7 @@ const CustomFieldsPage = () => {
         </title>
       </Head>
       <main className="min-h-screen bg-muted">
-        <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           {notFound ? (
             <Card>
               <CardContent className="pt-6">
@@ -121,41 +125,63 @@ const CustomFieldsPage = () => {
           ) : isLoading || !project ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : (
-            <>
-              <div className="space-y-2">
-                <Button
-                  asChild
-                  variant="link"
-                  size="sm"
-                  className="px-0 h-auto"
-                >
-                  <Link
-                    href={`/projects/${project.id}`}
-                    data-testid="custom-fields-back-link"
+            (() => {
+              const space = resolveProjectSpace(project, spaces);
+              const isSpaceAdmin = isSpaceAdminFor(space, user.id);
+              return (
+                <>
+                  <nav
+                    className="flex items-center gap-1 text-sm text-muted-foreground"
+                    aria-label="Breadcrumb"
                   >
-                    <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-                    {project.title}
-                  </Link>
-                </Button>
-                <h1 className="text-2xl font-bold">Custom fields</h1>
-                <p className="text-sm text-muted-foreground">
-                  Per-project schema for structured task data. Anyone in
-                  the space can read the schema; only space admins can
-                  change it.
-                </p>
-              </div>
+                    {space && <span>{space.name}</span>}
+                    {space && <ChevronRight className="h-3.5 w-3.5" />}
+                    <Link href="/projects" className="hover:text-foreground">
+                      Projects
+                    </Link>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="hover:text-foreground"
+                      data-testid="custom-fields-back-link"
+                    >
+                      {project.title}
+                    </Link>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                    <span className="text-foreground">Custom fields</span>
+                  </nav>
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+                  <div className="space-y-1">
+                    <h1 className="text-2xl font-bold">Custom fields</h1>
+                    <p className="text-sm text-muted-foreground">
+                      Schema for every task in this project. Each field has a
+                      kind, subtype, footer aggregation, and a required flag.
+                      Only space admins can edit definitions.
+                    </p>
+                  </div>
 
-              <CustomFieldsManager
-                projectIri={project["@id"]}
-                isSpaceAdmin={isProjectSpaceAdmin(project, user.id, spaces)}
-              />
-            </>
+                  <Alert>
+                    <AlertDescription>
+                      {isSpaceAdmin
+                        ? `You're editing as a space admin. Members in ${space?.name ?? "this space"} can use these fields on tasks but can't change definitions.`
+                        : `Only space admins can edit definitions. You can use these fields on tasks in ${space?.name ?? "this space"}.`}
+                    </AlertDescription>
+                  </Alert>
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <CustomFieldsManager
+                    projectIri={project["@id"]}
+                    spaceName={space?.name}
+                    isSpaceAdmin={isSpaceAdmin}
+                  />
+                </>
+              );
+            })()
           )}
         </div>
       </main>
