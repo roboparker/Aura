@@ -272,7 +272,9 @@ class DiscussionCommentTest extends ApiTestCase
         $client->request('GET', '/discussions/' . $discussion->getId());
 
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $this->assertSame(2, $body['commentCount'] ?? null);
         $this->assertSame(2, $body['participantCount'] ?? null);
@@ -300,7 +302,9 @@ class DiscussionCommentTest extends ApiTestCase
         $client->request('GET', '/discussions');
 
         $this->assertResponseIsSuccessful();
-        $members = $client->getResponse()->toArray()['member'] ?? [];
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $members = $response->toArray()['member'] ?? [];
         $this->assertIsArray($members);
         $this->assertCount(1, $members);
         $first = $members[0];

@@ -40,7 +40,11 @@ test.describe("Discussions", () => {
       hasText: "Switch to pnpm",
     });
     await expect(discussion).toBeVisible();
-    await expect(discussion.locator("text=Ideas")).toBeVisible();
+    // The row renders the category badge twice (desktop column + mobile
+    // meta line); assert against whichever is visible at this viewport.
+    await expect(
+      discussion.locator('[data-testid="discussion-category-badge"]:visible'),
+    ).toContainText("Ideas");
 
     // Filter by category — switching to "Q&A" hides the new "ideas" post.
     await page.getByRole("tab", { name: "Q&A" }).click();
