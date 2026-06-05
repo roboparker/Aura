@@ -233,8 +233,11 @@ test.describe("Search page + autocomplete", () => {
   test("Cmd/Ctrl-K opens the search palette and runs a query", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail("search-palette"));
     await page.goto(`${BASE_URL}/account`);
+    // The overlay is mounted in the navbar, which only renders once auth
+    // resolves — wait for the (auth-only) navbar search before the shortcut.
+    await expect(page.getByTestId("navbar-search")).toBeVisible();
 
-    await page.keyboard.press("ControlOrMeta+KeyK");
+    await page.keyboard.press("ControlOrMeta+k");
     const overlay = page.getByTestId("search-overlay");
     await expect(overlay).toBeVisible();
 
