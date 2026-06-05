@@ -266,11 +266,27 @@ const CustomFieldSheet = ({
   const handle = fieldHandle(name || initial?.name || "");
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    // Non-modal so the in-drawer popups that portal to <body> (the currency
+    // Combobox, the date / color Popovers) stay clickable — a modal Radix
+    // dialog sets `pointer-events: none` on everything outside its content,
+    // which would swallow clicks on those portaled popups. The
+    // onInteractOutside guard keeps the drawer open when the user is
+    // interacting with one of those popups rather than truly clicking out.
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="right"
         className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
         data-testid="custom-field-sheet"
+        onInteractOutside={(e) => {
+          const target = e.detail.originalEvent.target as HTMLElement | null;
+          if (
+            target?.closest(
+              '[data-slot="combobox-content"],[data-slot="popover-content"],[data-radix-popper-content-wrapper]',
+            )
+          ) {
+            e.preventDefault();
+          }
+        }}
       >
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle className="text-sm font-semibold uppercase tracking-wide">
