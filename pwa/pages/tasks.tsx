@@ -10,6 +10,7 @@ import {
   Filter,
   GripVertical,
   MessageSquare,
+  PanelRight,
   Paperclip,
   Repeat,
   Trash2,
@@ -54,6 +55,7 @@ import CommentsPanel, {
 import AttachmentsPanel, {
   type Attachment,
 } from "@/components/tasks/AttachmentsPanel";
+import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -598,6 +600,7 @@ interface TaskRowProps {
   commentsLoading: boolean;
   onToggle: (task: Task) => void;
   onDelete: (task: Task) => void;
+  onOpenDetail: (task: Task) => void;
   onTagsChange: (task: Task, nextTagIris: string[]) => Promise<void>;
   onTitleChange: (task: Task, nextTitle: string) => Promise<void>;
   onDescriptionChange: (task: Task, nextDescription: string | null) => Promise<void>;
@@ -632,6 +635,7 @@ const TaskRow = ({
   commentsLoading,
   onToggle,
   onDelete,
+  onOpenDetail,
   onTagsChange,
   onTitleChange,
   onDescriptionChange,
@@ -900,7 +904,16 @@ const TaskRow = ({
             subjectLabel={task.title}
           />
         </TableCell>
-        <TableCell className="align-top text-right">
+        <TableCell className="align-top text-right whitespace-nowrap">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onOpenDetail(task)}
+            aria-label={`Open details for "${task.title}"`}
+            data-testid="task-open-detail"
+          >
+            <PanelRight className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -1309,6 +1322,33 @@ const Tasks = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const currentUserIri = user ? `/users/${user.id}` : null;
+
+  // Deep-linkable task detail: the open task lives in the URL (`?task={id}`)
+  // so the drawer survives refresh/share. Shallow routing keeps the list
+  // mounted underneath.
+  const activeTaskId =
+    typeof router.query.task === "string" ? router.query.task : null;
+  const openTaskDetail = useCallback(
+    (task: Task) => {
+      void router.push(
+        { pathname: router.pathname, query: { ...router.query, task: task.id } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
+  const handleDrawerOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) return;
+      const query = { ...router.query };
+      delete query.task;
+      void router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
+    },
+    [router],
+  );
   // Both `/tasks` and `/my-tasks` mount this component. The latter pins the
   // assignee filter to the logged-in user and hides the picker, so the page
   // is effectively a fixed "everything assigned to me" view.
@@ -2408,6 +2448,7 @@ const Tasks = () => {
                           commentsLoading={loadingCommentsFor.has(task["@id"])}
                           onToggle={handleToggle}
                           onDelete={handleDelete}
+                          onOpenDetail={openTaskDetail}
                           onTagsChange={handleTagsChange}
                           onTitleChange={handleTitleChange}
                           onDescriptionChange={handleDescriptionChange}
@@ -2435,6 +2476,32 @@ const Tasks = () => {
           )}
         </div>
       </div>
+      <TaskDetailDrawer
+        taskId={activeTaskId}
+        open={Boolean(activeTaskId)}
+        onOpenChange={handleDrawerOpenChange}
+        currentUserIri={currentUserIri}
+        assignableUsers={assignableUsers}
+        allTags={allTags}
+        onTaskChanged={(updated) =>
+          setTasks((current) =>
+            current.map((t) =>
+              t["@id"] === updated["@id"]
+                ? {
+                    ...t,
+                    title: updated.title,
+                    description: updated.description,
+                    completedOn: updated.completedOn,
+                    dueDate: updated.dueDate,
+                    tags: updated.tags,
+                    assignees: updated.assignees,
+                    attachments: updated.attachments,
+                  }
+                : t,
+            ),
+          )
+        }
+      />
     </>
   );
 };
