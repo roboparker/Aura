@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { displayName } from "@/lib/userDisplay";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -39,6 +39,15 @@ interface CommentsPanelProps {
   /** Set when the current user has the parent-specific delete-
    *  escalation right (task owner / page space admin). */
   canModerate: boolean;
+  /**
+   * Whether the composer is shown. Defaults to true. Discussions pass
+   * false on a locked thread so existing comments stay visible while
+   * new replies are turned away (mirrored by the server-side lock
+   * guard); `composerNotice` renders in the composer's place.
+   */
+  canCompose?: boolean;
+  /** Rendered instead of the composer when `canCompose` is false. */
+  composerNotice?: ReactNode;
   onCreate: (body: string) => Promise<void>;
   onEdit: (comment: Comment, body: string) => Promise<void>;
   onDelete: (comment: Comment) => Promise<void>;
@@ -67,6 +76,8 @@ const CommentsPanel = ({
   isLoading,
   currentUserIri,
   canModerate,
+  canCompose = true,
+  composerNotice,
   onCreate,
   onEdit,
   onDelete,
@@ -125,25 +136,29 @@ const CommentsPanel = ({
         </ul>
       )}
 
-      <div className="space-y-2" data-testid="comments-composer">
-        <MarkdownEditor
-          key={draftKey}
-          value={draft}
-          onChange={setDraft}
-          ariaLabel={`Comment on "${parentLabel}"`}
-        />
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            size="sm"
-            disabled={submitting || !draft.trim()}
-            onClick={() => void submit()}
-            data-testid="comment-submit"
-          >
-            {submitting ? "Posting…" : "Post comment"}
-          </Button>
+      {canCompose ? (
+        <div className="space-y-2" data-testid="comments-composer">
+          <MarkdownEditor
+            key={draftKey}
+            value={draft}
+            onChange={setDraft}
+            ariaLabel={`Comment on "${parentLabel}"`}
+          />
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={submitting || !draft.trim()}
+              onClick={() => void submit()}
+              data-testid="comment-submit"
+            >
+              {submitting ? "Posting…" : "Post comment"}
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : (
+        composerNotice ?? null
+      )}
     </div>
   );
 };

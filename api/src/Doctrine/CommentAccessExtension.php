@@ -22,8 +22,10 @@ use Symfony\Bundle\SecurityBundle\Security;
  *    project's space (#185). Standalone (projectless) tasks fall back
  *    to owner-only.
  *  - Page comments: visible to any member of the page's space.
+ *  - Discussion comments: visible to any member of the discussion's
+ *    space.
  *
- * Both branches OR together, and the per-comment commentable_type
+ * The branches OR together, and the per-comment commentable_type
  * keeps them mutually exclusive on a given row.
  */
 final class CommentAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
@@ -93,18 +95,33 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceGroupMembership::class,
         );
 
+        // Discussion branch: comment is on a discussion whose space
+        // contains the caller (direct or via group).
+        $discussionSpaceDirect = sprintf(
+            'SELECT 1 FROM %s ca_d_direct WHERE ca_d_direct.space = ca_discussion.space AND ca_d_direct.user = :currentUser',
+            SpaceMembership::class,
+        );
+        $discussionSpaceGroup = sprintf(
+            'SELECT 1 FROM %s ca_d_grp JOIN ca_d_grp.userGroup ca_d_grp_obj JOIN ca_d_grp_obj.memberships ca_d_grp_member WHERE ca_d_grp.space = ca_discussion.space AND ca_d_grp_member.user = :currentUser',
+            SpaceGroupMembership::class,
+        );
+
         $queryBuilder
             ->leftJoin(sprintf('%s.task', $rootAlias), 'ca_task')
             ->leftJoin('ca_task.project', 'ca_project')
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
+            ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ca_discussion')
             ->andWhere(sprintf(
                 '(ca_task.id IS NOT NULL AND (%s OR EXISTS(%s) OR EXISTS(%s)))
-                 OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))',
+                 OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
+                 OR (ca_discussion.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))',
                 $taskOwnerCheck,
                 $taskSpaceDirect,
                 $taskSpaceGroup,
                 $pageSpaceDirect,
                 $pageSpaceGroup,
+                $discussionSpaceDirect,
+                $discussionSpaceGroup,
             ))
             ->setParameter('currentUser', $user);
     }

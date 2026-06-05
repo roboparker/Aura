@@ -13,6 +13,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Filter\DiscussionSearchFilter;
 use App\Repository\DiscussionRepository;
+use App\State\DiscussionAggregateProvider;
 use App\State\DiscussionAuthorProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -32,6 +33,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            provider: DiscussionAggregateProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -40,6 +42,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            provider: DiscussionAggregateProvider::class,
         ),
         new Patch(
             // Edit: author only. Pin/lock ride the same Patch — a
@@ -155,6 +158,27 @@ class Discussion
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['discussion:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    /**
+     * Reply aggregates — computed at read time by
+     * {@see App\State\DiscussionAggregateProvider} and never persisted.
+     * The list and detail surfaces render reply counts, participant
+     * avatar stacks, and a last-activity timestamp from these.
+     */
+    private int $commentCount = 0;
+
+    private ?\DateTimeImmutable $lastActivityAt = null;
+
+    private int $participantCount = 0;
+
+    /**
+     * Distinct people who have touched the thread (author first, then
+     * repliers), capped for display. The full count lives in
+     * {@see $participantCount}.
+     *
+     * @var list<User>
+     */
+    private array $participants = [];
 
     public function __construct()
     {
@@ -274,5 +298,63 @@ class Discussion
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    #[Groups(['discussion:read'])]
+    public function getCommentCount(): int
+    {
+        return $this->commentCount;
+    }
+
+    public function setCommentCount(int $commentCount): static
+    {
+        $this->commentCount = $commentCount;
+        return $this;
+    }
+
+    /**
+     * Falls back to the thread's creation time so a reply-less thread
+     * still reports a meaningful "last activity" instead of null.
+     */
+    #[Groups(['discussion:read'])]
+    public function getLastActivityAt(): \DateTimeImmutable
+    {
+        return $this->lastActivityAt ?? $this->createdAt;
+    }
+
+    public function setLastActivityAt(?\DateTimeImmutable $lastActivityAt): static
+    {
+        $this->lastActivityAt = $lastActivityAt;
+        return $this;
+    }
+
+    #[Groups(['discussion:read'])]
+    public function getParticipantCount(): int
+    {
+        return $this->participantCount;
+    }
+
+    public function setParticipantCount(int $participantCount): static
+    {
+        $this->participantCount = $participantCount;
+        return $this;
+    }
+
+    /**
+     * @return list<User>
+     */
+    #[Groups(['discussion:read'])]
+    public function getParticipants(): array
+    {
+        return $this->participants;
+    }
+
+    /**
+     * @param list<User> $participants
+     */
+    public function setParticipants(array $participants): static
+    {
+        $this->participants = $participants;
+        return $this;
     }
 }

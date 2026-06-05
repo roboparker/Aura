@@ -15,6 +15,7 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  *  - task comments: task owner + project space members.
  *  - page comments: page's space members.
+ *  - discussion comments: discussion's space members.
  *
  * Unknown handles are ignored silently — the spec treats them as
  * plain text rather than 4xx-ing so users can write `@TODO` or
@@ -165,6 +166,17 @@ final class CommentMentionService
                     $bag[$this->localPart($member)] = $member;
                 }
             }
+            return $bag;
+        }
+
+        $discussion = $comment->getDiscussion();
+        if (null !== $discussion) {
+            $space = $discussion->getSpace();
+            if (null !== $space) {
+                foreach ($space->getEffectiveUsers() as $member) {
+                    $bag[$this->localPart($member)] = $member;
+                }
+            }
         }
         return $bag;
     }
@@ -202,6 +214,10 @@ final class CommentMentionService
         $page = $comment->getPage();
         if (null !== $page) {
             return sprintf('%s mentioned you on "%s"', $name, $page->getTitle());
+        }
+        $discussion = $comment->getDiscussion();
+        if (null !== $discussion) {
+            return sprintf('%s mentioned you on "%s"', $name, $discussion->getTitle());
         }
         return sprintf('%s mentioned you', $name);
     }
