@@ -65,7 +65,19 @@ final class ProjectSearchFilter extends AbstractFilter
                 $rootAlias,
                 $queryParam,
             ))
-            ->setParameter($queryParam, $trimmed)
+            ->setParameter($queryParam, $trimmed);
+
+        // `?sort=recent` orders newest-first instead of by relevance.
+        $filters = $context['filters'] ?? null;
+        if ('recent' === (is_array($filters) ? ($filters['sort'] ?? null) : null)) {
+            $queryBuilder
+                ->resetDQLPart('orderBy')
+                ->orderBy(sprintf('%s.createdOn', $rootAlias), 'DESC');
+
+            return;
+        }
+
+        $queryBuilder
             ->addSelect(sprintf(
                 'SEARCH_VECTOR_RANK(%s.searchVector, :%s) AS HIDDEN %s',
                 $rootAlias,

@@ -194,4 +194,64 @@ test.describe("Search page + autocomplete", () => {
     await expect(page).not.toHaveURL(/kind=/);
     await expect(page.getByTestId("search-results")).toContainText(taskTitle);
   });
+
+  test("annotates a task that matched only in a comment", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail("search-prov"));
+
+    const ldHeaders = { "Content-Type": "application/ld+json" };
+    const taskRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: ldHeaders,
+      data: { title: "Quarterly planning" },
+    });
+    expect(taskRes.ok()).toBeTruthy();
+    const task = await taskRes.json();
+    const commentRes = await page.request.post(`${BASE_URL}/comments`, {
+      headers: ldHeaders,
+      data: { task: task["@id"], body: "We should discuss the zephyrwidget rollout." },
+    });
+    expect(commentRes.ok()).toBeTruthy();
+
+    // The term lives only in the comment, so the row must surface the
+    // "matched in comment" provenance line (not just the title).
+    await page.goto(`${BASE_URL}/search?q=zephyrwidget`);
+    await expect(page.getByTestId("search-result-count")).toContainText("1 result");
+    await expect(page.getByTestId("search-results")).toContainText("matched in comment");
+  });
+
+  test("sort toggle and scope widen round-trip through the URL", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail("search-sort"));
+
+    await page.goto(`${BASE_URL}/search?q=anything`);
+    await page.getByTestId("search-sort").getByText("Most recent").click();
+    await expect(page).toHaveURL(/sort=recent/);
+
+    // Scope defaults to the active space; the chip widens to all spaces.
+    await page.getByTestId("search-scope").click();
+    await expect(page).toHaveURL(/scope=all/);
+  });
+
+  test("Cmd/Ctrl-K opens the search palette and runs a query", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail("search-palette"));
+    await page.goto(`${BASE_URL}/account`);
+    // The overlay is mounted in the navbar, which only renders once auth
+    // resolves — wait for the (auth-only) navbar search before the shortcut.
+    await expect(page.getByTestId("navbar-search")).toBeVisible();
+
+    await page.keyboard.press("ControlOrMeta+k");
+    const overlay = page.getByTestId("search-overlay");
+    await expect(overlay).toBeVisible();
+
+    await page.getByTestId("search-overlay-input").fill("rocketship");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/search\?q=rocketship/);
+  });
+
+  test("empty state offers to create a task from the query", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail("search-empty"));
+
+    await page.goto(`${BASE_URL}/search?q=zzznotathing999`);
+    const empty = page.getByTestId("search-empty");
+    await expect(empty).toBeVisible();
+    await expect(empty).toContainText("Create a task");
+  });
 });

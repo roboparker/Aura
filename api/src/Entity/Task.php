@@ -17,6 +17,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskOwnerProcessor;
+use App\State\TaskSearchProvenanceProvider;
 use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
 use App\Validator\ValidCustomFieldValues;
@@ -40,6 +41,10 @@ use Symfony\Component\Validator\Constraints as Assert;
             // client-controlled pagination the per-page size is fixed at the
             // 30-item default and the savings disappear.
             paginationClientItemsPerPage: true,
+            // Annotates results with comment / custom-field match provenance
+            // when `?search=` is present (no-op otherwise; delegates to the
+            // stock provider for access scoping + pagination).
+            provider: TaskSearchProvenanceProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -491,6 +496,34 @@ class Task
                 $value->setTask(null);
             }
         }
+        return $this;
+    }
+
+    /**
+     * Search match provenance for the hidden sources (comment / custom
+     * field), computed at read time by
+     * {@see App\State\TaskSearchProvenanceProvider} only when `?search=`
+     * is present. Empty otherwise. Never persisted.
+     *
+     * @var list<array{source: string, label: string, snippet: string}>
+     */
+    private array $searchMatches = [];
+
+    /**
+     * @return list<array{source: string, label: string, snippet: string}>
+     */
+    #[Groups(['task:read'])]
+    public function getSearchMatches(): array
+    {
+        return $this->searchMatches;
+    }
+
+    /**
+     * @param list<array{source: string, label: string, snippet: string}> $searchMatches
+     */
+    public function setSearchMatches(array $searchMatches): static
+    {
+        $this->searchMatches = $searchMatches;
         return $this;
     }
 }
