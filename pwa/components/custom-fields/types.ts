@@ -33,6 +33,7 @@ export type CustomFieldSubtype =
   // reference
   | "user"
   | "task"
+  | "project"
   | "page"
   | "discussion";
 
@@ -55,10 +56,10 @@ export interface CustomFieldConfig {
   minLength?: number;
   maxLength?: number;
   pattern?: string;
-  // numeric.{int,float,money}
-  min?: number;
-  max?: number;
-  decimalPlaces?: number;
+  // numeric.{int,float} use numeric bounds; date.* use ISO-string bounds
+  // in the subtype's wire format. Both ride the same keys.
+  min?: number | string;
+  max?: number | string;
   currency?: string;
   // select.{single,multi}
   options?: SelectOption[];
@@ -91,4 +92,56 @@ export interface FooterRow {
 
 export interface FooterResponse {
   footers: FooterRow[];
+}
+
+/** Per-definition fill stat from `GET /projects/{id}/custom_field_stats`. */
+export interface FieldFillStat {
+  definition: string;
+  filled: number;
+}
+
+export interface FieldStatsResponse {
+  total: number;
+  stats: FieldFillStat[];
+}
+
+/** Per-option usage from `GET /custom_field_definitions/{id}/option_stats`. */
+export interface OptionStat {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface OptionStatsResponse {
+  options: OptionStat[];
+}
+
+/** One row from the project-scoped custom-field change log. */
+export interface ActivityRow {
+  id: number;
+  action: string;
+  loggedAt: string | null;
+  objectClass: string;
+  objectId: string;
+  version: number;
+  actor: string | null;
+  data: Record<string, unknown>;
+}
+
+export interface ActivityActor {
+  "@id": string;
+  id: string;
+  email: string;
+  givenName: string | null;
+  familyName: string | null;
+  personalizedColor: string | null;
+  avatarUrls?: Record<string, string> | null;
+}
+
+export interface ActivityResponse {
+  items: ActivityRow[];
+  totalItems: number;
+  page: number;
+  itemsPerPage: number;
+  actors: Record<string, ActivityActor>;
 }

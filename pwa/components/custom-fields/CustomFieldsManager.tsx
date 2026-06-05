@@ -1,42 +1,48 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ChangeEvent,
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, History, Pencil, Plus } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  CustomFieldConfigEditor,
-  KIND_DESCRIPTORS,
-  KIND_ORDER,
-  defaultConfigFor,
-  fallbackSubtypeFor,
-} from "./kind-editors";
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
+import CustomFieldSheet from "./CustomFieldSheet";
+import CustomFieldChangeLog from "./CustomFieldChangeLog";
+import { fieldHandle } from "./handle";
+import { kindLabelFor, subtypeLabelFor } from "./kind-editors";
 import type {
-  CustomFieldConfig,
   CustomFieldDefinition,
-  CustomFieldKind,
-  CustomFieldSubtype,
-  FooterDescriptor,
-  FooterKind,
+  FieldStatsResponse,
 } from "./types";
 
 /**
- * Schema editor for a project's custom field catalogue. Talks to
- * `/custom_field_definitions` with the {kind, subtype, config, footer,
- * nullable} payload the API now expects (#227). Per-kind config
- * editors live in `kind-editors.tsx`; this component owns the shared
- * scaffolding (list, composer, footer descriptor).
+ * Schema editor for a project's custom field catalogue. Renders the
+ * fields as a sortable table (drag to reorder → column order on the task
+ * list), opens a right-side {@link CustomFieldSheet} for create/edit, and
+ * exposes the project-scoped change log. Talks to
+ * `/custom_field_definitions` plus the reorder / stats / activity helper
+ * endpoints.
  */
 interface Collection<T> {
   member?: T[];
@@ -45,8 +51,12 @@ interface Collection<T> {
 
 interface Props {
   projectIri: string;
+  /** Active space name, surfaced in the reference editor scope note. */
+  spaceName?: string;
   isSpaceAdmin: boolean;
 }
+
+const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -54,6 +64,7 @@ const errorMessage = async (res: Response): Promise<string> => {
     data.detail ||
     data.description ||
     data["hydra:description"] ||
+    data.error ||
     "Request failed."
   );
 };
@@ -65,20 +76,18 @@ const sortByPosition = (
     (a, b) => a.position - b.position || a.name.localeCompare(b.name),
   );
 
-const describeType = (def: CustomFieldDefinition): string => {
-  const kindLabel = KIND_DESCRIPTORS[def.kind]?.label ?? def.kind;
-  const subtypeLabel =
-    KIND_DESCRIPTORS[def.kind]?.subtypes.find((s) => s.value === def.subtype)
-      ?.label ?? def.subtype;
-  return `${kindLabel} · ${subtypeLabel}`;
-};
-
-const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
+const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => {
+  const projectId = projectIdFromIri(projectIri);
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [showComposer, setShowComposer] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [filled, setFilled] = useState<Record<string, number>>({});
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
+  const [changeLogOpen, setChangeLogOpen] = useState(false);
+
+  const sensors = useSensors(useSensor(PointerSensor));
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -101,49 +110,121 @@ const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
     }
   }, [projectIri]);
 
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/projects/${projectId}/custom_field_stats`,
+        { credentials: "include", headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) return;
+      const data: FieldStatsResponse = await res.json();
+      setTotal(data.total);
+      const map: Record<string, number> = {};
+      for (const s of data.stats) map[s.definition] = s.filled;
+      setFilled(map);
+    } catch {
+      /* fill counts are a nicety — ignore failures */
+    }
+  }, [projectId]);
+
   useEffect(() => {
     void load();
-  }, [load]);
-
-  const handleCreated = (created: CustomFieldDefinition) => {
-    setDefs((prev) => sortByPosition([...prev, created]));
-    setShowComposer(false);
-  };
-
-  const handleUpdated = (updated: CustomFieldDefinition) => {
-    setDefs((prev) =>
-      sortByPosition(
-        prev.map((d) => (d["@id"] === updated["@id"] ? updated : d)),
-      ),
-    );
-    setEditingId(null);
-  };
-
-  const handleDeleted = async (def: CustomFieldDefinition) => {
-    if (
-      !window.confirm(
-        `Delete custom field "${def.name}"? Existing values on tasks will also be removed.`,
-      )
-    ) {
-      return;
-    }
-    try {
-      const res = await fetch(`${ENTRYPOINT}${def["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await errorMessage(res));
-      setDefs((prev) => prev.filter((d) => d["@id"] !== def["@id"]));
-    } catch (err) {
-      window.alert(err instanceof Error ? err.message : "Failed to delete.");
-    }
-  };
+    void loadStats();
+  }, [load, loadStats]);
 
   const nextPosition =
     defs.length > 0 ? Math.max(...defs.map((d) => d.position)) + 1 : 0;
 
+  const openCreate = () => {
+    setEditing(null);
+    setSheetOpen(true);
+  };
+  const openEdit = (def: CustomFieldDefinition) => {
+    setEditing(def);
+    setSheetOpen(true);
+  };
+
+  const handleSaved = (saved: CustomFieldDefinition) => {
+    setDefs((prev) => {
+      const exists = prev.some((d) => d["@id"] === saved["@id"]);
+      const next = exists
+        ? prev.map((d) => (d["@id"] === saved["@id"] ? saved : d))
+        : [...prev, saved];
+      return sortByPosition(next);
+    });
+    void loadStats();
+  };
+
+  const handleDeleted = (def: CustomFieldDefinition) => {
+    setDefs((prev) => prev.filter((d) => d["@id"] !== def["@id"]));
+  };
+
+  const persistOrder = useCallback(
+    async (ordered: CustomFieldDefinition[]) => {
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/reorder`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ order: ordered.map((d) => d["@id"]) }),
+          },
+        );
+        if (!res.ok) throw new Error(await errorMessage(res));
+      } catch (err) {
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to save order.",
+        );
+        void load(); // re-sync to the server's truth
+      }
+    },
+    [projectId, load],
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = defs.findIndex((d) => d["@id"] === active.id);
+    const to = defs.findIndex((d) => d["@id"] === over.id);
+    if (from < 0 || to < 0) return;
+    const next = [...defs];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    const renumbered = next.map((d, i) => ({ ...d, position: i }));
+    setDefs(renumbered);
+    void persistOrder(renumbered);
+  };
+
+  const editingValueCount = useMemo(
+    () => (editing ? filled[editing["@id"]] : undefined),
+    [editing, filled],
+  );
+
   return (
     <div className="space-y-4" data-testid="custom-fields-manager">
+      <div className="flex items-center justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setChangeLogOpen(true)}
+          data-testid="custom-fields-changelog"
+        >
+          <History className="mr-1 h-3.5 w-3.5" /> Change log
+        </Button>
+        {isSpaceAdmin && (
+          <Button
+            type="button"
+            size="sm"
+            onClick={openCreate}
+            data-testid="custom-field-add"
+          >
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
+          </Button>
+        )}
+      </div>
+
       {loadError && (
         <Alert variant="destructive">
           <AlertDescription>{loadError}</AlertDescription>
@@ -152,374 +233,190 @@ const CustomFieldsManager = ({ projectIri, isSpaceAdmin }: Props) => {
 
       {isLoading ? (
         <p className="text-muted-foreground text-sm">Loading…</p>
-      ) : defs.length === 0 && !showComposer ? (
-        <Card>
-          <CardContent className="pt-6 space-y-3">
-            <p className="text-muted-foreground text-sm">
-              No custom fields yet.
-              {isSpaceAdmin
-                ? " Add the first one to start collecting structured data on tasks."
-                : " Only space admins can add fields."}
-            </p>
-            {isSpaceAdmin && (
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setShowComposer(true)}
-                data-testid="custom-field-add"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" /> Add field
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <ul className="space-y-2" data-testid="custom-field-list">
-            {defs.map((def) =>
-              editingId === def["@id"] ? (
-                <li key={def["@id"]} data-testid="custom-field-item">
-                  <CustomFieldComposer
-                    projectIri={projectIri}
-                    initial={def}
-                    onSaved={handleUpdated}
-                    onCancel={() => setEditingId(null)}
-                  />
-                </li>
-              ) : (
-                <li key={def["@id"]} data-testid="custom-field-item">
-                  <Card>
-                    <CardContent className="pt-4 pb-4 flex flex-wrap items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className="font-medium"
-                            data-testid="custom-field-name"
-                          >
-                            {def.name}
-                          </span>
-                          <Badge variant="outline">{describeType(def)}</Badge>
-                          {!def.nullable && (
-                            <Badge variant="secondary">Required</Badge>
-                          )}
-                          {def.config.multi && (
-                            <Badge variant="secondary">Multi-value</Badge>
-                          )}
-                          {def.footer && (
-                            <Badge variant="secondary">
-                              Footer: {def.footer.kind}
-                            </Badge>
-                          )}
-                        </div>
-                        {def.kind === "select" && def.config.options && (
-                          <p className="text-xs text-muted-foreground">
-                            Options:{" "}
-                            {def.config.options.map((o) => o.label).join(", ")}
-                          </p>
-                        )}
-                      </div>
-                      {isSpaceAdmin && (
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingId(def["@id"])}
-                            data-testid="custom-field-edit"
-                          >
-                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void handleDeleted(def)}
-                            className="text-destructive hover:text-destructive"
-                            data-testid="custom-field-delete"
-                          >
-                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </li>
-              ),
-            )}
-          </ul>
-
-          {isSpaceAdmin && !showComposer && (
+      ) : defs.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <p className="text-muted-foreground text-sm">
+            No custom fields yet.
+            {isSpaceAdmin
+              ? " Add the first one to start collecting structured data on tasks."
+              : " Only space admins can add fields."}
+          </p>
+          {isSpaceAdmin && (
             <Button
               type="button"
               size="sm"
-              variant="outline"
-              onClick={() => setShowComposer(true)}
-              data-testid="custom-field-add"
+              className="mt-3"
+              onClick={openCreate}
             >
-              <Plus className="h-3.5 w-3.5 mr-1" /> Add field
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add field
             </Button>
           )}
-        </>
+        </div>
+      ) : (
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-8" />
+                <TableHead>Name</TableHead>
+                <TableHead>Kind</TableHead>
+                <TableHead>Required</TableHead>
+                <TableHead>Footer</TableHead>
+                <TableHead className="text-right">Filled</TableHead>
+                {isSpaceAdmin && <TableHead className="w-16 text-right">Actions</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={defs.map((d) => d["@id"])}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {defs.map((def) => (
+                    <FieldRow
+                      key={def["@id"]}
+                      def={def}
+                      total={total}
+                      filled={filled[def["@id"]] ?? 0}
+                      isSpaceAdmin={isSpaceAdmin}
+                      draggable={isSpaceAdmin && defs.length > 1}
+                      onEdit={() => openEdit(def)}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
+            </TableBody>
+          </Table>
+          {isSpaceAdmin && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex w-full items-center gap-1 border-t px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              data-testid="custom-field-add-row"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add another field
+            </button>
+          )}
+        </div>
       )}
 
-      {isSpaceAdmin && showComposer && (
-        <CustomFieldComposer
-          projectIri={projectIri}
-          initialPosition={nextPosition}
-          onSaved={handleCreated}
-          onCancel={() => setShowComposer(false)}
-        />
+      {defs.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Drag rows to reorder. Order here drives column order on the task list.
+        </p>
       )}
+
+      <CustomFieldSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        projectIri={projectIri}
+        spaceName={spaceName}
+        initial={editing ?? undefined}
+        initialPosition={nextPosition}
+        valueCount={editingValueCount}
+        onSaved={handleSaved}
+        onDeleted={isSpaceAdmin ? handleDeleted : undefined}
+      />
+
+      <CustomFieldChangeLog
+        open={changeLogOpen}
+        onOpenChange={setChangeLogOpen}
+        projectId={projectId}
+      />
     </div>
   );
 };
 
-interface ComposerProps {
-  projectIri: string;
-  initial?: CustomFieldDefinition;
-  initialPosition?: number;
-  onSaved: (def: CustomFieldDefinition) => void;
-  onCancel: () => void;
-}
-
-const CustomFieldComposer = ({
-  projectIri,
-  initial,
-  initialPosition = 0,
-  onSaved,
-  onCancel,
-}: ComposerProps) => {
-  const [name, setName] = useState(initial?.name ?? "");
-  const [kind, setKind] = useState<CustomFieldKind>(initial?.kind ?? "text");
-  const [subtype, setSubtype] = useState<CustomFieldSubtype>(
-    initial?.subtype ?? fallbackSubtypeFor("text"),
-  );
-  const [config, setConfig] = useState<CustomFieldConfig>(
-    initial?.config ?? defaultConfigFor("text", "text"),
-  );
-  const [nullable, setNullable] = useState(initial?.nullable ?? true);
-  const [footer, setFooter] = useState<FooterDescriptor | null>(
-    initial?.footer ?? null,
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const isEdit = Boolean(initial);
-  const descriptor = KIND_DESCRIPTORS[kind];
-
-  const multiSupported = useMemo(() => {
-    if (!descriptor.supportsMulti) return false;
-    if (descriptor.noMultiSubtypes?.includes(subtype)) return false;
-    // select.multi forces multi=true; select.single forces false.
-    if (kind === "select") return false;
-    return true;
-  }, [descriptor, subtype, kind]);
-
-  const handleKindChange = (next: CustomFieldKind) => {
-    const nextSubtype = KIND_DESCRIPTORS[next].subtypes[0].value;
-    setKind(next);
-    setSubtype(nextSubtype);
-    setConfig(defaultConfigFor(next, nextSubtype));
-    setFooter(null);
-  };
-
-  const handleSubtypeChange = (next: CustomFieldSubtype) => {
-    setSubtype(next);
-    if (kind === "select") {
-      // Keep options across single<->multi switches; just flip the
-      // multi flag in config since it's intrinsic to the subtype.
-      setConfig((prev) => ({ ...prev, multi: next === "multi" }));
-    } else if (descriptor.noMultiSubtypes?.includes(next)) {
-      setConfig((prev) => ({ ...prev, multi: false }));
-    }
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
-
-    setSubmitting(true);
-    setError(null);
-    try {
-      const body: Record<string, unknown> = {
-        name: trimmedName,
-        kind,
-        subtype,
-        config,
-        nullable,
-        footer,
-      };
-      let res: Response;
-      if (isEdit && initial) {
-        res = await fetch(`${ENTRYPOINT}${initial["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/merge-patch+json",
-            Accept: "application/ld+json",
-          },
-          body: JSON.stringify(body),
-        });
-      } else {
-        res = await fetch(`${ENTRYPOINT}/custom_field_definitions`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/ld+json" },
-          body: JSON.stringify({
-            ...body,
-            project: projectIri,
-            position: initialPosition,
-          }),
-        });
-      }
-      if (!res.ok) throw new Error(await errorMessage(res));
-      const saved: CustomFieldDefinition = await res.json();
-      onSaved(saved);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+const FieldRow = ({
+  def,
+  total,
+  filled,
+  isSpaceAdmin,
+  draggable,
+  onEdit,
+}: {
+  def: CustomFieldDefinition;
+  total: number;
+  filled: number;
+  isSpaceAdmin: boolean;
+  draggable: boolean;
+  onEdit: () => void;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: def["@id"], disabled: !draggable });
 
   return (
-    <Card data-testid="custom-field-composer">
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="cf-name">Name</Label>
-            <Input
-              id="cf-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              maxLength={80}
-              data-testid="custom-field-name-input"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="cf-kind">Kind</Label>
-              <select
-                id="cf-kind"
-                value={kind}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  handleKindChange(e.target.value as CustomFieldKind)
-                }
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                data-testid="custom-field-kind-input"
-              >
-                {KIND_ORDER.map((k) => (
-                  <option key={k} value={k}>
-                    {KIND_DESCRIPTORS[k].label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="cf-subtype">Subtype</Label>
-              <select
-                id="cf-subtype"
-                value={subtype}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  handleSubtypeChange(e.target.value as CustomFieldSubtype)
-                }
-                className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                data-testid="custom-field-subtype-input"
-              >
-                {descriptor.subtypes.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <CustomFieldConfigEditor
-            kind={kind}
-            subtype={subtype}
-            config={config}
-            onChange={setConfig}
-          />
-
-          {multiSupported && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="cf-multi"
-                checked={Boolean(config.multi)}
-                onCheckedChange={(checked) =>
-                  setConfig({ ...config, multi: Boolean(checked) })
-                }
-                data-testid="custom-field-multi-input"
-              />
-              <Label htmlFor="cf-multi">Allow multiple values</Label>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="cf-required"
-              checked={!nullable}
-              onCheckedChange={(checked) => setNullable(!checked)}
-              data-testid="custom-field-required-input"
-            />
-            <Label htmlFor="cf-required">Required</Label>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="cf-footer">
-              Footer aggregation{" "}
-              <span className="text-muted-foreground text-xs">(optional)</span>
-            </Label>
-            <select
-              id="cf-footer"
-              value={footer?.kind ?? ""}
-              onChange={(e) => {
-                const v = e.target.value;
-                setFooter(v === "" ? null : { kind: v as FooterKind });
-              }}
-              className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              data-testid="custom-field-footer-input"
-            >
-              <option value="">No footer</option>
-              {descriptor.footerKinds.map((fk) => (
-                <option key={fk} value={fk}>
-                  {fk}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <div className="flex gap-2">
-            <Button
-              type="submit"
-              size="sm"
-              disabled={submitting || !name.trim()}
-              data-testid="custom-field-save"
-            >
-              {submitting ? "Saving…" : isEdit ? "Save" : "Create"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onCancel}
-              disabled={submitting}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+    <TableRow
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(isDragging && "opacity-60")}
+      data-testid="custom-field-item"
+    >
+      <TableCell className="w-8 pr-0">
+        {draggable && (
+          <button
+            type="button"
+            className="cursor-grab text-muted-foreground hover:text-foreground"
+            aria-label={`Reorder ${def.name}`}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        )}
+      </TableCell>
+      <TableCell>
+        <div className="font-medium" data-testid="custom-field-name">
+          {def.name}
+        </div>
+        <div className="font-mono text-xs text-muted-foreground">
+          {fieldHandle(def.name)}
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className="font-normal">
+          {kindLabelFor(def.kind).toLowerCase()} ·{" "}
+          {subtypeLabelFor(def.kind, def.subtype).toLowerCase()}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        {def.nullable ? (
+          <span className="text-sm text-muted-foreground">Optional</span>
+        ) : (
+          <Badge variant="secondary">Required</Badge>
+        )}
+      </TableCell>
+      <TableCell>
+        {def.footer ? (
+          <span className="text-sm font-medium uppercase">
+            {def.footer.kind}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+        {filled}/{total}
+      </TableCell>
+      {isSpaceAdmin && (
+        <TableCell className="text-right">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onEdit}
+            aria-label={`Edit ${def.name}`}
+            data-testid="custom-field-edit"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        </TableCell>
+      )}
+    </TableRow>
   );
 };
 
