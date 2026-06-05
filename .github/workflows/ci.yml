@@ -116,9 +116,10 @@ jobs:
         name: Run PHPUnit
         # PHPUnit's deprecation tracker accumulates context across the whole
         # suite, so peak memory grows with test count. The default 128M was
-        # tight even before; bumping to 512M leaves headroom as the suite
-        # keeps growing.
-        run: docker compose exec -T php php -d memory_limit=512M bin/phpunit
+        # tight even before; 512M then started tipping over as the suite
+        # grew, so we run unbounded here — GitHub runners have GBs free and
+        # the limit was only ever an accidental ceiling, not a real budget.
+        run: docker compose exec -T php php -d memory_limit=-1 bin/phpunit
 
   phpstan:
     name: PHPStan
