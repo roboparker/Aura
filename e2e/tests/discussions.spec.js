@@ -22,7 +22,7 @@ test.describe("Discussions", () => {
     const panel = page.locator('[data-testid="discussions-panel"]');
     await expect(panel).toBeVisible();
     await expect(
-      panel.locator("text=No discussions yet"),
+      panel.locator("text=No discussions in this space yet"),
     ).toBeVisible();
 
     // Open the composer, post a discussion in "ideas".
@@ -48,11 +48,14 @@ test.describe("Discussions", () => {
     await page.getByRole("tab", { name: "Ideas" }).click();
     await expect(discussion).toBeVisible();
 
-    // Admin pin / unpin from the list.
-    await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
-    await expect(discussion.locator("text=Pinned")).toBeVisible();
-    await discussion.locator('[data-testid="discussion-toggle-pin"]').click();
-    await expect(discussion.locator("text=Pinned")).toHaveCount(0);
+    // Admin pin / unpin from the list — actions live in the row's
+    // "…" overflow menu (rendered in a portal once opened).
+    await discussion.locator('[data-testid="discussion-row-menu"]').click();
+    await page.locator('[data-testid="discussion-toggle-pin"]').click();
+    await expect(discussion.locator('[aria-label="Pinned"]')).toBeVisible();
+    await discussion.locator('[data-testid="discussion-row-menu"]').click();
+    await page.locator('[data-testid="discussion-toggle-pin"]').click();
+    await expect(discussion.locator('[aria-label="Pinned"]')).toHaveCount(0);
 
     // Drill into the detail page via the row's title link.
     await discussion.locator('[data-testid="discussion-title"]').click();

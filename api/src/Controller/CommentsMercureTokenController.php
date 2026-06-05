@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Task;
 use App\Entity\User;
@@ -55,8 +56,18 @@ class CommentsMercureTokenController extends AbstractController
         return $this->mint($id, $request, $user, Page::class, '/pages/');
     }
 
+    #[Route(
+        '/discussions/{id}/comments/mercure-token',
+        name: 'discussion_comments_mercure_token',
+        methods: ['GET'],
+    )]
+    public function discussion(string $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        return $this->mint($id, $request, $user, Discussion::class, '/discussions/');
+    }
+
     /**
-     * @param class-string<Task|Page> $entityClass
+     * @param class-string<Task|Page|Discussion> $entityClass
      */
     private function mint(
         string $id,
@@ -88,7 +99,7 @@ class CommentsMercureTokenController extends AbstractController
         return new JsonResponse(['topic' => $topic]);
     }
 
-    private function canRead(Task|Page $parent, User $user): bool
+    private function canRead(Task|Page|Discussion $parent, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;

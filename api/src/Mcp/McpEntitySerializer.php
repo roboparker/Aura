@@ -87,6 +87,7 @@ final class McpEntitySerializer
             'commentableType' => $comment->getCommentableType(),
             'taskId' => null === $comment->getTask() ? null : (string) $comment->getTask()->getId(),
             'pageId' => null === $comment->getPage() ? null : (string) $comment->getPage()->getId(),
+            'discussionId' => null === $comment->getDiscussion() ? null : (string) $comment->getDiscussion()->getId(),
             'body' => $comment->getBody(),
             'author' => $this->userSummary($comment->getAuthor()),
             'createdAt' => $comment->getCreatedAt()->format(\DateTimeInterface::ATOM),
