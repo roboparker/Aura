@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\ActivityLog;
+use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -128,6 +129,7 @@ final class ActivityFeedSerializer
         return match (true) {
             $fqcn === Task::class => 'Task',
             $fqcn === Project::class => 'Project',
+            $fqcn === CustomFieldDefinition::class => 'CustomFieldDefinition',
             default => substr($fqcn, (int) strrpos($fqcn, '\\') + 1),
         };
     }

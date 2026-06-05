@@ -16,6 +16,7 @@ use App\CustomField\CustomFieldKind;
 use App\Repository\CustomFieldDefinitionRepository;
 use App\Validator\ValidCustomFieldDefinition;
 use Doctrine\ORM\Mapping as ORM;
+use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
@@ -74,6 +75,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['space_id'], name: 'idx_cfd_space')]
 #[ORM\UniqueConstraint(name: 'uniq_cfd_project_name', columns: ['project_id', 'name'])]
 #[ORM\HasLifecycleCallbacks]
+#[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 #[UniqueEntity(
     fields: ['project', 'name'],
     message: 'A field with this name already exists in the project.',
@@ -121,6 +123,7 @@ class CustomFieldDefinition
         max: self::MAX_NAME_LENGTH,
         maxMessage: 'Field name cannot be longer than {{ limit }} characters.',
     )]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private string $name = '';
 
@@ -132,6 +135,7 @@ class CustomFieldDefinition
         callback: [CustomFieldKind::class, 'values'],
         message: 'Kind must be one of: {{ choices }}.',
     )]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private string $kind = CustomFieldKind::TEXT->value;
 
@@ -142,6 +146,7 @@ class CustomFieldDefinition
     #[ORM\Column(length: 24)]
     #[Assert\NotBlank(message: 'Subtype is required.')]
     #[Assert\Length(max: 24)]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private string $subtype = 'text';
 
@@ -153,6 +158,7 @@ class CustomFieldDefinition
      * @var array<string, mixed>
      */
     #[ORM\Column(type: 'json', options: ['default' => '{}'])]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private array $config = [];
 
@@ -165,6 +171,7 @@ class CustomFieldDefinition
      * @var array{kind: string, label?: string}|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private ?array $footer = null;
 
@@ -173,11 +180,13 @@ class CustomFieldDefinition
      * `false` means the task validator enforces presence at save time.
      */
     #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private bool $nullable = true;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     #[Assert\PositiveOrZero(message: 'Position cannot be negative.')]
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private int $position = 0;
 
