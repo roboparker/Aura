@@ -33,8 +33,8 @@ const DEBOUNCE_MS = 220;
  * The local draft state mirrors the URL while the user types so the
  * field doesn't fight with browser autocomplete; the input commits to
  * the URL on submit, and pre-fills from the URL when the user lands
- * back on /search via a deep link. ⌘/Ctrl+K focuses the input from
- * anywhere in the app.
+ * back on /search via a deep link. ⌘/Ctrl+K opens the richer
+ * SearchOverlay command palette (mounted in the navbar).
  */
 interface SearchBarProps {
   /**
@@ -67,20 +67,8 @@ const SearchBar = ({ className }: SearchBarProps = {}) => {
     setDraft(initial);
   }, [initial]);
 
-  // Global focus shortcut — match the convention used by GitHub, Linear,
-  // and most app shells. The browser's own input handling ignores ⌘K
-  // anyway, so we don't need to gate this on the active element.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const isMeta = e.metaKey || e.ctrlKey;
-      if (!isMeta || e.key.toLowerCase() !== "k") return;
-      e.preventDefault();
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
+  // ⌘/Ctrl+K is owned by SearchOverlay (the command palette) — the
+  // inline bar stays for quick type-in-place autocomplete.
 
   // Close the dropdown on outside click. Listening at capture time so a
   // click into another popover (e.g. the account menu) closes us

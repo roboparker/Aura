@@ -98,6 +98,20 @@ final class TaskSearchFilter extends AbstractFilter
             ))
             ->setParameter($queryParam, $trimmed);
 
+        // `?sort=recent` flips the search ordering from relevance to
+        // newest-first; anything else (incl. the default) ranks by
+        // relevance. The param itself has no filter of its own — it just
+        // rides along in the filter context.
+        $filters = $context['filters'] ?? null;
+        $sort = is_array($filters) ? ($filters['sort'] ?? null) : null;
+        if ('recent' === $sort) {
+            $queryBuilder
+                ->resetDQLPart('orderBy')
+                ->orderBy(sprintf('%s.createdOn', $rootAlias), 'DESC');
+
+            return;
+        }
+
         // Replace the default ORDER BY with relevance-first when a query
         // is present. Tasks without a direct title/description hit (i.e.
         // matched only via a comment) get rank 0 so they sort last.

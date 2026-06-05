@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import NotificationBell from "@/components/notifications/NotificationBell";
 import OverdueBadge from "@/components/tasks/OverdueBadge";
+import SearchOverlay from "@/components/search/SearchOverlay";
 import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
@@ -49,6 +50,7 @@ const Navbar = () => {
           <>
             <Breadcrumbs className="hidden md:flex flex-1 min-w-0" />
             <SearchBar className="flex-1 min-w-0 max-w-3xl" />
+            <SearchOverlay />
           </>
         )}
 
