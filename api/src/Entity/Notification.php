@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Doctrine\Orm\Filter\ExistsFilter;
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
@@ -14,15 +15,19 @@ use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * In-app notification for the recipient. Today the only kind is
- * `task_reminder` (created by App\Command\DispatchTaskRemindersCommand);
- * the `type` field leaves room for other kinds later (mentions, invites, …)
- * without splitting the table.
+ * In-app notification for the recipient. Kinds: `task_reminder`
+ * (App\Command\DispatchTaskRemindersCommand), `mention` / `reply` /
+ * `comment` (comment activity, via App\Service\NotificationDispatcher),
+ * and `assigned` / `status` (task activity). Most carry an `actor` (the
+ * user who triggered it) and resolve a deep-link `target` from whichever
+ * of task / comment / discussion / page is set.
  *
- * Read access is per-user — a Doctrine query extension scopes listings to
- * the current recipient. Mark-as-read is the only allowed mutation, gated
- * by App\State\NotificationUpdateProcessor so the rest of the row stays
- * server-controlled.
+ * Read access is per-user — App\Doctrine\NotificationRecipientExtension
+ * scopes listings to the current recipient. The only client-writable
+ * fields are `readAt` and `archivedAt` (mark-read / archive); everything
+ * else is server-controlled. Bulk mark-read / archive live on
+ * App\Controller\NotificationBulkController; the live bell subscribes to
+ * the per-user Mercure topic minted by NotificationsMercureTokenController.
  */
 #[ApiResource(
     operations: [
@@ -42,10 +47,12 @@ use Symfony\Component\Uid\Uuid;
     denormalizationContext: ['groups' => ['notification:write']],
     order: ['createdAt' => 'DESC'],
 )]
-#[ApiFilter(ExistsFilter::class, properties: ['readAt'])]
+#[ApiFilter(ExistsFilter::class, properties: ['readAt', 'archivedAt'])]
+#[ApiFilter(SearchFilter::class, properties: ['type' => 'exact'])]
 #[ORM\Entity(repositoryClass: NotificationRepository::class)]
 #[ORM\Table(name: 'notification')]
 #[ORM\Index(columns: ['recipient_id', 'read_at'], name: 'idx_notification_recipient_read')]
+#[ORM\Index(columns: ['recipient_id', 'archived_at'], name: 'idx_notification_recipient_archived')]
 #[ORM\UniqueConstraint(
     name: 'uniq_task_reminder',
     columns: ['recipient_id', 'task_id', 'reminder_offset'],
@@ -72,6 +79,15 @@ class Notification
      */
     public const TYPE_TASK_MENTION = self::TYPE_MENTION;
 
+    /** Someone replied in a thread you posted in (not an @mention of you). */
+    public const TYPE_REPLY = 'reply';
+    /** New comment on a task you own / a thread you started. */
+    public const TYPE_COMMENT = 'comment';
+    /** A task was assigned to you. */
+    public const TYPE_ASSIGNED = 'assigned';
+    /** A task you own or are assigned to changed status (e.g. completed). */
+    public const TYPE_STATUS = 'status';
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -82,6 +98,17 @@ class Notification
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?User $recipient = null;
+
+    /**
+     * Who triggered the notification (commenter, assigner, …). Null for
+     * system-generated rows like reminders. Embedded under
+     * `notification:read` so the row renders an actor avatar without a
+     * follow-up fetch. SET NULL on actor deletion so the row survives.
+     */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['notification:read'])]
+    private ?User $actor = null;
 
     #[ORM\Column(length: 50)]
     #[Groups(['notification:read'])]
@@ -127,12 +154,38 @@ class Notification
     private ?Comment $comment = null;
 
     /**
+     * Discussion this notification points at, when it isn't comment- or
+     * task-derived. Internal — the deep-link is exposed via the computed
+     * `targetUrl` getter rather than a raw IRI.
+     */
+    #[ORM\ManyToOne(targetEntity: Discussion::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    private ?Discussion $discussion = null;
+
+    /**
+     * Page this notification points at, when it isn't comment- or
+     * task-derived. Internal — see `targetUrl`.
+     */
+    #[ORM\ManyToOne(targetEntity: Page::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    private ?Page $page = null;
+
+    /**
      * Set by NotificationUpdateProcessor when the user marks the row read.
      * `null` means unread; any non-null value means read.
      */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['notification:read', 'notification:write'])]
     private ?\DateTimeImmutable $readAt = null;
+
+    /**
+     * Set when the user archives the row (single PATCH or the bulk
+     * archive endpoint). `null` means it's still in the active inbox;
+     * any value means archived ("View archived" surfaces these).
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['notification:read', 'notification:write'])]
+    private ?\DateTimeImmutable $archivedAt = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['notification:read'])]
@@ -271,5 +324,145 @@ class Notification
     {
         $this->comment = $comment;
         return $this;
+    }
+
+    public function getActor(): ?User
+    {
+        return $this->actor;
+    }
+
+    public function setActor(?User $actor): static
+    {
+        $this->actor = $actor;
+        return $this;
+    }
+
+    public function getDiscussion(): ?Discussion
+    {
+        return $this->discussion;
+    }
+
+    public function setDiscussion(?Discussion $discussion): static
+    {
+        $this->discussion = $discussion;
+        return $this;
+    }
+
+    public function getPage(): ?Page
+    {
+        return $this->page;
+    }
+
+    public function setPage(?Page $page): static
+    {
+        $this->page = $page;
+        return $this;
+    }
+
+    public function getArchivedAt(): ?\DateTimeImmutable
+    {
+        return $this->archivedAt;
+    }
+
+    public function setArchivedAt(?\DateTimeImmutable $archivedAt): static
+    {
+        $this->archivedAt = $archivedAt;
+        return $this;
+    }
+
+    /**
+     * Front-end deep-link for the row, resolved from whichever parent is
+     * set (comment unwraps to its own parent). Null when nothing is
+     * linkable. Computed at read time — never persisted.
+     */
+    #[Groups(['notification:read'])]
+    public function getTargetUrl(): ?string
+    {
+        return $this->resolveTarget()['url'];
+    }
+
+    /** Title of the linked entity (task / discussion / page title). */
+    #[Groups(['notification:read'])]
+    public function getTargetLabel(): ?string
+    {
+        return $this->resolveTarget()['label'];
+    }
+
+    /** Breadcrumb context — the parent project or space name. */
+    #[Groups(['notification:read'])]
+    public function getContextLabel(): ?string
+    {
+        return $this->resolveTarget()['context'];
+    }
+
+    /**
+     * @return array{url: ?string, label: ?string, context: ?string}
+     */
+    private function resolveTarget(): array
+    {
+        $task = $this->task;
+        $comment = $this->comment;
+        if (null !== $comment) {
+            if (null !== $comment->getTask()) {
+                $task = $comment->getTask();
+            } elseif (null !== $comment->getPage()) {
+                return $this->pageTarget($comment->getPage());
+            } elseif (null !== $comment->getDiscussion()) {
+                return $this->discussionTarget($comment->getDiscussion());
+            }
+        }
+        if (null !== $task) {
+            return $this->taskTarget($task);
+        }
+        if (null !== $this->discussion) {
+            return $this->discussionTarget($this->discussion);
+        }
+        if (null !== $this->page) {
+            return $this->pageTarget($this->page);
+        }
+
+        return ['url' => null, 'label' => null, 'context' => null];
+    }
+
+    /**
+     * @return array{url: ?string, label: ?string, context: ?string}
+     */
+    private function taskTarget(Task $task): array
+    {
+        $project = $task->getProject();
+
+        return [
+            'url' => '/tasks',
+            'label' => $task->getTitle(),
+            'context' => null === $project ? 'Tasks' : $project->getTitle(),
+        ];
+    }
+
+    /**
+     * @return array{url: ?string, label: ?string, context: ?string}
+     */
+    private function discussionTarget(Discussion $discussion): array
+    {
+        $id = $discussion->getId();
+
+        return [
+            'url' => null === $id ? null : '/discussions/' . $id,
+            'label' => $discussion->getTitle(),
+            'context' => $discussion->getSpace()?->getName(),
+        ];
+    }
+
+    /**
+     * @return array{url: ?string, label: ?string, context: ?string}
+     */
+    private function pageTarget(Page $page): array
+    {
+        $id = $page->getId();
+
+        return [
+            'url' => null === $id ? null : '/pages/' . $id,
+            'label' => $page->getTitle(),
+            'context' => $page->getSpace()?->getName(),
+        ];
     }
 }

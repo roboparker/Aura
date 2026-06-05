@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Repository\TaskRepository;
+use App\Service\TaskActivityNotifier;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -29,6 +30,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private Security $security,
         private TaskRepository $tasks,
+        private TaskActivityNotifier $activity,
     ) {
     }
 
@@ -47,6 +49,11 @@ final class TaskOwnerProcessor implements ProcessorInterface
         $min = $this->tasks->findMinPositionForOwner($user);
         $data->setPosition(null === $min ? 0 : $min - 1);
 
-        return $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+        $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+
+        // On create, every assignee is freshly assigned.
+        $this->activity->notifyAssigned($result, $user, $result->getAssignees());
+
+        return $result;
     }
 }

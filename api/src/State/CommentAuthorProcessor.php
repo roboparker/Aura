@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Comment;
 use App\Entity\User;
+use App\Service\CommentActivityNotifier;
 use App\Service\CommentMentionService;
 use App\Service\CommentMercurePublisher;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -15,8 +16,10 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 /**
  * Stamps the comment with the currently authenticated user before
  * persisting, then notifies Mercure subscribers and dispatches
- * `@mention` notifications. Author is never trusted from the request
- * payload — same pattern as TaskOwnerProcessor.
+ * notifications: `@mention`s first (so they win the per-comment
+ * precedence), then `reply` / `comment` thread activity. Author is
+ * never trusted from the request payload — same pattern as
+ * TaskOwnerProcessor.
  *
  * @implements ProcessorInterface<Comment, Comment>
  */
@@ -31,6 +34,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
         private Security $security,
         private CommentMercurePublisher $publisher,
         private CommentMentionService $mentions,
+        private CommentActivityNotifier $activity,
     ) {
     }
 
@@ -48,6 +52,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
 
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
         $this->mentions->dispatchMentions($result);
+        $this->activity->dispatch($result);
         $this->publisher->publishCreated($result);
 
         return $result;

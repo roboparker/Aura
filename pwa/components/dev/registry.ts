@@ -12,7 +12,8 @@ export type RegistryEntry = {
     | "Layout"
     | "Discussions"
     | "Custom fields"
-    | "Groups";
+    | "Groups"
+    | "Notifications";
   description: string;
 };
 
@@ -54,5 +55,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "category-badge", name: "CategoryBadge", category: "Discussions", description: "Colored-dot pill naming a discussion's category." },
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
   { slug: "group-tile", name: "GroupTile", category: "Groups", description: "Square colored tile with a grid glyph for a UserGroup avatar." },
+  { slug: "notification-row", name: "NotificationRow", category: "Notifications", description: "Inbox row with unread/read/selected states and hover quick-actions." },
   { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },
 ];

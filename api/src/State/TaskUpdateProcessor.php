@@ -5,8 +5,11 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Task;
+use App\Entity\User;
 use App\Repository\TaskRepository;
+use App\Service\TaskActivityNotifier;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -32,6 +35,8 @@ final class TaskUpdateProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private EntityManagerInterface $em,
         private TaskRepository $tasks,
+        private Security $security,
+        private TaskActivityNotifier $activity,
     ) {
     }
 
@@ -48,7 +53,31 @@ final class TaskUpdateProcessor implements ProcessorInterface
             && null !== $data->getRecurrenceRule()
             && null !== $data->getDueDate();
 
+        // Snapshot the persisted assignee ids before the flush so we can
+        // tell who was *newly* assigned by this PATCH — the in-memory
+        // collection has already been mutated, and `previous_data` shares
+        // the same collection reference, so neither is trustworthy here.
+        $previousAssigneeIds = $this->tasks->findAssigneeIdsFromDatabase($data);
+
         $result = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
+
+        $actor = $this->security->getUser();
+        if ($actor instanceof User) {
+            $newAssignees = [];
+            foreach ($result->getAssignees() as $assignee) {
+                $id = $assignee->getId();
+                if (null !== $id && !in_array((string) $id, $previousAssigneeIds, true)) {
+                    $newAssignees[] = $assignee;
+                }
+            }
+            if ([] !== $newAssignees) {
+                $this->activity->notifyAssigned($result, $actor, $newAssignees);
+            }
+
+            if ($wasIncomplete && $isNowComplete) {
+                $this->activity->notifyCompleted($result, $actor);
+            }
+        }
 
         if ($shouldRecur) {
             $this->createNextOccurrence($result);
