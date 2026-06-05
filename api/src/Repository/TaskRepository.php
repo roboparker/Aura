@@ -20,6 +20,39 @@ final class TaskRepository extends ServiceEntityRepository
     }
 
     /**
+     * Assignee user-ids as currently stored in the database, regardless
+     * of any in-memory (not-yet-flushed) collection changes. Lets the
+     * task update processor diff old-vs-new assignees on a PATCH to find
+     * who was *newly* assigned — the in-memory `previous_data` clone
+     * shares the same collection reference and can't be trusted for it.
+     *
+     * @return list<string>
+     */
+    public function findAssigneeIdsFromDatabase(Task $task): array
+    {
+        /** @var list<array{id: mixed}> $rows */
+        $rows = $this->createQueryBuilder('t')
+            ->select('u.id')
+            ->join('t.assignees', 'u')
+            ->where('t = :task')
+            ->setParameter('task', $task)
+            ->getQuery()
+            ->getScalarResult();
+
+        $ids = [];
+        foreach ($rows as $row) {
+            $id = $row['id'];
+            if (is_string($id)) {
+                $ids[] = $id;
+            } elseif ($id instanceof \Stringable) {
+                $ids[] = (string) $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
      * Smallest position currently in use by the given owner, or null if they
      * have no tasks. Callers subtract one to insert a new task at the top.
      */

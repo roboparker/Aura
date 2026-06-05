@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\Task;
 use App\Entity\User;
@@ -31,6 +32,38 @@ class NotificationRepository extends ServiceEntityRepository
             'task' => $task,
             'reminderOffset' => $offset,
         ]);
+    }
+
+    /**
+     * Whether the recipient already has a comment-derived notification
+     * for this comment. The `uniq_comment_mention` index keeps it to one
+     * row per (recipient, comment); this pre-check lets the dispatcher
+     * honour type precedence (mention > reply > comment) without tripping
+     * the constraint.
+     */
+    public function commentNotificationExists(User $recipient, Comment $comment): bool
+    {
+        return null !== $this->findOneBy([
+            'recipient' => $recipient,
+            'comment' => $comment,
+        ]);
+    }
+
+    /**
+     * Unread, unarchived notifications for the recipient — the working
+     * set the bulk "mark all read" endpoint flips.
+     *
+     * @return Notification[]
+     */
+    public function findUnreadForRecipient(User $recipient): array
+    {
+        return $this->createQueryBuilder('n')
+            ->andWhere('n.recipient = :recipient')
+            ->andWhere('n.readAt IS NULL')
+            ->andWhere('n.archivedAt IS NULL')
+            ->setParameter('recipient', $recipient)
+            ->getQuery()
+            ->getResult();
     }
 
     /**

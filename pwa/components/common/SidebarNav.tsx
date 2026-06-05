@@ -17,6 +17,7 @@ import SpaceSwitcher from "./SpaceSwitcher";
 // stays as a button at the bottom of the sidebar.
 const PERSONAL_NAV_LINKS = [
   { href: "/my-tasks", label: "My Tasks" },
+  { href: "/notifications", label: "Notifications" },
   { href: "/groups", label: "Groups" },
   { href: "/account", label: "My Account" },
   { href: "/settings", label: "Settings" },

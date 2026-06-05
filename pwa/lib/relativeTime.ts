@@ -28,3 +28,19 @@ export function formatRelative(iso: string | Date): string {
   if (abs < 31536000) return RELATIVE.format(Math.round(diffSec / 2592000), "month");
   return RELATIVE.format(Math.round(diffSec / 31536000), "year");
 }
+
+export type TimeGroup = "Today" | "This week" | "Earlier";
+
+/**
+ * Buckets a timestamp into the Today / This week / Earlier groups the
+ * notification surfaces render under. "This week" is the trailing 7 days
+ * (excluding today); anything older is "Earlier".
+ */
+export function timeGroup(iso: string | Date): TimeGroup {
+  const ts = iso instanceof Date ? iso.getTime() : new Date(iso).getTime();
+  if (Number.isNaN(ts)) return "Earlier";
+  const ageMs = Date.now() - ts;
+  if (ageMs < 86_400_000) return "Today";
+  if (ageMs < 7 * 86_400_000) return "This week";
+  return "Earlier";
+}

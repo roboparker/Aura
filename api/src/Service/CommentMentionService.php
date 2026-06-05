@@ -5,8 +5,6 @@ namespace App\Service;
 use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\User;
-use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Parses `@mention` tokens out of a {@see Comment} body and creates
@@ -37,7 +35,7 @@ final class CommentMentionService
     private const MENTION_PATTERN = '/(?:^|\s)@([A-Za-z0-9._+-]+)/';
 
     public function __construct(
-        private EntityManagerInterface $em,
+        private NotificationDispatcher $dispatcher,
     ) {
     }
 
@@ -92,38 +90,21 @@ final class CommentMentionService
             if (null === $user) {
                 continue;
             }
-            if (true === $author->getId()?->equals($user->getId())) {
-                continue;
-            }
-            if ($this->alreadyNotified($user, $comment)) {
-                continue;
-            }
 
-            $notification = new Notification();
-            $notification->setRecipient($user);
-            $notification->setComment($comment);
-            $notification->setType(Notification::TYPE_MENTION);
-
-            // Carry the parent task on `Notification.task` when the
-            // comment is task-scoped so the existing deep-link path
-            // on the bell keeps working. Page-scoped notifications
-            // leave `task` null and rely on `comment` for the link.
-            $task = $comment->getTask();
-            if (null !== $task) {
-                $notification->setTask($task);
-            }
-
-            $notification->setTitle($this->renderTitle($author, $comment));
-            $notification->setBody($this->snippet($body));
-            $this->em->persist($notification);
-
-            try {
-                $this->em->flush();
+            // The dispatcher owns self-skip, the (recipient, comment)
+            // dedup, and the Mercure/push fan-out. We still pass the
+            // task so a task-scoped mention keeps its deep-link.
+            $note = $this->dispatcher->notify(
+                recipient: $user,
+                type: Notification::TYPE_MENTION,
+                actor: $author,
+                title: $this->renderTitle($author, $comment),
+                body: $this->snippet($body),
+                task: $comment->getTask(),
+                comment: $comment,
+            );
+            if (null !== $note) {
                 ++$created;
-            } catch (UniqueConstraintViolationException) {
-                // Race with a concurrent edit on the same comment;
-                // recover the EM and continue with remaining tokens.
-                $this->em->clear();
             }
         }
 
@@ -194,14 +175,6 @@ final class CommentMentionService
         $email = strtolower($user->getEmail());
         $at = strpos($email, '@');
         return false === $at ? $email : substr($email, 0, $at);
-    }
-
-    private function alreadyNotified(User $recipient, Comment $comment): bool
-    {
-        return null !== $this->em->getRepository(Notification::class)->findOneBy([
-            'recipient' => $recipient,
-            'comment' => $comment,
-        ]);
     }
 
     private function renderTitle(User $author, Comment $comment): string
