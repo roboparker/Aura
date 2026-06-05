@@ -1,0 +1,16 @@
+{# @var notification \App\Entity\Notification #}
+{# @var recipient \App\Entity\User #}
+Hi {{ recipient.givenName ?: recipient.email }},
+
+{{ notification.title }}
+{% if notification.contextLabel %}(in {{ notification.contextLabel }})
+{% endif %}
+{% if notification.body %}
+    {{ notification.body }}
+{% endif %}
+
+Open in Aura: {{ actionUrl }}
+
+You're getting this because real-time email notifications are on. Manage them in your Aura settings.
+
+— Aura

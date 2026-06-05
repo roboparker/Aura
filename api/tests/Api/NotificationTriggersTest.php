@@ -53,6 +53,41 @@ class NotificationTriggersTest extends ApiTestCase
         $this->assertSame((string) $bob->getId(), (string) $rows[0]->getActor()?->getId());
     }
 
+    public function testRealtimeEmailSentForNotification(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+
+        // bob comments → alice (owner, default realtime prefs) is emailed.
+        $this->postComment(static::createClient(), $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Looks good.']);
+
+        $this->assertEmailCount(1);
+        $message = $this->getMailerMessage(0);
+        self::assertNotNull($message);
+        $this->assertEmailHeaderSame($message, 'To', 'alice@example.com');
+        $this->assertEmailHtmlBodyContains($message, 'Plan launch');
+        $this->assertEmailTextBodyContains($message, 'Plan launch');
+    }
+
+    public function testRealtimeEmailSkippedForDigestUser(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $alice->setPreferences(['notificationFrequency' => 'daily']);
+        $this->entityManager->flush();
+        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+
+        $this->postComment(static::createClient(), $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Looks good.']);
+
+        // Digest-cadence users get the in-app row but no realtime email —
+        // the digest command owns their delivery.
+        $this->assertEmailCount(0);
+        $this->assertCount(1, $this->notificationsFor($alice));
+    }
+
     public function testReplyNotifiesPriorParticipant(): void
     {
         $alice = $this->createUser('alice@example.com');

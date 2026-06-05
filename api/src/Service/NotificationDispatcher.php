@@ -14,19 +14,24 @@ use App\Repository\NotificationRepository;
 use App\Repository\PushSubscriptionRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * Single creation path for in-app notifications (mentions, replies,
  * comments, assignments, status changes). Centralises the rules every
  * producer needs: never notify the actor about their own action, honour
  * the one-row-per-comment precedence (mention > reply > comment), and
- * fan the row out to the live bell (Mercure) + Web Push.
+ * fan the row out to the live bell (Mercure), Web Push, and a real-time
+ * email.
  *
- * Realtime/digest email is intentionally NOT sent here: rows created by
- * the dispatcher are picked up by the existing digest command for users
- * on a digest frequency, and realtime users already get the live bell +
- * push. (Per-event realtime email for these types is a follow-up.)
+ * Email mirrors the reminder dispatcher's split: a real-time email goes
+ * out here only when the recipient is on the `realtime` frequency;
+ * digest-frequency users instead have their rows rolled up by
+ * App\Command\DispatchNotificationDigestCommand (which only selects
+ * digest-cadence users), so no one is double-emailed.
  */
 final class NotificationDispatcher
 {
@@ -36,8 +41,11 @@ final class NotificationDispatcher
         private NotificationMercurePublisher $mercure,
         private PushSenderInterface $pushSender,
         private PushSubscriptionRepository $pushSubscriptions,
+        private MailerInterface $mailer,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
+        #[Autowire('%env(default::MAILER_FROM)%')]
+        private ?string $mailerFrom = null,
     ) {
     }
 
@@ -97,6 +105,7 @@ final class NotificationDispatcher
 
         $this->mercure->publishCreated($notification);
         $this->sendPush($recipient, $notification);
+        $this->sendEmail($recipient, $notification);
 
         return $notification;
     }
@@ -134,6 +143,45 @@ final class NotificationDispatcher
                 $this->em->flush();
                 continue;
             }
+        }
+    }
+
+    /**
+     * Real-time email, gated on the recipient's `emailNotificationsEnabled`
+     * (master switch, defaults on) and `notificationFrequency === 'realtime'`.
+     * Digest-cadence users are skipped here — the digest command owns their
+     * delivery. A transport failure is swallowed: the in-app row, push, and
+     * Mercure event already landed, so we don't fail the producing write.
+     */
+    private function sendEmail(User $recipient, Notification $notification): void
+    {
+        $prefs = $recipient->getPreferences();
+        if (false === ($prefs['emailNotificationsEnabled'] ?? true)) {
+            return;
+        }
+        if ('realtime' !== ($prefs['notificationFrequency'] ?? 'realtime')) {
+            return;
+        }
+
+        $base = rtrim($this->frontendUrl, '/');
+        $target = $notification->getTargetUrl();
+
+        $email = (new TemplatedEmail())
+            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test')
+            ->to($recipient->getEmail())
+            ->subject($notification->getTitle())
+            ->htmlTemplate('emails/notification.html.twig')
+            ->textTemplate('emails/notification.txt.twig')
+            ->context([
+                'recipient' => $recipient,
+                'notification' => $notification,
+                'actionUrl' => null === $target ? $base . '/notifications' : $base . $target,
+            ]);
+
+        try {
+            $this->mailer->send($email);
+        } catch (TransportExceptionInterface) {
+            // Swallow — the notification already landed in-app.
         }
     }
 }

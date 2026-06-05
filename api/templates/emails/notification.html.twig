@@ -1,0 +1,25 @@
+{# @var notification \App\Entity\Notification #}
+{# @var recipient \App\Entity\User #}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p><strong>{{ notification.title }}</strong></p>
+
+{% if notification.contextLabel %}
+    <p style="color: #6b7280; font-size: 13px;">in {{ notification.contextLabel }}</p>
+{% endif %}
+
+{% if notification.body %}
+    <blockquote style="margin: 0 0 1em; padding-left: 12px; border-left: 3px solid #d1d5db; color: #374151;">
+        {{ notification.body }}
+    </blockquote>
+{% endif %}
+
+<p>
+    <a href="{{ actionUrl }}">Open in Aura</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You&rsquo;re getting this because real-time email notifications are on. Manage them in your Aura settings.
+</p>
+
+<p>&mdash; Aura</p>
