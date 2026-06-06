@@ -87,6 +87,9 @@ test.describe("Change email (authenticated)", () => {
     // Sign back in with the new email so /confirm and /revert have a session
     // refresh path that mirrors a real user — not strictly required by the
     // API (both endpoints are public), but it exercises refreshUser().
+    // Clear cookies first so /signin shows the form (an authed session would
+    // redirect straight to the profile panel).
+    await page.context().clearCookies();
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", newEmail);
     await page.fill("#password", "Password123!@#");
@@ -98,6 +101,7 @@ test.describe("Change email (authenticated)", () => {
     await expect(page.locator(`text=${oldEmail}`).first()).toBeVisible();
 
     // The old email should once again be the working credential
+    await page.context().clearCookies();
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", oldEmail);
     await page.fill("#password", "Password123!@#");

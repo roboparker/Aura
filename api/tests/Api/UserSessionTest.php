@@ -47,7 +47,9 @@ class UserSessionTest extends ApiTestCase
 
         $client->request('GET', '/me/sessions');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $sessions = $this->arrayField($body, 'sessions');
         $this->assertCount(1, $sessions);
         $first = $sessions[0];
@@ -141,7 +143,9 @@ class UserSessionTest extends ApiTestCase
 
         $client->request('GET', '/api/me');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
         $twoFactor = $this->arrayField($body, 'twoFactor');
         $this->assertSame('totp', $twoFactor['method']);
         $this->assertArrayHasKey('recoveryCodesTotal', $twoFactor);

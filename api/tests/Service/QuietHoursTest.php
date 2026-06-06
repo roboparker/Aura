@@ -10,6 +10,9 @@ use PHPUnit\Framework\TestCase;
 
 class QuietHoursTest extends TestCase
 {
+    /**
+     * @param array<string, mixed> $quietHours
+     */
     private function userWith(array $quietHours, string $timezone = 'UTC'): User
     {
         $user = new User();

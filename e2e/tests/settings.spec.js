@@ -52,6 +52,9 @@ test.describe("Settings", () => {
   });
 
   test("generate and revoke an API token", async ({ page }) => {
+    // Accept the revoke confirm() prompt — registered up front so it's active
+    // by the time the dialog fires.
+    page.on("dialog", (d) => d.accept());
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/settings/api-tokens`);
 
@@ -65,9 +68,8 @@ test.describe("Settings", () => {
     await expect(plaintext).toContainText("aura_pat_");
     await page.getByTestId("api-token-done").click();
 
-    // Row appears; revoke it (the confirm() prompt is auto-accepted).
+    // Row appears; revoke it (the confirm() prompt is auto-accepted above).
     await expect(page.getByTestId("api-token-row")).toContainText("ci-test");
-    page.on("dialog", (d) => d.accept());
     await page.getByTestId("api-token-revoke").click();
     await expect(page.getByTestId("api-token-row")).toHaveCount(0);
   });

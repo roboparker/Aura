@@ -312,7 +312,6 @@ class McpTest extends ApiTestCase
         // Guards against a new MCP tool silently defaulting to "allowed for
         // any scope" — every tool must be mapped in ScopeMap.
         $registry = static::getContainer()->get(\App\Mcp\McpToolRegistry::class);
-        $this->assertInstanceOf(\App\Mcp\McpToolRegistry::class, $registry);
         foreach ($registry->all() as $tool) {
             $name = $tool->getName();
             $this->assertNotNull(

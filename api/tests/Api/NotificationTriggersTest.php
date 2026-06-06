@@ -63,7 +63,9 @@ class NotificationTriggersTest extends ApiTestCase
         // Comment emails are off by default in the matrix — opt alice in so we
         // exercise the realtime-email path.
         $prefs = $alice->getPreferences();
-        $prefs['notificationMatrix']['comments']['email'] = true;
+        $matrix = is_array($prefs['notificationMatrix'] ?? null) ? $prefs['notificationMatrix'] : [];
+        $matrix['comments'] = ['inApp' => true, 'email' => true];
+        $prefs['notificationMatrix'] = $matrix;
         $alice->setPreferences($prefs);
         $this->entityManager->flush();
 

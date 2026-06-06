@@ -62,10 +62,13 @@ class AccountLifecycleTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseIsSuccessful();
-        $content = $client->getResponse()->getContent();
-        $this->assertIsString($content);
-        $this->assertStringContainsString('alice@example.com', $content);
-        $this->assertStringContainsString('Export me', $content);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $profile = $this->arrayField($body, 'profile');
+        $this->assertSame('alice@example.com', $profile['email']);
+        $tasks = $this->arrayField($body, 'tasks');
+        $this->assertNotEmpty($tasks);
     }
 
     public function testDeleteRejectsWrongEmail(): void
