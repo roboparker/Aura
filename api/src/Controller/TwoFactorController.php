@@ -267,8 +267,11 @@ class TwoFactorController extends AbstractController
 
         return $this->json([
             'enabled' => $user->isTotpEnabled(),
+            'method' => 'totp',
             'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+            'recoveryCodesTotal' => count($user->getRecoveryCodes()),
             'enabledAt' => $user->getTotpEnabledAt()?->format(\DateTimeInterface::ATOM),
+            'lastVerifiedAt' => $user->getTotpLastVerifiedAt()?->format(\DateTimeInterface::ATOM),
         ]);
     }
 

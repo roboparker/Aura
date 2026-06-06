@@ -26,6 +26,7 @@ security:
             lazy: true
             stateless: false
             provider: app_user_provider
+            user_checker: App\Security\UserChecker
             json_login:
                 check_path: auth_login
                 username_path: email
@@ -59,6 +60,8 @@ security:
         # PWA can route it to the /waitlist gate.
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
+        - { path: ^/me/sessions, roles: ROLE_USER }
+        - { path: ^/me/(deactivate|export|delete)$, roles: ROLE_USER }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }

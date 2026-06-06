@@ -19,8 +19,7 @@ const PERSONAL_NAV_LINKS = [
   { href: "/my-tasks", label: "My Tasks" },
   { href: "/notifications", label: "Notifications" },
   { href: "/groups", label: "Groups" },
-  { href: "/account", label: "My Account" },
-  { href: "/settings", label: "Settings" },
+  { href: "/settings/profile", label: "Settings" },
 ];
 
 // The shared section is now a list of accessible spaces (rendered

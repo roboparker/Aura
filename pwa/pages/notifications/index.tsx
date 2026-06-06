@@ -140,7 +140,7 @@ const NotificationsPage = () => {
                 <Check className="mr-1 h-3.5 w-3.5" /> Mark all read
               </Button>
               <Button asChild size="sm" variant="outline">
-                <Link href="/settings">
+                <Link href="/settings/notifications">
                   <Settings className="mr-1 h-3.5 w-3.5" /> Preferences
                 </Link>
               </Button>

@@ -37,7 +37,7 @@ test.describe("Avatar", () => {
       familyName: "Quinn",
     });
 
-    await page.goto(`${BASE_URL}/account`);
+    await page.goto(`${BASE_URL}/settings/profile`);
     await page.locator('input[type="file"]').setInputFiles(AVATAR_FIXTURE);
 
     const avatarImg = page.locator('[data-testid="sidebar-user-header"] img');

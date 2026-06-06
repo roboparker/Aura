@@ -18,7 +18,7 @@ async function registerAndSignIn(page, request, email, password = "Password123!@
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/account/);
+  await expect(page).toHaveURL(/\/settings\/profile/);
 }
 
 async function getLatestEmail(request, recipient, timeout = 5000) {
@@ -87,22 +87,26 @@ test.describe("Change email (authenticated)", () => {
     // Sign back in with the new email so /confirm and /revert have a session
     // refresh path that mirrors a real user — not strictly required by the
     // API (both endpoints are public), but it exercises refreshUser().
+    // Clear cookies first so /signin shows the form (an authed session would
+    // redirect straight to the profile panel).
+    await page.context().clearCookies();
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", newEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
     // Now follow the revert link
     await page.goto(revertUrl);
     await expect(page.locator(`text=${oldEmail}`).first()).toBeVisible();
 
     // The old email should once again be the working credential
+    await page.context().clearCookies();
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", oldEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
   });
 
   test("cannot request a change to an already-registered address", async ({

@@ -4,8 +4,10 @@ namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use App\Mcp\ScopeMap;
 use App\Repository\ApiTokenRepository;
 use App\State\ApiTokenCreateProcessor;
 use App\State\ApiTokenDeleteProcessor;
@@ -35,6 +37,14 @@ use Symfony\Component\Validator\Constraints as Assert;
             uriTemplate: '/api-tokens',
             security: "is_granted('ROLE_USER')",
         ),
+        // Item Get pins the resource IRI to the hyphenated `/api-tokens/{id}`
+        // template so the `@id` in responses matches the Delete route (without
+        // it, API Platform falls back to the default `/api_tokens/{id}` and
+        // DELETE 405s).
+        new Get(
+            uriTemplate: '/api-tokens/{id}',
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getUser() == user)",
+        ),
         new Post(
             uriTemplate: '/api-tokens',
             security: "is_granted('ROLE_USER')",
@@ -62,6 +72,20 @@ class ApiToken
     public const PLAINTEXT_PREFIX = 'aura_pat_';
 
     public const MAX_NAME_LENGTH = 80;
+
+    /**
+     * Resource-oriented scope vocabulary the UI offers and the API accepts.
+     * Tools are mapped to these via {@see ScopeMap}; `admin` is the superset.
+     * An empty scope list means "all tools" (the personal-token default).
+     */
+    public const SCOPE_VOCABULARY = [
+        'read:tasks',
+        'write:tasks',
+        'read:projects',
+        'write:projects',
+        'read:pages',
+        'admin',
+    ];
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -96,6 +120,11 @@ class ApiToken
      */
     #[ORM\Column(type: 'json')]
     #[Groups(['api_token:read', 'api_token:write'])]
+    #[Assert\Choice(
+        choices: self::SCOPE_VOCABULARY,
+        multiple: true,
+        message: 'Unknown scope. Allowed: {{ choices }}.',
+    )]
     private array $scopes = [];
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
@@ -224,14 +253,12 @@ class ApiToken
     }
 
     /**
-     * True when the token's allow-list permits the named tool. An empty
-     * scope list means "no restriction" — see the property docblock.
+     * True when the token's scope set permits the named tool. Resolution
+     * (resource scopes, `admin` superset, write⇒read, empty⇒all) lives in
+     * {@see ScopeMap} so it can be unit-tested and shared.
      */
     public function allowsTool(string $tool): bool
     {
-        if ([] === $this->scopes) {
-            return true;
-        }
-        return in_array($tool, $this->scopes, true);
+        return ScopeMap::isToolAllowed($this->scopes, $tool);
     }
 }

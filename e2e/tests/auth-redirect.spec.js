@@ -12,8 +12,9 @@ const PLACEHOLDER_UUID = "00000000-0000-0000-0000-000000000000";
 // fail on it. Pages with route params use PLACEHOLDER_UUID; the auth
 // check runs before any fetch, so a non-existent ID is fine.
 const AUTHED_PATHS = [
-  "/account",
-  "/settings",
+  "/settings/profile",
+  "/settings/security",
+  "/settings/notifications",
   "/admin",
   "/my-tasks",
   "/tasks",
@@ -120,9 +121,9 @@ test.describe("Auth redirect", () => {
   });
 
   // Each entry is a `?next=` value that should be rejected by `safeNextPath()`
-  // and fall back to /account. The list is the full set of attack vectors the
-  // helper guards against; if any of them ever land the user somewhere else,
-  // we want CI to scream.
+  // and fall back to /settings/profile. The list is the full set of attack
+  // vectors the helper guards against; if any of them ever land the user
+  // somewhere else, we want CI to scream.
   const HOSTILE_NEXT_VALUES = [
     {
       label: "protocol-relative URL (`//host/...`)",
@@ -179,7 +180,7 @@ test.describe("Auth redirect", () => {
 
       // Falls back to the default landing page rather than wherever
       // the attacker tried to send us.
-      await expect(page).toHaveURL(/\/account$/);
+      await expect(page).toHaveURL(/\/settings\/profile$/);
     });
   }
 });

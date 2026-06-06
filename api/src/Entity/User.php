@@ -182,6 +182,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?\DateTimeImmutable $totpEnabledAt = null;
 
     /**
+     * Last time a TOTP / backup code was accepted at the login challenge —
+     * surfaced in the Settings security panel. Stamped by
+     * {@see \App\EventSubscriber\TwoFactorVerifiedStamper} on the Scheb
+     * SUCCESS event.
+     */
+    #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $totpLastVerifiedAt = null;
+
+    /**
+     * Soft-deactivation timestamp (Settings → Danger zone). When set, all
+     * sessions are revoked; signing back in clears it (reactivation) via
+     * {@see \App\Security\UserChecker}.
+     */
+    #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deactivatedAt = null;
+
+    /**
      * Recovery codes for the 2FA challenge.
      *
      * Each entry is `{hash, consumedAt, encrypted?, consumedCode?}`:
@@ -221,11 +238,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
 
     public const ALLOWED_THEMES = ['light', 'dark', 'system'];
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
+    public const NOTIFICATION_MATRIX_ROWS = [
+        'mentions',
+        'assigned',
+        'comments',
+        'replies',
+        'status',
+        'space-invites',
+    ];
+
     public const DEFAULT_PREFERENCES = [
         'theme' => 'system',
+        // IANA time-zone identifier (e.g. "America/New_York"). Anchors
+        // scheduling + reminder display and digest/quiet-hours math.
+        'timezone' => 'UTC',
+        // Legacy master switches — kept as hard overrides over the matrix.
         'emailNotificationsEnabled' => true,
         'pushNotificationsEnabled' => false,
         'notificationFrequency' => 'realtime',
+        // Per-event delivery matrix: row → {inApp, email}.
+        'notificationMatrix' => [
+            'mentions' => ['inApp' => true, 'email' => true],
+            'assigned' => ['inApp' => true, 'email' => true],
+            'comments' => ['inApp' => true, 'email' => false],
+            'replies' => ['inApp' => true, 'email' => true],
+            'status' => ['inApp' => true, 'email' => false],
+            'space-invites' => ['inApp' => true, 'email' => true],
+        ],
+        // Email digest cadence (supersedes notificationFrequency).
+        'emailDigest' => ['mode' => 'realtime', 'hour' => 8],
+        // Quiet hours (interpreted in the user's timezone). Suppresses
+        // email + push while active; in-app rows still land.
+        'quietHours' => ['enabled' => false, 'start' => '22:00', 'end' => '07:00'],
     ];
 
     public function getId(): ?Uuid
@@ -505,6 +549,33 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function getTotpEnabledAt(): ?\DateTimeImmutable
     {
         return $this->totpEnabledAt;
+    }
+
+    public function getTotpLastVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->totpLastVerifiedAt;
+    }
+
+    public function setTotpLastVerifiedAt(?\DateTimeImmutable $at): static
+    {
+        $this->totpLastVerifiedAt = $at;
+        return $this;
+    }
+
+    public function getDeactivatedAt(): ?\DateTimeImmutable
+    {
+        return $this->deactivatedAt;
+    }
+
+    public function setDeactivatedAt(?\DateTimeImmutable $at): static
+    {
+        $this->deactivatedAt = $at;
+        return $this;
+    }
+
+    public function isDeactivated(): bool
+    {
+        return null !== $this->deactivatedAt;
     }
 
     /**

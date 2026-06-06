@@ -128,6 +128,8 @@ final class DispatchNotificationDigestCommand extends Command
         $all = $this->em->getRepository(User::class)->findAll();
         return array_values(array_filter(
             $all,
+            // notificationFrequency is the canonical cadence (the Settings UI
+            // keeps emailDigest.mode in sync with it).
             static fn (User $u) => ($u->getPreferences()['notificationFrequency'] ?? 'realtime') === $period,
         ));
     }

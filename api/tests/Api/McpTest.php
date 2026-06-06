@@ -286,7 +286,7 @@ class McpTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $task = $this->makeTask($alice, 'Read me');
-        $plain = $this->mintToken($alice, 'Read-only', scopes: ['get_task']);
+        $plain = $this->mintToken($alice, 'Read-only', scopes: ['read:tasks']);
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
@@ -305,6 +305,20 @@ class McpTest extends ApiTestCase
         $this->assertIsArray($content[0]);
         $this->assertIsString($content[0]['text']);
         $this->assertStringContainsString('scopes', $content[0]['text']);
+    }
+
+    public function testEveryRegisteredToolHasAScope(): void
+    {
+        // Guards against a new MCP tool silently defaulting to "allowed for
+        // any scope" — every tool must be mapped in ScopeMap.
+        $registry = static::getContainer()->get(\App\Mcp\McpToolRegistry::class);
+        foreach ($registry->all() as $tool) {
+            $name = $tool->getName();
+            $this->assertNotNull(
+                \App\Mcp\ScopeMap::requiredScope($name),
+                sprintf('MCP tool "%s" has no scope mapping in ScopeMap.', $name),
+            );
+        }
     }
 
     public function testTokenLastUsedIsStamped(): void

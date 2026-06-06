@@ -42,12 +42,22 @@ final class NotificationDispatcher
         private PushSenderInterface $pushSender,
         private PushSubscriptionRepository $pushSubscriptions,
         private MailerInterface $mailer,
+        private QuietHours $quietHours,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
         #[Autowire('%env(default::MAILER_FROM)%')]
         private ?string $mailerFrom = null,
     ) {
     }
+
+    /** Notification type → per-event matrix row. */
+    private const TYPE_TO_ROW = [
+        Notification::TYPE_MENTION => 'mentions',
+        Notification::TYPE_REPLY => 'replies',
+        Notification::TYPE_COMMENT => 'comments',
+        Notification::TYPE_ASSIGNED => 'assigned',
+        Notification::TYPE_STATUS => 'status',
+    ];
 
     /**
      * Creates and fans out one notification. Returns the row, or null
@@ -103,11 +113,43 @@ final class NotificationDispatcher
             return null;
         }
 
-        $this->mercure->publishCreated($notification);
-        $this->sendPush($recipient, $notification);
-        $this->sendEmail($recipient, $notification);
+        // In-app row is the inbox source of truth and always persists. The
+        // live bell + push respect the per-event "in-app" toggle; email
+        // respects the "email" toggle (in sendEmail). Quiet hours suppress
+        // the disturbing channels (email + push) but not the bell.
+        $inAppAllowed = $this->matrixAllows($recipient, $notification->getType(), 'inApp');
+        $quiet = $this->quietHours->isQuiet($recipient);
+
+        if ($inAppAllowed) {
+            $this->mercure->publishCreated($notification);
+            if (!$quiet) {
+                $this->sendPush($recipient, $notification);
+            }
+        }
+        if (!$quiet) {
+            $this->sendEmail($recipient, $notification);
+        }
 
         return $notification;
+    }
+
+    /**
+     * Whether the recipient's per-event matrix permits `$channel`
+     * ('inApp'|'email') for a notification `$type`. Types without a matrix
+     * row (e.g. reminders, which don't flow through here) default to allowed.
+     */
+    private function matrixAllows(User $recipient, string $type, string $channel): bool
+    {
+        $row = self::TYPE_TO_ROW[$type] ?? null;
+        if (null === $row) {
+            return true;
+        }
+        $matrix = $recipient->getPreferences()['notificationMatrix'] ?? null;
+        $config = is_array($matrix) && is_array($matrix[$row] ?? null) ? $matrix[$row] : null;
+        if (null === $config) {
+            return true;
+        }
+        return true === ($config[$channel] ?? true);
     }
 
     /**
@@ -156,9 +198,18 @@ final class NotificationDispatcher
     private function sendEmail(User $recipient, Notification $notification): void
     {
         $prefs = $recipient->getPreferences();
+        // Master switch wins over the matrix.
         if (false === ($prefs['emailNotificationsEnabled'] ?? true)) {
             return;
         }
+        // Per-event email toggle.
+        if (!$this->matrixAllows($recipient, $notification->getType(), 'email')) {
+            return;
+        }
+        // Only realtime-cadence users get a per-event email here; digest
+        // users are rolled up by DispatchNotificationDigestCommand. The UI
+        // keeps notificationFrequency in sync with emailDigest.mode, so this
+        // stays the canonical cadence field.
         if ('realtime' !== ($prefs['notificationFrequency'] ?? 'realtime')) {
             return;
         }
