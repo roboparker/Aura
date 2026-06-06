@@ -40,8 +40,49 @@ test.describe("Settings", () => {
     await expect(page).toHaveURL(/\/settings\/notifications/);
     await expect(page.getByTestId("settings-notifications")).toBeVisible();
 
+    await page.getByTestId("settings-nav-api-tokens").click();
+    await expect(page).toHaveURL(/\/settings\/api-tokens/);
+    await expect(page.getByTestId("api-tokens")).toBeVisible();
+
+    await page.getByTestId("settings-nav-danger").click();
+    await expect(page).toHaveURL(/\/settings\/danger/);
+
     await page.getByTestId("settings-nav-profile").click();
     await expect(page).toHaveURL(/\/settings\/profile/);
+  });
+
+  test("generate and revoke an API token", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/settings/api-tokens`);
+
+    await page.getByTestId("api-token-generate").click();
+    await page.getByTestId("api-token-name").fill("ci-test");
+    await page.getByTestId("api-token-create").click();
+
+    // One-time plaintext shown, prefixed with aura_pat_.
+    const plaintext = page.getByTestId("api-token-plaintext");
+    await expect(plaintext).toBeVisible();
+    await expect(plaintext).toContainText("aura_pat_");
+    await page.getByTestId("api-token-done").click();
+
+    // Row appears; revoke it (the confirm() prompt is auto-accepted).
+    await expect(page.getByTestId("api-token-row")).toContainText("ci-test");
+    page.on("dialog", (d) => d.accept());
+    await page.getByTestId("api-token-revoke").click();
+    await expect(page.getByTestId("api-token-row")).toHaveCount(0);
+  });
+
+  test("deleting the account requires the exact email and signs out", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/settings/danger`);
+
+    await page.getByTestId("delete-open").click();
+    // Wrong email keeps the confirm button disabled.
+    await page.getByTestId("delete-confirm-email").fill("wrong@example.com");
+    await page.getByTestId("danger-stepup-input").fill("Password123!@#");
+    await expect(page.getByTestId("delete-confirm")).toBeDisabled();
   });
 
   test("theme preference persists (Profile panel)", async ({ page }) => {
