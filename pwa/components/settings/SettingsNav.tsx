@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Shield, User } from "lucide-react";
+import { Bell, KeyRound, Shield, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SettingsSectionKey =
@@ -30,6 +30,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "Notifications",
     href: "/settings/notifications",
     Icon: Bell,
+  },
+  {
+    key: "api-tokens",
+    label: "API tokens",
+    href: "/settings/api-tokens",
+    Icon: KeyRound,
   },
 ];
 
