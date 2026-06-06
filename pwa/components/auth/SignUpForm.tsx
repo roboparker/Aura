@@ -69,9 +69,14 @@ interface Props {
    * picks their color.
    */
   onCollected: (values: SignUpFormValues, inviteToken?: string) => void;
+  /**
+   * Submit-button label. Defaults to "Create account"; the signup page
+   * passes "Join the waitlist" when the instance is in waitlist mode.
+   */
+  submitLabel?: string;
 }
 
-const SignUpForm = ({ inviteToken, onCollected }: Props) => {
+const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }: Props) => {
   const [invite, setInvite] = useState<InviteContext | null>(null);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -262,7 +267,7 @@ const SignUpForm = ({ inviteToken, onCollected }: Props) => {
               <PasswordStrengthMeter password={values.password} />
 
               <Button type="submit" disabled={isSubmitting} className="w-full">
-                Create account
+                {submitLabel}
               </Button>
 
               <p className="text-xs text-muted-foreground text-center">

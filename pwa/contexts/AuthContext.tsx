@@ -39,6 +39,14 @@ export interface User {
   nickname: string | null;
   personalizedColor: string;
   avatarUrls: { thumb?: string; profile?: string } | null;
+  /**
+   * True while this account is on the launch waitlist — it can sign in and
+   * read /api/me but holds no ROLE_USER server-side, so it's blocked from
+   * everything else. The app routes these users to the /waitlist gate
+   * (see WaitlistGate in Layout). Cleared in bulk when an admin opens
+   * signups. Optional on the wire — treat missing as false.
+   */
+  waitlisted?: boolean;
   // Inlined on /api/me so the PWA can apply the saved theme on first paint.
   // Always present — the API merges in defaults for older rows.
   preferences: UserPreferences;

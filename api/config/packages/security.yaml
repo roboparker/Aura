@@ -54,8 +54,13 @@ security:
         # (and only that endpoint) so users can submit their code.
         - { path: ^/auth/2fa-check$, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
         - { path: ^/auth/change-password$, roles: ROLE_USER }
-        - { path: ^/api/me$, roles: ROLE_USER }
+        # Any authenticated session (including a waitlisted ROLE_WAITLISTED
+        # account, which has no ROLE_USER) must read its own profile so the
+        # PWA can route it to the /waitlist gate.
+        - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
+        # Waitlist mode toggle — platform admins only.
+        - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }

@@ -1,0 +1,17 @@
+{# @var recipient \App\Entity\User #}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p>Good news — your spot on the Aura waitlist just opened up. Your account is
+now active and ready to use.</p>
+
+<p>
+    <a href="{{ signinUrl }}">Sign in to Aura</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    Sign in with the email and password you chose when you joined the
+    waitlist. If you've forgotten your password, you can reset it from the
+    sign-in page.
+</p>
+
+<p>&mdash; Aura</p>

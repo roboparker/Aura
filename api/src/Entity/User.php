@@ -88,6 +88,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[Groups(['user:read'])]
     private array $roles = [];
 
+    /**
+     * When true the account is on the launch waitlist: it can sign in and
+     * read /api/me but holds no ROLE_USER (see {@see getRoles()}), so every
+     * ROLE_USER-gated resource + access extension blocks it without any
+     * per-endpoint special-casing. Set server-side only — by
+     * UserPasswordHasherProcessor at signup while waitlist mode is on, and
+     * cleared in bulk by WaitlistPromoter when an admin opens signups. Never
+     * placed in a serialization group, so it can't be toggled over the wire.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $waitlisted = false;
+
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
     #[Assert\Length(max: 100)]
@@ -268,6 +280,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /** @return string[] */
     public function getRoles(): array
     {
+        // A waitlisted account is deliberately denied ROLE_USER: nearly
+        // every resource (security expressions + access extensions) requires
+        // it, so withholding it fails closed and boxes a waiting user into
+        // sign-in + /api/me + the waitlist page. Promotion (WaitlistPromoter)
+        // flips the flag and ROLE_USER returns on the next request.
+        if ($this->waitlisted) {
+            return ['ROLE_WAITLISTED'];
+        }
+
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
         return array_unique($roles);
@@ -277,6 +298,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
+        return $this;
+    }
+
+    public function isWaitlisted(): bool
+    {
+        return $this->waitlisted;
+    }
+
+    public function setWaitlisted(bool $waitlisted): static
+    {
+        $this->waitlisted = $waitlisted;
         return $this;
     }
 

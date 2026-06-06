@@ -124,11 +124,27 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
                   size="sm"
                   className={cn(
                     "justify-start w-full",
-                    router.pathname.startsWith("/admin") &&
+                    router.pathname === "/admin" &&
                       "bg-accent text-accent-foreground",
                   )}
                 >
                   <Link href="/admin">Admin</Link>
+                </Button>,
+              )}
+            </span>
+            <span>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "justify-start w-full",
+                    router.pathname.startsWith("/admin/waitlist") &&
+                      "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href="/admin/waitlist">Waitlist</Link>
                 </Button>,
               )}
             </span>

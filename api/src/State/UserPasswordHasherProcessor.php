@@ -10,6 +10,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
+use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -29,6 +30,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         private AvatarColorService $colorService,
         private UserInviteRepository $inviteRepository,
         private EntityManagerInterface $em,
+        private WaitlistSettings $waitlistSettings,
     ) {
     }
 
@@ -57,6 +59,16 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         // pass a color still get a valid one without thinking about it).
         if ($operation instanceof Post && !$data->isPersonalizedColorExplicitlySet()) {
             $data->setPersonalizedColor($this->colorService->pick());
+        }
+
+        // While the instance is in waitlist mode, a fresh signup lands as a
+        // waitlisted account: it can sign in and read /api/me but holds no
+        // ROLE_USER until an admin opens signups (WaitlistPromoter). We still
+        // provision the personal space + accept invites below — they stay
+        // invisible to the user until promotion, and reusing the one signup
+        // path avoids a second provisioning flow.
+        if ($operation instanceof Post && $this->waitlistSettings->isEnabled()) {
+            $data->setWaitlisted(true);
         }
 
         /** @var User $user */

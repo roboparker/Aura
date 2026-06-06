@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ENTRYPOINT } from "@/config/entrypoint";
+import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,6 +45,11 @@ type AuthStep =
   | "signup-form"
   | "signup-color"
   | "signup-provisioning"
+  // Waitlist-mode signup skips the avatar-color step: collect → register →
+  // "you're on the list" confirmation. submitting unmounts the form so a
+  // double-click can't double-submit.
+  | "waitlist-submitting"
+  | "waitlist-done"
   | "totp"
   | "backup";
 
@@ -76,6 +84,19 @@ const SIGNUP_COLOR_COPY: { title: string; subtitle: string } = {
     "Your initials show up everywhere in Aura. Pick a color you'll recognize at a glance — you can change it later.",
 };
 
+/** Header copy when the instance is in waitlist mode (signup form step). */
+const WAITLIST_SIGNUP_COPY: { title: string; subtitle: string } = {
+  title: "Join the Aura waitlist",
+  subtitle:
+    "We're onboarding people in batches. Claim your spot and we'll email you the moment your account is ready.",
+};
+
+/** Header copy for the post-join confirmation step. */
+const WAITLIST_DONE_COPY: { title: string; subtitle: string } = {
+  title: "You're on the list",
+  subtitle: "Thanks for signing up — we'll be in touch soon.",
+};
+
 /**
  * 2FA copy is built per-render because the subtitle weaves in the
  * caller's email — easier to keep here as one small function than to
@@ -106,6 +127,10 @@ const AuthCard = ({ defaultTab }: Props) => {
     defaultTab === "signup" ? "signup-form" : "credentials",
   );
   const [twoFactorEmail, setTwoFactorEmail] = useState<string | null>(null);
+  // Whether the instance is in waitlist mode — drives the signup copy and
+  // flow. Defaults to false (open signups); the /signup-status fetch below
+  // flips it on. Invite signups always run the normal flow.
+  const [waitlistMode, setWaitlistMode] = useState(false);
 
   // Sign-up multi-step state. The form payload is captured on step 1
   // and held here so step 2 can POST it with the chosen color; the
@@ -139,6 +164,28 @@ const AuthCard = ({ defaultTab }: Props) => {
     }
   }, [isLoading, isAuthenticated, next, router, inviteToken]);
 
+  // Resolve whether signups are open or gated behind the waitlist. Only the
+  // signup entry point needs to know (the sign-in side is unaffected), and
+  // invite signups always bypass the waitlist. Errors fall back to open
+  // signups — the server still enforces the real gate.
+  useEffect(() => {
+    if (defaultTab !== "signup" || inviteToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchWithTimeout(`${ENTRYPOINT}/signup-status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled) setWaitlistMode(Boolean(data.waitlistEnabled));
+      } catch {
+        /* keep the open-signup default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultTab, inviteToken]);
+
   const queryIndex = router.asPath.indexOf("?");
   const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
 
@@ -162,6 +209,9 @@ const AuthCard = ({ defaultTab }: Props) => {
     if (tfCopy) return { title: tfCopy.title, subtitle: tfCopy.subtitle };
     if (step === "signup-color") return SIGNUP_COLOR_COPY;
     if (step === "signup-provisioning") return null;
+    if (step === "waitlist-submitting") return null;
+    if (step === "waitlist-done") return WAITLIST_DONE_COPY;
+    if (waitlistMode && step === "signup-form") return WAITLIST_SIGNUP_COPY;
     return { title: tabCopy.title, subtitle: tabCopy.subtitle };
   })();
 
@@ -205,6 +255,8 @@ const AuthCard = ({ defaultTab }: Props) => {
   const showFooter =
     step !== "signup-color" &&
     step !== "signup-provisioning" &&
+    step !== "waitlist-submitting" &&
+    step !== "waitlist-done" &&
     !isInviteSignup;
 
   return (
@@ -222,14 +274,69 @@ const AuthCard = ({ defaultTab }: Props) => {
         ) : (
         <CardContent className={cardCopy ? "p-8 pt-2" : "p-8"}>
           {step === "signup-form" && (
-            <SignUpForm
-              inviteToken={inviteToken}
-              onCollected={(values, token) => {
-                setSignupPayload({ values, inviteToken: token });
-                setSignupError(null);
-                setStep("signup-color");
-              }}
-            />
+            <div className="space-y-4">
+              {signupError && (
+                <Alert variant="destructive" data-testid="signup-error">
+                  <AlertDescription>{signupError}</AlertDescription>
+                </Alert>
+              )}
+              <SignUpForm
+                inviteToken={inviteToken}
+                submitLabel={waitlistMode ? "Join the waitlist" : undefined}
+                onCollected={async (values, token) => {
+                  setSignupPayload({ values, inviteToken: token });
+                  setSignupError(null);
+                  if (!waitlistMode) {
+                    setStep("signup-color");
+                    return;
+                  }
+                  // Waitlist mode: skip the avatar-color step and register
+                  // straight away. Switching the step here unmounts the form
+                  // before the await resolves, so it can't double-submit; the
+                  // backend assigns a random avatar color.
+                  setStep("waitlist-submitting");
+                  try {
+                    await register({
+                      email: values.email,
+                      password: values.password,
+                      givenName: values.givenName,
+                      familyName: values.familyName,
+                      inviteToken: token,
+                    });
+                    setStep("waitlist-done");
+                  } catch (err) {
+                    setSignupError(
+                      err instanceof Error ? err.message : "Couldn't join the waitlist.",
+                    );
+                    setStep("signup-form");
+                  }
+                }}
+              />
+            </div>
+          )}
+
+          {step === "waitlist-submitting" && (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Joining the waitlist…</p>
+            </div>
+          )}
+
+          {step === "waitlist-done" && (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <CheckCircle2 className="h-12 w-12 text-primary" />
+              <p className="text-sm text-muted-foreground">
+                We&apos;ll email{" "}
+                <span className="font-medium text-foreground">
+                  {signupPayload?.values.email}
+                </span>{" "}
+                as soon as your account is ready. You can sign in any time to
+                check your status.
+              </p>
+              <Button asChild className="w-full">
+                <Link href="/signin">Go to sign in</Link>
+              </Button>
+            </div>
           )}
 
           {step === "signup-color" && signupPayload && (

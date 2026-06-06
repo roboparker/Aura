@@ -6,12 +6,42 @@ import {
   QueryClientProvider,
 } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
+import WaitlistGate from "@/components/auth/WaitlistGate";
 import Footer from "./Footer";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
+
+/**
+ * Inner shell rendered beneath the auth/space providers. A waitlisted account
+ * only ever sees the /waitlist gate, so we render its page chrome-free (no
+ * sidebar/navbar) — it reads as a standalone screen rather than the empty app.
+ */
+const AppShell = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
+
+  if (user?.waitlisted) {
+    return <>{children}</>;
+  }
+
+  return (
+    // Persistent left sidebar (`md:` and up) when signed in; the navbar's
+    // mobile Sheet handles the small-screen case. Sidebar renders nothing
+    // for unauthenticated visitors so the marketing/auth screens keep their
+    // original full-width layout. Sidebar sits outside the navbar+content
+    // column so it spans the full viewport height.
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex-1 min-w-0 flex flex-col">
+        <Navbar />
+        <div className="flex-1">{children}</div>
+        <Footer />
+      </div>
+    </div>
+  );
+};
 
 const Layout = ({
   children,
@@ -36,30 +66,16 @@ const Layout = ({
         <HydrationBoundary state={dehydratedState}>
           <AuthProvider>
             <ActiveSpaceProvider>
-              {/* Persistent left sidebar (`md:` and up) when signed
-                  in; the navbar's mobile Sheet handles the small-
-                  screen case. Sidebar renders nothing for
-                  unauthenticated visitors so the marketing/auth
-                  screens keep their original full-width layout.
-
-                  Sidebar sits outside the navbar+content column so
-                  it spans the full viewport height — the navbar
-                  starts where the sidebar ends. The Footer rides at
-                  the bottom of the content column, right of the
-                  sidebar. */}
-              <div className="flex min-h-screen">
-                <Sidebar />
-                <div className="flex-1 min-w-0 flex flex-col">
-                  <Navbar />
-                  <div className="flex-1">{children}</div>
-                  <Footer />
-                </div>
-              </div>
+              <AppShell>{children}</AppShell>
               {/* Forced modal that appears the moment the API signals
                   this session signed in with a backup code. See
                   TwoFactorRecoveryInterstitial for the flow. Renders
                   nothing when not pending so it costs no DOM. */}
               <TwoFactorRecoveryInterstitial />
+              {/* Keeps a waitlisted account pinned to the /waitlist gate
+                  wherever it tries to navigate. Renders nothing for normal
+                  users. */}
+              <WaitlistGate />
             </ActiveSpaceProvider>
           </AuthProvider>
         </HydrationBoundary>

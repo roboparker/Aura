@@ -10,6 +10,14 @@ parameters:
     # MEDIUM; dev + test relax to VERY_WEAK (see `when@dev` / `when@test`).
     app.password_min_strength: 2
 
+    # Default signup mode when no `app_setting` row has been written yet
+    # (i.e. before any admin has touched the toggle). Ships ON so a fresh
+    # prod/staging deploy is locked to the waitlist immediately; dev + test
+    # relax to OFF so local signups + the test suite keep working. Once an
+    # admin flips the toggle, the DB row wins over this default. Read by
+    # App\Service\WaitlistSettings.
+    app.waitlist_enabled_default: true
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -80,6 +88,9 @@ when@dev:
         # Local dev: don't make the engineer think up a 12-char password
         # every time fixtures rebuild. Backend still enforces 8-char min.
         app.password_min_strength: 0
+        # Local dev defaults to open signups so the normal flow Just Works;
+        # toggle waitlist on from /admin/waitlist to exercise the gate.
+        app.waitlist_enabled_default: false
 
 # In test the dispatcher must not open real sockets to FCM/Mozilla — alias
 # the interface to an in-memory recorder the test suite can inspect and
@@ -89,6 +100,10 @@ when@test:
         # Test fixtures use trivial passwords; the gate is unit-tested in
         # `PasswordPolicyValidatorTest` independent of this default.
         app.password_min_strength: 0
+        # Default to open signups so the existing user/auth suite keeps
+        # registering plain users; WaitlistTest flips the toggle on
+        # explicitly to exercise the gated path.
+        app.waitlist_enabled_default: false
     services:
         App\Tests\Push\InMemoryPushSender:
             public: true
