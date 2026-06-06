@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use App\Mcp\ScopeMap;
@@ -35,6 +36,14 @@ use Symfony\Component\Validator\Constraints as Assert;
         new GetCollection(
             uriTemplate: '/api-tokens',
             security: "is_granted('ROLE_USER')",
+        ),
+        // Item Get pins the resource IRI to the hyphenated `/api-tokens/{id}`
+        // template so the `@id` in responses matches the Delete route (without
+        // it, API Platform falls back to the default `/api_tokens/{id}` and
+        // DELETE 405s).
+        new Get(
+            uriTemplate: '/api-tokens/{id}',
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getUser() == user)",
         ),
         new Post(
             uriTemplate: '/api-tokens',
