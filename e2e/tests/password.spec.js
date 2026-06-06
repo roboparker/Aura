@@ -67,7 +67,8 @@ test.describe("Change password (authenticated)", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/settings\/profile/);
 
-    // Change password
+    // Change password — the form lives on the Security panel.
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "OriginalPass1!");
     await page.fill("#newPassword", "BrandNewPass1!");
     await page.fill("#confirmPassword", "BrandNewPass1!");
@@ -98,6 +99,7 @@ test.describe("Change password (authenticated)", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/settings\/profile/);
 
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "wrongpass");
     await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "newPassword123!@#");
@@ -121,6 +123,7 @@ test.describe("Change password (authenticated)", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/settings\/profile/);
 
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "OriginalPass1!");
     await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "different");
