@@ -12,7 +12,7 @@
  * redirector.
  */
 
-const FALLBACK_PATH = "/account";
+const FALLBACK_PATH = "/settings/profile";
 
 // Arbitrary base used to round-trip user-supplied `next` through the
 // URL parser. The host/protocol are bogus so we can detect any value

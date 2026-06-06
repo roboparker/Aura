@@ -65,9 +65,10 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
-    // Change password
+    // Change password — the form lives on the Security panel.
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "OriginalPass1!");
     await page.fill("#newPassword", "BrandNewPass1!");
     await page.fill("#confirmPassword", "BrandNewPass1!");
@@ -85,7 +86,7 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
   });
 
   test("wrong current password shows error", async ({ page, request }) => {
@@ -96,8 +97,9 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "wrongpass");
     await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "newPassword123!@#");
@@ -119,8 +121,9 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
+    await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "OriginalPass1!");
     await page.fill("#newPassword", "newPassword123!@#");
     await page.fill("#confirmPassword", "different");
@@ -172,7 +175,7 @@ test.describe("Forgot password (reset via email)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
   });
 
   test("forgot-password returns success for unknown email (no enumeration)", async ({

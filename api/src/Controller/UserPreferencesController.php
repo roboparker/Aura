@@ -81,13 +81,68 @@ class UserPreferencesController extends AbstractController
             'theme' => is_string($value) && in_array($value, User::ALLOWED_THEMES, true)
                 ? null
                 : 'theme must be one of: light, dark, system.',
+            'timezone' => is_string($value) && in_array($value, \DateTimeZone::listIdentifiers(), true)
+                ? null
+                : 'timezone must be a valid IANA time-zone identifier.',
             'notificationFrequency' => is_string($value) && in_array($value, User::ALLOWED_FREQUENCIES, true)
                 ? null
                 : 'notificationFrequency must be one of: realtime, hourly, daily.',
             'emailNotificationsEnabled', 'pushNotificationsEnabled' => is_bool($value)
                 ? null
                 : sprintf('%s must be a boolean.', $key),
+            'notificationMatrix' => $this->validateMatrix($value),
+            'emailDigest' => $this->validateDigest($value),
+            'quietHours' => $this->validateQuietHours($value),
             default => sprintf('Unknown preference key: %s.', $key),
         };
+    }
+
+    private function validateMatrix(mixed $value): ?string
+    {
+        if (!is_array($value)) {
+            return 'notificationMatrix must be an object.';
+        }
+        foreach ($value as $row => $channels) {
+            if (!is_string($row) || !in_array($row, User::NOTIFICATION_MATRIX_ROWS, true)) {
+                return sprintf('Unknown notification row: %s.', is_string($row) ? $row : gettype($row));
+            }
+            if (!is_array($channels) || !is_bool($channels['inApp'] ?? null) || !is_bool($channels['email'] ?? null)) {
+                return sprintf('notificationMatrix.%s must be {inApp: bool, email: bool}.', $row);
+            }
+        }
+        return null;
+    }
+
+    private function validateDigest(mixed $value): ?string
+    {
+        if (!is_array($value)) {
+            return 'emailDigest must be an object.';
+        }
+        $mode = $value['mode'] ?? null;
+        if (!is_string($mode) || !in_array($mode, ['realtime', 'hourly', 'daily'], true)) {
+            return 'emailDigest.mode must be one of: realtime, hourly, daily.';
+        }
+        $hour = $value['hour'] ?? null;
+        if (!is_int($hour) || $hour < 0 || $hour > 23) {
+            return 'emailDigest.hour must be an integer between 0 and 23.';
+        }
+        return null;
+    }
+
+    private function validateQuietHours(mixed $value): ?string
+    {
+        if (!is_array($value)) {
+            return 'quietHours must be an object.';
+        }
+        if (!is_bool($value['enabled'] ?? null)) {
+            return 'quietHours.enabled must be a boolean.';
+        }
+        foreach (['start', 'end'] as $bound) {
+            $time = $value[$bound] ?? null;
+            if (!is_string($time) || 1 !== preg_match('/^([01][0-9]|2[0-3]):[0-5][0-9]$/', $time)) {
+                return sprintf('quietHours.%s must be a HH:MM time.', $bound);
+            }
+        }
+        return null;
     }
 }

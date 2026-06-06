@@ -21,7 +21,7 @@ async function registerAndSignIn(page, email, password = "Password123!@#", optio
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/account/);
+  await expect(page).toHaveURL(/\/settings\/profile/);
 }
 
 /**
@@ -113,7 +113,7 @@ const FIXTURE_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
  * would require either disabling 2FA for tests (defeats coverage) or
  * burning a one-shot backup code per run (mutates fixture state).
  *
- * Lands on `/account` once the challenge completes.
+ * Lands on `/settings/profile` once the challenge completes.
  *
  * @param {import('@playwright/test').Page} page
  */
@@ -132,8 +132,8 @@ async function signInAsFixtureUser(page) {
   });
   expect(submitRes.ok()).toBeTruthy();
 
-  await page.goto(`${BASE_URL}/account`);
-  await expect(page).toHaveURL(/\/account/);
+  await page.goto(`${BASE_URL}/settings/profile`);
+  await expect(page).toHaveURL(/\/settings\/profile/);
 }
 
 /**

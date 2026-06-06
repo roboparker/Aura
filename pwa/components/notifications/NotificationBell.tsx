@@ -288,7 +288,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
             View all
           </Link>
           <Link
-            href="/settings"
+            href="/settings/notifications"
             onClick={() => setOpen(false)}
             className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
           >

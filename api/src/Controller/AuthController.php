@@ -76,7 +76,11 @@ class AuthController extends AbstractController
             // round-trip to /me/2fa/status on every render.
             'twoFactor' => [
                 'enabled' => $user->isTotpEnabled(),
+                'method' => 'totp',
                 'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
+                'recoveryCodesTotal' => count($user->getRecoveryCodes()),
+                'enabledAt' => $user->getTotpEnabledAt()?->format(\DateTimeInterface::ATOM),
+                'lastVerifiedAt' => $user->getTotpLastVerifiedAt()?->format(\DateTimeInterface::ATOM),
                 // Surfaced so the PWA can mount the recovery interstitial
                 // immediately after a backup-code login — see
                 // {@see \App\EventSubscriber\TwoFactorRecoveryListener}.

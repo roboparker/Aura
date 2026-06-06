@@ -6,16 +6,46 @@ import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 export type ThemePreference = "light" | "dark" | "system";
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
 
+export interface NotificationChannel {
+  inApp: boolean;
+  email: boolean;
+}
+
+export interface EmailDigestPref {
+  mode: NotificationFrequency;
+  hour: number;
+}
+
+export interface QuietHoursPref {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
 export interface UserPreferences {
   theme: ThemePreference;
+  /** IANA time-zone identifier (e.g. "America/New_York"). Defaults to "UTC". */
+  timezone: string;
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   notificationFrequency: NotificationFrequency;
+  /** Per-event delivery matrix: row key → {inApp, email}. */
+  notificationMatrix: Record<string, NotificationChannel>;
+  emailDigest: EmailDigestPref;
+  quietHours: QuietHoursPref;
 }
 
 export interface TwoFactorStatus {
   enabled: boolean;
+  /** Second-factor method — currently always "totp" when enabled. */
+  method?: string;
   recoveryCodesRemaining: number;
+  /** Total recovery codes ever issued in the current batch (used + unused). */
+  recoveryCodesTotal?: number;
+  /** ISO timestamp 2FA was enabled, or null. */
+  enabledAt?: string | null;
+  /** ISO timestamp of the last successful 2FA challenge, or null. */
+  lastVerifiedAt?: string | null;
   /**
    * True when this session signed in with a backup recovery code. Set by
    * the API's TwoFactorRecoveryListener on /auth/2fa-check, cleared once

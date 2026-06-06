@@ -46,6 +46,8 @@ const TwoFactorSection = () => {
   // card while React Query / useAuth refresh in the background.
   const enabled = user?.twoFactor?.enabled ?? false;
   const recoveryCodesRemaining = user?.twoFactor?.recoveryCodesRemaining ?? 0;
+  const recoveryCodesTotal = user?.twoFactor?.recoveryCodesTotal ?? 0;
+  const lastVerifiedAt = user?.twoFactor?.lastVerifiedAt ?? null;
 
   const fetchCodes = useCallback(async () => {
     setCodesError(null);
@@ -123,6 +125,29 @@ const TwoFactorSection = () => {
 
       {enabled && (
         <div className="ml-8 space-y-2">
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="2fa-summary"
+          >
+            Method TOTP
+            {recoveryCodesTotal > 0 && (
+              <>
+                {" · "}
+                backup codes {recoveryCodesRemaining} of {recoveryCodesTotal}{" "}
+                unused
+              </>
+            )}
+            {lastVerifiedAt && (
+              <>
+                {" · "}
+                last verified{" "}
+                {new Date(lastVerifiedAt).toLocaleDateString(undefined, {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </>
+            )}
+          </p>
           <div className="flex items-center justify-between gap-2 text-xs">
             <span
               className={

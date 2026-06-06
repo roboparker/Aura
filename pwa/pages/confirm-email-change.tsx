@@ -99,7 +99,7 @@ const ConfirmEmailChange = () => {
                   </AlertDescription>
                 </Alert>
                 <Button asChild className="w-full">
-                  <Link href="/account">Back to my account</Link>
+                  <Link href="/settings/profile">Back to settings</Link>
                 </Button>
               </>
             ) : (
@@ -108,7 +108,7 @@ const ConfirmEmailChange = () => {
                   <AlertDescription>{state.message}</AlertDescription>
                 </Alert>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/account">Back to my account</Link>
+                  <Link href="/settings/profile">Back to settings</Link>
                 </Button>
               </>
             )}
