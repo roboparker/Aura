@@ -106,6 +106,44 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    /**
+     * The PWA task drawer maps inline field errors by the violation
+     * propertyPath, so the `customFieldValues[<index>].value` shape is a
+     * contract — pin it here so a serializer change can't silently break
+     * per-field validation rendering.
+     */
+    public function testValidationViolationUsesCustomFieldValuesPropertyPath(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $count = $this->seedField($project, 'Count', CustomFieldDefinition::TYPE_NUMBER);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Some task',
+                'project' => '/projects/' . $project->getId(),
+                'customFieldValues' => [
+                    ['definition' => '/custom_field_definitions/' . $count->getId(), 'value' => 'twelve'],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray(false);
+        $violations = $body['violations'] ?? null;
+        $this->assertIsArray($violations);
+        $paths = array_map(
+            static fn (mixed $v): mixed => is_array($v) ? $v['propertyPath'] ?? null : null,
+            $violations,
+        );
+        $this->assertContains('customFieldValues[0].value', $paths);
+    }
+
     public function testNumberFieldAcceptsIntegerAndFloat(): void
     {
         $alice = $this->createUser('alice@example.com');
