@@ -6,7 +6,6 @@ import {
   SideMenuController,
   useCreateBlockNote,
 } from "@blocknote/react";
-import { useTheme } from "next-themes";
 import { useMemo } from "react";
 import type { MarkdownEditorProps } from "./MarkdownEditor";
 
@@ -29,14 +28,6 @@ const MarkdownEditorInner = ({ value, onChange, id, ariaLabel }: MarkdownEditorP
   }, []);
 
   const editor = useCreateBlockNote({ initialContent: initial });
-
-  // BlockNote ships its own light/dark themes; bind to the same `next-themes`
-  // resolution the rest of the app uses so the editor follows the toggle and
-  // the OS preference. `resolvedTheme` is undefined for one render before
-  // next-themes hydrates — fall back to "light" so we don't flash the dark
-  // theme on a light-mode page.
-  const { resolvedTheme } = useTheme();
-  const editorTheme = resolvedTheme === "dark" ? "dark" : "light";
 
   return (
     <div
@@ -61,7 +52,7 @@ const MarkdownEditorInner = ({ value, onChange, id, ariaLabel }: MarkdownEditorP
     >
       <BlockNoteView
         editor={editor}
-        theme={editorTheme}
+        theme="dark"
         sideMenu={false}
         onChange={() => {
           onChange(editor.blocksToMarkdownLossy(editor.document));

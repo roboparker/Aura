@@ -47,7 +47,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
   { slug: "avatar-stack", name: "AvatarStack", category: "User", description: "Overlapping avatar cluster with a +N overflow chip." },
   { slug: "layout", name: "Layout", category: "Layout", description: "App-shell wrapper: providers + persistent Navbar and Sidebar." },
-  { slug: "navbar", name: "Navbar", category: "Layout", description: "Top app bar with wordmark, search, badges, theme toggle, and mobile sheet." },
+  { slug: "navbar", name: "Navbar", category: "Layout", description: "Top app bar with wordmark, search, badges, and mobile sheet." },
   { slug: "sidebar", name: "Sidebar", category: "Layout", description: "Persistent left navigation column (md and up, authenticated only)." },
   { slug: "sidebar-nav", name: "SidebarNav", category: "Layout", description: "Shared nav contents used by the persistent sidebar and the mobile sheet." },
   { slug: "search-bar", name: "SearchBar", category: "Layout", description: "Navbar task search with debounced autocomplete; ⌘K opens the SearchOverlay palette." },
@@ -58,5 +58,4 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
   { slug: "group-tile", name: "GroupTile", category: "Groups", description: "Square colored tile with a grid glyph for a UserGroup avatar." },
   { slug: "notification-row", name: "NotificationRow", category: "Notifications", description: "Inbox row with unread/read/selected states and hover quick-actions." },
-  { slug: "theme-toggle", name: "ThemeToggle", category: "Theme", description: "Dark/light/system theme switcher." },
 ];

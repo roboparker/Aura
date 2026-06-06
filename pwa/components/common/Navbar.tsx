@@ -16,7 +16,6 @@ import SearchOverlay from "@/components/search/SearchOverlay";
 import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
-import ThemeToggle from "./ThemeToggle";
 
 const Navbar = () => {
   const { isAuthenticated } = useAuth();
@@ -59,7 +58,6 @@ const Navbar = () => {
             <>
               <OverdueBadge enabled={isAuthenticated} />
               <NotificationBell enabled={isAuthenticated} />
-              <ThemeToggle />
               {/* Mobile-only entry to the same nav surface — the
                   persistent Sidebar takes over on `md` and up. */}
               <Sheet>
@@ -93,7 +91,6 @@ const Navbar = () => {
               <Button asChild size="sm">
                 <Link href="/signup">Sign Up</Link>
               </Button>
-              <ThemeToggle />
             </>
           )}
         </div>

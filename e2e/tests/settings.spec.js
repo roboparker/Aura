@@ -87,21 +87,15 @@ test.describe("Settings", () => {
     await expect(page.getByTestId("delete-confirm")).toBeDisabled();
   });
 
-  test("theme preference persists (Profile panel)", async ({ page }) => {
+  test("app renders in dark mode (no theme switcher)", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/settings/profile`);
 
+    // Aura is dark-only: the appearance/theme picker is gone and the
+    // document is always tagged `dark`.
     await expect(
-      page.locator('[data-testid="settings-theme-system"]'),
-    ).toHaveAttribute("aria-checked", "true");
-
-    await page.locator('[data-testid="settings-theme-dark"]').click();
-    await expect(page.locator('[data-testid="settings-save-saved"]')).toBeVisible();
-
-    await page.reload();
-    await expect(
-      page.locator('[data-testid="settings-theme-dark"]'),
-    ).toHaveAttribute("aria-checked", "true");
+      page.locator('[data-testid="settings-appearance"]'),
+    ).toHaveCount(0);
     const htmlClass = await page.locator("html").getAttribute("class");
     expect(htmlClass).toContain("dark");
   });

@@ -74,8 +74,8 @@ class AuthController extends AbstractController
             // User::getRoles), so the server-side block is authoritative —
             // this flag just drives the client UX.
             'waitlisted' => $user->isWaitlisted(),
-            // Inlined so the PWA can apply the saved theme on initial render
-            // without an extra round-trip to /me/preferences.
+            // Inlined so the PWA has notification + timezone settings on
+            // initial render without an extra round-trip to /me/preferences.
             'preferences' => $user->getPreferences(),
             // Surfaced so the PWA can show "2FA on" in the security card
             // and the count-of-remaining-codes warning without an extra
