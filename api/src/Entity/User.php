@@ -170,6 +170,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?\DateTimeImmutable $totpEnabledAt = null;
 
     /**
+     * Last time a TOTP / backup code was accepted at the login challenge —
+     * surfaced in the Settings security panel. Stamped by
+     * {@see \App\EventSubscriber\TwoFactorVerifiedStamper} on the Scheb
+     * SUCCESS event.
+     */
+    #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $totpLastVerifiedAt = null;
+
+    /**
      * Recovery codes for the 2FA challenge.
      *
      * Each entry is `{hash, consumedAt, encrypted?, consumedCode?}`:
@@ -476,6 +485,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function getTotpEnabledAt(): ?\DateTimeImmutable
     {
         return $this->totpEnabledAt;
+    }
+
+    public function getTotpLastVerifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->totpLastVerifiedAt;
+    }
+
+    public function setTotpLastVerifiedAt(?\DateTimeImmutable $at): static
+    {
+        $this->totpLastVerifiedAt = $at;
+        return $this;
     }
 
     /**

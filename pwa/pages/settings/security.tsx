@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import SettingsShell from "@/components/settings/SettingsShell";
 import ChangePasswordForm from "@/components/account/ChangePasswordForm";
 import TwoFactorSection from "@/components/account/TwoFactorSection";
+import ActiveSessionsTable from "@/components/settings/ActiveSessionsTable";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +35,15 @@ const SecurityPage = () => {
           <ChangePasswordForm />
           <Separator />
           <TwoFactorSection />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Active sessions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ActiveSessionsTable />
         </CardContent>
       </Card>
     </SettingsShell>

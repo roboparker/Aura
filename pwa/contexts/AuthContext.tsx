@@ -17,7 +17,15 @@ export interface UserPreferences {
 
 export interface TwoFactorStatus {
   enabled: boolean;
+  /** Second-factor method — currently always "totp" when enabled. */
+  method?: string;
   recoveryCodesRemaining: number;
+  /** Total recovery codes ever issued in the current batch (used + unused). */
+  recoveryCodesTotal?: number;
+  /** ISO timestamp 2FA was enabled, or null. */
+  enabledAt?: string | null;
+  /** ISO timestamp of the last successful 2FA challenge, or null. */
+  lastVerifiedAt?: string | null;
   /**
    * True when this session signed in with a backup recovery code. Set by
    * the API's TwoFactorRecoveryListener on /auth/2fa-check, cleared once

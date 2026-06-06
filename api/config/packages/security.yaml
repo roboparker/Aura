@@ -56,6 +56,7 @@ security:
         - { path: ^/auth/change-password$, roles: ROLE_USER }
         - { path: ^/api/me$, roles: ROLE_USER }
         - { path: ^/me/2fa, roles: ROLE_USER }
+        - { path: ^/me/sessions, roles: ROLE_USER }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
