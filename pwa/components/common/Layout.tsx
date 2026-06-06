@@ -5,7 +5,6 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { ThemeProvider } from "next-themes";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
@@ -53,34 +52,24 @@ const Layout = ({
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    // No explicit user choice → follow the OS `prefers-color-scheme`.
-    // Once the user clicks the toggle we persist their choice in localStorage,
-    // and that takes precedence over the system pref.
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <QueryClientProvider client={queryClient}>
-        <HydrationBoundary state={dehydratedState}>
-          <AuthProvider>
-            <ActiveSpaceProvider>
-              <AppShell>{children}</AppShell>
-              {/* Forced modal that appears the moment the API signals
-                  this session signed in with a backup code. See
-                  TwoFactorRecoveryInterstitial for the flow. Renders
-                  nothing when not pending so it costs no DOM. */}
-              <TwoFactorRecoveryInterstitial />
-              {/* Keeps a waitlisted account pinned to the /waitlist gate
-                  wherever it tries to navigate. Renders nothing for normal
-                  users. */}
-              <WaitlistGate />
-            </ActiveSpaceProvider>
-          </AuthProvider>
-        </HydrationBoundary>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <HydrationBoundary state={dehydratedState}>
+        <AuthProvider>
+          <ActiveSpaceProvider>
+            <AppShell>{children}</AppShell>
+            {/* Forced modal that appears the moment the API signals
+                this session signed in with a backup code. See
+                TwoFactorRecoveryInterstitial for the flow. Renders
+                nothing when not pending so it costs no DOM. */}
+            <TwoFactorRecoveryInterstitial />
+            {/* Keeps a waitlisted account pinned to the /waitlist gate
+                wherever it tries to navigate. Renders nothing for normal
+                users. */}
+            <WaitlistGate />
+          </ActiveSpaceProvider>
+        </AuthProvider>
+      </HydrationBoundary>
+    </QueryClientProvider>
   );
 };
 

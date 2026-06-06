@@ -146,7 +146,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?MediaObject $avatar = null;
 
     /**
-     * Per-user preferences (theme, notification toggles, frequency). Stored
+     * Per-user preferences (timezone, notification toggles, frequency). Stored
      * as a JSON object so we can extend the shape without a migration each
      * time. The canonical defaults live in {@see DEFAULT_PREFERENCES} and are
      * merged in by the getter, so older rows don't need backfilling and
@@ -236,7 +236,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $totpRecoveryCodes = null;
 
-    public const ALLOWED_THEMES = ['light', 'dark', 'system'];
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
     public const NOTIFICATION_MATRIX_ROWS = [
         'mentions',
@@ -248,7 +247,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     ];
 
     public const DEFAULT_PREFERENCES = [
-        'theme' => 'system',
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
         // scheduling + reminder display and digest/quiet-hours math.
         'timezone' => 'UTC',
@@ -449,7 +447,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Always returns the full preference set, defaults merged in for any
      * keys the stored row is missing. Callers can read e.g.
-     * `$user->getPreferences()['theme']` without null-checks.
+     * `$user->getPreferences()['timezone']` without null-checks.
      *
      * @return array<string, mixed>
      */

@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
-import { useTheme } from "next-themes";
 import { ENTRYPOINT } from "../config/entrypoint";
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 
-export type ThemePreference = "light" | "dark" | "system";
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
 
 export interface NotificationChannel {
@@ -23,7 +21,6 @@ export interface QuietHoursPref {
 }
 
 export interface UserPreferences {
-  theme: ThemePreference;
   /** IANA time-zone identifier (e.g. "America/New_York"). Defaults to "UTC". */
   timezone: string;
   emailNotificationsEnabled: boolean;
@@ -77,8 +74,8 @@ export interface User {
    * signups. Optional on the wire — treat missing as false.
    */
   waitlisted?: boolean;
-  // Inlined on /api/me so the PWA can apply the saved theme on first paint.
-  // Always present — the API merges in defaults for older rows.
+  // Inlined on /api/me so the PWA has notification + timezone settings on
+  // first paint. Always present — the API merges in defaults for older rows.
   preferences: UserPreferences;
   // Inlined so the security-card render doesn't have to chase a separate
   // /me/2fa/status request — the API merges defaults for legacy rows.
@@ -181,18 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { setTheme } = useTheme();
 
   const clearError = useCallback(() => setError(null), []);
-
-  // Apply the user's saved theme whenever the profile changes (login, refresh,
-  // settings update via updateUserLocally). This makes the theme follow the
-  // user across devices instead of being pinned to whatever localStorage on
-  // *this* browser remembers from a prior visit.
-  useEffect(() => {
-    const theme = user?.preferences?.theme;
-    if (theme) setTheme(theme);
-  }, [user?.preferences?.theme, setTheme]);
 
   const fetchMe = useCallback(async () => {
     try {

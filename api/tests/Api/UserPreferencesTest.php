@@ -47,7 +47,7 @@ class UserPreferencesTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
-            'json' => ['theme' => 'dark'],
+            'json' => ['timezone' => 'America/New_York'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
@@ -55,7 +55,7 @@ class UserPreferencesTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertSame('dark', $body['theme']);
+        $this->assertSame('America/New_York', $body['timezone']);
         // Other keys untouched.
         $this->assertTrue($body['emailNotificationsEnabled']);
         $this->assertSame('realtime', $body['notificationFrequency']);
@@ -69,7 +69,7 @@ class UserPreferencesTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
             'json' => [
-                'theme' => 'light',
+                'timezone' => 'America/New_York',
                 'pushNotificationsEnabled' => true,
                 'notificationFrequency' => 'daily',
             ],
@@ -80,7 +80,7 @@ class UserPreferencesTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertSame('light', $body['theme']);
+        $this->assertSame('America/New_York', $body['timezone']);
         $this->assertTrue($body['pushNotificationsEnabled']);
         $this->assertSame('daily', $body['notificationFrequency']);
     }
@@ -92,7 +92,7 @@ class UserPreferencesTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
-            'json' => ['theme' => 'dark'],
+            'json' => ['timezone' => 'America/New_York'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
         $this->assertResponseIsSuccessful();
@@ -103,7 +103,7 @@ class UserPreferencesTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertSame('dark', $body['theme']);
+        $this->assertSame('America/New_York', $body['timezone']);
     }
 
     public function testPatchRejectsUnknownKey(): void
@@ -114,20 +114,6 @@ class UserPreferencesTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
             'json' => ['language' => 'eo'],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
-        ]);
-
-        $this->assertResponseStatusCodeSame(422);
-    }
-
-    public function testPatchRejectsInvalidThemeValue(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-
-        $client = static::createClient();
-        $client->loginUser($alice);
-        $client->request('PATCH', '/me/preferences', [
-            'json' => ['theme' => 'sepia'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
@@ -290,10 +276,11 @@ class UserPreferencesTest extends ApiTestCase
 
     public function testApiMeReturnsPreferencesInline(): void
     {
-        // The PWA reads preferences off the existing /api/me payload so the
-        // theme can apply on first paint without a second round-trip.
+        // The PWA reads preferences off the existing /api/me payload so
+        // notification + timezone settings apply on first paint without a
+        // second round-trip.
         $alice = $this->createUser('alice@example.com');
-        $alice->setPreferences(array_merge(User::DEFAULT_PREFERENCES, ['theme' => 'dark']));
+        $alice->setPreferences(array_merge(User::DEFAULT_PREFERENCES, ['timezone' => 'America/New_York']));
         $this->entityManager->flush();
 
         $client = static::createClient();
@@ -304,7 +291,7 @@ class UserPreferencesTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertSame('dark', $this->arrayField($body, 'preferences')['theme']);
+        $this->assertSame('America/New_York', $this->arrayField($body, 'preferences')['timezone']);
     }
 
     /**

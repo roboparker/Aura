@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Highlight, themes, type Language } from "prism-react-renderer";
-import { useTheme } from "next-themes";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +10,6 @@ type CodeBlockProps = {
 };
 
 const CodeBlock = ({ code, language = "tsx", className }: CodeBlockProps) => {
-  const { resolvedTheme } = useTheme();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -20,8 +18,8 @@ const CodeBlock = ({ code, language = "tsx", className }: CodeBlockProps) => {
     window.setTimeout(() => setCopied(false), 1500);
   };
 
-  // `themes` is from prism-react-renderer; pick palette to match active mode.
-  const prismTheme = resolvedTheme === "dark" ? themes.vsDark : themes.github;
+  // `themes` is from prism-react-renderer; Aura is dark-only.
+  const prismTheme = themes.vsDark;
 
   return (
     <div className={cn("group relative overflow-hidden rounded-md border border-input bg-muted/30", className)}>

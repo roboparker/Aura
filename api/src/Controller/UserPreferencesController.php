@@ -78,9 +78,6 @@ class UserPreferencesController extends AbstractController
     private function validateValue(string $key, mixed $value): ?string
     {
         return match ($key) {
-            'theme' => is_string($value) && in_array($value, User::ALLOWED_THEMES, true)
-                ? null
-                : 'theme must be one of: light, dark, system.',
             'timezone' => is_string($value) && in_array($value, \DateTimeZone::listIdentifiers(), true)
                 ? null
                 : 'timezone must be a valid IANA time-zone identifier.',
