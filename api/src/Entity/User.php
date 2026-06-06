@@ -218,14 +218,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
 
     public const ALLOWED_THEMES = ['light', 'dark', 'system'];
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
+    public const NOTIFICATION_MATRIX_ROWS = [
+        'mentions',
+        'assigned',
+        'comments',
+        'replies',
+        'status',
+        'space-invites',
+    ];
+
     public const DEFAULT_PREFERENCES = [
         'theme' => 'system',
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
-        // scheduling + reminder display and (later) digest/quiet-hours math.
+        // scheduling + reminder display and digest/quiet-hours math.
         'timezone' => 'UTC',
+        // Legacy master switches — kept as hard overrides over the matrix.
         'emailNotificationsEnabled' => true,
         'pushNotificationsEnabled' => false,
         'notificationFrequency' => 'realtime',
+        // Per-event delivery matrix: row → {inApp, email}.
+        'notificationMatrix' => [
+            'mentions' => ['inApp' => true, 'email' => true],
+            'assigned' => ['inApp' => true, 'email' => true],
+            'comments' => ['inApp' => true, 'email' => false],
+            'replies' => ['inApp' => true, 'email' => true],
+            'status' => ['inApp' => true, 'email' => false],
+            'space-invites' => ['inApp' => true, 'email' => true],
+        ],
+        // Email digest cadence (supersedes notificationFrequency).
+        'emailDigest' => ['mode' => 'realtime', 'hour' => 8],
+        // Quiet hours (interpreted in the user's timezone). Suppresses
+        // email + push while active; in-app rows still land.
+        'quietHours' => ['enabled' => false, 'start' => '22:00', 'end' => '07:00'],
     ];
 
     public function getId(): ?Uuid

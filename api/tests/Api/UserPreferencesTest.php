@@ -194,6 +194,85 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testPatchAcceptsNotificationMatrix(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => [
+                'notificationMatrix' => [
+                    'mentions' => ['inApp' => true, 'email' => false],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testPatchRejectsMalformedMatrix(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['notificationMatrix' => ['mentions' => ['inApp' => 'yes']]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsUnknownMatrixRow(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['notificationMatrix' => ['bogus' => ['inApp' => true, 'email' => true]]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchAcceptsQuietHoursAndDigest(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => [
+                'quietHours' => ['enabled' => true, 'start' => '22:00', 'end' => '07:00'],
+                'emailDigest' => ['mode' => 'daily', 'hour' => 8],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testPatchRejectsBadQuietHoursTime(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['quietHours' => ['enabled' => true, 'start' => '25:99', 'end' => '07:00']],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsBadDigestHour(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['emailDigest' => ['mode' => 'daily', 'hour' => 47]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testPatchRejectsNonObjectBody(): void
     {
         $alice = $this->createUser('alice@example.com');

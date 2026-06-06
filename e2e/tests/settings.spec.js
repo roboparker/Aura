@@ -63,33 +63,25 @@ test.describe("Settings", () => {
     expect(htmlClass).toContain("dark");
   });
 
-  test("notification preferences persist (Notifications panel)", async ({
+  test("notification matrix preference persists (Notifications panel)", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/settings/notifications`);
 
-    // Defaults: email on, push off, realtime frequency.
-    await expect(
-      page.locator('[data-testid="settings-email-toggle"]'),
-    ).toBeChecked();
-    await expect(
-      page.locator('[data-testid="settings-frequency-realtime"]'),
-    ).toHaveAttribute("aria-checked", "true");
-
-    await page.locator('[data-testid="settings-email-toggle"]').uncheck();
-    await page.locator('[data-testid="settings-frequency-daily"]').click();
-    await expect(
-      page.locator('[data-testid="settings-frequency-daily"]'),
-    ).toHaveAttribute("aria-checked", "true");
+    // Mentions → email is on by default; turn it off.
+    const mentionsEmail = page.getByTestId("notif-mentions-email");
+    await expect(mentionsEmail).toHaveAttribute("aria-checked", "true");
+    await mentionsEmail.click();
+    await expect(mentionsEmail).toHaveAttribute("aria-checked", "false");
+    // Wait for the autosave to land before reloading.
+    await expect(page.getByTestId("settings-save-saved")).toBeVisible();
 
     await page.reload();
-    await expect(
-      page.locator('[data-testid="settings-email-toggle"]'),
-    ).not.toBeChecked();
-    await expect(
-      page.locator('[data-testid="settings-frequency-daily"]'),
-    ).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByTestId("notif-mentions-email")).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   test("time zone selection persists across reload", async ({ page }) => {

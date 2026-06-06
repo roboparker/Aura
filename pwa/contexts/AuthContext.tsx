@@ -6,6 +6,22 @@ import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 export type ThemePreference = "light" | "dark" | "system";
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
 
+export interface NotificationChannel {
+  inApp: boolean;
+  email: boolean;
+}
+
+export interface EmailDigestPref {
+  mode: NotificationFrequency;
+  hour: number;
+}
+
+export interface QuietHoursPref {
+  enabled: boolean;
+  start: string;
+  end: string;
+}
+
 export interface UserPreferences {
   theme: ThemePreference;
   /** IANA time-zone identifier (e.g. "America/New_York"). Defaults to "UTC". */
@@ -13,6 +29,10 @@ export interface UserPreferences {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   notificationFrequency: NotificationFrequency;
+  /** Per-event delivery matrix: row key → {inApp, email}. */
+  notificationMatrix: Record<string, NotificationChannel>;
+  emailDigest: EmailDigestPref;
+  quietHours: QuietHoursPref;
 }
 
 export interface TwoFactorStatus {
