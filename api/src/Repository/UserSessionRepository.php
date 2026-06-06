@@ -46,6 +46,20 @@ class UserSessionRepository extends ServiceEntityRepository
      * Revoke every active session for the user except the one whose hash is
      * `$exceptHash`. Returns the number of sessions revoked.
      */
+    /** Revoke every active session for the user. Returns the count revoked. */
+    public function revokeAllForUser(User $user): int
+    {
+        return $this->createQueryBuilder('s')
+            ->update()
+            ->set('s.revokedAt', ':now')
+            ->where('s.user = :user')
+            ->andWhere('s.revokedAt IS NULL')
+            ->setParameter('now', new \DateTimeImmutable())
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->execute();
+    }
+
     public function revokeOthers(User $user, string $exceptHash): int
     {
         return $this->createQueryBuilder('s')

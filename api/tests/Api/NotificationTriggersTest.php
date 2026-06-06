@@ -60,7 +60,14 @@ class NotificationTriggersTest extends ApiTestCase
         $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
         $task = $this->createTaskInProject($alice, $project, 'Plan launch');
 
-        // bob comments → alice (owner, default realtime prefs) is emailed.
+        // Comment emails are off by default in the matrix — opt alice in so we
+        // exercise the realtime-email path.
+        $prefs = $alice->getPreferences();
+        $prefs['notificationMatrix']['comments']['email'] = true;
+        $alice->setPreferences($prefs);
+        $this->entityManager->flush();
+
+        // bob comments → alice (owner, realtime cadence) is emailed.
         $this->postComment(static::createClient(), $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Looks good.']);
 
         $this->assertEmailCount(1);

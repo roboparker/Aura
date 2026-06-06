@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, KeyRound, Shield, User } from "lucide-react";
+import { Bell, KeyRound, Shield, TriangleAlert, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SettingsSectionKey =
@@ -36,6 +36,13 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "API tokens",
     href: "/settings/api-tokens",
     Icon: KeyRound,
+  },
+  {
+    key: "danger",
+    label: "Danger zone",
+    href: "/settings/danger",
+    Icon: TriangleAlert,
+    danger: true,
   },
 ];
 

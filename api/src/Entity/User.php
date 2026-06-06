@@ -179,6 +179,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?\DateTimeImmutable $totpLastVerifiedAt = null;
 
     /**
+     * Soft-deactivation timestamp (Settings → Danger zone). When set, all
+     * sessions are revoked; signing back in clears it (reactivation) via
+     * {@see \App\Security\UserChecker}.
+     */
+    #[ORM\Column(type: 'datetimetz_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deactivatedAt = null;
+
+    /**
      * Recovery codes for the 2FA challenge.
      *
      * Each entry is `{hash, consumedAt, encrypted?, consumedCode?}`:
@@ -520,6 +528,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     {
         $this->totpLastVerifiedAt = $at;
         return $this;
+    }
+
+    public function getDeactivatedAt(): ?\DateTimeImmutable
+    {
+        return $this->deactivatedAt;
+    }
+
+    public function setDeactivatedAt(?\DateTimeImmutable $at): static
+    {
+        $this->deactivatedAt = $at;
+        return $this;
+    }
+
+    public function isDeactivated(): bool
+    {
+        return null !== $this->deactivatedAt;
     }
 
     /**
