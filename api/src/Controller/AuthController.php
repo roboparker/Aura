@@ -68,6 +68,12 @@ class AuthController extends AbstractController
             'nickname' => $user->getNickname(),
             'personalizedColor' => $user->getPersonalizedColor(),
             'avatarUrls' => $user->getAvatarUrls(),
+            // Surfaced so the PWA can route a waitlisted account to the
+            // /waitlist gate and keep it out of the rest of the app. The
+            // account holds no ROLE_USER while this is true (see
+            // User::getRoles), so the server-side block is authoritative —
+            // this flag just drives the client UX.
+            'waitlisted' => $user->isWaitlisted(),
             // Inlined so the PWA can apply the saved theme on initial render
             // without an extra round-trip to /me/preferences.
             'preferences' => $user->getPreferences(),
