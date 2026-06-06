@@ -8,6 +8,8 @@ export type NotificationFrequency = "realtime" | "hourly" | "daily";
 
 export interface UserPreferences {
   theme: ThemePreference;
+  /** IANA time-zone identifier (e.g. "America/New_York"). Defaults to "UTC". */
+  timezone: string;
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   notificationFrequency: NotificationFrequency;

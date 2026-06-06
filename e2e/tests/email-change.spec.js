@@ -18,7 +18,7 @@ async function registerAndSignIn(page, request, email, password = "Password123!@
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/account/);
+  await expect(page).toHaveURL(/\/settings\/profile/);
 }
 
 async function getLatestEmail(request, recipient, timeout = 5000) {
@@ -91,7 +91,7 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#email", newEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
     // Now follow the revert link
     await page.goto(revertUrl);
@@ -102,7 +102,7 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#email", oldEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
   });
 
   test("cannot request a change to an already-registered address", async ({

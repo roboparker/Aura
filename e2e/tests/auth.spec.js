@@ -57,10 +57,10 @@ test.describe("Authentication", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
 
-    // Should redirect to account page. The email now appears in two
-    // places after sign-in (sidebar header + main account form), so
-    // scope the assertion to the account page itself.
-    await expect(page).toHaveURL(/\/account/);
+    // Should redirect to the Settings profile panel. The email now appears
+    // in two places after sign-in (sidebar header + profile identity form),
+    // so scope the assertion to the main panel.
+    await expect(page).toHaveURL(/\/settings\/profile/);
     await expect(
       page.getByRole("main").getByText(email),
     ).toBeVisible();
@@ -82,7 +82,7 @@ test.describe("Authentication", () => {
     await page.fill("#password", "admin123");
     await page.click('button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/account/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
 
     // Navigate to admin
     await page.goto(`${BASE_URL}/admin`);

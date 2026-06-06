@@ -211,6 +211,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
     public const DEFAULT_PREFERENCES = [
         'theme' => 'system',
+        // IANA time-zone identifier (e.g. "America/New_York"). Anchors
+        // scheduling + reminder display and (later) digest/quiet-hours math.
+        'timezone' => 'UTC',
         'emailNotificationsEnabled' => true,
         'pushNotificationsEnabled' => false,
         'notificationFrequency' => 'realtime',

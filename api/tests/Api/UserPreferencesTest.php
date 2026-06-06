@@ -134,6 +134,38 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testPatchAcceptsValidTimezone(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['timezone' => 'America/New_York'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $this->assertSame('America/New_York', $body['timezone']);
+    }
+
+    public function testPatchRejectsInvalidTimezone(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['timezone' => 'Not/AZone'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testPatchRejectsInvalidFrequencyValue(): void
     {
         $alice = $this->createUser('alice@example.com');

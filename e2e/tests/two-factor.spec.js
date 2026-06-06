@@ -12,8 +12,8 @@ test.describe("Two-factor authentication", () => {
     const email = uniqueEmail("tfa-setup");
     await registerAndSignIn(page, email);
 
-    // /account hosts the Security card with the 2FA section.
-    await page.goto(`${BASE_URL}/account`);
+    // The Security panel hosts the 2FA section.
+    await page.goto(`${BASE_URL}/settings/security`);
 
     const section = page.getByTestId("2fa-section");
     await expect(section).toBeVisible();

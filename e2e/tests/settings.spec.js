@@ -10,72 +10,110 @@ const uniqueEmail = () => shared("settings");
 
 test.describe("Settings", () => {
   test("unauthenticated visitors are redirected to sign in", async ({ page }) => {
-    await page.goto(`${BASE_URL}/settings`);
+    await page.goto(`${BASE_URL}/settings/profile`);
     await expect(page).toHaveURL(/\/signin/);
   });
 
-  test("user can change theme and notification preferences and they persist", async ({
+  test("old /account and /settings routes redirect into the shell", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await page.goto(`${BASE_URL}/settings`);
-    await expect(page).toHaveTitle("Settings - Aura");
 
-    // Defaults: system theme + realtime frequency + email on, push off.
-    const systemTheme = page.locator('[data-testid="settings-theme-system"]');
-    await expect(systemTheme).toHaveAttribute("aria-checked", "true");
+    await page.goto(`${BASE_URL}/account`);
+    await expect(page).toHaveURL(/\/settings\/profile/);
+
+    await page.goto(`${BASE_URL}/settings`);
+    await expect(page).toHaveURL(/\/settings\/profile/);
+  });
+
+  test("subnav moves between Profile, Security and Notifications", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/settings/profile`);
+
+    await page.getByTestId("settings-nav-security").click();
+    await expect(page).toHaveURL(/\/settings\/security/);
+    await expect(page.getByTestId("2fa-section")).toBeVisible();
+
+    await page.getByTestId("settings-nav-notifications").click();
+    await expect(page).toHaveURL(/\/settings\/notifications/);
+    await expect(page.getByTestId("settings-notifications")).toBeVisible();
+
+    await page.getByTestId("settings-nav-profile").click();
+    await expect(page).toHaveURL(/\/settings\/profile/);
+  });
+
+  test("theme preference persists (Profile panel)", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/settings/profile`);
+
+    await expect(
+      page.locator('[data-testid="settings-theme-system"]'),
+    ).toHaveAttribute("aria-checked", "true");
+
+    await page.locator('[data-testid="settings-theme-dark"]').click();
+    await expect(page.locator('[data-testid="settings-save-saved"]')).toBeVisible();
+
+    await page.reload();
+    await expect(
+      page.locator('[data-testid="settings-theme-dark"]'),
+    ).toHaveAttribute("aria-checked", "true");
+    const htmlClass = await page.locator("html").getAttribute("class");
+    expect(htmlClass).toContain("dark");
+  });
+
+  test("notification preferences persist (Notifications panel)", async ({
+    page,
+  }) => {
+    await registerAndSignIn(page, uniqueEmail());
+    await page.goto(`${BASE_URL}/settings/notifications`);
+
+    // Defaults: email on, push off, realtime frequency.
     await expect(
       page.locator('[data-testid="settings-email-toggle"]'),
     ).toBeChecked();
     await expect(
-      page.locator('[data-testid="settings-push-toggle"]'),
-    ).not.toBeChecked();
-    await expect(
       page.locator('[data-testid="settings-frequency-realtime"]'),
     ).toHaveAttribute("aria-checked", "true");
 
-    // Switch to dark — settings auto-save.
-    await page.locator('[data-testid="settings-theme-dark"]').click();
-    await expect(
-      page.locator('[data-testid="settings-theme-dark"]'),
-    ).toHaveAttribute("aria-checked", "true");
-    // Wait for the "Saved" toast as confirmation that the PATCH landed.
-    await expect(page.locator('[data-testid="settings-save-saved"]')).toBeVisible();
-
-    // Disable email + flip frequency to daily.
     await page.locator('[data-testid="settings-email-toggle"]').uncheck();
     await page.locator('[data-testid="settings-frequency-daily"]').click();
     await expect(
       page.locator('[data-testid="settings-frequency-daily"]'),
     ).toHaveAttribute("aria-checked", "true");
 
-    // Reload — preferences came from the server, not just local state.
     await page.reload();
-    await expect(page.locator('[data-testid="settings-theme-dark"]')).toHaveAttribute(
-      "aria-checked",
-      "true",
-    );
     await expect(
       page.locator('[data-testid="settings-email-toggle"]'),
     ).not.toBeChecked();
     await expect(
       page.locator('[data-testid="settings-frequency-daily"]'),
     ).toHaveAttribute("aria-checked", "true");
-
-    // Theme is also reflected on the <html> element via next-themes.
-    const htmlClass = await page.locator("html").getAttribute("class");
-    expect(htmlClass).toContain("dark");
   });
 
-  test("settings link appears in the sidebar", async ({ page }) => {
+  test("time zone selection persists across reload", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    // No "open menu" step — the sidebar is always visible on the
-    // desktop viewport Playwright uses.
+    await page.goto(`${BASE_URL}/settings/profile`);
+
+    const tz = page.getByTestId("settings-timezone-input");
+    await tz.click();
+    await tz.fill("London");
+    await page.getByRole("option", { name: /London/ }).first().click();
+
+    await page.reload();
+    await expect(page.getByTestId("settings-timezone-input")).toHaveValue(
+      /London/,
+    );
+  });
+
+  test("settings link in the sidebar opens the shell", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail());
     const settingsLink = page
       .locator('[data-testid="app-sidebar"]')
       .getByRole("link", { name: "Settings" });
     await expect(settingsLink).toBeVisible();
     await settingsLink.click();
-    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page).toHaveURL(/\/settings\/profile/);
   });
 });

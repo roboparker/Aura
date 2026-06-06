@@ -81,6 +81,9 @@ class UserPreferencesController extends AbstractController
             'theme' => is_string($value) && in_array($value, User::ALLOWED_THEMES, true)
                 ? null
                 : 'theme must be one of: light, dark, system.',
+            'timezone' => is_string($value) && in_array($value, \DateTimeZone::listIdentifiers(), true)
+                ? null
+                : 'timezone must be a valid IANA time-zone identifier.',
             'notificationFrequency' => is_string($value) && in_array($value, User::ALLOWED_FREQUENCIES, true)
                 ? null
                 : 'notificationFrequency must be one of: realtime, hourly, daily.',
