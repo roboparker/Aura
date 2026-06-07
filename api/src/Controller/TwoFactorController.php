@@ -35,6 +35,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 class TwoFactorController extends AbstractController
 {
+    use JsonRequestTrait;
+
     public function __construct(
         private TwoFactorSetupService $setup,
         private EntityManagerInterface $em,
@@ -273,25 +275,5 @@ class TwoFactorController extends AbstractController
             'enabledAt' => $user->getTotpEnabledAt()?->format(\DateTimeInterface::ATOM),
             'lastVerifiedAt' => $user->getTotpLastVerifiedAt()?->format(\DateTimeInterface::ATOM),
         ]);
-    }
-
-    /** @return array<string, mixed> */
-    private function jsonBody(Request $request): array
-    {
-        $decoded = json_decode($request->getContent(), true);
-        if (!is_array($decoded)) {
-            return [];
-        }
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
-    }
-
-    /**
-     * @param array<string, mixed> $body
-     */
-    private function stringField(array $body, string $key): string
-    {
-        $value = $body[$key] ?? null;
-        return is_string($value) ? $value : '';
     }
 }

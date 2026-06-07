@@ -25,6 +25,8 @@ use Symfony\Component\Uid\Uuid;
  */
 class UserSessionController extends AbstractController
 {
+    use JsonRequestTrait;
+
     public function __construct(
         private readonly UserSessionRepository $sessions,
         private readonly EntityManagerInterface $em,
@@ -102,16 +104,5 @@ class UserSessionController extends AbstractController
         }
         $id = $request->getSession()->getId();
         return '' === $id ? '' : hash('sha256', $id);
-    }
-
-    /** @return array<string, mixed> */
-    private function jsonBody(Request $request): array
-    {
-        $decoded = json_decode($request->getContent(), true);
-        if (!is_array($decoded)) {
-            return [];
-        }
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
     }
 }
