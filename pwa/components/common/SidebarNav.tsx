@@ -147,6 +147,22 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
                 </Button>,
               )}
             </span>
+            <span>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "justify-start w-full",
+                    router.pathname.startsWith("/admin/segments") &&
+                      "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href="/admin/segments">Segments</Link>
+                </Button>,
+              )}
+            </span>
             {ADMIN_EXTERNAL_LINKS.map(({ href, label }) => (
               <Button
                 key={href}

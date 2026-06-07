@@ -2,6 +2,7 @@
 
 namespace App\Command;
 
+use App\Entity\Segment;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -60,6 +61,17 @@ final class UserRoleCommand extends Command
         if (in_array($role, self::RESERVED_ROLES, true)) {
             $io->error(sprintf(
                 '%s is managed automatically and can\'t be set with this command.',
+                $role,
+            ));
+            return Command::INVALID;
+        }
+        // Segment roles (ROLE_SEGMENT_*) are computed from segment membership
+        // at request time, never stored on the user. Manage them with
+        // `app:segment add|remove` instead — storing one here would be a
+        // no-op the SegmentVoter ignores.
+        if (str_starts_with($role, Segment::ROLE_PREFIX)) {
+            $io->error(sprintf(
+                '%s is a segment role — manage it with `app:segment add|remove <key> <email>`.',
                 $role,
             ));
             return Command::INVALID;

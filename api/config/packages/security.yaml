@@ -64,6 +64,9 @@ security:
         - { path: ^/me/(deactivate|export|delete)$, roles: ROLE_USER }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
+        # User segments (A/B tests, beta gating, rollouts) — platform admins
+        # only. Covers the ApiResource CRUD and the member/preview controller.
+        - { path: ^/segments, roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
