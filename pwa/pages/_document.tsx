@@ -35,10 +35,7 @@ const Document = () => (
     suppressHydrationWarning
   >
     <Head>
-      <script
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{ __html: codeThemeBootstrap }}
-      />
+      <script dangerouslySetInnerHTML={{ __html: codeThemeBootstrap }} />
     </Head>
     <body>
       <Main />
