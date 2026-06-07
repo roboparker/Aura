@@ -49,7 +49,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?Uuid $id = null;
 
     // Settable on signup (`user:create`), but not on PATCH — changes
@@ -57,7 +57,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $email = '';
 
     #[ORM\Column]
@@ -103,18 +103,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $givenName = '';
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Family name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $familyName = '';
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?string $nickname = null;
 
     /**
@@ -128,7 +128,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
 
     /**
