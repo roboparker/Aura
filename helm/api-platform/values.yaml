@@ -27,6 +27,23 @@ pwa:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
 
+# Postgres-backed Symfony Messenger job queue. The Doctrine transport reuses
+# the app database; auto_setup is off because the messenger_messages table is
+# created by a migration.
+messenger:
+  transportDsn: "doctrine://default?auto_setup=false"
+
+# Long-running job runner (bin/console messenger:consume). Set enabled: false
+# to fall back to processing jobs inline / via cron only.
+worker:
+  enabled: true
+  replicaCount: 1
+  # Recycle the worker process periodically to bound memory growth; the
+  # Deployment restarts it immediately. Tune for your workload.
+  timeLimit: "3600"
+  memoryLimit: "128M"
+  resources: {}
+
 # You may prefer using the managed version in production: https://mercure.rocks
 mercure:
   publicUrl: https://chart-example.local/.well-known/mercure

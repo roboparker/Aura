@@ -16,7 +16,6 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 
 /**
@@ -32,6 +31,12 @@ use Symfony\Component\Mailer\MailerInterface;
  * digest-frequency users instead have their rows rolled up by
  * App\Command\DispatchNotificationDigestCommand (which only selects
  * digest-cadence users), so no one is double-emailed.
+ *
+ * The send itself is non-blocking: Symfony Mailer's SendEmailMessage is
+ * routed to the async (Doctrine) transport in messenger.yaml, so
+ * $mailer->send() enqueues a job and the messenger worker does the actual
+ * SMTP delivery (with retries + dead-letter). SMTP latency never touches
+ * the producing request.
  */
 final class NotificationDispatcher
 {
@@ -192,8 +197,11 @@ final class NotificationDispatcher
      * Real-time email, gated on the recipient's `emailNotificationsEnabled`
      * (master switch, defaults on) and `notificationFrequency === 'realtime'`.
      * Digest-cadence users are skipped here — the digest command owns their
-     * delivery. A transport failure is swallowed: the in-app row, push, and
-     * Mercure event already landed, so we don't fail the producing write.
+     * delivery.
+     *
+     * `$mailer->send()` doesn't hit SMTP inline: SendEmailMessage is routed
+     * to the async transport, so this enqueues the delivery and the worker
+     * does the send (with retries / dead-letter on transport failure).
      */
     private function sendEmail(User $recipient, Notification $notification): void
     {
@@ -229,10 +237,6 @@ final class NotificationDispatcher
                 'actionUrl' => null === $target ? $base . '/notifications' : $base . $target,
             ]);
 
-        try {
-            $this->mailer->send($email);
-        } catch (TransportExceptionInterface) {
-            // Swallow — the notification already landed in-app.
-        }
+        $this->mailer->send($email);
     }
 }

@@ -14,3 +14,4 @@ data:
   mercure-public-url: {{ .Values.mercure.publicUrl | default "http://127.0.0.1/.well-known/mercure" | quote }}
   mercure-extra-directives: {{ .Values.mercure.extraDirectives | quote }}
   caddy-global-options: {{ .Values.php.caddyGlobalOptions | quote }}
+  messenger-transport-dsn: {{ .Values.messenger.transportDsn | quote }}

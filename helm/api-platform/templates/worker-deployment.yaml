@@ -1,16 +1,17 @@
+{{- if .Values.worker.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "api-platform.fullname" . }}
+  name: {{ include "api-platform.fullname" . }}-worker
   labels:
     {{- include "api-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: {{ .Values.worker.replicaCount }}
   selector:
     matchLabels:
       {{- include "api-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
   template:
     metadata:
       annotations:
@@ -21,6 +22,7 @@ spec:
         {{- end }}
       labels:
         {{- include "api-platform.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -30,36 +32,19 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-php
+        - name: {{ .Chart.Name }}-worker
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.php.image.repository }}:{{ .Values.php.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.php.image.pullPolicy }}
+          command:
+            - bin/console
+            - messenger:consume
+            - async
+            - "--time-limit={{ .Values.worker.timeLimit }}"
+            - "--memory-limit={{ .Values.worker.memoryLimit }}"
+            - "-v"
           env:
-            - name: SERVER_NAME
-              value: :80
-            - name: PWA_UPSTREAM
-              value: {{ include "api-platform.fullname" . }}-pwa:3000
-            - name: MERCURE_PUBLISHER_JWT_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: mercure-jwt-secret
-            - name: MERCURE_SUBSCRIBER_JWT_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: mercure-jwt-secret
-            - name: TRUSTED_HOSTS
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: php-trusted-hosts
-            - name: TRUSTED_PROXIES
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: php-trusted-proxies
             - name: APP_ENV
               valueFrom:
                 configMapKeyRef:
@@ -75,11 +60,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: php-app-secret
-            - name: CORS_ALLOW_ORIGIN
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: php-cors-allow-origin
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -90,11 +70,6 @@ spec:
                 configMapKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: messenger-transport-dsn
-            - name: CADDY_GLOBAL_OPTIONS
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: caddy-global-options
             - name: MERCURE_URL
               valueFrom:
                 configMapKeyRef:
@@ -105,39 +80,21 @@ spec:
                 configMapKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: mercure-public-url
-            - name: MERCURE_EXTRA_DIRECTIVES
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ include "api-platform.fullname" . }}
-                  key: mercure-extra-directives
             - name: MERCURE_JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: mercure-jwt-secret
-          ports:
-            - name: http
-              containerPort: 80
-              protocol: TCP
-            - name: admin
-              containerPort: 2019
-              protocol: TCP
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "/bin/sleep 1; kill -QUIT 1"]
-          readinessProbe:
-            tcpSocket:
-              port: 80
-            initialDelaySeconds: 3
-            periodSeconds: 3
+          # Liveness via the consumer process: if messenger:consume dies the
+          # container exits and the Deployment restarts it. A lightweight
+          # check confirms the PHP process is alive.
           livenessProbe:
-            tcpSocket:
-              port: 80
-            initialDelaySeconds: 3
-            periodSeconds: 3
+            exec:
+              command: ["pgrep", "-f", "messenger:consume"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.worker.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -150,3 +107,4 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+{{- end }}

@@ -1,0 +1,39 @@
+framework:
+    messenger:
+        # Jobs that exhaust their retries are parked here for inspection
+        # (bin/console messenger:failed:show / :retry) instead of vanishing.
+        failure_transport: failed
+
+        transports:
+            # Postgres-backed queue. The worker (bin/console messenger:consume
+            # async) drains it with SELECT ... FOR UPDATE SKIP LOCKED, so it's
+            # safe to run multiple workers. auto_setup is off — the
+            # messenger_messages table is provisioned by a migration so it
+            # lives in the same schema-as-code flow as the rest of the DB.
+            async:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 0
+            failed: 'doctrine://default?queue_name=failed&auto_setup=false'
+
+        routing:
+            # Make ALL outbound email async: Symfony Mailer dispatches a
+            # SendEmailMessage for every $mailer->send(), so routing it here
+            # moves notification, invite, password-reset, 2FA, email-change,
+            # waitlist, and digest/reminder emails onto the queue — each with
+            # retries + the failed dead-letter transport. SMTP latency never
+            # touches the request.
+            Symfony\Component\Mailer\Messenger\SendEmailMessage: async
+
+when@test:
+    framework:
+        messenger:
+            # Run jobs inline in-process so email assertions in the API tests
+            # see the message without needing a worker. sync:// handles the
+            # message synchronously when it's dispatched.
+            transports:
+                async: 'sync://'
+                failed: 'in-memory://'
