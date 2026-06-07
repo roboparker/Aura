@@ -6,7 +6,7 @@ namespace App\Security;
 
 use App\Entity\User;
 use App\Security\TooManyTwoFactorAttemptsException;
-use App\Service\TwoFactorRecoveryState;
+use App\Service\UserPayloadSerializer;
 use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Scheb\TwoFactorBundle\Security\Http\Authentication\AuthenticationRequiredHandlerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -35,7 +35,7 @@ final class TwoFactorJsonHandler implements
     AuthenticationSuccessHandlerInterface,
     AuthenticationFailureHandlerInterface
 {
-    public function __construct(private TwoFactorRecoveryState $recoveryState)
+    public function __construct(private UserPayloadSerializer $userPayloadSerializer)
     {
     }
 
@@ -58,7 +58,7 @@ final class TwoFactorJsonHandler implements
             return new JsonResponse(['error' => 'Authentication state is invalid.'], 500);
         }
 
-        return new JsonResponse($this->serializeUser($user));
+        return new JsonResponse($this->userPayloadSerializer->serialize($user));
     }
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
@@ -90,34 +90,5 @@ final class TwoFactorJsonHandler implements
         return new JsonResponse([
             'error' => 'Invalid authentication code.',
         ], 401);
-    }
-
-    /**
-     * Mirrors {@see App\Controller\AuthController::serializeUser()}. Kept
-     * inline so this file is self-contained for the firewall handler chain
-     * — the two-factor success path doesn't run through the controller.
-     * Must stay in sync with AuthController; the PWA treats both responses
-     * as the same User shape.
-     *
-     * @return array<string, mixed>
-     */
-    private function serializeUser(User $user): array
-    {
-        return [
-            'id' => (string) $user->getId(),
-            'email' => $user->getEmail(),
-            'roles' => $user->getRoles(),
-            'givenName' => $user->getGivenName(),
-            'familyName' => $user->getFamilyName(),
-            'nickname' => $user->getNickname(),
-            'personalizedColor' => $user->getPersonalizedColor(),
-            'avatarUrls' => $user->getAvatarUrls(),
-            'preferences' => $user->getPreferences(),
-            'twoFactor' => [
-                'enabled' => $user->isTotpEnabled(),
-                'recoveryCodesRemaining' => $user->getRecoveryCodeCount(),
-                'recoveryPending' => $this->recoveryState->isPending(),
-            ],
-        ];
     }
 }

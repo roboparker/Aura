@@ -422,9 +422,9 @@ const AuthCard = ({ defaultTab }: Props) => {
         )}
       </Card>
       <p className="text-xs text-muted-foreground tracking-wide">
-        <a href="/privacy" className="hover:text-foreground">privacy</a>
+        <Link href="/privacy" className="hover:text-foreground">privacy</Link>
         <span className="mx-2 opacity-60">•</span>
-        <a href="/terms" className="hover:text-foreground">terms</a>
+        <Link href="/terms" className="hover:text-foreground">terms</Link>
       </p>
     </div>
   );

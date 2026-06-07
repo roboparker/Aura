@@ -1,10 +1,11 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
@@ -31,23 +32,17 @@ interface Project {
   members: Member[];
 }
 
-interface ProjectCollection {
-  member?: Project[];
-  "hydra:member"?: Project[];
-}
+const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback;
 
 const Projects = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace } = useActiveSpace();
   const router = useRouter();
-
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   // Bumped after a successful create so the MarkdownEditor remounts empty.
   const [editorResetKey, setEditorResetKey] = useState(0);
 
@@ -55,81 +50,92 @@ const Projects = () => {
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
 
+  // Most recent mutation failure; query failures fall back to the query's
+  // own error in `error` below.
+  const [actionError, setActionError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadProjects = useCallback(async () => {
-    setError(null);
-    try {
-      // Scope to the active space (#187). Falls back to an unfiltered
-      // GET while the space list is still loading so the page doesn't
-      // flash empty on first paint — the access extension will cap the
-      // result set to spaces the user belongs to either way.
-      const url = activeSpace
-        ? `${ENTRYPOINT}/projects?space=${encodeURIComponent(activeSpace["@id"])}`
-        : `${ENTRYPOINT}/projects`;
-      const res = await fetch(url, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load projects.");
-      }
-      const data: ProjectCollection = await res.json();
-      setProjects(data.member ?? data["hydra:member"] ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load projects.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeSpace]);
+  // Scope to the active space (#187). Falls back to an unfiltered GET while
+  // the space list is still loading so the page doesn't flash empty on first
+  // paint — the access extension caps the result set to the user's spaces
+  // either way. react-query keys on the space so switching spaces refetches
+  // (and caches each space's list).
+  const spaceIri = activeSpace?.["@id"] ?? null;
+  const projectsQuery = useQuery({
+    queryKey: ["projects", spaceIri],
+    enabled: isAuthenticated,
+    queryFn: () =>
+      apiGetCollection<Project>(
+        spaceIri ? `/projects?space=${encodeURIComponent(spaceIri)}` : "/projects",
+        { errorMessage: "Failed to load projects." },
+      ),
+  });
+  const projects = projectsQuery.data ?? [];
+  const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["projects"] });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadProjects();
-    }
-  }, [isAuthenticated, loadProjects]);
-
-  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!title.trim()) return;
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/projects`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiSend("POST", "/projects", {
+        errorMessage: "Failed to create project.",
+        body: {
           title: title.trim(),
           description: description.trim() || null,
-          // Pin the new project to the active space (#187). Without
-          // this, ProjectOwnerProcessor still falls back to the
-          // creator's personal space, so visitors who created a
-          // project while their active space was a shared one would
-          // be surprised to find it in their personal space instead.
-          ...(activeSpace ? { space: activeSpace["@id"] } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create project.",
-        );
-      }
+          // Pin the new project to the active space (#187) so work created
+          // in a shared space doesn't silently land in the personal one.
+          ...(spaceIri ? { space: spaceIri } : {}),
+        },
+      }),
+    onSuccess: () => {
       setTitle("");
       setDescription("");
       setEditorResetKey((k) => k + 1);
-      await loadProjects();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setActionError(null);
+      void refreshProjects();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to create project.")),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (project: Project) =>
+      apiSend("PATCH", project["@id"], {
+        contentType: "application/merge-patch+json",
+        errorMessage: "Failed to update project.",
+        body: {
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+        },
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setActionError(null);
+      void refreshProjects();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to update project.")),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (project: Project) =>
+      apiSend("DELETE", project["@id"], { errorMessage: "Failed to delete project." }),
+    onSuccess: () => {
+      setActionError(null);
+      void refreshProjects();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to delete project.")),
+  });
+
+  const error =
+    actionError ??
+    (projectsQuery.isError ? errorMessage(projectsQuery.error, "Failed to load projects.") : null);
+
+  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+    createMutation.mutate();
   };
 
   const startEdit = (project: Project) => {
@@ -142,35 +148,13 @@ const Projects = () => {
     setEditingId(null);
   };
 
-  const handleUpdate = async (event: FormEvent<HTMLFormElement>, project: Project) => {
+  const handleUpdate = (event: FormEvent<HTMLFormElement>, project: Project) => {
     event.preventDefault();
     if (!editTitle.trim()) return;
-
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim() || null,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to update project.",
-        );
-      }
-      setEditingId(null);
-      await loadProjects();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update project.");
-    }
+    updateMutation.mutate(project);
   };
 
-  const handleDelete = async (project: Project) => {
+  const handleDelete = (project: Project) => {
     // Deleting a project deletes it for every member, and its tasks revert to
     // personal (project_id SET NULL). Make sure the user is aware.
     if (
@@ -180,20 +164,7 @@ const Projects = () => {
     ) {
       return;
     }
-
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error("Failed to delete project.");
-      }
-      await loadProjects();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete project.");
-    }
+    deleteMutation.mutate(project);
   };
 
   if (authLoading || !isAuthenticated) {
@@ -240,8 +211,8 @@ const Projects = () => {
                     onChange={setDescription}
                   />
                 </div>
-                <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                  {isSubmitting ? "Adding..." : "Add Project"}
+                <Button type="submit" disabled={createMutation.isPending || !title.trim()}>
+                  {createMutation.isPending ? "Adding..." : "Add Project"}
                 </Button>
               </form>
             </CardContent>
@@ -253,7 +224,7 @@ const Projects = () => {
             </Alert>
           )}
 
-          {isLoading ? (
+          {projectsQuery.isLoading ? (
             <p className="text-muted-foreground">Loading projects...</p>
           ) : projects.length === 0 ? (
             <Card>

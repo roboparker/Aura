@@ -26,6 +26,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  */
 class AccountLifecycleController extends AbstractController
 {
+    use JsonRequestTrait;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SensitiveActionVerifier $verifier,
@@ -105,16 +107,5 @@ class AccountLifecycleController extends AbstractController
         if ($request->hasSession()) {
             $request->getSession()->invalidate();
         }
-    }
-
-    /** @return array<string, mixed> */
-    private function jsonBody(Request $request): array
-    {
-        $decoded = json_decode($request->getContent(), true);
-        if (!is_array($decoded)) {
-            return [];
-        }
-        /** @var array<string, mixed> $decoded */
-        return $decoded;
     }
 }

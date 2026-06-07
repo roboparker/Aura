@@ -2,10 +2,10 @@
 
 namespace App\Controller;
 
-use App\Entity\ActivityLog;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Service\ActivityFeedQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,11 +26,10 @@ use Symfony\Component\Uid\Uuid;
  */
 class ProjectActivityController extends AbstractController
 {
-    private const DEFAULT_PAGE_SIZE = 20;
-    private const MAX_PAGE_SIZE = 100;
-
-    public function __construct(private EntityManagerInterface $em)
-    {
+    public function __construct(
+        private EntityManagerInterface $em,
+        private ActivityFeedQuery $activityFeed,
+    ) {
     }
 
     #[Route(
@@ -52,55 +51,15 @@ class ProjectActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $page = max(1, (int) $request->query->get('page', '1'));
-        $perPage = min(
-            self::MAX_PAGE_SIZE,
-            max(1, (int) $request->query->get('itemsPerPage', (string) self::DEFAULT_PAGE_SIZE)),
-        );
-
-        // Collect every task id belonging to this project — we need the
-        // full set to scope the Task slice of the audit feed. Using a
-        // subquery keeps the work inside the database.
-        $taskIds = array_map(
+        $taskIds = array_values(array_map(
             static fn (Task $t): string => (string) $t->getId(),
             $project->getTasks()->toArray(),
-        );
+        ));
 
-        $repo = $this->em->getRepository(ActivityLog::class);
-        $where = '(l.objectClass = :projectClass AND l.objectId = :projectId)';
-        if ([] !== $taskIds) {
-            $where .= ' OR (l.objectClass = :taskClass AND l.objectId IN (:taskIds))';
-        }
-
-        $applyParams = function (\Doctrine\ORM\QueryBuilder $qb) use ($project, $taskIds): \Doctrine\ORM\QueryBuilder {
-            $qb->setParameter('projectClass', Project::class)
-                ->setParameter('projectId', (string) $project->getId());
-            if ([] !== $taskIds) {
-                $qb->setParameter('taskClass', Task::class)
-                    ->setParameter('taskIds', $taskIds);
-            }
-            return $qb;
-        };
-
-        // Count and select share filters but the count must NOT carry
-        // ORDER BY — Postgres rejects mixing it with COUNT(*).
-        $rawTotal = $applyParams(
-            $repo->createQueryBuilder('l')
-                ->select('COUNT(l.id)')
-                ->where($where),
-        )->getQuery()->getSingleScalarResult();
-        $totalItems = is_numeric($rawTotal) ? (int) $rawTotal : 0;
-        /** @var ActivityLog[] $rows */
-        $rows = $applyParams(
-            $repo->createQueryBuilder('l')
-                ->where($where)
-                ->orderBy('l.loggedAt', 'DESC')
-                ->addOrderBy('l.version', 'DESC')
-                ->setFirstResult(($page - 1) * $perPage)
-                ->setMaxResults($perPage),
-        )->getQuery()->getResult();
-
-        return new JsonResponse(ActivityFeedSerializer::serialize($rows, $totalItems, $page, $perPage, $this->em));
+        return new JsonResponse($this->activityFeed->forObjectGroups([
+            Project::class => [(string) $project->getId()],
+            Task::class => $taskIds,
+        ], $request));
     }
 
     private function canRead(Project $project, User $user): bool

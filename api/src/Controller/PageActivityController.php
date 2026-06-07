@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
-use App\Entity\ActivityLog;
 use App\Entity\Page;
 use App\Entity\User;
+use App\Service\ActivityFeedQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,11 +23,10 @@ use Symfony\Component\Uid\Uuid;
  */
 class PageActivityController extends AbstractController
 {
-    private const DEFAULT_PAGE_SIZE = 20;
-    private const MAX_PAGE_SIZE = 100;
-
-    public function __construct(private EntityManagerInterface $em)
-    {
+    public function __construct(
+        private EntityManagerInterface $em,
+        private ActivityFeedQuery $activityFeed,
+    ) {
     }
 
     #[Route(
@@ -49,33 +48,9 @@ class PageActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $pageNumber = max(1, (int) $request->query->get('page', '1'));
-        $perPage = min(
-            self::MAX_PAGE_SIZE,
-            max(1, (int) $request->query->get('itemsPerPage', (string) self::DEFAULT_PAGE_SIZE)),
+        return new JsonResponse(
+            $this->activityFeed->forClass(Page::class, [(string) $page->getId()], $request),
         );
-
-        $repo = $this->em->getRepository(ActivityLog::class);
-        $totalItems = (int) $repo->createQueryBuilder('l')
-            ->select('COUNT(l.id)')
-            ->where('l.objectClass = :class AND l.objectId = :id')
-            ->setParameter('class', Page::class)
-            ->setParameter('id', (string) $page->getId())
-            ->getQuery()
-            ->getSingleScalarResult();
-        /** @var ActivityLog[] $rows */
-        $rows = $repo->createQueryBuilder('l')
-            ->where('l.objectClass = :class AND l.objectId = :id')
-            ->setParameter('class', Page::class)
-            ->setParameter('id', (string) $page->getId())
-            ->orderBy('l.loggedAt', 'DESC')
-            ->addOrderBy('l.version', 'DESC')
-            ->setFirstResult(($pageNumber - 1) * $perPage)
-            ->setMaxResults($perPage)
-            ->getQuery()
-            ->getResult();
-
-        return new JsonResponse(ActivityFeedSerializer::serialize($rows, $totalItems, $pageNumber, $perPage, $this->em));
     }
 
     private function canRead(Page $page, User $user): bool

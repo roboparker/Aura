@@ -8,6 +8,8 @@ use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Service\CopyTitleSuffixer;
+use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -77,7 +79,7 @@ class ProjectCopyController extends AbstractController
         $rawSpace = $payload['space'] ?? null;
         $target = $source->getSpace();
         if (is_string($rawSpace) && '' !== trim($rawSpace)) {
-            $spaceId = $this->extractIdFromIri($rawSpace);
+            $spaceId = SpaceIriResolver::extractId($rawSpace);
             if (null === $spaceId) {
                 return $this->json(['error' => 'Invalid space IRI.'], 400);
             }
@@ -97,7 +99,7 @@ class ProjectCopyController extends AbstractController
         }
 
         $copy = (new Project())
-            ->setTitle($this->copyTitle($source->getTitle()))
+            ->setTitle(CopyTitleSuffixer::apply($source->getTitle(), self::TITLE_MAX))
             ->setDescription($source->getDescription())
             ->setOwner($user)
             ->setSpace($target);
@@ -175,39 +177,6 @@ class ProjectCopyController extends AbstractController
         ], 201);
     }
 
-    /**
-     * "<title> (copy)" — but only adds the suffix if it isn't already
-     * present so repeated copies don't pile up "(copy) (copy) (copy)".
-     * Truncates to fit Project's 255-char `title` column so the new
-     * row doesn't fail validation.
-     */
+    /** Project's `title` column width — the clone must fit it after suffixing. */
     private const TITLE_MAX = 255;
-
-    private function copyTitle(string $sourceTitle): string
-    {
-        $suffix = ' (copy)';
-        if (str_ends_with($sourceTitle, $suffix)) {
-            return $sourceTitle;
-        }
-        $combined = $sourceTitle . $suffix;
-        if (mb_strlen($combined) <= self::TITLE_MAX) {
-            return $combined;
-        }
-        // $suffix is a literal ' (copy)' (7 chars), so TITLE_MAX -
-        // strlen($suffix) is always positive — no need for a fallback branch.
-        $room = self::TITLE_MAX - mb_strlen($suffix);
-        return mb_substr($sourceTitle, 0, $room) . $suffix;
-    }
-
-    private function extractIdFromIri(string $iri): ?string
-    {
-        $trimmed = trim($iri);
-        if (Uuid::isValid($trimmed)) {
-            return $trimmed;
-        }
-        if (1 === preg_match('#^/spaces/([0-9a-f-]+)$#i', $trimmed, $m) && Uuid::isValid($m[1])) {
-            return $m[1];
-        }
-        return null;
-    }
 }

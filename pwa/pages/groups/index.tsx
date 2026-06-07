@@ -1,7 +1,8 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen,
   LayoutGrid,
@@ -10,16 +11,12 @@ import {
   Search,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { resolveGroupColor } from "@/lib/avatarPalette";
 import { formatRelative, isRecent } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
-import {
-  type Group,
-  type GroupCollection,
-  toGroupAvatarUser,
-} from "@/lib/groupTypes";
+import { type Group, toGroupAvatarUser } from "@/lib/groupTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -61,11 +58,10 @@ const Groups = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
 
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -73,26 +69,23 @@ const Groups = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadGroups = useCallback(async () => {
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/groups`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
-      if (!res.ok) throw new Error("Failed to load groups.");
-      const data: GroupCollection = await res.json();
-      setGroups(data.member ?? data["hydra:member"] ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load groups.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) void loadGroups();
-  }, [isAuthenticated, loadGroups]);
+  const groupsQuery = useQuery({
+    queryKey: ["groups"],
+    enabled: isAuthenticated,
+    queryFn: () => apiGetCollection<Group>("/groups", { errorMessage: "Failed to load groups." }),
+  });
+  // Stable reference so the filtered/owned useMemos below don't recompute
+  // every render (react-query returns a new array identity each call).
+  const groups = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
+  const isLoading = groupsQuery.isLoading;
+  const refreshGroups = () => queryClient.invalidateQueries({ queryKey: ["groups"] });
+  const error =
+    actionError ??
+    (groupsQuery.isError
+      ? groupsQuery.error instanceof Error
+        ? groupsQuery.error.message
+        : "Failed to load groups."
+      : null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -116,19 +109,14 @@ const Groups = () => {
 
   const handleLeave = async (group: Group) => {
     if (!window.confirm(`Leave "${group.title}"?`)) return;
-    setError(null);
+    setActionError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/groups/${group.id}/leave`, {
-        method: "POST",
-        credentials: "include",
+      await apiSend("POST", `/groups/${group.id}/leave`, {
+        errorMessage: "Failed to leave group.",
       });
-      if (!res.ok && res.status !== 204) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to leave group.");
-      }
-      await loadGroups();
+      void refreshGroups();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to leave group.");
+      setActionError(err instanceof Error ? err.message : "Failed to leave group.");
     }
   };
 
@@ -238,7 +226,7 @@ const Groups = () => {
             twoFactorEnabled={user.twoFactor?.enabled ?? false}
             onDeleted={() => {
               setDeleteTarget(null);
-              void loadGroups();
+              void refreshGroups();
             }}
           />
         )}

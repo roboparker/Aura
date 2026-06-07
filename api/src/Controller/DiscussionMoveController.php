@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Discussion;
 use App\Entity\Space;
 use App\Entity\User;
+use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -52,7 +53,7 @@ class DiscussionMoveController extends AbstractController
         if (!is_string($rawSpace) || '' === trim($rawSpace)) {
             return $this->json(['error' => 'Target `space` IRI is required.'], 400);
         }
-        $spaceId = $this->extractIdFromIri($rawSpace);
+        $spaceId = SpaceIriResolver::extractId($rawSpace);
         if (null === $spaceId) {
             return $this->json(['error' => 'Invalid space IRI.'], 400);
         }
@@ -83,20 +84,5 @@ class DiscussionMoveController extends AbstractController
             'space' => '/spaces/' . $target->getId(),
             'moved' => true,
         ], 200);
-    }
-
-    /**
-     * Accepts either an IRI (`/spaces/{uuid}`) or a bare UUID.
-     */
-    private function extractIdFromIri(string $iri): ?string
-    {
-        $trimmed = trim($iri);
-        if (Uuid::isValid($trimmed)) {
-            return $trimmed;
-        }
-        if (1 === preg_match('#^/spaces/([0-9a-f-]+)$#i', $trimmed, $m) && Uuid::isValid($m[1])) {
-            return $m[1];
-        }
-        return null;
     }
 }

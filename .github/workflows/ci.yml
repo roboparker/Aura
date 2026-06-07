@@ -255,6 +255,17 @@ jobs:
         run: |
           docker compose exec -T pwa sh -c 'until [ -d node_modules/typescript ]; do sleep 2; done'
           docker compose exec -T pwa pnpm typecheck
+      -
+        name: PWA lint
+        # ESLint (Next + react-hooks rules) — run in the same job as the
+        # typecheck so hook-rule / Next regressions fail CI too. node_modules
+        # is already warm from the typecheck step above.
+        run: docker compose exec -T pwa pnpm lint
+      -
+        name: PWA unit tests
+        # Vitest over the pure logic in pwa/lib (query parsing, validation
+        # mapping, password strength). Component coverage stays in e2e.
+        run: docker compose exec -T pwa pnpm test
 
   e2e:
     name: E2E
