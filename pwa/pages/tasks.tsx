@@ -3,9 +3,6 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  ArrowUpDown,
   Bell,
   Filter,
   GripVertical,
@@ -55,6 +52,30 @@ import CommentsPanel, {
 import AttachmentsPanel, {
   type Attachment,
 } from "@/components/tasks/AttachmentsPanel";
+import RecurrencePicker from "@/components/tasks/RecurrencePicker";
+import SortableHeader from "@/components/tasks/SortableHeader";
+import {
+  DEFAULT_SORT,
+  REMINDER_LABELS,
+  REMINDER_OFFSETS,
+  addDays,
+  addMonths,
+  dueDateStatus,
+  formatDueDate,
+  formatRecurrenceSummary,
+  isoToLocalDate,
+  localDateToIso,
+  plainTextDescription,
+  removeComment,
+  todayLocalMidnight,
+  type DueDateStatus,
+  type RecurrenceRule,
+  type ReminderOffset,
+  type SortKey,
+  type SortState,
+  type Tag,
+  type Task,
+} from "@/components/tasks/taskHelpers";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -85,69 +106,6 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-interface Tag {
-  "@id": string;
-  id: string;
-  title: string;
-  color: string;
-}
-
-type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
-
-interface RecurrenceRule {
-  frequency: RecurrenceFrequency;
-  interval: number;
-}
-
-// Allowlist of reminder offsets the API accepts on Task.reminders. Kept in
-// the same order the picker renders so checkbox state ↔ JSON array stay
-// trivially aligned.
-const REMINDER_OFFSETS = ["15m", "1h", "1d"] as const;
-type ReminderOffset = (typeof REMINDER_OFFSETS)[number];
-const REMINDER_LABELS: Record<ReminderOffset, string> = {
-  "15m": "15 minutes before",
-  "1h": "1 hour before",
-  "1d": "1 day before",
-};
-
-interface Task {
-  "@id": string;
-  id: string;
-  title: string;
-  description: string | null;
-  createdOn: string;
-  completedOn: string | null;
-  dueDate: string | null;
-  // Embedded user shape under `task:read` (the User entity exposes its
-  // basic fields in that group). Used here only to widen comment
-  // delete-rights for the task owner without an extra fetch.
-  owner: { "@id": string };
-  recurrenceRule: RecurrenceRule | null;
-  reminders: ReminderOffset[] | null;
-  // Attachments embed inline under `task:read`. The PWA uploads via
-  // `POST /media-objects?kind=attachment`, then PATCHes the IRI here.
-  attachments: Attachment[];
-  position: number;
-  tags: Tag[];
-  assignees: AssigneeOption[];
-  // The API serializes Task.project as a bare IRI string under `task:read`.
-  // null means "personal task" — only the owner is assignable.
-  project: string | null;
-}
-
-const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
-  daily: "day",
-  weekly: "week",
-  monthly: "month",
-  yearly: "year",
-};
-
-const formatRecurrenceSummary = (rule: RecurrenceRule): string => {
-  const noun = FREQUENCY_LABELS[rule.frequency];
-  if (rule.interval === 1) return `Every ${noun}`;
-  return `Every ${rule.interval} ${noun}s`;
-};
-
 interface ProjectMembership {
   "@id": string;
   members: Array<{ "@id": string }>;
@@ -158,80 +116,6 @@ interface Collection<T> {
   member?: T[];
   "hydra:member"?: T[];
 }
-
-// "manual" maps to the persisted `position` order — drag-to-reorder is only
-// active in this mode because anything else would snap rows back the moment
-// we re-sorted. The other keys are derived sort orders that don't touch the
-// underlying tasks array, just the rendered view.
-type SortKey = "manual" | "completed" | "title" | "due";
-type SortDir = "asc" | "desc";
-
-interface SortState {
-  key: SortKey;
-  dir: SortDir;
-}
-
-const DEFAULT_SORT: SortState = { key: "manual", dir: "asc" };
-
-// Stored as ISO datetime on the wire but only the calendar day matters —
-// we persist UTC midnight on the picked day so round-trips are stable
-// across timezones. Read back via the YYYY-MM-DD slice and rebuild as a
-// local Date so the calendar / formatter render the day the user picked.
-const isoToLocalDate = (iso: string | null): Date | undefined => {
-  if (!iso) return undefined;
-  const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day);
-};
-
-const localDateToIso = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}T00:00:00+00:00`;
-};
-
-const dueDateFormatter = new Intl.DateTimeFormat(undefined, {
-  year: "numeric",
-  month: "short",
-  day: "numeric",
-});
-
-const formatDueDate = (iso: string | null): string => {
-  const date = isoToLocalDate(iso);
-  return date ? dueDateFormatter.format(date) : "";
-};
-
-// Local-midnight "today" so day comparisons line up with the dates the picker
-// stores (also local-midnight). Cheaper than a fresh Date() per row.
-const todayLocalMidnight = (): Date => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-};
-
-type DueDateStatus = "overdue" | "today" | "future" | "none";
-
-const dueDateStatus = (iso: string | null, completed: boolean): DueDateStatus => {
-  if (completed || !iso) return "none";
-  const due = isoToLocalDate(iso);
-  if (!due) return "none";
-  const today = todayLocalMidnight();
-  if (due.getTime() < today.getTime()) return "overdue";
-  if (due.getTime() === today.getTime()) return "today";
-  return "future";
-};
-
-const addDays = (date: Date, days: number): Date => {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-};
-
-const addMonths = (date: Date, months: number): Date => {
-  const next = new Date(date);
-  next.setMonth(next.getMonth() + months);
-  return next;
-};
 
 interface DueDateCellProps {
   value: string | null;
@@ -456,137 +340,6 @@ const DueDateCell = ({
         )}
       </PopoverContent>
     </Popover>
-  );
-};
-
-interface RecurrencePickerProps {
-  value: RecurrenceRule | null;
-  onChange: (next: RecurrenceRule | null) => void | Promise<void>;
-  testIdPrefix: string;
-}
-
-// Inline recurrence controls — renders inside the date popover so users
-// don't have to context-switch to set a repeat. "Off" clears the rule;
-// otherwise the (frequency, interval) pair is sent as a single update.
-const RecurrencePicker = ({ value, onChange, testIdPrefix }: RecurrencePickerProps) => {
-  const frequency: "off" | RecurrenceFrequency = value?.frequency ?? "off";
-  const interval = value?.interval ?? 1;
-
-  const handleFrequencyChange = (next: string) => {
-    if (next === "off") {
-      void onChange(null);
-      return;
-    }
-    void onChange({ frequency: next as RecurrenceFrequency, interval });
-  };
-
-  const handleIntervalChange = (raw: string) => {
-    const parsed = Number.parseInt(raw, 10);
-    if (!Number.isFinite(parsed) || parsed < 1) return;
-    if (!value) return;
-    void onChange({ frequency: value.frequency, interval: parsed });
-  };
-
-  return (
-    <div className="border-t p-2 space-y-2 min-w-56">
-      <div className="flex items-center gap-2 text-sm">
-        <Repeat className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
-        <label
-          htmlFor={`${testIdPrefix}-frequency`}
-          className="text-muted-foreground"
-        >
-          Repeat
-        </label>
-        <select
-          id={`${testIdPrefix}-frequency`}
-          value={frequency}
-          onChange={(e) => handleFrequencyChange(e.target.value)}
-          className="ml-auto h-8 rounded-md border border-input bg-background px-2 text-sm"
-          data-testid={`${testIdPrefix}-frequency`}
-        >
-          <option value="off">Off</option>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="yearly">Yearly</option>
-        </select>
-      </div>
-      {value && (
-        <div className="flex items-center gap-2 text-sm">
-          <label
-            htmlFor={`${testIdPrefix}-interval`}
-            className="text-muted-foreground"
-          >
-            Every
-          </label>
-          <Input
-            id={`${testIdPrefix}-interval`}
-            type="number"
-            min={1}
-            max={99}
-            value={interval}
-            onChange={(e) => handleIntervalChange(e.target.value)}
-            className="h-8 w-16"
-            data-testid={`${testIdPrefix}-interval`}
-          />
-          <span className="text-muted-foreground">
-            {FREQUENCY_LABELS[value.frequency]}
-            {interval === 1 ? "" : "s"}
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Strip the most common markdown punctuation so the description in the
-// dedicated sub-row reads as plain text. We keep paragraph breaks via `\n`
-// so multi-paragraph descriptions still feel structured. A real markdown
-// renderer (`MarkdownView`) can replace this later if we want bold/links.
-const plainTextDescription = (markdown: string | null): string => {
-  if (!markdown) return "";
-  return markdown
-    .replace(/`{3}[\s\S]*?`{3}/g, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/^[#>*_~`\-]+\s*/gm, "")
-    .replace(/\!?\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/[*_~]+/g, "")
-    .replace(/[ \t]+/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-};
-
-// Drops one comment from the local list. Was a recursive subtree
-// pruner pre-#228 when comments had a reply tree; the unified model
-// is flat, so a single ID filter is enough.
-const removeComment = (list: Comment[], removedIri: string): Comment[] =>
-  list.filter((c) => c["@id"] !== removedIri);
-
-interface SortableHeaderProps {
-  label: string;
-  sortKey: SortKey;
-  active: SortState;
-  onSort: (key: SortKey) => void;
-  className?: string;
-}
-
-const SortableHeader = ({ label, sortKey, active, onSort, className }: SortableHeaderProps) => {
-  const isActive = active.key === sortKey;
-  const Icon = isActive ? (active.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-  return (
-    <TableHead className={className}>
-      <button
-        type="button"
-        onClick={() => onSort(sortKey)}
-        className="inline-flex items-center gap-1 -ml-2 px-2 py-1 rounded-sm hover:bg-accent text-left font-medium"
-        aria-sort={
-          isActive ? (active.dir === "asc" ? "ascending" : "descending") : "none"
-        }
-      >
-        <span>{label}</span>
-        <Icon className={cn("h-3.5 w-3.5", isActive ? "opacity-100" : "opacity-50")} />
-      </button>
-    </TableHead>
   );
 };
 
