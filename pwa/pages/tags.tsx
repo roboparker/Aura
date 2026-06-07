@@ -1,8 +1,9 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
@@ -20,25 +21,19 @@ interface Tag {
   color: string;
 }
 
-interface TagCollection {
-  member?: Tag[];
-  "hydra:member"?: Tag[];
-}
-
 const DEFAULT_COLOR = "#6b7280";
+
+const errorMessage = (err: unknown, fallback: string): string =>
+  err instanceof Error ? err.message : fallback;
 
 const Tags = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
-
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [color, setColor] = useState(DEFAULT_COLOR);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   // Bumped after a successful create so the MarkdownEditor remounts empty.
   const [editorResetKey, setEditorResetKey] = useState(0);
 
@@ -47,70 +42,76 @@ const Tags = () => {
   const [editDescription, setEditDescription] = useState("");
   const [editColor, setEditColor] = useState(DEFAULT_COLOR);
 
+  // Most recent mutation failure; query failures fall back to the query's
+  // own error in `error` below.
+  const [actionError, setActionError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const loadTags = useCallback(async () => {
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/tags`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load tags.");
-      }
-      const data: TagCollection = await res.json();
-      setTags(data.member ?? data["hydra:member"] ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tags.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const tagsQuery = useQuery({
+    queryKey: ["tags"],
+    enabled: isAuthenticated,
+    queryFn: () => apiGetCollection<Tag>("/tags", { errorMessage: "Failed to load tags." }),
+  });
+  const tags = tagsQuery.data ?? [];
+  const refreshTags = () => queryClient.invalidateQueries({ queryKey: ["tags"] });
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadTags();
-    }
-  }, [isAuthenticated, loadTags]);
-
-  const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!title.trim()) return;
-
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/tags`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          color,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create tag.",
-        );
-      }
+  const createMutation = useMutation({
+    mutationFn: () =>
+      apiSend("POST", "/tags", {
+        errorMessage: "Failed to create tag.",
+        body: { title: title.trim(), description: description.trim() || null, color },
+      }),
+    onSuccess: () => {
       setTitle("");
       setDescription("");
       setColor(DEFAULT_COLOR);
       setEditorResetKey((k) => k + 1);
-      await loadTags();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create tag.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setActionError(null);
+      void refreshTags();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to create tag.")),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (tag: Tag) =>
+      apiSend("PATCH", tag["@id"], {
+        contentType: "application/merge-patch+json",
+        errorMessage: "Failed to update tag.",
+        body: {
+          title: editTitle.trim(),
+          description: editDescription.trim() || null,
+          color: editColor,
+        },
+      }),
+    onSuccess: () => {
+      setEditingId(null);
+      setActionError(null);
+      void refreshTags();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to update tag.")),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (tag: Tag) => apiSend("DELETE", tag["@id"], { errorMessage: "Failed to delete tag." }),
+    onSuccess: () => {
+      setActionError(null);
+      void refreshTags();
+    },
+    onError: (err) => setActionError(errorMessage(err, "Failed to delete tag.")),
+  });
+
+  const error =
+    actionError ?? (tagsQuery.isError ? errorMessage(tagsQuery.error, "Failed to load tags.") : null);
+
+  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!title.trim()) return;
+    createMutation.mutate();
   };
 
   const startEdit = (tag: Tag) => {
@@ -124,53 +125,17 @@ const Tags = () => {
     setEditingId(null);
   };
 
-  const handleUpdate = async (event: FormEvent<HTMLFormElement>, tag: Tag) => {
+  const handleUpdate = (event: FormEvent<HTMLFormElement>, tag: Tag) => {
     event.preventDefault();
     if (!editTitle.trim()) return;
-
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${tag["@id"]}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
-          title: editTitle.trim(),
-          description: editDescription.trim() || null,
-          color: editColor,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to update tag.",
-        );
-      }
-      setEditingId(null);
-      await loadTags();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update tag.");
-    }
+    updateMutation.mutate(tag);
   };
 
-  const handleDelete = async (tag: Tag) => {
+  const handleDelete = (tag: Tag) => {
     if (!window.confirm(`Delete tag "${tag.title}"? It will be removed from any tasks using it.`)) {
       return;
     }
-
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}${tag["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error("Failed to delete tag.");
-      }
-      await loadTags();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete tag.");
-    }
+    deleteMutation.mutate(tag);
   };
 
   if (authLoading || !isAuthenticated) {
@@ -230,8 +195,8 @@ const Tags = () => {
                     <span className="text-sm font-mono text-muted-foreground">{color}</span>
                   </div>
                 </div>
-                <Button type="submit" disabled={isSubmitting || !title.trim()}>
-                  {isSubmitting ? "Adding..." : "Add Tag"}
+                <Button type="submit" disabled={createMutation.isPending || !title.trim()}>
+                  {createMutation.isPending ? "Adding..." : "Add Tag"}
                 </Button>
               </form>
             </CardContent>
@@ -243,7 +208,7 @@ const Tags = () => {
             </Alert>
           )}
 
-          {isLoading ? (
+          {tagsQuery.isLoading ? (
             <p className="text-muted-foreground">Loading tags...</p>
           ) : tags.length === 0 ? (
             <Card>
