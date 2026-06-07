@@ -7,6 +7,14 @@ doctrine:
         #server_version: '16'
 
         profiling_collect_backtrace: '%kernel.debug%'
+
+        # Messenger's Doctrine transport table (messenger_messages) is
+        # provisioned by a migration with auto_setup disabled, so the ORM
+        # never learns about it. Exclude it from schema introspection or
+        # doctrine:schema:validate / migrations:diff would flag it as an
+        # untracked table that schema:update would drop.
+        schema_filter: ~^(?!messenger_messages)~
+
         # doctrine/dbal 4 dropped the legacy `array` type. Gedmo's
         # AbstractLogEntry still declares its `data` column as
         # `array`, so we re-register it as a JSON-backed alias.
