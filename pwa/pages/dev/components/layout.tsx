@@ -4,7 +4,7 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const LayoutPage = () => (
   <ComponentDoc
     name="Layout"
-    description="App-shell wrapper used by _app.tsx. Mounts ThemeProvider, QueryClientProvider, HydrationBoundary, AuthProvider, and ActiveSpaceProvider, then renders the persistent Navbar + Sidebar around page content. Sidebar collapses to nothing for unauthenticated visitors so marketing and auth screens keep their full-width chrome."
+    description="App-shell wrapper used by _app.tsx. Mounts QueryClientProvider, HydrationBoundary, AuthProvider, and ActiveSpaceProvider, then renders the persistent Sidebar + Navbar + Footer around page content. Sidebar collapses to nothing for unauthenticated visitors so marketing and auth screens keep their full-width chrome; waitlisted accounts render chrome-free. The app is dark-only — there is no theme provider."
     importPath={`import Layout from "@/components/common/Layout";`}
     examples={[
       {

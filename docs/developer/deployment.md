@@ -101,13 +101,14 @@ Ensure all secrets are set to strong, unique values in production.
 
 ### Deploy
 ```bash
+cd helm
 skaffold run
 ```
 
 ### Configuration
 - Helm chart: `helm/api-platform/`
-- Skaffold config: `skaffold.yaml`
-- Values override: `skaffold-values.yaml`
+- Skaffold config: `helm/skaffold.yaml`
+- Values override: `helm/skaffold-values.yaml`
 
 ## CI/CD
 
