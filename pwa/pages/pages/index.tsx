@@ -1,10 +1,11 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
@@ -34,11 +35,6 @@ interface PageRow {
   createdBy: AvatarUser & { "@id": string; id: string };
 }
 
-interface Collection<T> {
-  member?: T[];
-  "hydra:member"?: T[];
-}
-
 const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
 const formatRelative = (iso: string): string => {
   const ts = new Date(iso).getTime();
@@ -59,9 +55,6 @@ const PagesIndex = () => {
   const { activeSpace } = useActiveSpace();
   const router = useRouter();
 
-  const [pages, setPages] = useState<PageRow[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   // Composer
@@ -76,31 +69,27 @@ const PagesIndex = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
+  const spaceIri = activeSpace?.["@id"] ?? null;
+  const pagesQuery = useQuery({
+    queryKey: ["pages", spaceIri, search.trim()],
+    enabled: isAuthenticated,
+    queryFn: () => {
       const params = new URLSearchParams({ itemsPerPage: "100" });
-      if (activeSpace) params.set("space", activeSpace["@id"]);
+      if (spaceIri) params.set("space", spaceIri);
       const trimmed = search.trim();
       if (trimmed) params.set("search", trimmed);
-      const res = await fetch(`${ENTRYPOINT}/pages?${params.toString()}`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
+      return apiGetCollection<PageRow>(`/pages?${params.toString()}`, {
+        errorMessage: "Failed to load pages.",
       });
-      if (!res.ok) throw new Error("Failed to load pages.");
-      const data: Collection<PageRow> = await res.json();
-      setPages(data.member ?? data["hydra:member"] ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [activeSpace, search]);
-
-  useEffect(() => {
-    if (isAuthenticated) void load();
-  }, [isAuthenticated, load]);
+    },
+  });
+  const pages = pagesQuery.data ?? [];
+  const isLoading = pagesQuery.isLoading;
+  const error = pagesQuery.isError
+    ? pagesQuery.error instanceof Error
+      ? pagesQuery.error.message
+      : "Failed to load."
+    : null;
 
   const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,26 +97,13 @@ const PagesIndex = () => {
     setIsCreating(true);
     setCreateError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/pages`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          space: activeSpace["@id"],
-          title: newTitle.trim(),
-          body: "",
-        }),
+      const created = await apiSend<PageRow>("POST", "/pages", {
+        errorMessage: "Failed to create page.",
+        body: { space: activeSpace["@id"], title: newTitle.trim(), body: "" },
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.detail || data["hydra:description"] || "Failed to create page.",
-        );
-      }
-      const created: PageRow = await res.json();
       setNewTitle("");
       setShowComposer(false);
-      await router.push(`/pages/${created.id}`);
+      if (created) await router.push(`/pages/${created.id}`);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create.");
     } finally {
