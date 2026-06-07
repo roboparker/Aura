@@ -23,6 +23,18 @@ services:
       - host.docker.internal:host-gateway
     tty: true
 
+  # The worker (defined in compose.yaml) reuses the dev php image, which has
+  # no source baked in — give it the same source + vendor mounts as php here
+  # (compose.e2e.yaml replaces compose.override.yaml, which carries them for
+  # normal dev). Without this the worker boots an empty /app and crashes.
+  worker:
+    volumes:
+      - ./api:/app
+      - /app/var
+      - api_vendor:/app/vendor
+    environment:
+      XDEBUG_MODE: "off"
+
   pwa:
     # Distinct image name from the dev-target `app-pwa` so both can be
     # baked, saved, and loaded side-by-side in a single CI artifact.

@@ -17,6 +17,7 @@ services:
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
       MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
+      MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
@@ -40,6 +41,46 @@ services:
       timeout: 5s
       retries: 20
       start_period: 60s
+
+  # Long-running job runner: drains the Postgres-backed Messenger queue
+  # (currently notification emails). Reuses the app-php image and the shared
+  # docker-entrypoint, which special-cases `bin/console` to wait for the DB.
+  # Depends on php being healthy so migrations are applied once (by php)
+  # before the worker boots — its own entrypoint migrate is then a no-op.
+  worker:
+    image: ${IMAGES_PREFIX:-}app-php
+    depends_on:
+      php:
+        condition: service_healthy
+    restart: unless-stopped
+    command:
+      - bin/console
+      - messenger:consume
+      - async
+      - "-vv"
+      - "--time-limit=3600"
+      - "--memory-limit=128M"
+    # The worker reuses the app-php image, whose HEALTHCHECK curls the Caddy
+    # admin endpoint — but this container runs messenger:consume, not the web
+    # server, so that probe can never pass. Replace it with a liveness check
+    # on the consumer process (pidof, since the slim image has no pgrep/ps).
+    # start_period covers the entrypoint's DB-wait + migrate before consume
+    # starts. `up --wait` needs a real healthcheck, so this can't be disabled.
+    healthcheck:
+      test: ["CMD-SHELL", "pidof php > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
+    environment:
+      SERVER_NAME: php-worker
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=${POSTGRES_CHARSET:-utf8}
+      MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
+      MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
+      MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
+      MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
+      MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
 
   pwa:
     image: ${IMAGES_PREFIX:-}app-pwa

@@ -24,6 +24,17 @@ services:
       - host.docker.internal:host-gateway
     tty: true
 
+  # Job runner shares the dev image + source bind-mount + vendor volume so
+  # it runs the same code the php service does (the dev image has no source
+  # baked in — it lives in the bind-mount).
+  worker:
+    volumes:
+      - ./api:/app
+      - /app/var
+      - api_vendor:/app/vendor
+    environment:
+      XDEBUG_MODE: "off"
+
   # Static-analysis tools run against the dev `app-php` image (built by
   # the existing `php` service) so they inherit the same PHP extensions
   # the app needs at runtime (pdo_pgsql, intl, gd) — phpstan-doctrine's

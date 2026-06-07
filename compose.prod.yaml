@@ -9,6 +9,11 @@ services:
       MERCURE_PUBLISHER_JWT_KEY: ${CADDY_MERCURE_JWT_SECRET}
       MERCURE_SUBSCRIBER_JWT_KEY: ${CADDY_MERCURE_JWT_SECRET}
 
+  # Reuses the prod php image (source + vendor baked in, no bind-mount).
+  worker:
+    environment:
+      APP_SECRET: ${APP_SECRET}
+
   pwa:
     build:
       context: ./pwa
