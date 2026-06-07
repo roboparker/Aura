@@ -61,7 +61,9 @@ class UserPayloadSerializerTest extends KernelTestCase
 
         $payload = $this->serializer()->serialize($user);
 
-        $this->assertContains('ROLE_SEGMENT_BETA_EDITOR', $payload['roles']);
+        $roles = $payload['roles'];
+        $this->assertIsArray($roles);
+        $this->assertContains('ROLE_SEGMENT_BETA_EDITOR', $roles);
     }
 
     public function testWaitlistedUserGetsNoSegmentRoles(): void
@@ -74,7 +76,9 @@ class UserPayloadSerializerTest extends KernelTestCase
         $payload = $this->serializer()->serialize($user);
 
         $this->assertTrue($payload['waitlisted']);
-        $this->assertNotContains('ROLE_SEGMENT_BETA_EDITOR', $payload['roles']);
+        $roles = $payload['roles'];
+        $this->assertIsArray($roles);
+        $this->assertNotContains('ROLE_SEGMENT_BETA_EDITOR', $roles);
     }
 
     private function makeUser(string $email): User
