@@ -24,9 +24,16 @@ const STATUS_VALUES = new Set(["open", "completed"]);
 const stripQuotes = (s: string): string =>
   s.length >= 2 && s.startsWith('"') && s.endsWith('"') ? s.slice(1, -1) : s;
 
+// Tokenise on whitespace but keep a quoted run together, so
+// `tag:"launch blocker"` is one token (not `tag:"launch` + `blocker"`).
+// A token is either a chunk containing a "…" quoted span, or a plain
+// run of non-space characters.
+const TOKEN_RE = /[^\s"]*"[^"]*"[^\s"]*|[^\s"]+/g;
+
 /**
  * Splits a raw query into free text + recognised tokens. Unknown tokens
  * (e.g. `has:video`) fall through to free text rather than erroring.
+ * Quoted phrases survive on `tag:` / `in:` values, e.g. `tag:"launch blocker"`.
  */
 export function parseQuery(raw: string): ParsedQuery {
   const tags: string[] = [];
@@ -35,7 +42,7 @@ export function parseQuery(raw: string): ParsedQuery {
   let space: string | null = null;
   const textParts: string[] = [];
 
-  for (const token of raw.trim().split(/\s+/).filter(Boolean)) {
+  for (const token of raw.match(TOKEN_RE) ?? []) {
     const lower = token.toLowerCase();
     if (lower.startsWith("tag:")) {
       const v = stripQuotes(token.slice(4));

@@ -11,12 +11,21 @@ describe("parseQuery", () => {
     expect(p.text).toBe("ship the rest");
   });
 
-  it("strips surrounding quotes from single-token tag: and in: values", () => {
-    // NB: the query is whitespace-split before quotes are stripped, so a
-    // quoted value only round-trips when it has no spaces.
-    const p = parseQuery('tag:"launch" in:"Space"');
+  it("keeps quoted phrases (with spaces) together on tag: and in: values", () => {
+    const p = parseQuery('tag:"launch blocker" in:"My Space"');
+    expect(p.tags).toEqual(["launch blocker"]);
+    expect(p.space).toBe("My Space");
+  });
+
+  it("still strips quotes from a space-free quoted value", () => {
+    const p = parseQuery('tag:"launch"');
     expect(p.tags).toEqual(["launch"]);
-    expect(p.space).toBe("Space");
+  });
+
+  it("mixes a quoted tag with trailing free text correctly", () => {
+    const p = parseQuery('ship tag:"launch blocker" now');
+    expect(p.tags).toEqual(["launch blocker"]);
+    expect(p.text).toBe("ship now");
   });
 
   it("only accepts valid status values", () => {
