@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
@@ -29,11 +29,6 @@ interface Project {
   createdOn: string;
   owner: Member;
   members: Member[];
-}
-
-interface ProjectCollection {
-  member?: Project[];
-  "hydra:member"?: Project[];
 }
 
 const Projects = () => {
@@ -68,18 +63,10 @@ const Projects = () => {
       // GET while the space list is still loading so the page doesn't
       // flash empty on first paint — the access extension will cap the
       // result set to spaces the user belongs to either way.
-      const url = activeSpace
-        ? `${ENTRYPOINT}/projects?space=${encodeURIComponent(activeSpace["@id"])}`
-        : `${ENTRYPOINT}/projects`;
-      const res = await fetch(url, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
-      if (!res.ok) {
-        throw new Error("Failed to load projects.");
-      }
-      const data: ProjectCollection = await res.json();
-      setProjects(data.member ?? data["hydra:member"] ?? []);
+      const path = activeSpace
+        ? `/projects?space=${encodeURIComponent(activeSpace["@id"])}`
+        : "/projects";
+      setProjects(await apiGetCollection<Project>(path, { errorMessage: "Failed to load projects." }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load projects.");
     } finally {
@@ -100,11 +87,9 @@ const Projects = () => {
     setIsSubmitting(true);
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/projects`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
+      await apiSend("POST", "/projects", {
+        errorMessage: "Failed to create project.",
+        body: {
           title: title.trim(),
           description: description.trim() || null,
           // Pin the new project to the active space (#187). Without
@@ -113,14 +98,8 @@ const Projects = () => {
           // project while their active space was a shared one would
           // be surprised to find it in their personal space instead.
           ...(activeSpace ? { space: activeSpace["@id"] } : {}),
-        }),
+        },
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create project.",
-        );
-      }
       setTitle("");
       setDescription("");
       setEditorResetKey((k) => k + 1);
@@ -148,21 +127,14 @@ const Projects = () => {
 
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({
+      await apiSend("PATCH", project["@id"], {
+        contentType: "application/merge-patch+json",
+        errorMessage: "Failed to update project.",
+        body: {
           title: editTitle.trim(),
           description: editDescription.trim() || null,
-        }),
+        },
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to update project.",
-        );
-      }
       setEditingId(null);
       await loadProjects();
     } catch (err) {
@@ -183,13 +155,7 @@ const Projects = () => {
 
     setError(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}${project["@id"]}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        throw new Error("Failed to delete project.");
-      }
+      await apiSend("DELETE", project["@id"], { errorMessage: "Failed to delete project." });
       await loadProjects();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete project.");
