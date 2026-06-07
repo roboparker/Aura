@@ -67,6 +67,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: SegmentRepository::class)]
 #[ORM\Table(name: 'segment')]
 #[ORM\UniqueConstraint(name: 'uniq_segment_key', columns: ['segment_key'])]
+#[ORM\Index(columns: ['created_by_id'], name: 'idx_segment_created_by')]
 class Segment
 {
     public const MAX_KEY_LENGTH = 64;

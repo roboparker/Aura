@@ -43,8 +43,6 @@ final class Version20260606130000 extends AbstractMigration
         SQL);
         $this->addSql('CREATE UNIQUE INDEX uniq_segment_key ON segment (segment_key)');
         $this->addSql('CREATE INDEX idx_segment_created_by ON segment (created_by_id)');
-        $this->addSql('COMMENT ON COLUMN segment.id IS \'(DC2Type:uuid)\'');
-        $this->addSql('COMMENT ON COLUMN segment.created_by_id IS \'(DC2Type:uuid)\'');
         $this->addSql(<<<'SQL'
             ALTER TABLE segment
                 ADD CONSTRAINT fk_segment_created_by FOREIGN KEY (created_by_id)
@@ -63,9 +61,6 @@ final class Version20260606130000 extends AbstractMigration
         SQL);
         $this->addSql('CREATE UNIQUE INDEX uniq_segment_membership_user ON segment_membership (segment_id, user_id)');
         $this->addSql('CREATE INDEX idx_segment_membership_user ON segment_membership (user_id)');
-        $this->addSql('COMMENT ON COLUMN segment_membership.id IS \'(DC2Type:uuid)\'');
-        $this->addSql('COMMENT ON COLUMN segment_membership.segment_id IS \'(DC2Type:uuid)\'');
-        $this->addSql('COMMENT ON COLUMN segment_membership.user_id IS \'(DC2Type:uuid)\'');
         $this->addSql(<<<'SQL'
             ALTER TABLE segment_membership
                 ADD CONSTRAINT fk_segment_membership_segment FOREIGN KEY (segment_id)
