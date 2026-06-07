@@ -76,10 +76,13 @@ const AdminSegmentDetail: NextPage = () => {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const res = await fetchWithTimeout(`${ENTRYPOINT}/segments/${id}`, {
-        credentials: "include",
-        headers: { Accept: "application/ld+json" },
-      });
+      const res = await fetchWithTimeout(
+        `${ENTRYPOINT}/segments/${encodeURIComponent(id)}`,
+        {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        },
+      );
       if (res.status === 404) {
         setNotFound(true);
         return;
