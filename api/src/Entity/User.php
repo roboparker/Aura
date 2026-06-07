@@ -49,7 +49,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?Uuid $id = null;
 
     // Settable on signup (`user:create`), but not on PATCH — changes
@@ -57,7 +57,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $email = '';
 
     #[ORM\Column]
@@ -103,18 +103,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $givenName = '';
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Family name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $familyName = '';
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?string $nickname = null;
 
     /**
@@ -128,7 +128,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'user:write', 'user:create', 'project:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
 
     /**
@@ -146,7 +146,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private ?MediaObject $avatar = null;
 
     /**
-     * Per-user preferences (theme, notification toggles, frequency). Stored
+     * Per-user preferences (timezone, notification toggles, frequency). Stored
      * as a JSON object so we can extend the shape without a migration each
      * time. The canonical defaults live in {@see DEFAULT_PREFERENCES} and are
      * merged in by the getter, so older rows don't need backfilling and
@@ -236,7 +236,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $totpRecoveryCodes = null;
 
-    public const ALLOWED_THEMES = ['light', 'dark', 'system'];
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
     public const NOTIFICATION_MATRIX_ROWS = [
         'mentions',
@@ -248,7 +247,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     ];
 
     public const DEFAULT_PREFERENCES = [
-        'theme' => 'system',
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
         // scheduling + reminder display and digest/quiet-hours math.
         'timezone' => 'UTC',
@@ -449,7 +447,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Always returns the full preference set, defaults merged in for any
      * keys the stored row is missing. Callers can read e.g.
-     * `$user->getPreferences()['theme']` without null-checks.
+     * `$user->getPreferences()['timezone']` without null-checks.
      *
      * @return array<string, mixed>
      */

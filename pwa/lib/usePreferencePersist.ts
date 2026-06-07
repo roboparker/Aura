@@ -6,7 +6,7 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 /**
  * Shared optimistic save for `PATCH /me/preferences`, used by the Settings
- * panels (theme, timezone, notifications). Mirrors the original inline logic
+ * panels (timezone, notifications). Mirrors the original inline logic
  * from the old single settings page: optimistic local merge, a monotonic
  * request id so a slow-then-fast pair can't clobber the newer state, and a
  * transient "saved" pill that auto-clears.

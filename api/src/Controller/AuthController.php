@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\SegmentEvaluator;
 use App\Service\TwoFactorRecoveryState;
 use Scheb\TwoFactorBundle\Security\Authentication\Token\TwoFactorTokenInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,6 +17,7 @@ class AuthController extends AbstractController
     public function __construct(
         private Security $security,
         private TwoFactorRecoveryState $recoveryState,
+        private SegmentEvaluator $segmentEvaluator,
     ) {
     }
 
@@ -59,10 +61,22 @@ class AuthController extends AbstractController
      */
     private function serializeUser(User $user): array
     {
+        // A waitlisted account holds no ROLE_USER and is boxed into the gate,
+        // so it gets no segment roles. Everyone else has their active
+        // ROLE_SEGMENT_* roles appended so the PWA can feature-gate UI with
+        // the same role strings the backend's SegmentVoter answers for.
+        $roles = $user->getRoles();
+        if (!$user->isWaitlisted()) {
+            $roles = array_values(array_unique([
+                ...$roles,
+                ...$this->segmentEvaluator->activeSegmentRolesFor($user),
+            ]));
+        }
+
         return [
             'id' => (string) $user->getId(),
             'email' => $user->getEmail(),
-            'roles' => $user->getRoles(),
+            'roles' => $roles,
             'givenName' => $user->getGivenName(),
             'familyName' => $user->getFamilyName(),
             'nickname' => $user->getNickname(),
@@ -74,8 +88,8 @@ class AuthController extends AbstractController
             // User::getRoles), so the server-side block is authoritative —
             // this flag just drives the client UX.
             'waitlisted' => $user->isWaitlisted(),
-            // Inlined so the PWA can apply the saved theme on initial render
-            // without an extra round-trip to /me/preferences.
+            // Inlined so the PWA has notification + timezone settings on
+            // initial render without an extra round-trip to /me/preferences.
             'preferences' => $user->getPreferences(),
             // Surfaced so the PWA can show "2FA on" in the security card
             // and the count-of-remaining-codes warning without an extra

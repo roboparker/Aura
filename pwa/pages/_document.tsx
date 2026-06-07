@@ -26,6 +26,11 @@ const codeThemeBootstrap = `
 const Document = () => (
   <Html
     lang="en"
+    // Aura is dark-only. The `dark` class is hard-coded here so the
+    // app paints dark on first byte (no flash, no client toggle) and
+    // Tailwind's `dark:` variants + the code-fence `html.dark` rules
+    // keep resolving.
+    className="dark"
     data-code-theme={DEFAULT_CODE_THEME_ID}
     suppressHydrationWarning
   >

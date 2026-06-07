@@ -2,7 +2,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import SettingsShell from "@/components/settings/SettingsShell";
 import SaveIndicator from "@/components/settings/SaveIndicator";
-import AppearanceCard from "@/components/settings/AppearanceCard";
 import TimezoneSelect from "@/components/settings/TimezoneSelect";
 import AvatarSection from "@/components/account/AvatarSection";
 import EmailChangeForm from "@/components/account/EmailChangeForm";
@@ -54,11 +53,6 @@ const ProfilePage = () => {
           />
         </CardContent>
       </Card>
-
-      <AppearanceCard
-        value={prefs?.theme ?? "system"}
-        onChange={(theme) => void persist({ theme })}
-      />
     </SettingsShell>
   );
 };
