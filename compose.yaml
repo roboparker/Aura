@@ -62,11 +62,16 @@ services:
       - "--memory-limit=128M"
     # The worker reuses the app-php image, whose HEALTHCHECK curls the Caddy
     # admin endpoint — but this container runs messenger:consume, not the web
-    # server, so that probe can never pass. Disable it (a crashed worker is
-    # handled by restart: unless-stopped); otherwise `up --wait` reports the
-    # worker unhealthy.
+    # server, so that probe can never pass. Replace it with a liveness check
+    # on the consumer process (pidof, since the slim image has no pgrep/ps).
+    # start_period covers the entrypoint's DB-wait + migrate before consume
+    # starts. `up --wait` needs a real healthcheck, so this can't be disabled.
     healthcheck:
-      disable: true
+      test: ["CMD-SHELL", "pidof php > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 120s
     environment:
       SERVER_NAME: php-worker
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=${POSTGRES_CHARSET:-utf8}

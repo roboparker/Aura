@@ -86,11 +86,11 @@ spec:
                   name: {{ include "api-platform.fullname" . }}
                   key: mercure-jwt-secret
           # Liveness via the consumer process: if messenger:consume dies the
-          # container exits and the Deployment restarts it. A lightweight
-          # check confirms the PHP process is alive.
+          # container exits and the Deployment restarts it. The slim image has
+          # no pgrep/ps, so check for the php process with pidof.
           livenessProbe:
             exec:
-              command: ["pgrep", "-f", "messenger:consume"]
+              command: ["sh", "-c", "pidof php > /dev/null"]
             initialDelaySeconds: 30
             periodSeconds: 30
           resources:
