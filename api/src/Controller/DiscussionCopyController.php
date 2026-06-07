@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\Discussion;
 use App\Entity\Space;
 use App\Entity\User;
+use App\Service\CopyTitleSuffixer;
+use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -53,7 +55,7 @@ class DiscussionCopyController extends AbstractController
         $rawSpace = $payload['space'] ?? null;
         $target = $sourceSpace;
         if (is_string($rawSpace) && '' !== trim($rawSpace)) {
-            $spaceId = $this->extractIdFromIri($rawSpace);
+            $spaceId = SpaceIriResolver::extractId($rawSpace);
             if (null === $spaceId) {
                 return $this->json(['error' => 'Invalid space IRI.'], 400);
             }
@@ -71,7 +73,7 @@ class DiscussionCopyController extends AbstractController
         $copy = (new Discussion())
             ->setSpace($target)
             ->setAuthor($user)
-            ->setTitle($this->copyTitle($source->getTitle()))
+            ->setTitle(CopyTitleSuffixer::apply($source->getTitle(), Discussion::MAX_TITLE_LENGTH))
             ->setBody($source->getBody())
             ->setCategory($source->getCategory());
 
@@ -84,33 +86,5 @@ class DiscussionCopyController extends AbstractController
             'title' => $copy->getTitle(),
             'space' => '/spaces/' . $target->getId(),
         ], 201);
-    }
-
-    private function copyTitle(string $sourceTitle): string
-    {
-        $suffix = ' (copy)';
-        if (str_ends_with($sourceTitle, $suffix)) {
-            return $sourceTitle;
-        }
-        $combined = $sourceTitle . $suffix;
-        if (mb_strlen($combined) <= Discussion::MAX_TITLE_LENGTH) {
-            return $combined;
-        }
-        // $suffix is a literal ' (copy)' (7 chars), so MAX_TITLE_LENGTH -
-        // strlen($suffix) is always positive — no need for a fallback branch.
-        $room = Discussion::MAX_TITLE_LENGTH - mb_strlen($suffix);
-        return mb_substr($sourceTitle, 0, $room) . $suffix;
-    }
-
-    private function extractIdFromIri(string $iri): ?string
-    {
-        $trimmed = trim($iri);
-        if (Uuid::isValid($trimmed)) {
-            return $trimmed;
-        }
-        if (1 === preg_match('#^/spaces/([0-9a-f-]+)$#i', $trimmed, $m) && Uuid::isValid($m[1])) {
-            return $m[1];
-        }
-        return null;
     }
 }
