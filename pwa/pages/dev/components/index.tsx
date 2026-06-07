@@ -11,10 +11,11 @@ const categories = [
   "Data",
   "Editor",
   "User",
-  "Theme",
   "Layout",
   "Discussions",
   "Custom fields",
+  "Groups",
+  "Notifications",
 ] as const;
 
 const ComponentsIndex = () => (

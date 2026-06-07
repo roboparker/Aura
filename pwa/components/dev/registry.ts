@@ -8,7 +8,6 @@ export type RegistryEntry = {
     | "Data"
     | "Editor"
     | "User"
-    | "Theme"
     | "Layout"
     | "Discussions"
     | "Custom fields"
@@ -34,20 +33,28 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "formik-field", name: "FormikField", category: "Form", description: "Formik-aware label + input + error wrapper." },
   { slug: "input", name: "Input", category: "Form", description: "Single-line text input." },
   { slug: "input-group", name: "InputGroup", category: "Form", description: "Compose an input with leading/trailing addons." },
+  { slug: "input-otp", name: "InputOTP", category: "Form", description: "Segmented one-time-code input (slots + separator) built on input-otp." },
+  { slug: "color-swatch-picker", name: "ColorSwatchPicker", category: "Form", description: "Stateless radiogroup row of color swatches with a saving pulse state." },
+  { slug: "email-chip-input", name: "EmailChipInput", category: "Form", description: "Controlled multi-email chip input with paste-split, validation ring, and colored tiles." },
   { slug: "label", name: "Label", category: "Form", description: "Accessible label associated to a form control." },
   { slug: "popover", name: "Popover", category: "Overlay", description: "Floating content anchored to a trigger." },
   { slug: "separator", name: "Separator", category: "Primitive", description: "Horizontal or vertical divider." },
   { slug: "sheet", name: "Sheet", category: "Overlay", description: "Side-anchored drawer." },
   { slug: "switch", name: "Switch", category: "Form", description: "On/off toggle built on @base-ui/react." },
   { slug: "table", name: "Table", category: "Data", description: "Styled HTML table primitives." },
+  { slug: "comments-panel", name: "CommentsPanel", category: "Data", description: "Flat chronological comment thread with composer, inline edit/delete, and a lockable composer." },
   { slug: "tabs", name: "Tabs", category: "Primitive", description: "Tab list + panels." },
   { slug: "textarea", name: "Textarea", category: "Form", description: "Multi-line text input." },
   { slug: "markdown-editor", name: "MarkdownEditor", category: "Editor", description: "BlockNote-backed WYSIWYG markdown editor." },
   { slug: "markdown-view", name: "MarkdownView", category: "Editor", description: "Read-only markdown renderer." },
+  { slug: "code-fence", name: "CodeFence", category: "Editor", description: "Syntax-highlighted code block with copy button and per-page theme switcher." },
+  { slug: "code-theme-switcher", name: "CodeThemeSwitcher", category: "Editor", description: "Dropdown to pick the Prism palette for code fences; persisted to localStorage." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
   { slug: "avatar-stack", name: "AvatarStack", category: "User", description: "Overlapping avatar cluster with a +N overflow chip." },
-  { slug: "layout", name: "Layout", category: "Layout", description: "App-shell wrapper: providers + persistent Navbar and Sidebar." },
-  { slug: "navbar", name: "Navbar", category: "Layout", description: "Top app bar with wordmark, search, badges, and mobile sheet." },
+  { slug: "layout", name: "Layout", category: "Layout", description: "App-shell wrapper: providers + persistent Sidebar, Navbar, and Footer." },
+  { slug: "navbar", name: "Navbar", category: "Layout", description: "Top app bar with breadcrumbs/wordmark, search, badges, and mobile sheet." },
+  { slug: "breadcrumbs", name: "Breadcrumbs", category: "Layout", description: "URL-derived navbar breadcrumb trail; lazy-fetches entity names for UUID segments." },
+  { slug: "footer", name: "Footer", category: "Layout", description: "Static site footer with product, developer, and project link columns." },
   { slug: "sidebar", name: "Sidebar", category: "Layout", description: "Persistent left navigation column (md and up, authenticated only)." },
   { slug: "sidebar-nav", name: "SidebarNav", category: "Layout", description: "Shared nav contents used by the persistent sidebar and the mobile sheet." },
   { slug: "search-bar", name: "SearchBar", category: "Layout", description: "Navbar task search with debounced autocomplete; ⌘K opens the SearchOverlay palette." },

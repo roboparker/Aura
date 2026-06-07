@@ -4,17 +4,17 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const SpaceSwitcherPage = () => (
   <ComponentDoc
     name="SpaceSwitcher"
-    description="Active-space dropdown surfaced next to the Aura wordmark in the navbar. Picks the user's current space and persists the choice via ActiveSpaceContext (localStorage key `aura.activeSpaceId`), so listing pages (`/projects`, `/discussions`) scope to it. Personal spaces wear a lock icon. Renders 'Loading…' until the space list resolves and nothing if the user has no spaces."
+    description="Active-space dropdown rendered at the top of SidebarNav (under the user header, above the personal links). Picks the user's current space and persists the choice via ActiveSpaceContext (localStorage key `aura.activeSpaceId`), so listing pages (`/projects`, `/discussions`) scope to it. The dropdown lists spaces by recency, selecting one navigates to `/spaces/{id}`, and a divider adds shortcuts to All spaces (/spaces) and Create space (/spaces/new). Personal spaces wear a lock icon. Renders 'Loading…' until the space list resolves and nothing if the user has no active space."
     importPath={`import SpaceSwitcher from "@/components/common/SpaceSwitcher";`}
     examples={[
       {
-        title: "Default (in navbar)",
+        title: "Default (in the sidebar)",
         code: `<SpaceSwitcher />`,
         preview: (
           <p className="text-sm text-muted-foreground">
-            Mounted by <code className="mx-1">Navbar</code> for authenticated
-            users with at least one space loaded. The dropdown is already
-            visible in the navbar at the top of this page.
+            Mounted by <code className="mx-1">SidebarNav</code> for
+            authenticated users with at least one space loaded. The switcher is
+            already visible at the top of the sidebar on the left of this page.
           </p>
         ),
       },

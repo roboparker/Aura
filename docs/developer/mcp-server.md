@@ -37,7 +37,7 @@ curl -X POST https://your-aura/api-tokens \
 
 The response includes a one-shot `plainToken` field — copy it; subsequent `GET /api-tokens` calls do not return it again. The persisted database row stores only the sha256 hash.
 
-`scopes` is an array of MCP tool names. The empty array (default) means "all tools." Narrow tokens to e.g. `["get_task", "list_tasks"]` for read-only access.
+`scopes` is an array drawn from a fixed **resource vocabulary** (`ApiToken::SCOPE_VOCABULARY`), `Assert\Choice`-validated: `read:tasks`, `write:tasks`, `read:projects`, `write:projects`, `read:pages`, `admin`. The empty array (default) means "all tools." Each registered tool maps to a required scope via `App\Mcp\ScopeMap`, with `write:*` implying the matching `read:*` and `admin` acting as a superset — so e.g. `["read:tasks", "read:projects"]` yields a read-only token. (Raw tool names like `get_task` are **not** valid scope values and will be rejected.)
 
 `POST /api-tokens` and `GET /api-tokens` use the cookie-based PWA session (firewall: `main`); the `/mcp` firewall is independent and accepts only Bearer tokens.
 
@@ -58,7 +58,7 @@ The response includes a one-shot `plainToken` field — copy it; subsequent `GET
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
 
-> **Custom field values** — `set_custom_field` is intentionally not yet exposed: the underlying `CustomFieldValue` entity isn't built (only definitions, from #84). `get_custom_fields` returns the project's defined fields so MCP callers can prepare for the value-write surface once it lands.
+> **Custom field values** — `get_custom_fields` returns a project's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through the REST Task `customFieldValues` array; a dedicated `set_custom_field` MCP tool is not yet exposed.
 
 ## Errors
 

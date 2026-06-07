@@ -2,16 +2,14 @@ import UserAvatar from "@/components/user/UserAvatar";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 
 const ada = {
-  username: "ada-lovelace",
-  firstName: "Ada",
-  lastName: "Lovelace",
+  givenName: "Ada",
+  familyName: "Lovelace",
   personalizedColor: "#0e7490",
 };
 
 const lin = {
-  username: "lin-mei",
-  firstName: "Lin",
-  lastName: "Mei",
+  givenName: "Lin",
+  familyName: "Mei",
   personalizedColor: "#9333ea",
 };
 
@@ -25,9 +23,8 @@ const UserAvatarPage = () => (
         title: "Initials fallback (no avatarUrls)",
         code: `<UserAvatar
   user={{
-    username: "ada-lovelace",
-    firstName: "Ada",
-    lastName: "Lovelace",
+    givenName: "Ada",
+    familyName: "Lovelace",
     personalizedColor: "#0e7490",
   }}
 />`,
