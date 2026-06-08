@@ -42,6 +42,68 @@ const SheetPage = () => (
           </Sheet>
         ),
       },
+      {
+        title: "Other sides",
+        code: `{(["left", "top", "bottom"] as const).map((side) => (
+  <Sheet key={side}>
+    <SheetTrigger asChild>
+      <Button variant="outline">Open {side}</Button>
+    </SheetTrigger>
+    <SheetContent side={side}>
+      <SheetHeader>
+        <SheetTitle>{side} drawer</SheetTitle>
+        <SheetDescription>Anchored to the {side} edge.</SheetDescription>
+      </SheetHeader>
+    </SheetContent>
+  </Sheet>
+))}`,
+        preview: (
+          <div className="flex flex-wrap gap-2">
+            {(["left", "top", "bottom"] as const).map((side) => (
+              <Sheet key={side}>
+                <SheetTrigger asChild>
+                  <Button variant="outline">Open {side}</Button>
+                </SheetTrigger>
+                <SheetContent side={side}>
+                  <SheetHeader>
+                    <SheetTitle>{side} drawer</SheetTitle>
+                    <SheetDescription>Anchored to the {side} edge.</SheetDescription>
+                  </SheetHeader>
+                </SheetContent>
+              </Sheet>
+            ))}
+          </div>
+        ),
+      },
+      {
+        title: "Without close button",
+        code: `// Pass showCloseButton={false} when the drawer supplies its own
+// dismissal (e.g. a non-modal drawer with footer actions).
+<Sheet>
+  <SheetTrigger asChild>
+    <Button variant="outline">Open</Button>
+  </SheetTrigger>
+  <SheetContent side="right" showCloseButton={false}>
+    <SheetHeader>
+      <SheetTitle>No X in the corner</SheetTitle>
+      <SheetDescription>Dismiss via the overlay or your own button.</SheetDescription>
+    </SheetHeader>
+  </SheetContent>
+</Sheet>`,
+        preview: (
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline">Open</Button>
+            </SheetTrigger>
+            <SheetContent side="right" showCloseButton={false}>
+              <SheetHeader>
+                <SheetTitle>No X in the corner</SheetTitle>
+                <SheetDescription>Dismiss via the overlay or your own button.</SheetDescription>
+              </SheetHeader>
+            </SheetContent>
+          </Sheet>
+        ),
+      },
     ]}
   />
 );

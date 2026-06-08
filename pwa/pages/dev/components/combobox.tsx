@@ -1,11 +1,15 @@
 import { useState } from "react";
 import {
   Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
   ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
+  ComboboxValue,
 } from "@/components/ui/combobox";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 
@@ -43,11 +47,46 @@ const SingleSelect = () => {
   );
 };
 
+const MultiSelect = () => {
+  const [value, setValue] = useState<Fruit[]>([fruits[0]]);
+  return (
+    <Combobox<Fruit, true>
+      items={fruits}
+      multiple
+      value={value}
+      onValueChange={setValue}
+      itemToStringLabel={(f) => f.label}
+      itemToStringValue={(f) => f.id}
+    >
+      <ComboboxChips>
+        <ComboboxValue>
+          {value.map((fruit) => (
+            <ComboboxChip key={fruit.id} aria-label={fruit.label}>
+              {fruit.label}
+            </ComboboxChip>
+          ))}
+        </ComboboxValue>
+        <ComboboxChipsInput placeholder="Add fruit…" />
+      </ComboboxChips>
+      <ComboboxContent>
+        <ComboboxEmpty>No matches.</ComboboxEmpty>
+        <ComboboxList>
+          {(fruit: Fruit) => (
+            <ComboboxItem key={fruit.id} value={fruit}>
+              {fruit.label}
+            </ComboboxItem>
+          )}
+        </ComboboxList>
+      </ComboboxContent>
+    </Combobox>
+  );
+};
+
 const ComboboxPage = () => (
   <ComponentDoc
     name="Combobox"
     description="Searchable select built on @base-ui/react. Pass `multiple` for chip-style multi-select. See pwa/components/tasks/TagsCombobox.tsx for a real-world chips example."
-    importPath={`import { Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty } from "@/components/ui/combobox";`}
+    importPath={`import { Combobox, ComboboxInput, ComboboxContent, ComboboxList, ComboboxItem, ComboboxEmpty, ComboboxChips, ComboboxChip, ComboboxChipsInput, ComboboxValue } from "@/components/ui/combobox";`}
     examples={[
       {
         title: "Single-select",
@@ -73,6 +112,41 @@ const ComboboxPage = () => (
   </ComboboxContent>
 </Combobox>`,
         preview: <SingleSelect />,
+      },
+      {
+        title: "Multi-select (chips)",
+        code: `const [value, setValue] = useState<Fruit[]>([fruits[0]]);
+
+<Combobox<Fruit, true>
+  items={fruits}
+  multiple
+  value={value}
+  onValueChange={setValue}
+  itemToStringLabel={(f) => f.label}
+  itemToStringValue={(f) => f.id}
+>
+  <ComboboxChips>
+    <ComboboxValue>
+      {value.map((fruit) => (
+        <ComboboxChip key={fruit.id} aria-label={fruit.label}>
+          {fruit.label}
+        </ComboboxChip>
+      ))}
+    </ComboboxValue>
+    <ComboboxChipsInput placeholder="Add fruit…" />
+  </ComboboxChips>
+  <ComboboxContent>
+    <ComboboxEmpty>No matches.</ComboboxEmpty>
+    <ComboboxList>
+      {(fruit: Fruit) => (
+        <ComboboxItem key={fruit.id} value={fruit}>
+          {fruit.label}
+        </ComboboxItem>
+      )}
+    </ComboboxList>
+  </ComboboxContent>
+</Combobox>`,
+        preview: <MultiSelect />,
       },
     ]}
   />

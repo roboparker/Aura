@@ -2,8 +2,10 @@ import { Search, AtSign } from "lucide-react";
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
   InputGroupText,
+  InputGroupTextarea,
 } from "@/components/ui/input-group";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 
@@ -52,6 +54,48 @@ const InputGroupPage = () => (
               <InputGroupInput placeholder="username" />
               <InputGroupAddon align="inline-end">
                 <InputGroupText>@aura.dev</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+        ),
+      },
+      {
+        title: "Trailing button",
+        code: `<InputGroup>
+  <InputGroupInput placeholder="Add a comment…" />
+  <InputGroupAddon align="inline-end">
+    <InputGroupButton variant="default" size="sm">Post</InputGroupButton>
+  </InputGroupAddon>
+</InputGroup>`,
+        preview: (
+          <div className="w-full max-w-sm">
+            <InputGroup>
+              <InputGroupInput placeholder="Add a comment…" />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton variant="default" size="sm">Post</InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          </div>
+        ),
+      },
+      {
+        title: "Textarea with block-end addon",
+        code: `// align="block-start" / "block-end" stack the addon above/below a
+// multiline control instead of beside it.
+<InputGroup>
+  <InputGroupTextarea placeholder="Write a description…" />
+  <InputGroupAddon align="block-end">
+    <InputGroupText>Markdown supported</InputGroupText>
+    <InputGroupButton size="sm" className="ml-auto">Save</InputGroupButton>
+  </InputGroupAddon>
+</InputGroup>`,
+        preview: (
+          <div className="w-full max-w-sm">
+            <InputGroup>
+              <InputGroupTextarea placeholder="Write a description…" />
+              <InputGroupAddon align="block-end">
+                <InputGroupText>Markdown supported</InputGroupText>
+                <InputGroupButton size="sm" className="ml-auto">Save</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
           </div>
