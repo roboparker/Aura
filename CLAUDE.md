@@ -17,7 +17,8 @@ Aura/
   compose.yaml        # Docker Compose (dev environment)
   CHANGELOG.md        # Project changelog
   CODE_OF_CONDUCT.md  # Contributor code of conduct
-  LICENSE             # MIT license
+  LICENSE             # GNU AGPL-3.0 (dual-licensed; commercial license available)
+  CLA.md              # Contributor License Agreement (enables dual licensing)
 ```
 
 ## Tech Stack
@@ -239,4 +240,5 @@ User docs:
 - `CHANGELOG.md` - Project changelog (Keep a Changelog format)
 - `CODE_OF_CONDUCT.md` - Contributor Covenant code of conduct
 - `CONTRIBUTORS.md` - Project contributors list
-- `LICENSE` - MIT license
+- `LICENSE` - GNU AGPL-3.0. Aura is dual-licensed: AGPL for open use, with separate commercial licenses available from the maintainer.
+- `CLA.md` - Contributor License Agreement. All contributions are accepted under it (grants the maintainer a relicensing license) so the dual-licensing model works.

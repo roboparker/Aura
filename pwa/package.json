@@ -2,6 +2,7 @@
   "name": "pwa",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "scripts": {
     "sync:docs": "node scripts/sync-docs.mjs",
     "predev": "node scripts/sync-docs.mjs",
@@ -10,8 +11,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@api-platform/admin": "^4.0.9",
@@ -64,8 +64,7 @@
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.7",
     "eslint-plugin-react-hooks": "^7.0.0",
-    "typescript": "^6.0.3",
-    "vitest": "^3.0.0"
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "@babel/core": "^7.19.0",

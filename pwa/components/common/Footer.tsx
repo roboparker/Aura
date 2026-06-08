@@ -105,7 +105,16 @@ const Footer = () => (
         </div>
       </div>
       <p className="mt-8 text-xs text-muted-foreground">
-        Aura — built on API Platform. Licensed MIT.
+        Aura — built on API Platform. Source-available under the{" "}
+        <a
+          href="https://github.com/roboparker/Aura/blob/main/LICENSE"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          GNU AGPL-3.0
+        </a>
+        .
       </p>
     </div>
   </footer>

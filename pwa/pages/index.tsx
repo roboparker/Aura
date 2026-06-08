@@ -205,7 +205,7 @@ const Home = () => {
 
         <footer className="border-t bg-background">
           <div className="max-w-5xl mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-            Aura · MIT License ·{" "}
+            Aura · AGPL-3.0 ·{" "}
             <Link
               href="https://github.com/roboparker/Aura"
               target="_blank"

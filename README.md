@@ -90,4 +90,14 @@ Community:
 
 ## License
 
-[MIT](LICENSE).
+Copyright © 2026 Robert Parker.
+
+Aura is free software, licensed under the **GNU Affero General Public License
+v3.0** — see [`LICENSE`](LICENSE). The AGPL's network-use clause means anyone
+who runs a modified Aura as a network service must offer their users the
+corresponding source.
+
+Separate **commercial licenses** are available from the maintainer for parties
+who do not wish to comply with the AGPL. Contributions are accepted under the
+[Contributor License Agreement](CLA.md), which supports this dual-licensing
+model.

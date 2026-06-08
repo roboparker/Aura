@@ -41,4 +41,9 @@ See `docs/developer/branching-and-releases.md` for the full branching and releas
 
 ## License
 
-By submitting a PR, you agree to license your contribution under the [MIT license](../LICENSE).
+Aura is licensed under the [GNU AGPL-3.0](../LICENSE). Because the project is
+also offered under separate commercial licenses, all contributions are
+accepted under our [Contributor License Agreement](../CLA.md): by opening a
+pull request, you agree to its terms for your contributions. You keep
+ownership of your work — the CLA grants the maintainer a license (including
+the right to relicense) so the dual-licensing model can work.
