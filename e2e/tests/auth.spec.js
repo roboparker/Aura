@@ -26,7 +26,13 @@ test.describe("Authentication", () => {
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Keep the random seed; just commit it.
-    await expect(page.getByTestId("avatar-color-picker")).toBeVisible();
+    try {
+      await expect(page.getByTestId("avatar-color-picker")).toBeVisible({ timeout: 5000 });
+    } catch (e) {
+      const dbg = await page.locator("body").innerText();
+      throw new Error("DEBUG signup did not advance. Body text:
+" + dbg.slice(0, 1400));
+    }
     await page.getByTestId("signup-color-continue").click();
 
     // Step 3 — provisioning animation then redirect to /signin with the
