@@ -16,7 +16,7 @@ You'll need an authenticator app installed on your phone. Any of these work:
 
 Then in Aura:
 
-1. Sign in and open **Account settings**.
+1. Sign in and open **Settings → Security**.
 2. Find the **Two-factor authentication** section.
 3. Click **Enable**.
 4. A QR code appears. Open your authenticator app, tap "Add account" (the exact wording varies — look for a `+` button), and scan the code. If your phone can't reach the screen, tap **Enter this key manually** under the QR and type it in.
@@ -37,7 +37,7 @@ If the code is rejected, double-check that:
 - You typed the code for *Aura* — your app likely has codes for several other services that look identical.
 - The code hasn't already rolled over. Each code is valid for 30 seconds; if it changes mid-typing, use the new one.
 
-After five wrong codes in a row Aura rate-limits you for a short window. Wait, then try again with a fresh code.
+After five code attempts within a minute, Aura rate-limits you for a short window. Wait, then try again with a fresh code.
 
 ## Recovery codes
 
@@ -49,7 +49,7 @@ Treat them like passwords:
 - **Don't email them to yourself** or save them in a note synced to a cloud you can't reach without the phone you're protecting.
 - **Don't share them.** Anyone with a code can use it to sign in.
 
-You can see how many codes you have left in **Account settings → Two-factor authentication**. If you've used several and want a fresh batch, click **Regenerate codes** — this invalidates the old set and gives you ten new ones.
+You can see how many codes you have left in **Settings → Security → Two-factor authentication**. If you've used several and want a fresh batch, click **Regenerate codes** — this invalidates the old set and gives you ten new ones.
 
 To see your current codes again later (for example, to copy them into a new password manager), click **Reveal codes**. You'll be asked for a code from your authenticator app first.
 
@@ -80,7 +80,7 @@ This removes 2FA from your account entirely. Use this if you don't have a new au
 2. Enter your account password.
 3. Click **Disable 2FA**.
 
-Your account is now password-only. You can turn 2FA back on any time from **Account settings**.
+Your account is now password-only. You can turn 2FA back on any time from **Settings → Security**.
 
 ### Notification emails
 
@@ -100,7 +100,7 @@ This is intentional: a backdoor that bypassed both factors would defeat the poin
 
 ## Turning 2FA off voluntarily
 
-You can disable 2FA from **Account settings → Two-factor authentication → Disable** at any time. You'll be asked for a current code from your authenticator (not your password — Aura assumes your authenticator still works) to confirm.
+You can disable 2FA from **Settings → Security → Two-factor authentication → Disable** at any time. You'll be asked for a current code from your authenticator (not your password — Aura assumes your authenticator still works) to confirm.
 
 Once disabled, your TOTP secret and remaining recovery codes are deleted. If you re-enable later, you'll go through the QR-scan setup from scratch.
 

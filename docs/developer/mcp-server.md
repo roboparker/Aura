@@ -94,7 +94,7 @@ For local dev (default `compose.yaml` ports):
 }
 ```
 
-A copy-paste-ready file lives at [`api/config/mcp-server.json`](../api/config/mcp-server.json).
+A copy-paste-ready file lives at [`api/config/mcp-server.json`](../../api/config/mcp-server.json).
 
 ## Implementation notes
 

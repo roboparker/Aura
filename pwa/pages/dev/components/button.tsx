@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 
@@ -32,13 +32,16 @@ const ButtonPage = () => (
         code: `<Button size="sm">Small</Button>
 <Button>Default</Button>
 <Button size="lg">Large</Button>
-<Button size="icon" aria-label="Add"><Plus /></Button>`,
+<Button size="icon" aria-label="Add"><Plus /></Button>
+{/* icon-xs (h-5 w-5) — used internally by Combobox/InputGroup for inline trigger + chip-remove buttons */}
+<Button size="icon-xs" variant="ghost" aria-label="Remove"><X /></Button>`,
         preview: (
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm">Small</Button>
             <Button>Default</Button>
             <Button size="lg">Large</Button>
             <Button size="icon" aria-label="Add"><Plus /></Button>
+            <Button size="icon-xs" variant="ghost" aria-label="Remove"><X /></Button>
           </div>
         ),
       },

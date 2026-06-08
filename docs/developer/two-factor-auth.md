@@ -20,7 +20,7 @@ Config: [api/config/packages/scheb_2fa.yaml](../../api/config/packages/scheb_2fa
 - `totpSecretEncrypted: ?string` — sodium-secretbox-encrypted TOTP secret. Key is derived from `APP_SECRET` by [`App\Service\TwoFactorSecretCipher`](../../api/src/Service/TwoFactorSecretCipher.php).
 - `totpSecretCache: ?string` — transient (not persisted) plaintext, populated on Doctrine `postLoad` by [`App\EventListener\UserTotpCipherInjector`](../../api/src/EventListener/UserTotpCipherInjector.php). Scheb reads this through `getTotpAuthenticationConfiguration()`.
 - `totpEnabledAt: ?DateTimeImmutable` — telemetry only.
-- `recoveryCodes: list<array{hash: string, encrypted?: string, consumedAt: ?string, consumedCode?: ?string}>` — JSON. `hash` is the source of truth for verification; `encrypted` is the sodium-encrypted plaintext used by the GitHub-style "reveal codes" flow. Spent entries are kept (with `consumedAt`) so the UI can show "X of 10 used."
+- `totpRecoveryCodes: list<array{hash: string, encrypted?: string, consumedAt: ?string, consumedCode?: ?string}>` — JSON. `hash` is the source of truth for verification; `encrypted` is the sodium-encrypted plaintext used by the GitHub-style "reveal codes" flow. Spent entries are kept (with `consumedAt`) so the UI can show "X of 10 used."
 
 Keeping the secret encrypted at rest means a database leak (without `APP_SECRET`) doesn't yield usable TOTP secrets. The plaintext only lives in process memory between `postLoad` and the next `EntityManager::clear()`.
 

@@ -118,8 +118,9 @@ The API container includes a health check that verifies the `/docs` endpoint is 
 ```yaml
 healthcheck:
   test: curl --insecure --fail https://localhost/docs || exit 1
+  interval: 15s
   timeout: 5s
-  retries: 5
+  retries: 20
   start_period: 60s
 ```
 
