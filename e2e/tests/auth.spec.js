@@ -28,10 +28,9 @@ test.describe("Authentication", () => {
     // Step 2 — avatar color picker. Keep the random seed; just commit it.
     try {
       await expect(page.getByTestId("avatar-color-picker")).toBeVisible({ timeout: 5000 });
-    } catch (e) {
+    } catch (err) {
       const dbg = await page.locator("body").innerText();
-      throw new Error("DEBUG signup did not advance. Body text:
-" + dbg.slice(0, 1400));
+      throw new Error("DEBUG-DUMP " + dbg.slice(0, 1400));
     }
     await page.getByTestId("signup-color-continue").click();
 
