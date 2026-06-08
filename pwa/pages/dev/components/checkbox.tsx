@@ -53,7 +53,7 @@ const Indeterminate = () => {
 const CheckboxPage = () => (
   <ComponentDoc
     name="Checkbox"
-    description="Boolean input built on @radix-ui/react-checkbox. Pair with a Label using shared `id`/`htmlFor`. Pass `checked=\"indeterminate\"` for the tri-state parent of a select-all group."
+    description="Boolean input built on @radix-ui/react-checkbox. Pair with a Label using shared `id`/`htmlFor`. Pass `checked='indeterminate'` for the tri-state parent of a select-all group."
     importPath={`import { Checkbox } from "@/components/ui/checkbox";`}
     examples={[
       {
