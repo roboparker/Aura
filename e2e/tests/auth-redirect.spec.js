@@ -103,6 +103,7 @@ test.describe("Auth redirect", () => {
     await page.fill('input[name="familyName"]', "User");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
+    await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Commit the random seed.

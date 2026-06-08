@@ -18,6 +18,8 @@ test.describe("Authentication", () => {
     await page.fill("#familyName", "User");
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");
+    // Consent is now a required clickwrap checkbox before submit.
+    await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Keep the random seed; just commit it.
