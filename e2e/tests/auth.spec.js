@@ -29,8 +29,9 @@ test.describe("Authentication", () => {
     try {
       await expect(page.getByTestId("avatar-color-picker")).toBeVisible({ timeout: 5000 });
     } catch (err) {
-      const dbg = await page.locator("body").innerText();
-      throw new Error("DEBUG-DUMP " + dbg.slice(0, 1400));
+      const btn = await page.getByRole("button", { name: "Create account" }).evaluate((el) => el.outerHTML + " ||FORM=" + (el.form ? "yes" : "no")).catch(() => "no-btn");
+      const cb = await page.getByRole("checkbox").evaluate((el) => el.outerHTML).catch(() => "no-cb");
+      throw new Error("DEBUG-BTN " + btn + " ::: DEBUG-CB " + cb);
     }
     await page.getByTestId("signup-color-continue").click();
 
