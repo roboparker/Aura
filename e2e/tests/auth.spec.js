@@ -23,17 +23,13 @@ test.describe("Authentication", () => {
     const consent = page.getByRole("checkbox");
     await consent.click();
     await expect(consent).toBeChecked();
+    // Move focus off the checkbox before submitting so the click is not
+    // racing a blur/re-render from the Radix control.
+    await consent.blur();
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Keep the random seed; just commit it.
-    try {
-      await expect(page.getByTestId("avatar-color-picker")).toBeVisible({ timeout: 5000 });
-    } catch (err) {
-      await page.locator("form").first().evaluate((f) => f.requestSubmit());
-      const advanced = await page.getByTestId("avatar-color-picker").isVisible({ timeout: 3000 }).catch(() => false);
-      const summary = await page.getByTestId("signup-error-summary").innerText().catch(() => "none");
-      throw new Error("DEBUG-PROG advanced=" + advanced + " summary=[" + summary + "]");
-    }
+    await expect(page.getByTestId("avatar-color-picker")).toBeVisible();
     await page.getByTestId("signup-color-continue").click();
 
     // Step 3 — provisioning animation then redirect to /signin with the

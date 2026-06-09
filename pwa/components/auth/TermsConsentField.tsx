@@ -28,7 +28,6 @@ const TermsConsentField = ({ name = "acceptTerms" }: { name?: string }) => {
             helpers.setValue(checked === true);
             helpers.setTouched(true);
           }}
-          onBlur={() => helpers.setTouched(true)}
           aria-invalid={showError}
           aria-describedby={showError ? `${id}-error` : undefined}
           className="mt-0.5"
