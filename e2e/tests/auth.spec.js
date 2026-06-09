@@ -29,9 +29,10 @@ test.describe("Authentication", () => {
     try {
       await expect(page.getByTestId("avatar-color-picker")).toBeVisible({ timeout: 5000 });
     } catch (err) {
-      const btn = await page.getByRole("button", { name: "Create account" }).evaluate((el) => el.outerHTML + " ||FORM=" + (el.form ? "yes" : "no")).catch(() => "no-btn");
-      const cb = await page.getByRole("checkbox").evaluate((el) => el.outerHTML).catch(() => "no-cb");
-      throw new Error("DEBUG-BTN " + btn + " ::: DEBUG-CB " + cb);
+      await page.locator("form").first().evaluate((f) => f.requestSubmit());
+      const advanced = await page.getByTestId("avatar-color-picker").isVisible({ timeout: 3000 }).catch(() => false);
+      const summary = await page.getByTestId("signup-error-summary").innerText().catch(() => "none");
+      throw new Error("DEBUG-PROG advanced=" + advanced + " summary=[" + summary + "]");
     }
     await page.getByTestId("signup-color-continue").click();
 
