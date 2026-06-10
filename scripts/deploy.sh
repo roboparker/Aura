@@ -3,11 +3,14 @@
 # Production deploy, run ON the server by .github/workflows/deploy.yml
 # (or by hand for a manual deploy). Sequence:
 #
-#   1. raise the maintenance page (Caddy @maintenance flag file)
-#   2. back up the database + media (scripts/backup.sh)
-#   3. pull the new images and swap the containers
-#   4. wait for the stack to come back healthy
-#   5. lower the maintenance page
+#   1. pull the new images
+#   2. raise the maintenance page (Caddy @maintenance flag file)
+#   3. back up the database + media (`bin/console app:backup:run` in a
+#      one-off container of the INCOMING image — so the backup engine is
+#      always the code about to be deployed, never a stale container)
+#   4. swap the containers
+#   5. wait for the stack to come back healthy
+#   6. lower the maintenance page
 #
 # On ANY failure the script exits non-zero and leaves the maintenance page
 # UP — a half-deployed stack should not serve traffic, and the workflow
@@ -60,7 +63,13 @@ compose() {
 
 log "deploying tag $IMAGES_TAG"
 
-# 1. Maintenance page up. The flag lives in the maintenance_flag volume, so
+# 1. Pull first, so the backup below can run on the incoming image and the
+# swap later is quick. --no-build everywhere: the server never builds;
+# images come from the registry the workflow pushed to.
+log "pulling images"
+compose pull -q "${SERVICES[@]}"
+
+# 2. Maintenance page up. The flag lives in the maintenance_flag volume, so
 # it survives the container swap below. Tolerate failure on the very first
 # deploy from a pre-maintenance-mode image (no volume mount yet) — the flag
 # is cosmetic there, the deploy itself is unaffected.
@@ -68,17 +77,17 @@ log "raising maintenance page"
 compose exec -T php sh -c 'mkdir -p /app/var/maintenance && touch /app/var/maintenance/maintenance.on' \
   || log "WARN: could not raise maintenance flag (old image without maintenance support?)"
 
-# 2. Pre-deploy backup. Uses the same retention pool as the nightly cron
-# (MAX_BACKUPS newest kept). A failed backup aborts the deploy — we never
-# swap code without a fresh restore point.
+# 3. Pre-deploy backup, via the same engine as the nightly scheduler job
+# (App\Service\BackupRunner; newest-MAX kept across both). Runs in a
+# one-off container of the image we are ABOUT to deploy — `compose run`
+# uses the freshly pulled tag plus the worker service's mounts (read-only
+# media + host-bound ./backups), so this works even when the currently
+# running containers predate the backup command. A failed backup aborts
+# the deploy — never swap code without a fresh restore point.
 log "running pre-deploy backup"
-COMPOSE_FILES="$COMPOSE_FILES" "$ROOT/scripts/backup.sh"
+compose run --rm --no-deps -T worker bin/console app:backup:run
 
-# 3. Pull and swap. --no-build: the server never builds; images come from
-# the registry the workflow pushed to.
-log "pulling images"
-compose pull -q "${SERVICES[@]}"
-
+# 4. Swap.
 log "swapping containers"
 compose up -d --no-build "${SERVICES[@]}"
 
@@ -89,7 +98,7 @@ else
   printf 'IMAGES_TAG=%s\n' "$IMAGES_TAG" >> .env
 fi
 
-# 4. Wait for health: php must be healthy (migrations ran, Caddy serving)
+# 5. Wait for health: php must be healthy (migrations ran, Caddy serving)
 # and the worker running. `compose ps` is polled rather than `up --wait`
 # so the failure mode is a readable timeout, not a hung compose call.
 log "waiting for stack health (timeout ${HEALTH_TIMEOUT}s)"
@@ -108,7 +117,7 @@ while true; do
   sleep 5
 done
 
-# 5. Maintenance page down — only reached when everything above succeeded.
+# 6. Maintenance page down — only reached when everything above succeeded.
 log "lowering maintenance page"
 compose exec -T php rm -f /app/var/maintenance/maintenance.on
 

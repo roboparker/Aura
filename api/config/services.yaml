@@ -18,6 +18,14 @@ parameters:
     # App\Service\WaitlistSettings.
     app.waitlist_enabled_default: true
 
+    # Backups (App\Service\BackupRunner): where app:backup:run writes its
+    # dumps/archives, and how many of each kind to keep (newest first,
+    # oldest deleted; 0 disables the cap). In the compose stack the dir is
+    # bind-mounted to ./backups on the host so scripts/restore.sh and
+    # off-box copy jobs work on plain files.
+    app.backup_dir: '%kernel.project_dir%/var/backups'
+    app.backup_max_backups: 5
+
 services:
     # default configuration for services in *this* file
     _defaults:

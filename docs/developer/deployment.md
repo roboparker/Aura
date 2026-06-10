@@ -95,34 +95,44 @@ Ensure all secrets are set to strong, unique values in production.
 ## Backups
 
 The compose stack has two stateful pieces: the PostgreSQL database (volume
-`database_data`) and user-uploaded media (volume `media_data`, mounted at
-`/app/var/media` in the `php` container). `scripts/backup.sh` snapshots
-both into timestamped files and prunes old ones:
+`database_data`) and user-uploaded media (volume `media_data`). Backups
+are **application-managed** — `App\Service\BackupRunner`, exposed as the
+`app:backup:run` console command — and run from two triggers, through the
+same code path:
+
+- **Nightly at 02:00 UTC** via the scheduler (`App\Scheduler\MainScheduleProvider`
+  fires `App\Message\RunBackup`; the existing `worker` service handles it —
+  no host cron, and a run missed during downtime is caught up on the next
+  worker boot thanks to the stateful schedule).
+- **Before every deploy**: `scripts/deploy.sh` runs the command in a
+  one-off container of the incoming image and aborts the deploy if it fails.
 
 ```bash
-scripts/backup.sh
-# -> backups/db-20260609-031500.sql.gz      (pg_dump | gzip)
-# -> backups/media-20260609-031500.tar.gz   (tar of the media volume)
+docker compose -f compose.yaml -f compose.prod.yaml exec -T worker bin/console app:backup:run
+# -> backups/db-20260610-020000.sql.gz      (pg_dump, gzip-compressed plain SQL)
+# -> backups/media-20260610-020000.tar.gz   (tar of the media volume)
 ```
 
-The stack must be running — the dump goes through `docker compose exec`.
-Configuration via env vars:
+`pg_dump` (from `postgresql-client`, baked into the api image) connects to
+the database over the compose network with the app's own Doctrine
+credentials — no `exec` into the database container. The worker mounts the
+media volume read-only and bind-mounts `./backups` to the host (gitignored),
+so backup files are plain host files for `restore.sh` and off-box copies.
 
-| Variable         | Default                          | Description |
-|------------------|----------------------------------|-------------|
-| `BACKUP_DIR`     | `./backups`                      | Where backup files are written |
-| `RETENTION_DAYS` | `14`                             | Delete backups older than N days (`0` disables age pruning) |
-| `MAX_BACKUPS`    | `5`                              | Keep at most N db dumps and N media archives, deleting the oldest first (`0` disables the cap). Applied after the age prune, so this is the effective ceiling — pre-deploy backups (`scripts/deploy.sh`) and the nightly cron share the same pool. |
-| `COMPOSE_FILES`  | `compose.yaml compose.prod.yaml` | Compose files passed as `-f` flags |
-| `POSTGRES_USER`  | `app`                            | Database user for `pg_dump`/`psql` |
-| `POSTGRES_DB`    | `app`                            | Database name |
+Configuration (parameters in `api/config/services.yaml`):
+
+| Parameter                | Default              | Description |
+|--------------------------|----------------------|-------------|
+| `app.backup_dir`         | `%kernel.project_dir%/var/backups` | Where backup files are written (host-bound to `./backups` in compose) |
+| `app.backup_max_backups` | `5`                  | Keep at most N db dumps and N media archives, deleting the oldest first (`0` disables). Nightly and pre-deploy backups share one pool, so this is the total ceiling per kind. |
 
 ### Restoring
 
-`scripts/restore.sh` is the inverse. It is **destructive** — it stops
-`php`/`worker`, drops and recreates the database, replays the dump, and
-(optionally) replaces the media volume contents — so it prompts for a
-literal `yes` unless `--force` is passed:
+`scripts/restore.sh` is the inverse (it stays a host-side shell script on
+purpose — a restore stops the very containers an in-app command would run
+in). It is **destructive** — it stops `php`/`worker`, drops and recreates
+the database, replays the dump, and (optionally) replaces the media volume
+contents — so it prompts for a literal `yes` unless `--force` is passed:
 
 ```bash
 scripts/restore.sh backups/db-20260609-031500.sql.gz
@@ -135,22 +145,17 @@ Restore into a fresh droplet by starting the stack first
 running the restore — the migration step on boot is harmless since the
 dump replays the full schema over the recreated database.
 
-### Scheduling with cron
+### Scheduling
 
-Nightly at 03:10, keeping the newest 5 of each kind, logging to a file:
+There is nothing to schedule on the host: the nightly run rides the same
+scheduler + worker pair as task reminders and digests (see "Recurring
+jobs" below). Every run — nightly or deploy-time — re-applies the
+`app.backup_max_backups` cap, so the pool always converges back to the
+newest 5 of each kind.
 
-```cron
-10 3 * * * cd /opt/aura && BACKUP_DIR=/var/backups/aura scripts/backup.sh >> /var/log/aura-backup.log 2>&1
-```
-
-The daily run is also what enforces the `MAX_BACKUPS` cap across the whole
-pool: deploys add a backup each (`scripts/deploy.sh` runs one before every
-container swap), and the next run — nightly or deploy-time — prunes back
-down to the newest 5.
-
-Backups written to the droplet's own disk don't survive the droplet
-dying — copy them off-box (e.g. `rclone`/`s3cmd` to DigitalOcean Spaces,
-or `scp` to another machine) as a second cron step.
+Backups written to the server's own disk don't survive the server
+dying — copy `./backups` off-box (e.g. `rclone` to object storage, or
+`scp` to another machine) from a host cron if you want that layer.
 
 ### DigitalOcean droplet snapshots
 
@@ -160,8 +165,8 @@ Docker volumes) and make whole-droplet recovery trivial. They are **not**
 a substitute for `pg_dump`, though — a snapshot of a running Postgres
 data directory is only crash-consistent, and snapshots can't restore a
 single database or be replayed into a different environment. Run both:
-snapshots for disaster recovery, `scripts/backup.sh` for clean,
-portable, point-in-time database dumps.
+snapshots for disaster recovery, `app:backup:run` for clean, portable,
+point-in-time database dumps.
 
 ## Kubernetes (Helm + Skaffold)
 

@@ -90,6 +90,13 @@ services:
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
+    volumes:
+      # Read-only view of uploads for the backup pass (app:backup:run tars
+      # this dir); the php service owns all writes to it.
+      - media_data:/app/var/media:ro
+      # Backups land on the host (./backups — gitignored) so restore.sh
+      # and off-box copy jobs work on plain files without docker cp.
+      - ./backups:/app/var/backups
 
   pwa:
     image: ${IMAGES_PREFIX:-}app-pwa:${IMAGES_TAG:-latest}

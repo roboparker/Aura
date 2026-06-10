@@ -19,11 +19,14 @@ WORKDIR /app
 
 # persistent / runtime deps
 # hadolint ignore=DL3008
+# postgresql-client provides pg_dump for App\Service\BackupRunner (the
+# nightly + pre-deploy backups run inside this image, over the network).
 RUN apt-get update && apt-get install --no-install-recommends -y \
 	acl \
 	file \
 	gettext \
 	git \
+	postgresql-client \
 	&& rm -rf /var/lib/apt/lists/*
 
 # https://getcomposer.org/doc/03-cli.md#composer-allow-superuser

@@ -28,7 +28,7 @@ On push to `production`, [`.github/workflows/deploy.yml`](../../.github/workflow
 1. Builds the api + pwa production images in CI and pushes them to GHCR, tagged with the commit SHA and `latest`.
 2. SSHes to the server (dedicated deploy key, pinned host key, secrets scoped to the branch-restricted `production` GitHub environment) and runs [`scripts/deploy.sh`](../../scripts/deploy.sh), which:
    - raises a **maintenance page** (Caddy serves a static 503 while the flag file exists),
-   - takes a **pre-deploy database + media backup** (same retention pool as the nightly cron — newest `MAX_BACKUPS` kept),
+   - takes a **pre-deploy database + media backup** (`bin/console app:backup:run` in a one-off container of the incoming image — same engine and retention pool as the nightly scheduler job, newest 5 kept),
    - pulls the new images and swaps the containers (migrations auto-run from the entrypoint),
    - waits for the stack to report healthy, then lowers the maintenance page.
 3. Verifies the site from the outside (`https://madori.app` + `/signup-status`).
