@@ -37,10 +37,17 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.php.image.repository }}:{{ .Values.php.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.php.image.pullPolicy }}
+          # Consumes the async job queue plus the symfony/scheduler transport
+          # that fires the recurring jobs (task reminders, notification
+          # digests — see App\Scheduler\MainScheduleProvider). The schedule's
+          # lock/state stores are pod-local, so keep replicaCount at 1 (or
+          # point LOCK_DSN + cache.app at shared stores) to avoid duplicate
+          # scheduler ticks — the handlers are idempotent either way.
           command:
             - bin/console
             - messenger:consume
             - async
+            - scheduler_default
             - "--time-limit={{ .Values.worker.timeLimit }}"
             - "--memory-limit={{ .Values.worker.memoryLimit }}"
             - "-v"

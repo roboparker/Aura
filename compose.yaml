@@ -43,10 +43,13 @@ services:
       start_period: 60s
 
   # Long-running job runner: drains the Postgres-backed Messenger queue
-  # (currently notification emails). Reuses the app-php image and the shared
-  # docker-entrypoint, which special-cases `bin/console` to wait for the DB.
-  # Depends on php being healthy so migrations are applied once (by php)
-  # before the worker boots — its own entrypoint migrate is then a no-op.
+  # (notification emails) plus the symfony/scheduler transport that fires
+  # the recurring jobs (task reminders every 5 min, hourly/daily digests —
+  # see App\Scheduler\MainScheduleProvider). Reuses the app-php image and
+  # the shared docker-entrypoint, which special-cases `bin/console` to wait
+  # for the DB. Depends on php being healthy so migrations are applied once
+  # (by php) before the worker boots — its own entrypoint migrate is then a
+  # no-op.
   worker:
     image: ${IMAGES_PREFIX:-}app-php
     depends_on:
@@ -57,6 +60,7 @@ services:
       - bin/console
       - messenger:consume
       - async
+      - scheduler_default
       - "-vv"
       - "--time-limit=3600"
       - "--memory-limit=128M"
