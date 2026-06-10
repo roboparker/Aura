@@ -13,7 +13,10 @@ use App\Service\AvatarColorService;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
  * @implements ProcessorInterface<User, User>
@@ -31,6 +34,9 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         private UserInviteRepository $inviteRepository,
         private EntityManagerInterface $em,
         private WaitlistSettings $waitlistSettings,
+        #[Autowire(service: 'limiter.signup_ip')]
+        private RateLimiterFactoryInterface $signupLimiter,
+        private RequestStack $requestStack,
     ) {
     }
 
@@ -39,6 +45,10 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): User
     {
+        if ($operation instanceof Post) {
+            $this->throttleSignup();
+        }
+
         // Hold onto the invite token before eraseCredentials() clears it; we
         // need it post-persist to wire the new user into their invited group.
         $inviteToken = $data->getInviteToken();
@@ -87,6 +97,34 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         }
 
         return $user;
+    }
+
+    /**
+     * Per-IP throttle on public signups (the `signup_ip` limiter in
+     * framework.yaml — env-tunable, relaxed in dev/test). POST /users is
+     * PUBLIC_ACCESS, so without this an unauthenticated script can mass-
+     * create accounts (each provisioning a personal space and, via the
+     * invite flow, sending mail). Keyed by client IP — TRUSTED_PROXIES is
+     * configured, so getClientIp() resolves the real caller behind Caddy.
+     * No request (CLI seeders, fixtures) means nothing to key on: skip.
+     */
+    private function throttleSignup(): void
+    {
+        $clientIp = $this->requestStack->getCurrentRequest()?->getClientIp();
+        if (null === $clientIp || '' === $clientIp) {
+            return;
+        }
+
+        $limit = $this->signupLimiter->create('ip-' . hash('sha256', $clientIp))->consume();
+        if ($limit->isAccepted()) {
+            return;
+        }
+
+        $retryAfter = max(1, $limit->getRetryAfter()->getTimestamp() - time());
+        throw new TooManyRequestsHttpException(
+            $retryAfter,
+            'Too many accounts created from this network. Please try again later.',
+        );
     }
 
     /**

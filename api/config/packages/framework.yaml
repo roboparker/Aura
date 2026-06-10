@@ -20,11 +20,52 @@ framework:
     # a stolen password can't be brute-forced past TOTP. Limiter is keyed
     # by user id (in-app code), not IP, so concurrent honest sessions on
     # the same network don't lock each other out.
+    #
+    # The abuse limits below guard the three unauthenticated endpoints
+    # (login / signup / forgot-password). Sizes are env-tunable so each
+    # deployment can adjust without a code change: prod-safe defaults live
+    # in api/.env; .env.dev and .env.test relax them so Playwright and the
+    # PHPUnit suite (hundreds of signups per run, all from one IP) never
+    # trip them. Storage is the default rate-limiter cache pool (backed by
+    # cache.app, filesystem) — per-container state, which is fine for the
+    # single-container deployment; a multi-replica deployment would need a
+    # shared store (e.g. Redis) behind cache.app to throttle globally.
     rate_limiter:
         two_factor_verify:
             policy: 'token_bucket'
             limit: 5
             rate: { interval: '1 minute', amount: 5 }
+        # Login brute-force: consumed by app.login_rate_limiter (see
+        # services.yaml), wired into the `main` firewall's login_throttling.
+        # `login_ip_email` is the per-(IP, email) limit; `login_ip` is the
+        # wider per-IP net across all emails. Only *failed* attempts count
+        # — the listener peeks at CheckPassport and consumes on failure.
+        login_ip_email:
+            policy: 'sliding_window'
+            limit: '%env(int:RATE_LIMIT_LOGIN_ATTEMPTS)%'
+            interval: '15 minutes'
+        login_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:RATE_LIMIT_LOGIN_ATTEMPTS_PER_IP)%'
+            interval: '15 minutes'
+        # Signup flood (POST /users is PUBLIC_ACCESS): consumed per client
+        # IP by UserPasswordHasherProcessor before the user is persisted.
+        signup_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:RATE_LIMIT_SIGNUPS_PER_IP)%'
+            interval: '1 hour'
+        # Forgot-password: each request mints a reset token and queues an
+        # email, so this is also a mail-spam vector. Both limiters are
+        # consumed in PasswordController::forgotPassword before the user
+        # lookup, so throttling can't leak whether an email is registered.
+        forgot_password_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:RATE_LIMIT_FORGOT_PASSWORD_PER_IP)%'
+            interval: '1 hour'
+        forgot_password_email:
+            policy: 'sliding_window'
+            limit: '%env(int:RATE_LIMIT_FORGOT_PASSWORD_PER_EMAIL)%'
+            interval: '1 hour'
 
     #esi: true
     #fragments: true

@@ -83,6 +83,21 @@ services:
         arguments:
             $minStrength: '%app.password_min_strength%'
 
+    # Login throttling for the `main` firewall (security.yaml
+    # `login_throttling.limiter`). Same shape as Symfony's built-in default
+    # — a per-(IP, email) limit plus a wider per-IP net — but wired to the
+    # env-tunable limiters declared in framework.yaml instead of the
+    # built-in hardcoded `max_attempts` / `5 * max_attempts` pair, so
+    # prod/dev/test can size them independently. Keys are HMAC-hashed with
+    # the kernel secret inside DefaultLoginRateLimiter; the limiter is
+    # peekable, so only *failed* attempts consume the budget.
+    app.login_rate_limiter:
+        class: Symfony\Component\Security\Http\RateLimiter\DefaultLoginRateLimiter
+        arguments:
+            $globalFactory: '@limiter.login_ip'
+            $localFactory: '@limiter.login_ip_email'
+            $secret: '%kernel.secret%'
+
 when@dev:
     parameters:
         # Local dev: don't make the engineer think up a 12-char password

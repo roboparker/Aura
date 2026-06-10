@@ -31,6 +31,16 @@ security:
                 check_path: auth_login
                 username_path: email
                 password_path: password
+                # Default failure behavior (401 + {error}) with one addition:
+                # login-throttling hits surface as 429 + Retry-After.
+                failure_handler: App\Security\JsonLoginFailureHandler
+            # Brute-force throttle on password auth. Counts failed attempts
+            # at /auth/login (successes don't consume); the 2FA challenge
+            # at /auth/2fa-check has its own `two_factor_verify` limiter.
+            # Limits are env-tunable — see the rate_limiter block in
+            # framework.yaml and app.login_rate_limiter in services.yaml.
+            login_throttling:
+                limiter: app.login_rate_limiter
             # SchebTwoFactorBundle: when the password-auth step succeeds and
             # the user has TOTP enabled, swap the token for a TwoFactorToken
             # and route the next POST to /auth/2fa-check through the
