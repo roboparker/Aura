@@ -21,6 +21,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * This is how you bootstrap the first admin (no admin UI grants ROLE_ADMIN).
  * The `ROLE_` prefix is added if you omit it, so `add admin you@x.com` works.
+ * When waitlist mode is on, promote the account off the waitlist first with
+ * `app:waitlist:promote <email> --no-email` — a waitlisted account holds only
+ * ROLE_WAITLISTED, so a stored ROLE_ADMIN has no effect until then.
  *
  * ROLE_USER is implicit (User::getRoles always appends it) and ROLE_WAITLISTED
  * is owned by the waitlist toggle, so both are rejected here.

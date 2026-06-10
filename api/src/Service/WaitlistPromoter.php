@@ -48,10 +48,12 @@ final class WaitlistPromoter
 
     /**
      * Promote a single waitlisted account (the admin's per-user "grant access"
-     * button). No-op if the user isn't actually waitlisted, so a double-click
-     * or a stale list doesn't re-send the email.
+     * button, or `app:waitlist:promote` from the CLI). No-op if the user isn't
+     * actually waitlisted, so a double-click or a stale list doesn't re-send
+     * the email. $sendEmail lets the CLI self-bootstrap path skip the
+     * "you're in" email — pointless when you're promoting yourself.
      */
-    public function promoteOne(User $user): void
+    public function promoteOne(User $user, bool $sendEmail = true): void
     {
         if (!$user->isWaitlisted()) {
             return;
@@ -59,7 +61,9 @@ final class WaitlistPromoter
 
         $user->setWaitlisted(false);
         $this->em->flush();
-        $this->sendAccess($user);
+        if ($sendEmail) {
+            $this->sendAccess($user);
+        }
     }
 
     private function sendAccess(User $user): void
