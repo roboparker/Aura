@@ -18,9 +18,9 @@ FROM frankenphp_upstream AS frankenphp_base
 WORKDIR /app
 
 # persistent / runtime deps
-# hadolint ignore=DL3008
 # postgresql-client provides pg_dump for App\Service\BackupRunner (the
 # nightly + pre-deploy backups run inside this image, over the network).
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install --no-install-recommends -y \
 	acl \
 	file \
