@@ -7,8 +7,15 @@ framework:
     # See https://caddyserver.com/docs/caddyfile/directives/reverse_proxy#headers
     trusted_headers: [ 'x-forwarded-for', 'x-forwarded-proto' ]
 
-    # Session is needed for json_login authentication
-    session: true
+    # Session is needed for json_login authentication.
+    # Cookie hardening: `secure` follows the request scheme (auto), the
+    # cookie is invisible to JS, and Lax same-site blocks cross-site POSTs
+    # from carrying it. The PWA and API are same-origin behind Caddy, so
+    # Lax doesn't affect the auth flow.
+    session:
+        cookie_secure: auto
+        cookie_httponly: true
+        cookie_samesite: lax
 
     # UUIDv7 is time-ordered, which keeps B-tree index locality good.
     # Configured globally so `doctrine.uuid_generator` emits v7.

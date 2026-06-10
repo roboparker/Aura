@@ -55,6 +55,19 @@
 	# Disable Topics tracking if not enabled explicitly: https://github.com/jkarlin/topics
 	header ?Permissions-Policy "browsing-topics=()"
 
+	# Security headers, applied to every response (PWA, API, /media/*, and
+	# the Mercure SSE endpoint — headers are sent once when the stream
+	# opens, so they don't interfere with event delivery). Browsers only
+	# honor HSTS over a trusted HTTPS connection, so the self-signed dev
+	# cert on localhost is unaffected. Nothing in the app is iframed, so
+	# DENY is safe.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
 	route {
 		# Serve user-uploaded media (avatars, attachments) directly from disk
 		handle_path /media/* {
