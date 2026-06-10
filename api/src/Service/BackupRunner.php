@@ -105,16 +105,16 @@ final class BackupRunner
         $process = new Process(
             [
                 'pg_dump',
-                '--host', $this->stringParam($params, 'host'),
-                '--port', $this->stringParam($params, 'port'),
-                '--username', $this->stringParam($params, 'user'),
-                '--dbname', $this->stringParam($params, 'dbname'),
+                '--host', $this->stringParam($params['host'] ?? null, 'host'),
+                '--port', $this->stringParam($params['port'] ?? null, 'port'),
+                '--username', $this->stringParam($params['user'] ?? null, 'user'),
+                '--dbname', $this->stringParam($params['dbname'] ?? null, 'dbname'),
                 '--compress', '6',
                 '--no-password',
                 '--file', $tmp,
             ],
             null,
-            ['PGPASSWORD' => $this->stringParam($params, 'password')],
+            ['PGPASSWORD' => $this->stringParam($params['password'] ?? null, 'password')],
             null,
             self::PROCESS_TIMEOUT_SECONDS,
         );
@@ -155,12 +155,9 @@ final class BackupRunner
 
     /**
      * Narrow one entry of Connection::getParams() to a CLI-safe string.
-     *
-     * @param array<string, mixed> $params
      */
-    private function stringParam(array $params, string $key): string
+    private function stringParam(mixed $value, string $key): string
     {
-        $value = $params[$key] ?? null;
         if (is_string($value)) {
             return $value;
         }
