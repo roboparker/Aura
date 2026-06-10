@@ -228,15 +228,24 @@ Use the `update-deps.sh` script to update all project dependencies:
 
 ## Scheduled background jobs
 
-Two console commands need to run on a cron in production:
+Recurring jobs are scheduled **in-process via [symfony/scheduler](https://symfony.com/doc/current/scheduler.html)** — there is no system cron, no extra container, and nothing to configure per environment. The schedule ([`api/src/Scheduler/MainScheduleProvider.php`](../../api/src/Scheduler/MainScheduleProvider.php)) materialises as a Messenger transport named `scheduler_default`, and the existing `worker` service consumes it alongside the `async` queue (`messenger:consume async scheduler_default`) in both the Compose stack and the Helm worker Deployment. Anywhere the worker runs, the schedule runs.
 
-| Command | Recommended cadence | Purpose |
+| Job | Cadence (UTC) | Purpose |
 | --- | --- | --- |
-| `bin/console app:tasks:reminders:dispatch` | Every 5 minutes | Creates in-app notifications for due task reminders and (for users on `notificationFrequency=realtime` with `emailNotificationsEnabled=true`) sends a per-reminder email. |
-| `bin/console app:notifications:dispatch-digest --period=hourly` | Hourly at minute 55 | Rolls up pending in-app notifications for users on `notificationFrequency=hourly` into a single grouped digest email. |
-| `bin/console app:notifications:dispatch-digest --period=daily` | Daily at 08:00 UTC | Same as above for users on `notificationFrequency=daily`. |
+| `DispatchTaskReminders` | Every 5 minutes | Creates in-app notifications for due task reminders and (for users on `notificationFrequency=realtime` with `emailNotificationsEnabled=true`) sends a per-reminder email. |
+| `DispatchNotificationDigest('hourly')` | Hourly at minute 55 | Rolls up pending in-app notifications for users on `notificationFrequency=hourly` into a single grouped digest email. |
+| `DispatchNotificationDigest('daily')` | Daily at 08:00 | Same as above for users on `notificationFrequency=daily`. |
 
-The digest commands stamp each notification with `digestedAt` once shipped, so reruns within the same window are no-ops. The realtime path skips users whose frequency is `hourly` or `daily`, so the two paths never double-deliver.
+Each tick dispatches a message through the normal Messenger pipeline; the handlers delegate to `App\Service\TaskReminderDispatcher` / `App\Service\NotificationDigestDispatcher`. The same services back the manual console commands, which remain available for one-off runs:
+
+```bash
+docker compose exec php bin/console app:tasks:reminders:dispatch
+docker compose exec php bin/console app:notifications:dispatch-digest --period=hourly
+```
+
+Everything is idempotent: the digest path stamps each notification with `digestedAt` once shipped (reruns within the same window are no-ops), reminders are deduped by a unique index on (recipient, task, offset), and the realtime path skips users whose frequency is `hourly` or `daily`, so the two paths never double-deliver.
+
+The schedule is **stateful** (last-run timestamps live in the app cache) so the worker's hourly `--time-limit` recycle — or a deploy — can't skip a tick that lands during the restart window; after longer downtime only the last missed run per job is replayed. A lock keeps multiple consumers from double-firing a tick, but with the default `LOCK_DSN=flock` and filesystem cache both stores are host-local — if you ever scale the worker beyond one replica, either keep a single replica consuming `scheduler_default` or point `LOCK_DSN` and `cache.app` at shared stores (the handlers are idempotent, so a duplicate tick is wasted work, not duplicate email). Inspect the schedule with `bin/console debug:scheduler`. See [`job-queue.md`](job-queue.md) for how to add a new recurring job.
 
 ## Web Push (VAPID)
 
