@@ -1,6 +1,6 @@
 services:
   php:
-    image: ${IMAGES_PREFIX:-}app-php
+    image: ${IMAGES_PREFIX:-}app-php:${IMAGES_TAG:-latest}
     depends_on:
       - database
     restart: unless-stopped
@@ -22,6 +22,11 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - media_data:/app/var/media
+      # Maintenance-mode flag lives in a named volume so it survives the
+      # container swap mid-deploy; scripts/deploy.sh raises it before the
+      # pre-deploy backup and lowers it after the new stack passes health.
+      # See the @maintenance matcher in api/frankenphp/Caddyfile.
+      - maintenance_flag:/app/var/maintenance
     ports:
       # HTTP
       - target: 80
@@ -51,7 +56,7 @@ services:
   # (by php) before the worker boots — its own entrypoint migrate is then a
   # no-op.
   worker:
-    image: ${IMAGES_PREFIX:-}app-php
+    image: ${IMAGES_PREFIX:-}app-php:${IMAGES_TAG:-latest}
     depends_on:
       php:
         condition: service_healthy
@@ -87,7 +92,7 @@ services:
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
 
   pwa:
-    image: ${IMAGES_PREFIX:-}app-pwa
+    image: ${IMAGES_PREFIX:-}app-pwa:${IMAGES_TAG:-latest}
     environment:
       NEXT_PUBLIC_ENTRYPOINT: http://php
     healthcheck:
@@ -146,6 +151,7 @@ volumes:
   caddy_data:
   caddy_config:
   media_data:
+  maintenance_flag:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###

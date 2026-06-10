@@ -1,0 +1,131 @@
+# Production deploy pipeline.
+#
+# Trigger: push to the `production` branch (i.e. merging the main →
+# production promote PR), or workflow_dispatch with an `image_tag` to roll
+# back to previously built images without rebuilding.
+#
+# Flow: build the api + pwa prod images in CI, push them to GHCR tagged
+# with the commit SHA (and `latest`), then SSH to the server and run
+# scripts/deploy.sh — which raises the maintenance page, backs up the
+# database, swaps the containers, health-checks, and lowers the page.
+#
+# Security notes (this is a public repo):
+#   - Everything sensitive (host, user, SSH key, pinned host key) lives in
+#     the `production` GitHub environment, which is restricted to this
+#     branch — forks and PR branches can never reach those secrets.
+#   - The deploy key is a dedicated keypair that exists only for this
+#     workflow; revoking it on the server kills the pipeline's access.
+#   - The server's host key is pinned (DEPLOY_KNOWN_HOSTS), so the deploy
+#     fails closed on a MITM instead of trusting whatever answers.
+#   - Third-party actions are pinned to commit SHAs, not mutable tags.
+#   - No secret is ever echoed; scripts avoid `set -x`.
+
+name: Deploy
+
+on:
+  push:
+    branches: [production]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: >-
+          Commit SHA of previously pushed images to (re)deploy — used for
+          rollback. Leave empty to build and deploy the current commit.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+# One deploy at a time; a queued push waits rather than interleaving.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & push images
+    # Skipped on rollback dispatches — the images already exist in GHCR.
+    if: ${{ github.event_name == 'push' || inputs.image_tag == '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push api image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: api
+          target: frankenphp_prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/app-php:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/app-php:latest
+          cache-from: type=gha,scope=app-php
+          cache-to: type=gha,scope=app-php,mode=max
+
+      - name: Build & push pwa image
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: pwa
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/app-pwa:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/app-pwa:latest
+          cache-from: type=gha,scope=app-pwa
+          cache-to: type=gha,scope=app-pwa,mode=max
+
+  deploy:
+    name: Deploy to production
+    needs: build
+    # Run when build succeeded, or was skipped because this is a rollback.
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://madori.app
+    env:
+      IMAGES_TAG: ${{ inputs.image_tag != '' && inputs.image_tag || github.sha }}
+    steps:
+      - name: Prepare SSH
+        run: |
+          umask 077
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o StrictHostKeyChecking=yes \
+              "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
+              "set -euo pipefail
+               cd /opt/aura
+               git fetch -q origin production
+               git checkout -q production
+               git reset -q --hard origin/production
+               IMAGES_TAG='${IMAGES_TAG}' ./scripts/deploy.sh"
+
+      - name: Verify from the outside
+        run: |
+          # The app must answer publicly with the maintenance page gone.
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 \
+            --output /dev/null https://madori.app/
+          status=$(curl -s -o /dev/null -w '%{http_code}' https://madori.app/signup-status)
+          if [ "$status" != "200" ]; then
+            echo "signup-status returned $status" >&2
+            exit 1
+          fi

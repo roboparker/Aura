@@ -187,9 +187,10 @@ npx playwright test
 - Shared helpers (auth + markdown editor) live in `e2e/tests/helpers.js` — prefer them over duplicating `registerAndSignIn` per spec.
 
 ### Git & Branching
-- `main` is the only long-lived branch — always deployable
+- Two long-lived branches: `main` (development trunk, default branch, all PRs target it — always deployable) and `production` (what the server runs; updated only via a `main → production` promote PR)
+- Merging a promote PR triggers the auto-deploy (`.github/workflows/deploy.yml`): images build in CI → GHCR, then `scripts/deploy.sh` on the server raises the maintenance page, takes a pre-deploy DB+media backup, swaps containers, health-checks, and lowers the page. Rollback = re-run the workflow with a previous `image_tag` SHA.
+- Promote PRs use a **merge commit** (keeps `production` fast-forwardable); all other PRs squash-merge into `main`
 - Create short-lived branches: `feature/`, `fix/`, `chore/`, `docs/`, `refactor/`
-- Squash and merge PRs
 - See `docs/developer/branching-and-releases.md` for the full strategy
 
 ### Releases

@@ -111,7 +111,8 @@ Configuration via env vars:
 | Variable         | Default                          | Description |
 |------------------|----------------------------------|-------------|
 | `BACKUP_DIR`     | `./backups`                      | Where backup files are written |
-| `RETENTION_DAYS` | `14`                             | Delete backups older than N days (`0` disables pruning) |
+| `RETENTION_DAYS` | `14`                             | Delete backups older than N days (`0` disables age pruning) |
+| `MAX_BACKUPS`    | `5`                              | Keep at most N db dumps and N media archives, deleting the oldest first (`0` disables the cap). Applied after the age prune, so this is the effective ceiling — pre-deploy backups (`scripts/deploy.sh`) and the nightly cron share the same pool. |
 | `COMPOSE_FILES`  | `compose.yaml compose.prod.yaml` | Compose files passed as `-f` flags |
 | `POSTGRES_USER`  | `app`                            | Database user for `pg_dump`/`psql` |
 | `POSTGRES_DB`    | `app`                            | Database name |
@@ -136,11 +137,16 @@ dump replays the full schema over the recreated database.
 
 ### Scheduling with cron
 
-Nightly at 03:10, keeping 14 days, logging to a file:
+Nightly at 03:10, keeping the newest 5 of each kind, logging to a file:
 
 ```cron
 10 3 * * * cd /opt/aura && BACKUP_DIR=/var/backups/aura scripts/backup.sh >> /var/log/aura-backup.log 2>&1
 ```
+
+The daily run is also what enforces the `MAX_BACKUPS` cap across the whole
+pool: deploys add a backup each (`scripts/deploy.sh` runs one before every
+container swap), and the next run — nightly or deploy-time — prunes back
+down to the newest 5.
 
 Backups written to the droplet's own disk don't survive the droplet
 dying — copy them off-box (e.g. `rclone`/`s3cmd` to DigitalOcean Spaces,

@@ -4,6 +4,41 @@
 
 Aura follows **GitHub Flow** — a lightweight, branch-based workflow where `main` is always deployable and all changes arrive via pull requests. Releases are tagged with **date-based build numbers**.
 
+There are exactly **two long-lived branches**:
+
+| Branch       | Role                                                                                                          |
+|--------------|---------------------------------------------------------------------------------------------------------------|
+| `main`       | Development trunk and the repo's default branch. All PRs target it; it is always deployable.                   |
+| `production` | What the production server runs. Updated **only** by merging a `main → production` "promote" PR. Every push to it triggers the automated deploy (see below). |
+
+### Promoting to production
+
+```bash
+gh pr create --base production --head main \
+  --title "Promote main to production" \
+  --body "Deploys everything merged since the last promote."
+```
+
+Merging that PR is the deploy button. The diff of the promote PR is exactly what is about to go live. Use a **merge commit** for promote PRs (not squash) so `production` keeps the same commit SHAs as `main` and stays fast-forwardable.
+
+### What the deploy does
+
+On push to `production`, [`.github/workflows/deploy.yml`](../../.github/workflows/deploy.yml):
+
+1. Builds the api + pwa production images in CI and pushes them to GHCR, tagged with the commit SHA and `latest`.
+2. SSHes to the server (dedicated deploy key, pinned host key, secrets scoped to the branch-restricted `production` GitHub environment) and runs [`scripts/deploy.sh`](../../scripts/deploy.sh), which:
+   - raises a **maintenance page** (Caddy serves a static 503 while the flag file exists),
+   - takes a **pre-deploy database + media backup** (same retention pool as the nightly cron — newest `MAX_BACKUPS` kept),
+   - pulls the new images and swaps the containers (migrations auto-run from the entrypoint),
+   - waits for the stack to report healthy, then lowers the maintenance page.
+3. Verifies the site from the outside (`https://madori.app` + `/signup-status`).
+
+On any failure the maintenance page **stays up** and the workflow fails loudly — fix forward, or roll back.
+
+### Rolling back
+
+Run the **Deploy** workflow manually (workflow_dispatch) with `image_tag` set to a previously deployed commit SHA. The build step is skipped; the server just re-pulls those images and swaps. Keep migrations backward-compatible so the previous code runs against the current schema.
+
 ## Workflow
 
 ```mermaid

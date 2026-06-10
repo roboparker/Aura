@@ -11,6 +11,11 @@
 # Configuration (env vars):
 #   BACKUP_DIR      Where backups are written (default: ./backups)
 #   RETENTION_DAYS  Delete backups older than N days (default: 14; 0 disables)
+#   MAX_BACKUPS     Keep at most N db dumps and N media archives, newest
+#                   first (default: 5; 0 disables). Applied after the age
+#                   prune, so the count cap is the effective ceiling: deploy
+#                   backups and the nightly cron both draw from the same
+#                   pool and the oldest files are deleted first.
 #   COMPOSE_FILES   Space-separated compose files (default: "compose.yaml compose.prod.yaml")
 #   POSTGRES_USER   Database user (default: app)
 #   POSTGRES_DB     Database name (default: app)
@@ -24,6 +29,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"
 RETENTION_DAYS="${RETENTION_DAYS:-14}"
+MAX_BACKUPS="${MAX_BACKUPS:-5}"
 COMPOSE_FILES="${COMPOSE_FILES:-compose.yaml compose.prod.yaml}"
 POSTGRES_USER="${POSTGRES_USER:-app}"
 POSTGRES_DB="${POSTGRES_DB:-app}"
@@ -71,6 +77,22 @@ if [ "$RETENTION_DAYS" -gt 0 ]; then
   find "$BACKUP_DIR" -maxdepth 1 -type f \
     \( -name 'db-*.sql.gz' -o -name 'media-*.tar.gz' \) \
     -mtime +"$RETENTION_DAYS" -print -delete
+fi
+
+# Count cap: keep only the newest MAX_BACKUPS of each kind, oldest deleted
+# first. Filenames embed a zero-padded timestamp, so lexicographic sort is
+# chronological — no reliance on mtimes that a restore or copy could touch.
+if [ "$MAX_BACKUPS" -gt 0 ]; then
+  log "pruning beyond the newest $MAX_BACKUPS backup(s) per kind"
+  for pattern in 'db-*.sql.gz' 'media-*.tar.gz'; do
+    find "$BACKUP_DIR" -maxdepth 1 -type f -name "$pattern" -print0 \
+      | sort -z \
+      | head -z -n -"$MAX_BACKUPS" \
+      | while IFS= read -r -d '' old; do
+          log "removing $old"
+          rm -f -- "$old"
+        done
+  done
 fi
 
 log "done: $db_file ($(du -h "$db_file" | cut -f1)), $media_file ($(du -h "$media_file" | cut -f1))"
