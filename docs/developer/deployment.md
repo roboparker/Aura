@@ -92,6 +92,71 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d
 
 Ensure all secrets are set to strong, unique values in production.
 
+## Backups
+
+The compose stack has two stateful pieces: the PostgreSQL database (volume
+`database_data`) and user-uploaded media (volume `media_data`, mounted at
+`/app/var/media` in the `php` container). `scripts/backup.sh` snapshots
+both into timestamped files and prunes old ones:
+
+```bash
+scripts/backup.sh
+# -> backups/db-20260609-031500.sql.gz      (pg_dump | gzip)
+# -> backups/media-20260609-031500.tar.gz   (tar of the media volume)
+```
+
+The stack must be running — the dump goes through `docker compose exec`.
+Configuration via env vars:
+
+| Variable         | Default                          | Description |
+|------------------|----------------------------------|-------------|
+| `BACKUP_DIR`     | `./backups`                      | Where backup files are written |
+| `RETENTION_DAYS` | `14`                             | Delete backups older than N days (`0` disables pruning) |
+| `COMPOSE_FILES`  | `compose.yaml compose.prod.yaml` | Compose files passed as `-f` flags |
+| `POSTGRES_USER`  | `app`                            | Database user for `pg_dump`/`psql` |
+| `POSTGRES_DB`    | `app`                            | Database name |
+
+### Restoring
+
+`scripts/restore.sh` is the inverse. It is **destructive** — it stops
+`php`/`worker`, drops and recreates the database, replays the dump, and
+(optionally) replaces the media volume contents — so it prompts for a
+literal `yes` unless `--force` is passed:
+
+```bash
+scripts/restore.sh backups/db-20260609-031500.sql.gz
+scripts/restore.sh --media backups/media-20260609-031500.tar.gz backups/db-20260609-031500.sql.gz
+scripts/restore.sh --force backups/db-20260609-031500.sql.gz   # no prompt (for scripted recovery)
+```
+
+Restore into a fresh droplet by starting the stack first
+(`docker compose -f compose.yaml -f compose.prod.yaml up -d`), then
+running the restore — the migration step on boot is harmless since the
+dump replays the full schema over the recreated database.
+
+### Scheduling with cron
+
+Nightly at 03:10, keeping 14 days, logging to a file:
+
+```cron
+10 3 * * * cd /opt/aura && BACKUP_DIR=/var/backups/aura scripts/backup.sh >> /var/log/aura-backup.log 2>&1
+```
+
+Backups written to the droplet's own disk don't survive the droplet
+dying — copy them off-box (e.g. `rclone`/`s3cmd` to DigitalOcean Spaces,
+or `scp` to another machine) as a second cron step.
+
+### DigitalOcean droplet snapshots
+
+Enable [droplet snapshots/backups](https://docs.digitalocean.com/products/images/snapshots/)
+as a belt-and-braces layer: they capture the whole disk (including the
+Docker volumes) and make whole-droplet recovery trivial. They are **not**
+a substitute for `pg_dump`, though — a snapshot of a running Postgres
+data directory is only crash-consistent, and snapshots can't restore a
+single database or be replayed into a different environment. Run both:
+snapshots for disaster recovery, `scripts/backup.sh` for clean,
+portable, point-in-time database dumps.
+
 ## Kubernetes (Helm + Skaffold)
 
 ### Prerequisites
