@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Formik, Form } from "formik";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -12,12 +11,14 @@ import {
   estimatePasswordStrength,
 } from "@/lib/passwordStrength";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
+import TermsConsentField from "./TermsConsentField";
 
 export interface SignUpFormValues {
   givenName: string;
   familyName: string;
   email: string;
   password: string;
+  acceptTerms: boolean;
 }
 
 interface InviteContext {
@@ -54,6 +55,10 @@ const validate = (values: SignUpFormValues) => {
     errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   } else if (estimatePasswordStrength(values.password) < MIN_PASSWORD_STRENGTH) {
     errors.password = "Too weak. Use a longer mix of words, numbers, and symbols.";
+  }
+
+  if (!values.acceptTerms) {
+    errors.acceptTerms = "Please agree to the Terms and Privacy Policy to continue.";
   }
 
   return errors;
@@ -175,6 +180,7 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
           familyName: "",
           email: invite?.email ?? "",
           password: "",
+          acceptTerms: false,
         }}
         validate={validate}
         onSubmit={(values, { setSubmitting }) => {
@@ -266,21 +272,11 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
               />
               <PasswordStrengthMeter password={values.password} />
 
+              <TermsConsentField />
+
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {submitLabel}
               </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                By continuing you agree to Aura&apos;s{" "}
-                <Link href="/terms" className="text-primary font-semibold hover:text-foreground">
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link href="/privacy" className="text-primary font-semibold hover:text-foreground">
-                  Privacy Policy
-                </Link>
-                .
-              </p>
             </Form>
           );
         }}

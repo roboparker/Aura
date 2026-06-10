@@ -24,6 +24,7 @@ import {
 import { CalloutBadge } from "@/components/ui/callout-badge";
 import { FormikField } from "@/components/ui/formik-field";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
+import TermsConsentField from "./TermsConsentField";
 
 /**
  * Inviter shown at the top of the invite-signup card. Backend returns
@@ -79,6 +80,7 @@ interface InviteSignupValues {
   givenName: string;
   familyName: string;
   password: string;
+  acceptTerms: boolean;
 }
 
 const validate = (values: InviteSignupValues) => {
@@ -91,6 +93,9 @@ const validate = (values: InviteSignupValues) => {
     errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   } else if (estimatePasswordStrength(values.password) < MIN_PASSWORD_STRENGTH) {
     errors.password = "Too weak. Use a longer mix of words, numbers, and symbols.";
+  }
+  if (!values.acceptTerms) {
+    errors.acceptTerms = "Please agree to the Terms and Privacy Policy to continue.";
   }
   return errors;
 };
@@ -434,7 +439,7 @@ const AcceptInviteCard = ({
       )}
 
       <Formik<InviteSignupValues>
-        initialValues={{ givenName: "", familyName: "", password: "" }}
+        initialValues={{ givenName: "", familyName: "", password: "", acceptTerms: false }}
         validate={validate}
         onSubmit={async (values, { setSubmitting, setStatus }) => {
           try {
@@ -513,27 +518,11 @@ const AcceptInviteCard = ({
               />
               <PasswordStrengthMeter password={values.password} />
 
+              <TermsConsentField />
+
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting ? "Creating account…" : "Accept & create account"}
               </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                By continuing you agree to Aura&apos;s{" "}
-                <Link
-                  href="/terms"
-                  className="text-primary font-semibold hover:text-foreground"
-                >
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link
-                  href="/privacy"
-                  className="text-primary font-semibold hover:text-foreground"
-                >
-                  Privacy Policy
-                </Link>
-                .
-              </p>
             </Form>
           );
         }}

@@ -103,6 +103,12 @@ test.describe("Auth redirect", () => {
     await page.fill('input[name="familyName"]', "User");
     await page.fill('input[name="email"]', email);
     await page.fill('input[name="password"]', password);
+    const consent = page.getByRole("checkbox");
+    await consent.click();
+    await expect(consent).toBeChecked();
+    // Move focus off the checkbox before submitting so the click is not
+    // racing a blur/re-render from the Radix control.
+    await consent.blur();
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Commit the random seed.

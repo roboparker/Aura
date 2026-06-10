@@ -18,6 +18,14 @@ test.describe("Authentication", () => {
     await page.fill("#familyName", "User");
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");
+    // Consent is now a required clickwrap checkbox before submit. Assert
+    // it is checked before submitting so the Formik state has committed.
+    const consent = page.getByRole("checkbox");
+    await consent.click();
+    await expect(consent).toBeChecked();
+    // Move focus off the checkbox before submitting so the click is not
+    // racing a blur/re-render from the Radix control.
+    await consent.blur();
     await page.getByRole("button", { name: "Create account" }).click();
 
     // Step 2 — avatar color picker. Keep the random seed; just commit it.
