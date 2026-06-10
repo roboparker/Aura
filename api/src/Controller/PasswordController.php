@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Validator\Constraints\PasswordStrengthValidator;
@@ -35,6 +36,13 @@ class PasswordController extends AbstractController
         private MailerInterface $mailer,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
+        // Abuse throttles on /auth/forgot-password — every accepted request
+        // can mint a token and queue an email, so it doubles as a mail-spam
+        // vector. Env-tunable, relaxed in dev/test; see framework.yaml.
+        #[Autowire(service: 'limiter.forgot_password_ip')]
+        private RateLimiterFactoryInterface $forgotPasswordIpLimiter,
+        #[Autowire(service: 'limiter.forgot_password_email')]
+        private RateLimiterFactoryInterface $forgotPasswordEmailLimiter,
         // Pairs with `App\Validator\PasswordPolicy` on the User entity so
         // signup, change-password, and reset-password gate at the same
         // env-driven floor (VERY_WEAK in dev/test, MEDIUM in staging/prod).
@@ -92,6 +100,14 @@ class PasswordController extends AbstractController
     {
         $data = $request->toArray();
         $email = self::stringField($data, 'email');
+
+        // Throttle before the user lookup so the limiter — like the 200
+        // below — behaves identically for registered and unknown emails;
+        // a 429 reveals nothing about whether the address has an account.
+        $throttled = $this->throttleForgotPassword($request, $email);
+        if (null !== $throttled) {
+            return $throttled;
+        }
 
         // Always return 200 to prevent email enumeration
         $response = $this->json([
@@ -177,6 +193,50 @@ class PasswordController extends AbstractController
         $this->em->flush();
 
         return $this->json(['message' => 'Password reset successfully.']);
+    }
+
+    /**
+     * Consumes the per-IP and per-email forgot-password limiters and
+     * returns the 429 response when either is exhausted, null otherwise.
+     * Both buckets are always consumed (no short-circuit) so accounting
+     * stays consistent whichever one trips first. Keys are hashed: the IP
+     * for cache-key safety (IPv6 colons), the email additionally
+     * lowercased so casing can't dodge the per-address limit.
+     */
+    private function throttleForgotPassword(Request $request, string $email): ?JsonResponse
+    {
+        $limits = [];
+
+        $clientIp = $request->getClientIp();
+        if (null !== $clientIp && '' !== $clientIp) {
+            $limits[] = $this->forgotPasswordIpLimiter
+                ->create('ip-' . hash('sha256', $clientIp))
+                ->consume();
+        }
+        if ('' !== $email) {
+            $limits[] = $this->forgotPasswordEmailLimiter
+                ->create('email-' . hash('sha256', mb_strtolower($email)))
+                ->consume();
+        }
+
+        foreach ($limits as $limit) {
+            if ($limit->isAccepted()) {
+                continue;
+            }
+
+            $retryAfter = max(1, $limit->getRetryAfter()->getTimestamp() - time());
+
+            return $this->json(
+                [
+                    'error' => 'Too many password reset requests. Please try again later.',
+                    'retryAfter' => $retryAfter,
+                ],
+                429,
+                ['Retry-After' => (string) $retryAfter],
+            );
+        }
+
+        return null;
     }
 
     private function sendResetEmail(User $user, string $plainToken): void

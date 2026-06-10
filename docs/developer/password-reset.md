@@ -61,7 +61,25 @@ Three implementation details keep the timing close to identical too:
 - We don't expose a per-account "you already requested one X seconds ago" hint.
 - The token table's `invalidateAllForUser` only runs on a hit, but its cost is a single UPDATE indexed by `user_id`, well below the SMTP-dispatch cost — the timing gap doesn't reliably distinguish hits from misses.
 
-> Caveat: there's no application-level rate limit on this endpoint today. Operators are expected to put a per-IP/per-email limit at the reverse proxy or CDN layer if abuse becomes a concern. See [open work](#open-work).
+The endpoint is rate limited, and the throttle preserves the no-enumeration property: both limiters are consumed *before* the user lookup, so a 429 carries no signal about whether the address has an account. See [rate limiting](#rate-limiting).
+
+## Rate limiting
+
+The three abuse-prone unauthenticated endpoints are throttled application-side (limiter config in [api/config/packages/framework.yaml](../../api/config/packages/framework.yaml)):
+
+| Endpoint | Limiter(s) | Default | Enforced by |
+| - | - | - | - |
+| `POST /auth/login` | `login_ip_email` + `login_ip` | 5 / (IP, email) and 25 / IP, per 15 min | Firewall `login_throttling` via the `app.login_rate_limiter` service ([services.yaml](../../api/config/services.yaml)); only *failed* attempts consume the budget — successes never count against it. Throttled attempts return **429** + `Retry-After` via [`App\Security\JsonLoginFailureHandler`](../../api/src/Security/JsonLoginFailureHandler.php). |
+| `POST /users` (signup) | `signup_ip` | 5 / IP, per hour | [`App\State\UserPasswordHasherProcessor`](../../api/src/State/UserPasswordHasherProcessor.php), before the user is persisted. Returns **429** + `Retry-After` (API Platform error shape). |
+| `POST /auth/forgot-password` | `forgot_password_ip` + `forgot_password_email` | 5 / IP and 3 / email, per hour | [`PasswordController::throttleForgotPassword`](../../api/src/Controller/PasswordController.php). Returns **429** with `{error, retryAfter}` + `Retry-After`. |
+
+Notes:
+
+- **Sizes are env-tunable** — `RATE_LIMIT_LOGIN_ATTEMPTS`, `RATE_LIMIT_LOGIN_ATTEMPTS_PER_IP`, `RATE_LIMIT_SIGNUPS_PER_IP`, `RATE_LIMIT_FORGOT_PASSWORD_PER_IP`, `RATE_LIMIT_FORGOT_PASSWORD_PER_EMAIL`. Prod-safe defaults live in [api/.env](../../api/.env); `.env.dev` and `.env.test` relax them to effectively unlimited so Playwright and the PHPUnit suite (hundreds of signups per run from one IP) never trip them.
+- **Forgot-password throttling is enumeration-safe**: both limiters are consumed before the user lookup, the per-email key is the sha256 of the lowercased address, and unknown emails consume (and 429) exactly like registered ones. It also caps the mail-spam angle — every accepted request mints a token and queues an email through the async Messenger queue, so the per-email limit bounds how noisy an attacker can make a victim's inbox.
+- **IP keying needs the real client IP.** The limiters key on `Request::getClientIp()`, which resolves `X-Forwarded-For` only behind the proxies in `TRUSTED_PROXIES` (set in [api/.env](../../api/.env), honored via `framework.trusted_proxies`). Deployments that add another proxy hop must extend that list or every caller collapses into one bucket.
+- **Storage is per-container.** Limiter state lives in the default rate-limiter cache pool, backed by `cache.app` (filesystem) — fine for the single-container deployment this ships with. A multi-replica deployment would need a shared backend (e.g. Redis) behind the pool for the limits to hold globally; until then each replica enforces them independently.
+- The 2FA challenge endpoint (`/auth/2fa-check`) has its own per-user `two_factor_verify` limiter — see [two-factor-auth.md](two-factor-auth.md).
 
 ## Token invalidation on re-request
 
@@ -171,13 +189,12 @@ The PWA's `no_token` synthesized state has no API counterpart — it's invoked w
 | Database leak | Plaintext token is never stored. An attacker who reads the table can't redeem; they'd need the active mailbox or to break sha256. |
 | Compromised mailbox | Same as every email-based reset. We send a notification email on change-via-reset? **Not yet** — open work below. |
 | 2FA bypass via password reset | The reset only changes the password. 2FA is unchanged — the user still has to clear the second factor at sign-in. A separate lost-device flow handles 2FA recovery. |
-| Brute-force the reset endpoint | The token is unguessable, so attempting to reset random tokens has effectively zero success rate. The forgot endpoint is a different problem (volume), addressed at the proxy layer today. |
-| Self-DoS via mass forgot requests | No per-account rate limit. An attacker who knows a valid email could mass-request links, invalidating each other in turn. The user can always request one more — the *latest* link always wins — but their inbox gets noisy. |
+| Brute-force the reset endpoint | The token is unguessable, so attempting to reset random tokens has effectively zero success rate. The forgot endpoint's volume problem is handled by the per-IP + per-email limits — see [rate limiting](#rate-limiting). |
+| Self-DoS via mass forgot requests | The per-email limit (3/hour by default) caps how many reset emails can be pushed at one address, from any number of IPs. The user can always request one more after the window — the *latest* link always wins. |
 
 ## Open work
 
 - **Notification email on successful change-via-reset.** Today the only confirmation is the "Password updated successfully" page banner. A "your password was reset" alert email would be a useful out-of-band signal for a compromised account, mirroring the 2FA recovery notifications.
-- **Per-IP / per-email rate limit on `/auth/forgot-password`.** Sized so a legitimate "I didn't get the email, let me try again" doesn't trip but a script abusing the endpoint does. The `two_factor_verify` limiter is the obvious model to clone — see [api/config/packages/framework.yaml](../../api/config/packages/framework.yaml).
 - **Notification email on successful change-via-`/auth/change-password`.** Same shape as the reset-via-link notification.
 
 ## Testing
@@ -187,6 +204,8 @@ The PWA's `no_token` synthesized state has no API counterpart — it's invoked w
 - Change-password happy path, wrong current password, too-short / same-as-current, unauthenticated, 2FA-on requires TOTP.
 - Forgot: valid email mints a token + sends email; unknown email still returns 200 and sends no mail (enumeration check); re-request invalidates prior tokens.
 - Reset: happy path, expired token, used token, invalid token, short password.
+
+[`api/tests/Api/RateLimitTest.php`](../../api/tests/Api/RateLimitTest.php) covers the throttles on login, signup, and forgot-password (429 + `Retry-After`, per-IP vs per-email keying, enumeration parity for unknown emails, successes-don't-consume on login). It overrides the `RATE_LIMIT_*` env vars per test — they're runtime-resolved env placeholders — and isolates its limiter buckets with unique `X-Forwarded-For` IPs so the rest of the suite (which runs as 127.0.0.1 against the relaxed `.env.test` limits) is unaffected.
 
 `assertEmailCount` reads from the per-request `MessageLoggerListener` — see the same note in [two-factor-auth.md#testing](two-factor-auth.md#testing): assert immediately after the request that should send. The forgot endpoint requires Mailpit to be running because the SMTP transport actually attempts delivery before failing soft; if you're running tests against a stack without Mailpit, the forgot-password test will surface a 500 from the unreachable MX. `docker compose up -d` brings it up alongside everything else.
 
