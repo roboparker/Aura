@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 
-const LAST_UPDATED = "May 17, 2026";
+const LAST_UPDATED = "June 9, 2026";
 
 const Privacy = () => (
   <>
@@ -27,9 +27,10 @@ const Privacy = () => (
         <div className="space-y-8 text-foreground leading-relaxed">
           <section>
             <p className="text-muted-foreground">
-              This Privacy Policy describes how Aura (the &quot;Service&quot;)
-              collects, uses, and protects your personal data when you use it.
-              By using the Service, you agree to the practices described here.
+              This Privacy Policy describes how Aura (the &quot;Service&quot;),
+              operated by Robert Parker (&quot;we&quot;, &quot;us&quot;), collects,
+              uses, and protects your personal data when you use it. By using
+              the Service, you agree to the practices described here.
             </p>
           </section>
 
@@ -49,7 +50,14 @@ const Privacy = () => (
               <li>
                 <strong className="text-foreground">Authentication data.</strong>{" "}
                 A hashed password and, if you enable two-factor authentication,
-                an encrypted TOTP secret and one-time backup codes.
+                an encrypted TOTP secret and one-time backup codes. If you
+                create API tokens, we store them in hashed form.
+              </li>
+              <li>
+                <strong className="text-foreground">Push subscriptions.</strong>{" "}
+                If you enable push notifications, we store a per-device
+                subscription endpoint so we can deliver notifications to that
+                device.
               </li>
               <li>
                 <strong className="text-foreground">Usage data.</strong>{" "}
@@ -78,8 +86,10 @@ const Privacy = () => (
               We do not sell your personal data. Content you create is visible
               only to you and the collaborators you share it with (for example,
               members of a space). We may share data with infrastructure
-              providers strictly to operate the Service, and we may disclose
-              information if required by law.
+              providers strictly to operate the Service — for example, push
+              notifications are delivered through your browser vendor&apos;s
+              push service (such as those operated by Google, Mozilla, or
+              Apple) — and we may disclose information if required by law.
             </p>
           </section>
 
@@ -87,10 +97,14 @@ const Privacy = () => (
             <h2 className="text-xl font-semibold mb-2">4. Data retention</h2>
             <p className="text-muted-foreground">
               We retain your account data and content for as long as your
-              account is active. When you delete your account, we delete the
-              associated personal data within a reasonable period, except where
+              account is active. When you delete your account, we delete your
+              personal data — your profile, credentials, sessions, tokens, and
+              notifications — within a reasonable period, except where
               retention is required for legal, security, or fraud-prevention
-              purposes.
+              purposes. Content you contributed to shared spaces (such as
+              tasks, pages, discussions, comments, and attachments) may remain
+              available to the other members of those spaces, disassociated
+              from your identity.
             </p>
           </section>
 
@@ -127,8 +141,9 @@ const Privacy = () => (
             <p className="text-muted-foreground">
               We use cookies and browser local storage for essential
               functionality such as keeping you signed in and remembering your
-              active space and theme preferences. We do not use third-party
-              advertising or tracking cookies.
+              active space, theme preferences, and recent searches (stored
+              only on your device). We do not use third-party advertising or
+              tracking cookies.
             </p>
           </section>
 

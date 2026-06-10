@@ -1,7 +1,7 @@
 import Head from "next/head";
 import Link from "next/link";
 
-const LAST_UPDATED = "May 17, 2026";
+const LAST_UPDATED = "June 9, 2026";
 
 const Terms = () => (
   <>
@@ -28,9 +28,10 @@ const Terms = () => (
           <section>
             <p className="text-muted-foreground">
               These Terms and Conditions (&quot;Terms&quot;) govern your access
-              to and use of Aura (the &quot;Service&quot;). By creating an
-              account or using the Service, you agree to be bound by these
-              Terms. If you do not agree, do not use the Service.
+              to and use of Aura (the &quot;Service&quot;), operated by Robert
+              Parker (&quot;we&quot;, &quot;us&quot;). By creating an account or
+              using the Service, you agree to be bound by these Terms. If you
+              do not agree, do not use the Service.
             </p>
           </section>
 
@@ -105,7 +106,21 @@ const Terms = () => (
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-2">7. Changes to these Terms</h2>
+            <h2 className="text-xl font-semibold mb-2">7. Governing law</h2>
+            <p className="text-muted-foreground">
+              These Terms are governed by the laws of the State of Oregon,
+              United States, without regard to its conflict-of-law provisions.
+              Any dispute arising out of or relating to these Terms or the
+              Service will be brought exclusively in the state or federal
+              courts located in Oregon, and you consent to the jurisdiction of
+              those courts. Nothing in this section limits any rights you may
+              have under the mandatory consumer-protection laws of the place
+              where you live.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-2">8. Changes to these Terms</h2>
             <p className="text-muted-foreground">
               We may update these Terms from time to time. When we do, we
               will revise the &quot;Last updated&quot; date above. If the
@@ -116,7 +131,7 @@ const Terms = () => (
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-2">8. Contact</h2>
+            <h2 className="text-xl font-semibold mb-2">9. Contact</h2>
             <p className="text-muted-foreground">
               Questions about these Terms? Reach out via the project&apos;s{" "}
               <Link
