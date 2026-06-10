@@ -4,6 +4,7 @@ namespace App\Scheduler;
 
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
+use App\Message\RunBackup;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -62,6 +63,12 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // Daily digest at 08:00 UTC — morning inbox for the
                 // EU/US-overlap audience.
                 RecurringMessage::cron('0 8 * * *', new DispatchNotificationDigest('daily'), $utc),
+                // Nightly backup at 02:00 UTC (db dump + media archive +
+                // newest-N retention prune — App\Service\BackupRunner).
+                // Replaces the old scripts/backup.sh host cron; stateful()
+                // means a run missed during downtime is caught up on the
+                // next worker boot instead of silently skipped.
+                RecurringMessage::cron('0 2 * * *', new RunBackup(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

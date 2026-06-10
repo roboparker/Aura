@@ -1,0 +1,106 @@
+<!doctype html>
+<!--
+  Maintenance page served by Caddy (see the @maintenance matcher in
+  Caddyfile) while scripts/deploy.sh swaps containers. It must stay fully
+  self-contained — inline styles, inline SVG, no /_next or /media asset
+  references — because every app container may be down while it renders.
+  Styled to match the PWA's auth screens (dark bg, glowing rounded-square
+  mark, soft card). The meta refresh bounces visitors back automatically
+  once the deploy finishes and the flag file is removed.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="30">
+  <title>Back in a minute</title>
+  <style>
+    :root {
+      --bg: #09090b;
+      --card: #131316;
+      --border: #26262b;
+      --fg: #fafafa;
+      --muted: #a1a1aa;
+      --accent: #2dd4bf;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    main {
+      width: min(26rem, calc(100vw - 2rem));
+      text-align: center;
+      padding: 2rem 0 3rem;
+    }
+    .mark {
+      display: block;
+      margin: 0 auto 1.25rem;
+      filter: drop-shadow(0 0 18px rgba(45, 212, 191, 0.55));
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 2rem 1.75rem;
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    p {
+      margin: 0;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+    .dots {
+      margin-top: 1.4rem;
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+    }
+    .dots span {
+      width: 0.4rem;
+      height: 0.4rem;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.25;
+      animation: pulse 1.6s infinite ease-in-out;
+    }
+    .dots span:nth-child(2) { animation-delay: 0.25s; }
+    .dots span:nth-child(3) { animation-delay: 0.5s; }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.25; transform: scale(1); }
+      45% { opacity: 1; transform: scale(1.25); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dots span { animation: none; opacity: 0.7; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <svg class="mark" width="56" height="56" viewBox="0 0 56 56" aria-hidden="true">
+      <rect x="10" y="10" width="36" height="36" rx="11"
+            fill="none" stroke="#2dd4bf" stroke-width="6" />
+    </svg>
+    <div class="card">
+      <h1>Back in a minute</h1>
+      <p>We&rsquo;re rolling out an update. Your work is safe, and this
+         page will bring you back automatically as soon as we&rsquo;re
+         done.</p>
+      <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+    </div>
+  </main>
+</body>
+</html>

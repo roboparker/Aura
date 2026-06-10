@@ -69,6 +69,29 @@
 	}
 
 	route {
+		# Maintenance mode: scripts/deploy.sh touches this flag file (in the
+		# maintenance_flag named volume, so it survives the container swap)
+		# while it backs up the DB and swaps images, and removes it once the
+		# new stack is healthy. Container healthchecks probe via
+		# https://localhost and must keep passing mid-deploy, so localhost is
+		# exempt. The flag never exists in dev — this block is inert there.
+		@maintenance {
+			file {
+				root /app/var/maintenance
+				try_files maintenance.on
+			}
+			not host localhost
+		}
+		handle @maintenance {
+			header Retry-After 60
+			header Cache-Control "no-store"
+			root * /etc/frankenphp
+			rewrite * /maintenance.html
+			file_server {
+				status 503
+			}
+		}
+
 		# Serve user-uploaded media (avatars, attachments) directly from disk
 		handle_path /media/* {
 			root * /app/var/media

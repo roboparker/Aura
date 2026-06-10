@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 #
-# Restore a backup created by scripts/backup.sh.
+# Restore a backup created by `bin/console app:backup:run`
+# (App\Service\BackupRunner — nightly via the scheduler, plus one before
+# every deploy). Stays a host-side script on purpose: a restore stops the
+# very containers an in-app command would run in.
 #
 # DESTRUCTIVE: drops and recreates the database, and (with --media)
 # replaces the contents of the media volume. Prompts for confirmation

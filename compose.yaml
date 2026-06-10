@@ -1,6 +1,6 @@
 services:
   php:
-    image: ${IMAGES_PREFIX:-}app-php
+    image: ${IMAGES_PREFIX:-}app-php:${IMAGES_TAG:-latest}
     depends_on:
       - database
     restart: unless-stopped
@@ -22,6 +22,11 @@ services:
       - caddy_data:/data
       - caddy_config:/config
       - media_data:/app/var/media
+      # Maintenance-mode flag lives in a named volume so it survives the
+      # container swap mid-deploy; scripts/deploy.sh raises it before the
+      # pre-deploy backup and lowers it after the new stack passes health.
+      # See the @maintenance matcher in api/frankenphp/Caddyfile.
+      - maintenance_flag:/app/var/maintenance
     ports:
       # HTTP
       - target: 80
@@ -51,7 +56,7 @@ services:
   # (by php) before the worker boots — its own entrypoint migrate is then a
   # no-op.
   worker:
-    image: ${IMAGES_PREFIX:-}app-php
+    image: ${IMAGES_PREFIX:-}app-php:${IMAGES_TAG:-latest}
     depends_on:
       php:
         condition: service_healthy
@@ -85,9 +90,16 @@ services:
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
+    volumes:
+      # Read-only view of uploads for the backup pass (app:backup:run tars
+      # this dir); the php service owns all writes to it.
+      - media_data:/app/var/media:ro
+      # Backups land on the host (./backups — gitignored) so restore.sh
+      # and off-box copy jobs work on plain files without docker cp.
+      - ./backups:/app/var/backups
 
   pwa:
-    image: ${IMAGES_PREFIX:-}app-pwa
+    image: ${IMAGES_PREFIX:-}app-pwa:${IMAGES_TAG:-latest}
     environment:
       NEXT_PUBLIC_ENTRYPOINT: http://php
     healthcheck:
@@ -146,6 +158,7 @@ volumes:
   caddy_data:
   caddy_config:
   media_data:
+  maintenance_flag:
 ###> doctrine/doctrine-bundle ###
   database_data:
 ###< doctrine/doctrine-bundle ###

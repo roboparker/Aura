@@ -18,12 +18,15 @@ FROM frankenphp_upstream AS frankenphp_base
 WORKDIR /app
 
 # persistent / runtime deps
+# postgresql-client provides pg_dump for App\Service\BackupRunner (the
+# nightly + pre-deploy backups run inside this image, over the network).
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install --no-install-recommends -y \
 	acl \
 	file \
 	gettext \
 	git \
+	postgresql-client \
 	&& rm -rf /var/lib/apt/lists/*
 
 # https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
@@ -51,6 +54,7 @@ RUN set -eux; \
 COPY --link frankenphp/conf.d/10-app.ini $PHP_INI_DIR/app.conf.d/
 COPY --link --chmod=755 frankenphp/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 COPY --link frankenphp/Caddyfile /etc/frankenphp/Caddyfile
+COPY --link frankenphp/maintenance.html /etc/frankenphp/maintenance.html
 
 ENTRYPOINT ["docker-entrypoint"]
 
