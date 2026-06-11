@@ -1,0 +1,24 @@
+{# @var recipient \App\Entity\User #}
+{# @var space \App\Entity\Space #}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p>Your export of the space <strong>{{ space.name }}</strong> is ready. It
+contains the space's projects, tasks, pages, discussions, comments, and
+attachments as a zip archive.</p>
+
+<p>
+    <a href="{{ downloadUrl }}">Download your export</a>
+</p>
+
+<p>
+    This link expires on {{ expiresAt|date('F j, Y') }} — after that the
+    archive is deleted and you'll need to request a new export.
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You'll need to be signed in to Aura as an admin of this space to download
+    the file — the link only works for space admins, not for anyone who
+    happens to receive it.
+</p>
+
+<p>&mdash; Aura</p>

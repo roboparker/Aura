@@ -26,6 +26,15 @@ parameters:
     app.backup_dir: '%kernel.project_dir%/var/backups'
     app.backup_max_backups: 5
 
+    # Space data exports (App\Service\SpaceExportBuilder / SpaceExportPruner):
+    # where the requested zip archives are written, and how many days a
+    # finished export stays downloadable before the nightly prune deletes the
+    # file and its row. The dir lives under var/ (NOT var/media) so the
+    # archives are never reachable through the public /media/* Caddy route —
+    # downloads go through the authenticated, token-gated endpoint only.
+    app.space_export_dir: '%kernel.project_dir%/var/exports'
+    app.space_export_retention_days: 7
+
 services:
     # default configuration for services in *this* file
     _defaults:
