@@ -94,6 +94,65 @@ docker compose -f compose.yaml -f compose.prod.yaml up -d
 
 Ensure all secrets are set to strong, unique values in production.
 
+## Origin TLS behind Cloudflare
+
+Production (`madori.app`) sits behind the Cloudflare proxy (orange cloud) with
+the SSL/TLS mode set to **Full (strict)**: Cloudflare presents its edge
+certificate to browsers and re-encrypts to the origin, validating the origin's
+certificate. By default Caddy/FrankenPHP auto-provisions a Let's Encrypt
+certificate for the origin, but **ACME renewal can fail behind the proxy** — the
+HTTP-01 / TLS-ALPN-01 challenges are intercepted by Cloudflare — so a renewal
+that silently fails would eventually lapse the origin cert and Full (strict)
+would start returning **HTTP 526** errors.
+
+The durable fix is a **Cloudflare Origin Certificate** (a long-lived cert, up to
+15 years, trusted only by Cloudflare's edge — exactly what a proxied origin
+needs). Caddy serves it via an explicit `tls` directive instead of ACME.
+
+This is wired up but **gated** so it has zero effect until switched on:
+
+- `api/frankenphp/Caddyfile` — both site blocks contain `{$TLS_DIRECTIVE}`,
+  which expands to nothing when the env var is unset (dev and pre-cutover prod
+  keep automatic HTTPS).
+- `compose.prod.yaml` — the `php` service passes `TLS_DIRECTIVE` through and
+  mounts the host `./certs` dir read-only at `/etc/caddy/origin`. `./certs` is
+  gitignored and survives the deploy's `git reset --hard`.
+
+### One-time cutover
+
+1. **Create the Origin Certificate.** In the Cloudflare dashboard:
+   *SSL/TLS → Origin Server → Create Certificate* (let Cloudflare generate the
+   key; hostnames `madori.app` + `*.madori.app`; 15-year validity). Copy the
+   **Origin Certificate** and **Private Key** PEM blocks.
+2. **Place the files on the server** (key readable only by root):
+   ```bash
+   mkdir -p /opt/aura/certs
+   # paste the cert into cert.pem and the key into key.pem
+   chmod 600 /opt/aura/certs/key.pem
+   ```
+3. **Enable it** in `/opt/aura/.env`:
+   ```
+   TLS_DIRECTIVE=tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem
+   ```
+4. **Recreate the `php` container** to pick up the new env + Caddyfile:
+   ```bash
+   docker compose -f compose.yaml -f compose.prod.yaml up -d php
+   ```
+5. **Verify** the origin now serves the Cloudflare Origin CA cert and the site
+   is still healthy through the proxy:
+   ```bash
+   echo | openssl s_client -connect 5.78.210.192:443 -servername madori.app 2>/dev/null \
+     | openssl x509 -noout -issuer -subject        # issuer: Cloudflare, Inc.
+   curl -sS -o /dev/null -w '%{http_code}\n' https://madori.app/   # 200
+   ```
+
+> The Caddyfile change ships in the `app-php` image, so the cutover requires the
+> image built from a commit that contains `{$TLS_DIRECTIVE}` to be deployed
+> first. Until step 3 sets the var, that deploy is a no-op for TLS.
+
+**Rollback:** remove the `TLS_DIRECTIVE` line from `.env` and
+`up -d php` again — Caddy reverts to automatic Let's Encrypt.
+
 ## Backups
 
 The compose stack has two stateful pieces: the PostgreSQL database (volume

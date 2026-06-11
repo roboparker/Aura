@@ -1,4 +1,5 @@
 /.env
 /backups/
+/certs/
 /helm/api-platform/charts/*
 !/helm/api-platform/charts/.gitignore
