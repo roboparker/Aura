@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { safeNextPath } from "@/lib/authRedirect";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -81,9 +81,10 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
             }
             // No deep link → honor the user's "Start page" preference.
             // For a specific space, prime the active space so the
-            // workspace home lands there.
+            // workspace home lands there. A valid `?next=` deep link
+            // wins, in which case we leave the active space untouched.
             const landing = readLanding(result.user?.preferences);
-            if (landing.page === "space") {
+            if (!isSafeNextPath(next) && landing.page === "space") {
               selectActiveSpaceById(landing.spaceId);
             }
             router.push(safeNextPath(next, landingPathFor(landing)));

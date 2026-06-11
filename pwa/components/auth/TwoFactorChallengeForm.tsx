@@ -4,7 +4,7 @@ import { Formik, Form, useFormikContext } from "formik";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { TwoFactorRateLimitError, useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { safeNextPath } from "@/lib/authRedirect";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -93,8 +93,11 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
         onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
           try {
             const user = await submitTwoFactorCode(code.trim());
+            // No deep link → honor the "Start page" preference, priming
+            // the active space for the "specific space" choice. A valid
+            // `?next=` deep link wins and leaves the active space alone.
             const landing = readLanding(user.preferences);
-            if (landing.page === "space") {
+            if (!isSafeNextPath(next) && landing.page === "space") {
               selectActiveSpaceById(landing.spaceId);
             }
             router.push(safeNextPath(next, landingPathFor(landing)));

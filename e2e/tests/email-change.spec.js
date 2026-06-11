@@ -18,6 +18,11 @@ async function registerAndSignIn(page, request, email, password = "Password123!@
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click('button[type="submit"]');
+  // A fresh sign-in lands on the default "Start page" (the workspace
+  // home, #406); this suite drives the profile settings page, so go
+  // there explicitly.
+  await expect(page).toHaveURL(/\/projects/);
+  await page.goto(`${BASE_URL}/settings/profile`);
   await expect(page).toHaveURL(/\/settings\/profile/);
 }
 
