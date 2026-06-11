@@ -7,6 +7,7 @@ use App\Entity\Comment;
 use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Project;
+use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\SpaceExport;
 use App\Entity\SpaceMembership;
@@ -14,6 +15,7 @@ use App\Entity\Task;
 use App\Entity\User;
 use App\Service\SpaceExportPruner;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemOperator;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\RawMessage;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -28,13 +30,18 @@ class SpaceExportTest extends ApiTestCase
     use SpaceMembershipFixture;
 
     private EntityManagerInterface $entityManager;
+    private FilesystemOperator $storage;
 
     protected function setUp(): void
     {
         $kernel = self::bootKernel();
-        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        $container = $kernel->getContainer();
+        $em = $container->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
+        $storage = $container->get('media.storage');
+        assert($storage instanceof FilesystemOperator);
+        $this->storage = $storage;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
@@ -42,6 +49,7 @@ class SpaceExportTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceExport')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -64,6 +72,11 @@ class SpaceExportTest extends ApiTestCase
         $this->createComment($alice, $task, 'Deposit paid.');
         $this->createDiscussion($alice, $space, 'Kickoff thread');
         $this->createPage($alice, $space, 'Runbook');
+
+        // A space attachment exercises the streamed addFile() path.
+        $media = $this->createMediaObject($alice, 'CONTRACT-BYTES', 'contract.pdf');
+        $space->addAttachment($media);
+        $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -102,6 +115,11 @@ class SpaceExportTest extends ApiTestCase
         $this->assertZipContains($path, 'tasks.json', 'Deposit paid.');
         $this->assertZipContains($path, 'discussions.json', 'Kickoff thread');
         $this->assertZipContains($path, 'pages.json', 'Runbook');
+        $this->assertZipContains(
+            $path,
+            'attachments/' . $media->getId() . '-contract.pdf',
+            'CONTRACT-BYTES',
+        );
 
         // Status endpoint says ready…
         $client->request('GET', '/space-exports/' . $token);
@@ -366,6 +384,23 @@ class SpaceExportTest extends ApiTestCase
         $this->entityManager->persist($page);
         $this->entityManager->flush();
         return $page;
+    }
+
+    private function createMediaObject(User $owner, string $bytes, string $name): MediaObject
+    {
+        $path = 'attachments/export-test-' . bin2hex(random_bytes(4)) . '-' . $name;
+        $this->storage->write($path, $bytes);
+
+        $media = new MediaObject();
+        $media->setOwner($owner);
+        $media->setKind(MediaObject::KIND_ATTACHMENT);
+        $media->setVariants(['original' => $path]);
+        $media->setOriginalName($name);
+        $media->setMimeType('application/pdf');
+        $media->setByteSize(\strlen($bytes));
+        $this->entityManager->persist($media);
+        $this->entityManager->flush();
+        return $media;
     }
 
     private function createUser(string $email): User

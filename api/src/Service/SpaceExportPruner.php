@@ -80,5 +80,31 @@ final class SpaceExportPruner
                 }
             }
         }
+
+        // Staging directories left behind by a build that died before
+        // close() (SpaceExportBuilder cleans them on the happy + error
+        // paths, so a survivor means a hard kill).
+        $dirs = glob($this->exportDir . '/space-export-*.parts', GLOB_ONLYDIR);
+        if (false !== $dirs) {
+            foreach ($dirs as $dir) {
+                $mtime = filemtime($dir);
+                if (is_int($mtime) && $mtime <= $cutoff->getTimestamp()) {
+                    $this->removeDir($dir);
+                }
+            }
+        }
+    }
+
+    private function removeDir(string $dir): void
+    {
+        $entries = glob($dir . '/*');
+        if (false !== $entries) {
+            foreach ($entries as $entry) {
+                if (is_file($entry)) {
+                    unlink($entry);
+                }
+            }
+        }
+        rmdir($dir);
     }
 }

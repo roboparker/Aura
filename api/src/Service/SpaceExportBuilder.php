@@ -62,6 +62,17 @@ final class SpaceExportBuilder
         $file = sprintf('%s/space-export-%s.zip', $this->exportDir, (string) $export->getId());
         $tmp = $file . '.tmp';
 
+        // Attachment bytes are streamed to temp files in this directory and
+        // referenced by ZipArchive::addFile(), which reads them lazily at
+        // close() — so the worker never holds a whole attachment in memory.
+        // The files must outlive the add calls, hence a directory we clean
+        // up only after close() (or on the error path). A crashed build's
+        // leftovers are swept by SpaceExportPruner alongside the .zip.tmp.
+        $partsDir = sprintf('%s/space-export-%s.parts', $this->exportDir, (string) $export->getId());
+        if (!is_dir($partsDir) && !mkdir($partsDir, 0750, true) && !is_dir($partsDir)) {
+            throw new \RuntimeException(sprintf('Export staging directory "%s" could not be created.', $partsDir));
+        }
+
         $projects = $this->em->getRepository(Project::class)
             ->findBy(['space' => $space], ['createdOn' => 'ASC']);
         $tasks = [] === $projects ? [] : $this->em->getRepository(Task::class)
@@ -110,17 +121,26 @@ final class SpaceExportBuilder
             ));
 
             foreach ($media as $mediaObject) {
-                $this->addAttachment($zip, $mediaObject);
+                $this->addAttachment($zip, $mediaObject, $partsDir);
             }
         } catch (\Throwable $e) {
             $zip->close();
             if (is_file($tmp)) {
                 unlink($tmp);
             }
+            $this->removeDir($partsDir);
             throw $e;
         }
 
-        if (!$zip->close()) {
+        // close() flushes the archive, reading every addFile() source — so
+        // the staging directory must survive until here, then it's safe to
+        // remove regardless of success.
+        $closed = $zip->close();
+        $this->removeDir($partsDir);
+        if (!$closed) {
+            if (is_file($tmp)) {
+                unlink($tmp);
+            }
             throw new \RuntimeException(sprintf('Could not finalize the export archive "%s".', $tmp));
         }
         if (!rename($tmp, $file)) {
@@ -157,7 +177,7 @@ final class SpaceExportBuilder
         }
     }
 
-    private function addAttachment(\ZipArchive $zip, MediaObject $media): void
+    private function addAttachment(\ZipArchive $zip, MediaObject $media, string $partsDir): void
     {
         $path = $media->getVariantPath('original') ?? array_values($media->getVariants())[0] ?? null;
         if (null === $path || !$this->mediaStorage->fileExists($path)) {
@@ -166,20 +186,51 @@ final class SpaceExportBuilder
             return;
         }
 
-        // ZipArchive has no stream-append API, so the bytes pass through
-        // memory; uploads are size-capped at ingest, so this stays bounded.
-        $stream = $this->mediaStorage->readStream($path);
-        $contents = stream_get_contents($stream);
-        if (\is_resource($stream)) {
-            fclose($stream);
+        // Stream flysystem → a staged temp file, then hand the path to
+        // ZipArchive::addFile() so the bytes are read from disk at close()
+        // rather than buffered in memory. The media id is unique, so it's a
+        // safe temp filename.
+        $tempPath = $partsDir . '/' . (string) $media->getId();
+        $dest = fopen($tempPath, 'wb');
+        if (false === $dest) {
+            throw new \RuntimeException(sprintf('Could not stage attachment "%s" for export.', (string) $media->getId()));
         }
-        if (false === $contents) {
+
+        $source = $this->mediaStorage->readStream($path);
+        $copied = stream_copy_to_stream($source, $dest);
+        if (\is_resource($source)) {
+            fclose($source);
+        }
+        fclose($dest);
+        if (false === $copied) {
+            // Couldn't read the bytes — skip rather than abort the export.
+            unlink($tempPath);
             return;
         }
 
-        if (!$zip->addFromString(self::attachmentFileName($media), $contents)) {
+        if (!$zip->addFile($tempPath, self::attachmentFileName($media))) {
             throw new \RuntimeException(sprintf('Could not add attachment "%s" to the export archive.', (string) $media->getId()));
         }
+    }
+
+    /**
+     * Removes a staging directory and its (flat) contents. Best-effort —
+     * a leftover that survives a hard kill is reaped by SpaceExportPruner.
+     */
+    private function removeDir(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $entries = glob($dir . '/*');
+        if (false !== $entries) {
+            foreach ($entries as $entry) {
+                if (is_file($entry)) {
+                    unlink($entry);
+                }
+            }
+        }
+        rmdir($dir);
     }
 
     /**
