@@ -241,7 +241,7 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
         window.localStorage.setItem(storageKeyFor(user.id), space.id);
       }
     },
-    [user?.id],
+    [user],
   );
 
   const isActiveSpaceAdmin = !!(

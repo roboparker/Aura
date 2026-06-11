@@ -65,10 +65,14 @@ test.describe("Authentication", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
 
-    // Should redirect to the Settings profile panel. The email now appears
-    // in two places after sign-in (sidebar header + profile identity form),
-    // so scope the assertion to the main panel.
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // A fresh sign-in with no redirect lands on the workspace home
+    // (/projects) with the user's Private space active (#405).
+    await expect(page).toHaveURL(/\/projects/);
+
+    // Confirm we're signed in as the right account. The email appears in
+    // two places (sidebar header + profile identity form), so open the
+    // profile panel and scope the assertion to the main panel.
+    await page.goto(`${BASE_URL}/settings/profile`);
     await expect(
       page.getByRole("main").getByText(email),
     ).toBeVisible();
@@ -90,7 +94,8 @@ test.describe("Authentication", () => {
     await page.fill("#password", "admin123");
     await page.click('button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
 
     // Navigate to admin
     await page.goto(`${BASE_URL}/admin`);
