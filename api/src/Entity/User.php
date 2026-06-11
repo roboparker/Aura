@@ -246,6 +246,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         'space-invites',
     ];
 
+    /**
+     * Post-login landing destinations for the "Start page" preference.
+     * `space` lands in the workspace home with a chosen space active
+     * (a null `spaceId` means the personal "Private" space).
+     */
+    public const LANDING_PAGES = ['tasks', 'notifications', 'spaces', 'space'];
+
     public const DEFAULT_PREFERENCES = [
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
         // scheduling + reminder display and digest/quiet-hours math.
@@ -268,6 +275,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // Quiet hours (interpreted in the user's timezone). Suppresses
         // email + push while active; in-app rows still land.
         'quietHours' => ['enabled' => false, 'start' => '22:00', 'end' => '07:00'],
+        // Post-login landing ("Start page"). `page` ∈ LANDING_PAGES; for
+        // 'space', `spaceId` names the space to activate (null = the
+        // personal "Private" space). Default matches #405: land in the
+        // workspace with the personal space active.
+        'landing' => ['page' => 'space', 'spaceId' => null],
     ];
 
     public function getId(): ?Uuid

@@ -21,6 +21,15 @@ export interface QuietHoursPref {
   end: string;
 }
 
+/** Post-login landing destination ("Start page" setting). */
+export type LandingPage = "tasks" | "notifications" | "spaces" | "space";
+
+export interface LandingPreference {
+  page: LandingPage;
+  /** For `page: "space"`, the space to activate. `null` = the personal space. */
+  spaceId: string | null;
+}
+
 export interface UserPreferences {
   /** IANA time-zone identifier (e.g. "America/New_York"). Defaults to "UTC". */
   timezone: string;
@@ -31,6 +40,8 @@ export interface UserPreferences {
   notificationMatrix: Record<string, NotificationChannel>;
   emailDigest: EmailDigestPref;
   quietHours: QuietHoursPref;
+  /** Where a fresh sign-in (no deep link) lands. */
+  landing: LandingPreference;
 }
 
 export interface TwoFactorStatus {
@@ -91,6 +102,13 @@ export interface User {
  */
 export interface LoginResult {
   requiresTwoFactor: boolean;
+  /**
+   * The signed-in user, present only when `requiresTwoFactor` is false.
+   * Returned alongside the context state update so the caller can resolve
+   * the post-login landing destination from fresh preferences without
+   * waiting for a re-render.
+   */
+  user?: User;
 }
 
 export interface RegisterInput {
@@ -119,7 +137,7 @@ interface AuthContextType {
    * user; throws on a wrong code, leaving the half-authenticated session
    * in place so the user can retry.
    */
-  submitTwoFactorCode: (code: string) => Promise<void>;
+  submitTwoFactorCode: (code: string) => Promise<User>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
   /**
@@ -229,10 +247,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await res.json();
     setUser(data);
-    return { requiresTwoFactor: false };
+    return { requiresTwoFactor: false, user: data as User };
   }, []);
 
-  const submitTwoFactorCode = useCallback(async (code: string) => {
+  const submitTwoFactorCode = useCallback(async (code: string): Promise<User> => {
     const res = await fetchWithTimeout(`${ENTRYPOINT}/auth/2fa-check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -257,6 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const data = await res.json();
     setUser(data);
+    return data as User;
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
