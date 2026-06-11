@@ -22,3 +22,10 @@ services:
   database:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  # Hard-require the Umami secret in prod (no insecure default). The
+  # dashboard port stays loopback-bound (see compose.yaml) — reach it via
+  # an SSH tunnel: ssh -L 3001:localhost:3001 <server>.
+  umami:
+    environment:
+      APP_SECRET: ${UMAMI_APP_SECRET}

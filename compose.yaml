@@ -109,6 +109,41 @@ services:
       retries: 20
       start_period: 60s
 
+  # Self-hosted Umami analytics (cookieless, first-party). Lives behind the
+  # `analytics` profile so CI stacks (`up --wait` with no service list) and
+  # casual dev `up -d` don't boot it; enable locally with
+  # `COMPOSE_PROFILES=analytics` in .env or `docker compose --profile
+  # analytics up -d`. scripts/deploy.sh always deploys it in prod. The
+  # tracker script + collect endpoint are proxied same-origin by Caddy
+  # (/umami/* in api/frankenphp/Caddyfile); the dashboard itself is only
+  # reachable through the published port below (loopback-bound in prod —
+  # see compose.prod.yaml — so access it via an SSH tunnel).
+  # Uses its own `umami` database on the shared Postgres instance —
+  # scripts/deploy.sh ensures it idempotently on every prod deploy; for a
+  # local stack create it once with
+  # `docker compose exec database createdb -U app umami`. Umami runs its
+  # own migrations on boot.
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    profiles: ["analytics"]
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:-!ChangeThisUmamiAppSecret!}
+      DISABLE_TELEMETRY: 1
+    ports:
+      - "127.0.0.1:${UMAMI_PORT:-3001}:3000"
+    healthcheck:
+      test: curl -f http://localhost:3000/api/heartbeat || exit 1
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped

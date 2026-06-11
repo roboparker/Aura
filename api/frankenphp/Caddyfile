@@ -98,6 +98,24 @@
 			file_server
 		}
 
+		# Umami analytics, proxied first-party so the tracker is same-origin
+		# (no extra DNS/cert, far less ad-block exposure). Only the tracker
+		# script and the collect endpoint are exposed — the Umami dashboard
+		# itself is NOT reachable through this host; it lives on the
+		# loopback-published port of the umami service (SSH tunnel in prod).
+		# The tracker derives its endpoint from the script src path, so
+		# /umami/script.js posts events to /umami/api/send. When the umami
+		# container isn't running (profile off) these paths 502; the PWA
+		# loads the script async and only when configured, so nothing breaks.
+		handle /umami/script.js {
+			rewrite * /script.js
+			reverse_proxy umami:3000
+		}
+		handle /umami/api/send {
+			rewrite * /api/send
+			reverse_proxy umami:3000
+		}
+
 		# Matches requests for HTML documents, for static files and for Next.js files,
 		# except for known API paths and paths with extensions handled by API Platform
 		@pwa expression `(

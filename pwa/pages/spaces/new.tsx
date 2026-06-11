@@ -5,6 +5,7 @@ import { Info, Lock, LockOpen } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { trackEvent } from "@/lib/analytics";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { cn } from "@/lib/utils";
@@ -140,6 +141,7 @@ const NewSpacePage = () => {
         );
       }
       const space: CreatedSpace = await res.json();
+      trackEvent("space-create", { visibility });
       // Refresh the sidebar / context list before navigating so the new
       // space is already in the list when the detail page mounts.
       await refresh();

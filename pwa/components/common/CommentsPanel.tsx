@@ -1,5 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import { trackEvent } from "@/lib/analytics";
 import { displayName } from "@/lib/userDisplay";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
@@ -94,6 +95,7 @@ const CommentsPanel = ({
     setError(null);
     try {
       await onCreate(trimmed);
+      trackEvent("comment-create");
       setDraft("");
       // Bump the editor key so BlockNote remounts with empty content.
       setDraftKey((k) => k + 1);

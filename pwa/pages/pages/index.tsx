@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { trackEvent } from "@/lib/analytics";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { displayName } from "@/lib/userDisplay";
@@ -101,6 +102,7 @@ const PagesIndex = () => {
         errorMessage: "Failed to create page.",
         body: { space: activeSpace["@id"], title: newTitle.trim(), body: "" },
       });
+      trackEvent("page-create");
       setNewTitle("");
       setShowComposer(false);
       if (created) await router.push(`/pages/${created.id}`);
