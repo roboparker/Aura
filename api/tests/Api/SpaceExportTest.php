@@ -161,12 +161,15 @@ class SpaceExportTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testDownloadIsRequesterOnly(): void
+    public function testDownloadIsRestrictedToSpaceAdmins(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+        $mallory = $this->createUser('mallory@example.com');
         $space = $this->createSpace($alice, 'Shared');
         $this->ensureSpaceMembership($space, $bob, Space::ROLE_ADMIN);
+        $this->ensureSpaceMembership($space, $carol, Space::ROLE_MEMBER);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -179,10 +182,24 @@ class SpaceExportTest extends ApiTestCase
         self::assertNotNull($message);
         $token = $this->extractToken($message);
 
-        // Even a co-admin of the space can't use someone else's link.
+        // A co-admin of the space can use the link (download bar mirrors
+        // the space-admin request bar).
         $client->loginUser($bob);
         $client->request('GET', '/space-exports/' . $token);
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertJsonContains(['status' => 'ready']);
+        $client->request('GET', '/space-exports/' . $token . '/download');
+        $this->assertResponseStatusCodeSame(200);
+
+        // A plain member of the space cannot.
+        $client->loginUser($carol);
+        $client->request('GET', '/space-exports/' . $token);
         $this->assertResponseStatusCodeSame(404);
+        $client->request('GET', '/space-exports/' . $token . '/download');
+        $this->assertResponseStatusCodeSame(404);
+
+        // A non-member cannot.
+        $client->loginUser($mallory);
         $client->request('GET', '/space-exports/' . $token . '/download');
         $this->assertResponseStatusCodeSame(404);
 

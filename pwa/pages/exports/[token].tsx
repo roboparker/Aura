@@ -96,9 +96,9 @@ const ExportDownloadPage = () => {
       <>
         <h1 className="text-xl font-semibold">Export not found</h1>
         <p className="text-sm text-muted-foreground">
-          This download link isn&apos;t valid for your account. Make sure
-          you&apos;re signed in as the person who requested the export — or
-          request a new one from the space&apos;s settings.
+          This download link isn&apos;t valid for your account. You need to be
+          signed in as an admin of the space the export belongs to — or you can
+          request a new export from that space&apos;s settings.
         </p>
       </>
     );

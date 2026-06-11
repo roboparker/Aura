@@ -139,9 +139,12 @@ class SpaceExportController extends AbstractController
     }
 
     /**
-     * Resolves a plaintext token to the caller's own export. Foreign and
-     * unknown tokens are indistinguishable (both null → 404) so the route
-     * can't confirm an export's existence to anyone but its requester.
+     * Resolves a plaintext token to an export the caller may access: the
+     * requester, any admin of the export's space, or a global admin. A
+     * space export bundles every member's content, so the download bar
+     * matches the request bar (space-admin). Foreign and unknown tokens
+     * are indistinguishable (both null → 404) so the route can't confirm
+     * an export's existence to anyone outside that set.
      */
     private function findByToken(string $token, User $user): ?SpaceExport
     {
@@ -154,11 +157,13 @@ class SpaceExportController extends AbstractController
         if (null === $export) {
             return null;
         }
-        if (true !== $export->getRequestedBy()->getId()?->equals($user->getId())) {
-            return null;
+
+        $isRequester = true === $export->getRequestedBy()->getId()?->equals($user->getId());
+        if ($isRequester || $this->isGranted('ROLE_ADMIN') || $export->getSpace()->isAdmin($user)) {
+            return $export;
         }
 
-        return $export;
+        return null;
     }
 
     private function downloadFileName(SpaceExport $export): string
