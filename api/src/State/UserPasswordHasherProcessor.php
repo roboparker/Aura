@@ -10,11 +10,14 @@ use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
+use App\Service\WaitlistJoinedMailer;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
@@ -34,6 +37,8 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         private UserInviteRepository $inviteRepository,
         private EntityManagerInterface $em,
         private WaitlistSettings $waitlistSettings,
+        private WaitlistJoinedMailer $waitlistJoinedMailer,
+        private LoggerInterface $logger,
         #[Autowire(service: 'limiter.signup_ip')]
         private RateLimiterFactoryInterface $signupLimiter,
         private RequestStack $requestStack,
@@ -96,6 +101,15 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
             $this->acceptInvite($user, $inviteToken);
         }
 
+        // Confirm the signup with a "you're on the list" email (#404). Gated on
+        // the persisted waitlisted flag, not the setting, so an invite-token
+        // signup that ever bypasses the gate (lands un-waitlisted) won't get it.
+        // Best-effort after the flush, mirroring the access email — a dead SMTP
+        // server logs a warning but can't undo the signup that already landed.
+        if ($operation instanceof Post && $user->isWaitlisted()) {
+            $this->sendWaitlistJoined($user);
+        }
+
         return $user;
     }
 
@@ -125,6 +139,18 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
             $retryAfter,
             'Too many accounts created from this network. Please try again later.',
         );
+    }
+
+    private function sendWaitlistJoined(User $user): void
+    {
+        try {
+            $this->waitlistJoinedMailer->sendJoinedConfirmation($user);
+        } catch (TransportExceptionInterface $e) {
+            $this->logger->warning('Failed to send waitlist confirmation email to {email}: {error}', [
+                'email' => $user->getEmail(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

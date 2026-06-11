@@ -4,8 +4,7 @@ import { useRouter } from "next/router";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { ENTRYPOINT } from "@/config/entrypoint";
-import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
@@ -130,10 +129,6 @@ const AuthCard = ({ defaultTab }: Props) => {
     defaultTab === "signup" ? "signup-form" : "credentials",
   );
   const [twoFactorEmail, setTwoFactorEmail] = useState<string | null>(null);
-  // Whether the instance is in waitlist mode — drives the signup copy and
-  // flow. Defaults to false (open signups); the /signup-status fetch below
-  // flips it on. Invite signups always run the normal flow.
-  const [waitlistMode, setWaitlistMode] = useState(false);
 
   // Sign-up multi-step state. The form payload is captured on step 1
   // and held here so step 2 can POST it with the chosen color; the
@@ -154,6 +149,13 @@ const AuthCard = ({ defaultTab }: Props) => {
     typeof router.query.invite === "string" ? router.query.invite : undefined;
   const registered = router.query.registered === "true";
   const reset = router.query.reset === "true";
+
+  // Whether the instance is in waitlist mode — drives the signup copy/flow and
+  // the footer CTA on both entry points. Invite signups always run the normal
+  // flow (they bypass the gate), so an invite token forces it off. Errors fall
+  // back to open signups; the server still enforces the real gate.
+  const { waitlistEnabled } = useSignupStatus();
+  const waitlistMode = waitlistEnabled && !inviteToken;
 
   useEffect(() => {
     // Authenticated users normally don't need /signin or /signup, so
@@ -181,28 +183,6 @@ const AuthCard = ({ defaultTab }: Props) => {
     selectActiveSpaceById,
   ]);
 
-  // Resolve whether signups are open or gated behind the waitlist. Only the
-  // signup entry point needs to know (the sign-in side is unaffected), and
-  // invite signups always bypass the waitlist. Errors fall back to open
-  // signups — the server still enforces the real gate.
-  useEffect(() => {
-    if (defaultTab !== "signup" || inviteToken) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetchWithTimeout(`${ENTRYPOINT}/signup-status`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled) setWaitlistMode(Boolean(data.waitlistEnabled));
-      } catch {
-        /* keep the open-signup default */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [defaultTab, inviteToken]);
-
   const queryIndex = router.asPath.indexOf("?");
   const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
 
@@ -221,6 +201,14 @@ const AuthCard = ({ defaultTab }: Props) => {
   const tabCopy = COPY[step === "credentials" ? "signin" : "signup"];
   const isTwoFactor = step === "totp" || step === "backup";
   const tfCopy = isTwoFactor ? twoFactorCopy(step, twoFactorEmail) : null;
+
+  // The footer's "switch" CTA points either at signup or signin. When it leads
+  // to signup and the instance is waitlisted, label it "Join the waitlist" so
+  // the signin page's footer reads the same as every other public CTA.
+  const switchCta =
+    waitlistMode && tabCopy.switchPath === "/signup"
+      ? "Join the waitlist"
+      : tabCopy.switchCta;
 
   const cardCopy: { title: string; subtitle: string } | null = (() => {
     if (tfCopy) return { title: tfCopy.title, subtitle: tfCopy.subtitle };
@@ -431,7 +419,7 @@ const AuthCard = ({ defaultTab }: Props) => {
                   href={`${tabCopy.switchPath}${search}`}
                   className="text-primary font-semibold hover:text-foreground"
                 >
-                  {tabCopy.switchCta}
+                  {switchCta}
                 </Link>
               </>
             )}
