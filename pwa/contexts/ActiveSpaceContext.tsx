@@ -95,6 +95,13 @@ interface ActiveSpaceContextType {
   activeSpace: Space | null;
   /** Switch the active space. Persists the choice in localStorage. */
   setActiveSpace: (space: Space) => void;
+  /**
+   * Select the active space by id before its row is necessarily loaded —
+   * used by the post-login landing flow to honor the "Start page" space
+   * choice. Passing `null` clears the selection and falls back to the
+   * personal space. Persists like {@link setActiveSpace}.
+   */
+  selectActiveSpaceById: (spaceId: string | null) => void;
   /** Reload the user's space list — call after creating, deleting, or being invited to a space. */
   refresh: () => Promise<void>;
   /** Convenience: is the current user a direct admin in the active space? */
@@ -193,6 +200,18 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const selectActiveSpaceById = useCallback((spaceId: string | null) => {
+    setActiveSpaceId(spaceId);
+    if (typeof window === "undefined") return;
+    if (spaceId) {
+      window.localStorage.setItem(STORAGE_KEY, spaceId);
+    } else {
+      // Clear the persisted choice so the active space resolves to the
+      // personal "Private" space (the null-spaceId landing default).
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  }, []);
+
   const isActiveSpaceAdmin = !!(
     activeSpace &&
     user &&
@@ -208,6 +227,7 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
         personalSpace,
         activeSpace,
         setActiveSpace,
+        selectActiveSpaceById,
         refresh: fetchSpaces,
         isActiveSpaceAdmin,
         isLoading,

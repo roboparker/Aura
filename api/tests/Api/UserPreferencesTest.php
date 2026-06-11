@@ -3,9 +3,12 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Uid\Uuid;
 
 class UserPreferencesTest extends ApiTestCase
 {
@@ -274,6 +277,156 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function simpleLandingPageProvider(): iterable
+    {
+        yield 'tasks' => ['tasks'];
+        yield 'notifications' => ['notifications'];
+        yield 'spaces' => ['spaces'];
+    }
+
+    /**
+     * @dataProvider simpleLandingPageProvider
+     */
+    public function testPatchAcceptsLandingPage(string $page): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => $page, 'spaceId' => null]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $landing = $this->arrayField($response->toArray(), 'landing');
+        $this->assertSame($page, $landing['page']);
+        $this->assertNull($landing['spaceId']);
+    }
+
+    public function testPatchRejectsUnknownLandingPage(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'reports', 'spaceId' => null]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchAcceptsLandingSpaceForMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpaceFor($alice);
+        $spaceId = $space->getId();
+        self::assertNotNull($spaceId);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'space', 'spaceId' => (string) $spaceId]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $landing = $this->arrayField($response->toArray(), 'landing');
+        $this->assertSame('space', $landing['page']);
+        $this->assertSame((string) $spaceId, $landing['spaceId']);
+    }
+
+    public function testPatchAcceptsLandingSpaceWithNullSpaceId(): void
+    {
+        // null spaceId means the personal "Private" space — no lookup.
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'space', 'spaceId' => null]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testPatchRejectsLandingSpaceForNonMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        // A space Bob owns but Alice has no membership in.
+        $space = $this->createSpaceFor($bob);
+        $spaceId = $space->getId();
+        self::assertNotNull($spaceId);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'space', 'spaceId' => (string) $spaceId]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsLandingSpaceForUnknownSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'space', 'spaceId' => (string) Uuid::v4()]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        // Unknown space is rejected the same as a forbidden one (404-shape).
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsLandingSpaceForMalformedSpaceId(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'space', 'spaceId' => 'not-a-uuid']],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchNormalizesSpaceIdAwayForNonSpacePage(): void
+    {
+        // A spaceId sent alongside a non-'space' page is dropped on store,
+        // so a stale id can't survive a switch to e.g. "tasks".
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpaceFor($alice);
+        $spaceId = $space->getId();
+        self::assertNotNull($spaceId);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['landing' => ['page' => 'tasks', 'spaceId' => (string) $spaceId]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $landing = $this->arrayField($response->toArray(), 'landing');
+        $this->assertSame('tasks', $landing['page']);
+        $this->assertNull($landing['spaceId']);
+    }
+
     public function testApiMeReturnsPreferencesInline(): void
     {
         // The PWA reads preferences off the existing /api/me payload so
@@ -314,5 +467,27 @@ class UserPreferencesTest extends ApiTestCase
         $this->entityManager->flush();
 
         return $user;
+    }
+
+    /**
+     * A shared space owned by `$owner`, with `$owner` as a direct admin
+     * member — enough for the landing-preference membership check.
+     */
+    private function createSpaceFor(User $owner): Space
+    {
+        $space = new Space();
+        $space->setName('Workspace');
+        $space->setCreatedBy($owner);
+
+        $membership = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($membership);
+
+        $this->entityManager->persist($space);
+        $this->entityManager->persist($membership);
+        $this->entityManager->flush();
+
+        return $space;
     }
 }

@@ -3,9 +3,11 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
+import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -122,7 +124,8 @@ const twoFactorCopy = (mode: TwoFactorMode, email: string | null): CopyEntry => 
 
 const AuthCard = ({ defaultTab }: Props) => {
   const router = useRouter();
-  const { isAuthenticated, isLoading, register } = useAuth();
+  const { isAuthenticated, isLoading, register, user } = useAuth();
+  const { selectActiveSpaceById } = useActiveSpace();
   const [step, setStep] = useState<AuthStep>(
     defaultTab === "signup" ? "signup-form" : "credentials",
   );
@@ -160,9 +163,23 @@ const AuthCard = ({ defaultTab }: Props) => {
     // (or accept-as-current-user if they happen to match). InviteSignup
     // handles the branching internally.
     if (!isLoading && isAuthenticated && !inviteToken) {
-      router.replace(safeNextPath(next));
+      // No deep link → fall back to the user's "Start page" preference,
+      // priming the active space for the "specific space" choice.
+      const landing = readLanding(user?.preferences);
+      if (!isSafeNextPath(next) && landing.page === "space") {
+        selectActiveSpaceById(landing.spaceId);
+      }
+      router.replace(safeNextPath(next, landingPathFor(landing)));
     }
-  }, [isLoading, isAuthenticated, next, router, inviteToken]);
+  }, [
+    isLoading,
+    isAuthenticated,
+    next,
+    router,
+    inviteToken,
+    user?.preferences,
+    selectActiveSpaceById,
+  ]);
 
   // Resolve whether signups are open or gated behind the waitlist. Only the
   // signup entry point needs to know (the sign-in side is unaffected), and

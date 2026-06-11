@@ -3,7 +3,9 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { safeNextPath } from "@/lib/authRedirect";
+import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
@@ -39,6 +41,7 @@ interface Props {
 
 const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => {
   const { login } = useAuth();
+  const { selectActiveSpaceById } = useActiveSpace();
   const router = useRouter();
   const [ssoNotice, setSsoNotice] = useState<string | null>(null);
 
@@ -76,7 +79,14 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
               onTwoFactorRequired(values.email);
               return;
             }
-            router.push(safeNextPath(next));
+            // No deep link → honor the user's "Start page" preference.
+            // For a specific space, prime the active space so the
+            // workspace home lands there.
+            const landing = readLanding(result.user?.preferences);
+            if (landing.page === "space") {
+              selectActiveSpaceById(landing.spaceId);
+            }
+            router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {
             setStatus(err instanceof Error ? err.message : "Sign in failed.");
           } finally {

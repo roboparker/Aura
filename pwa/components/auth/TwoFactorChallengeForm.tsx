@@ -3,7 +3,9 @@ import { useRouter } from "next/router";
 import { Formik, Form, useFormikContext } from "formik";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { TwoFactorRateLimitError, useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { safeNextPath } from "@/lib/authRedirect";
+import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
@@ -48,6 +50,7 @@ const TOTP_WINDOW_SECONDS = 30;
 
 const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
   const { submitTwoFactorCode } = useAuth();
+  const { selectActiveSpaceById } = useActiveSpace();
   const router = useRouter();
   // Wall-clock instant when the rate-limit bucket refills enough for
   // another attempt — null whenever we're not currently throttled. We
@@ -89,8 +92,12 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
         }}
         onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
           try {
-            await submitTwoFactorCode(code.trim());
-            router.push(safeNextPath(next));
+            const user = await submitTwoFactorCode(code.trim());
+            const landing = readLanding(user.preferences);
+            if (landing.page === "space") {
+              selectActiveSpaceById(landing.spaceId);
+            }
+            router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {
             if (err instanceof TwoFactorRateLimitError) {
               setRateLimitedUntil(Date.now() + err.retryAfterSeconds * 1000);
