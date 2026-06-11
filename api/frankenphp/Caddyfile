@@ -146,3 +146,23 @@
 		}
 	}
 }
+
+# Umami analytics dashboard on its own hostname, TLS-terminated by the same
+# Caddy (prod sets UMAMI_SERVER_NAME=analytics.<domain> plus a DNS A record;
+# the dev default *.localhost resolves to loopback and gets an internal
+# cert, so this block is inert when the umami container isn't running —
+# requests just 502). Auth is Umami's own login; keep the admin password
+# strong, this is internet-reachable in prod. The loopback-published port
+# on the umami service remains as an SSH-tunnel fallback.
+{$UMAMI_SERVER_NAME:analytics.localhost} {
+	encode zstd br gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	reverse_proxy umami:3000
+}

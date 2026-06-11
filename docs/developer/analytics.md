@@ -27,10 +27,13 @@ operator ── SSH tunnel ── 127.0.0.1:${UMAMI_PORT:-3001} ──> umami da
   collect endpoint). The tracker derives its endpoint from the script path,
   so everything stays on the app origin. The dashboard is *not* reachable
   through the public host.
-- **Dashboard access** is via the umami service's published port, which is
-  loopback-bound (`127.0.0.1:${UMAMI_PORT:-3001}`). In production reach it
-  with an SSH tunnel: `ssh -L 3001:localhost:3001 <server>`, then open
-  http://localhost:3001.
+- **Dashboard access**: the dashboard gets its own hostname, served by the
+  same Caddy — set `UMAMI_SERVER_NAME=analytics.<domain>` in the server's
+  `.env` and point a DNS A record at the server; Caddy provisions TLS
+  automatically. Auth is Umami's own login, so the admin password must be
+  strong — this host is internet-reachable. The umami service also keeps a
+  loopback-bound published port (`127.0.0.1:${UMAMI_PORT:-3001}`) as an
+  SSH-tunnel fallback (`ssh -L 3001:localhost:3001 <server>`).
 - **Compose profile**: the service sits behind the `analytics` profile so CI
   stacks and a casual dev `docker compose up -d` don't boot it.
   `scripts/deploy.sh` exports `COMPOSE_PROFILES=analytics`, so production
@@ -75,8 +78,10 @@ so the suite and local work never emit events.
    (`compose.prod.yaml` hard-requires it; generate with `openssl rand -hex 32`).
 2. Deploy (the next promote PR brings the umami service up and creates its
    database).
-3. Tunnel in (`ssh -L 3001:localhost:3001 <server>`), log into
-   http://localhost:3001 as **admin / umami**, and change the password.
+3. Set `UMAMI_SERVER_NAME=analytics.<domain>` in the server's `.env` and add
+   the matching DNS A record (or tunnel in: `ssh -L 3001:localhost:3001
+   <server>` → http://localhost:3001). Log in as **admin / umami** and
+   change the password immediately.
 4. Settings → Websites → Add website (name it after the domain). Copy the
    **Website ID**.
 5. Set `NEXT_PUBLIC_UMAMI_WEBSITE_ID=<id>` in `pwa/.env.production` and merge
