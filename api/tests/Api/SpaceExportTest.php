@@ -34,8 +34,8 @@ class SpaceExportTest extends ApiTestCase
 
     protected function setUp(): void
     {
-        $kernel = self::bootKernel();
-        $container = $kernel->getContainer();
+        self::bootKernel();
+        $container = static::getContainer();
         $em = $container->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
