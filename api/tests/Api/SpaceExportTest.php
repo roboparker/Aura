@@ -259,6 +259,46 @@ class SpaceExportTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(409);
     }
 
+    public function testNewExportSupersedesPreviousOneForSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+
+        // Seed a prior completed export for this space, with a real file
+        // on disk to prove the supersede deletes both row and file.
+        $oldFile = tempnam(sys_get_temp_dir(), 'aura-export-old-');
+        $this->assertIsString($oldFile);
+        $previous = new SpaceExport($space, $alice);
+        $previous->setStatus(SpaceExport::STATUS_COMPLETED);
+        $previous->setFilePath($oldFile);
+        $previous->setTokenHash(hash('sha256', 'old-token'));
+        $previous->setCompletedAt(new \DateTimeImmutable('-1 day'));
+        $previous->setExpiresAt(new \DateTimeImmutable('+6 days'));
+        $this->entityManager->persist($previous);
+        $this->entityManager->flush();
+        $previousId = (string) $previous->getId();
+
+        // Request a fresh export — the sync transport builds it inline.
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/spaces/' . $space->getId() . '/export', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(202);
+
+        $this->entityManager->clear();
+
+        // Exactly one export remains for the space — the new one.
+        $remaining = $this->entityManager->getRepository(SpaceExport::class)->findAll();
+        $this->assertCount(1, $remaining);
+        $this->assertNotSame($previousId, (string) $remaining[0]->getId());
+        $this->assertSame(SpaceExport::STATUS_COMPLETED, $remaining[0]->getStatus());
+
+        // The superseded archive's file is gone.
+        $this->assertFileDoesNotExist($oldFile);
+    }
+
     public function testPrunerDeletesExpiredExportsAndFiles(): void
     {
         $alice = $this->createUser('alice@example.com');

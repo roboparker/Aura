@@ -68,7 +68,21 @@ final class GenerateSpaceExportHandler
         $export->setCompletedAt($now);
         $export->setExpiresAt($now->add(new \DateInterval(sprintf('P%dD', $this->retentionDays))));
         $export->setStatus(SpaceExport::STATUS_COMPLETED);
+
+        // One export per space: now that this one is ready it supersedes
+        // any older export of the same space (a previous completed archive
+        // still inside its 7-day window, or a leftover failed row). Remove
+        // those rows in the same flush as the completion so the invariant
+        // holds atomically, then delete their files once the DB has
+        // committed. The concurrent-request 409 already prevents two builds
+        // racing, so "older" here only means already-finished rows.
+        $supersededPaths = $this->removeSupersededRows($export);
         $this->em->flush();
+        foreach ($supersededPaths as $oldPath) {
+            if (is_file($oldPath)) {
+                unlink($oldPath);
+            }
+        }
 
         $this->mailer->sendExportReady($export, $plainToken);
 
@@ -78,5 +92,36 @@ final class GenerateSpaceExportHandler
             (string) $export->getSpace()->getId(),
             $file,
         ));
+    }
+
+    /**
+     * Marks every other export of this export's space for removal and
+     * returns their on-disk paths (so the caller can unlink the files
+     * after the row deletion has committed).
+     *
+     * @return list<string>
+     */
+    private function removeSupersededRows(SpaceExport $keep): array
+    {
+        $others = $this->em->getRepository(SpaceExport::class)
+            ->createQueryBuilder('e')
+            ->where('e.space = :space')
+            ->andWhere('e.id != :id')
+            ->setParameter('space', $keep->getSpace())
+            ->setParameter('id', $keep->getId())
+            ->getQuery()
+            ->getResult();
+
+        $paths = [];
+        /** @var SpaceExport $old */
+        foreach ($others as $old) {
+            $path = $old->getFilePath();
+            if (null !== $path) {
+                $paths[] = $path;
+            }
+            $this->em->remove($old);
+        }
+
+        return $paths;
     }
 }
