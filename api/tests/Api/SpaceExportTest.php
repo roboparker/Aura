@@ -39,9 +39,7 @@ class SpaceExportTest extends ApiTestCase
         $em = $container->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
-        $storage = $container->get('media.storage');
-        assert($storage instanceof FilesystemOperator);
-        $this->storage = $storage;
+        $this->storage = $container->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
