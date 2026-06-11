@@ -58,6 +58,15 @@ class WaitlistTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
+        // Exactly one "you're on the waitlist" confirmation goes to the signup
+        // address (#404). Asserted before any further request — the mailer
+        // profiler reflects only the most recent request.
+        $this->assertEmailCount(1);
+        $email = $this->getMailerMessage();
+        self::assertNotNull($email);
+        $this->assertEmailAddressContains($email, 'To', 'waiter@example.com');
+        $this->assertEmailHeaderSame($email, 'Subject', "You're on the Aura waitlist");
+
         $user = $this->reloadUser('waiter@example.com');
         $this->assertTrue($user->isWaitlisted());
         $this->assertSame(['ROLE_WAITLISTED'], $user->getRoles());
@@ -78,6 +87,9 @@ class WaitlistTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
+
+        // Open signups get no waitlist confirmation email.
+        $this->assertEmailCount(0);
 
         $user = $this->reloadUser('open@example.com');
         $this->assertFalse($user->isWaitlisted());

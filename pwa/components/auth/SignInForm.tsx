@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
+import { markActiveSpaceReset } from "@/contexts/ActiveSpaceContext";
 import { safeNextPath } from "@/lib/authRedirect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,11 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
         onSubmit={async (values, { setSubmitting, setStatus }) => {
           try {
             const result = await login(values.email, values.password);
+            // Password accepted (login throws otherwise) — flag this as a
+            // fresh sign-in so the active space resets to Private. Set
+            // before the 2FA branch so it also covers the two-step path;
+            // the flag persists until the user fully authenticates.
+            markActiveSpaceReset();
             if (result.requiresTwoFactor) {
               onTwoFactorRequired(values.email);
               return;

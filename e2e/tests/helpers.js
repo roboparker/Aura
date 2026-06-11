@@ -21,7 +21,9 @@ async function registerAndSignIn(page, email, password = "Password123!@#", optio
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click('button[type="submit"]');
-  await expect(page).toHaveURL(/\/settings\/profile/);
+  // A fresh sign-in with no `?next=` lands on the workspace home
+  // (/projects), with the user's Private space active (#405).
+  await expect(page).toHaveURL(/\/projects/);
 }
 
 /**

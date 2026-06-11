@@ -111,9 +111,13 @@ needs). Caddy serves it via an explicit `tls` directive instead of ACME.
 
 This is wired up but **gated** so it has zero effect until switched on:
 
-- `api/frankenphp/Caddyfile` — both site blocks contain `{$TLS_DIRECTIVE}`,
-  which expands to nothing when the env var is unset (dev and pre-cutover prod
-  keep automatic HTTPS).
+- `api/frankenphp/Caddyfile` — the public host block and the analytics block
+  contain `{$TLS_DIRECTIVE}`, which expands to nothing when the env var is unset
+  (dev and pre-cutover prod keep automatic HTTPS). The internal `php` host is a
+  separate **HTTP-only** block (`http://php`) sharing the routing via the `(app)`
+  snippet — it must not carry the cert, because Caddy rejects a TLS policy on an
+  HTTP `:80` listener. For the same reason `php:80` was dropped from `SERVER_NAME`
+  in `compose.yaml`.
 - `compose.prod.yaml` — the `php` service passes `TLS_DIRECTIVE` through and
   mounts the host `./certs` dir read-only at `/etc/caddy/origin`. `./certs` is
   gitignored and survives the deploy's `git reset --hard`.
