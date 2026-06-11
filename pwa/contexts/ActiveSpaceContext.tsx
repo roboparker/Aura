@@ -138,6 +138,27 @@ export function markActiveSpaceReset() {
 }
 
 /**
+ * Like {@link markActiveSpaceReset}, but lands a fresh sign-in in a
+ * specific space — the #406 "Start page" space choice — instead of the
+ * personal space. Writes the per-user key directly (the React context's
+ * `user` lags a just-completed login by a render, so we can't go through
+ * the context setter here) and clears any pending reset flag so the
+ * landing resolution in {@link ActiveSpaceProvider} restores this choice.
+ * If the chosen space later becomes inaccessible the resolver falls back
+ * to the personal space, same as any stale stored selection.
+ */
+export function markActiveSpaceLanding(userId: string, spaceId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(storageKeyFor(userId), spaceId);
+    window.sessionStorage.removeItem(RESET_FLAG_KEY);
+  } catch {
+    // Storage-disabled browsers: fall back to whatever the resolver
+    // settles on (the personal space) — acceptable, not worth surfacing.
+  }
+}
+
+/**
  * Loads the user's space list from `GET /spaces` (already scoped to
  * the caller by SpaceAccessExtension) and tracks the active space —
  * the one whose content the listings should show.

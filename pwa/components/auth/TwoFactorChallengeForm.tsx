@@ -3,7 +3,12 @@ import { useRouter } from "next/router";
 import { Formik, Form, useFormikContext } from "formik";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { TwoFactorRateLimitError, useAuth } from "@/contexts/AuthContext";
-import { safeNextPath } from "@/lib/authRedirect";
+import {
+  markActiveSpaceLanding,
+  markActiveSpaceReset,
+} from "@/contexts/ActiveSpaceContext";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
+import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
@@ -89,8 +94,21 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
         }}
         onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
           try {
-            await submitTwoFactorCode(code.trim());
-            router.push(safeNextPath(next));
+            const user = await submitTwoFactorCode(code.trim());
+            // Fresh sign-in complete → resolve the "Start page" preference
+            // (#406). A specific-space choice lands there; every other
+            // case (incl. a `?next=` deep link) resets to Private (#405).
+            const landing = readLanding(user.preferences);
+            if (
+              !isSafeNextPath(next) &&
+              landing.page === "space" &&
+              landing.spaceId
+            ) {
+              markActiveSpaceLanding(user.id, landing.spaceId);
+            } else {
+              markActiveSpaceReset();
+            }
+            router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {
             if (err instanceof TwoFactorRateLimitError) {
               setRateLimitedUntil(Date.now() + err.retryAfterSeconds * 1000);

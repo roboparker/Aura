@@ -3,6 +3,8 @@ import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import SettingsShell from "@/components/settings/SettingsShell";
 import SaveIndicator from "@/components/settings/SaveIndicator";
 import TimezoneSelect from "@/components/settings/TimezoneSelect";
+import StartPageSelect from "@/components/settings/StartPageSelect";
+import { DEFAULT_LANDING } from "@/lib/landingDestination";
 import AvatarSection from "@/components/account/AvatarSection";
 import EmailChangeForm from "@/components/account/EmailChangeForm";
 import ProfileForm from "@/components/account/ProfileForm";
@@ -49,6 +51,12 @@ const ProfilePage = () => {
           <TimezoneSelect
             value={prefs?.timezone ?? "UTC"}
             onChange={(tz) => void persist({ timezone: tz })}
+            disabled={!user}
+          />
+          <Separator />
+          <StartPageSelect
+            value={prefs?.landing ?? DEFAULT_LANDING}
+            onChange={(landing) => void persist({ landing })}
             disabled={!user}
           />
         </CardContent>

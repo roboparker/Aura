@@ -3,8 +3,12 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
-import { markActiveSpaceReset } from "@/contexts/ActiveSpaceContext";
-import { safeNextPath } from "@/lib/authRedirect";
+import {
+  markActiveSpaceLanding,
+  markActiveSpaceReset,
+} from "@/contexts/ActiveSpaceContext";
+import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
+import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
@@ -73,16 +77,28 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
         onSubmit={async (values, { setSubmitting, setStatus }) => {
           try {
             const result = await login(values.email, values.password);
-            // Password accepted (login throws otherwise) — flag this as a
-            // fresh sign-in so the active space resets to Private. Set
-            // before the 2FA branch so it also covers the two-step path;
-            // the flag persists until the user fully authenticates.
-            markActiveSpaceReset();
             if (result.requiresTwoFactor) {
+              // The active-space landing decision is deferred to the 2FA
+              // step, where the user (and their preferences) resolve.
               onTwoFactorRequired(values.email);
               return;
             }
-            router.push(safeNextPath(next));
+            // Fresh sign-in → resolve the "Start page" preference (#406).
+            // A specific-space choice lands there; every other case (incl.
+            // a `?next=` deep link) resets to the Private space (#405).
+            const landing = readLanding(result.user?.preferences);
+            const userId = result.user?.id;
+            if (
+              !isSafeNextPath(next) &&
+              landing.page === "space" &&
+              landing.spaceId &&
+              userId
+            ) {
+              markActiveSpaceLanding(userId, landing.spaceId);
+            } else {
+              markActiveSpaceReset();
+            }
+            router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {
             setStatus(err instanceof Error ? err.message : "Sign in failed.");
           } finally {

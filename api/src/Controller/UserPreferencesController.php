@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Space;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -9,6 +10,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * Self-service preferences for the current user. Lives outside the generic
@@ -57,9 +59,18 @@ class UserPreferencesController extends AbstractController
                 ], 422);
             }
 
-            $error = $this->validateValue($key, $value);
+            $error = $this->validateValue($key, $value, $user);
             if (null !== $error) {
                 return $this->json(['error' => $error], 422);
+            }
+            // `landing.spaceId` only carries meaning for the 'space'
+            // page — normalise it away for the other destinations so a
+            // stale id can't linger on the stored object.
+            if ('landing' === $key && is_array($value)) {
+                $value = [
+                    'page' => $value['page'],
+                    'spaceId' => 'space' === $value['page'] ? ($value['spaceId'] ?? null) : null,
+                ];
             }
             $next[$key] = $value;
         }
@@ -75,7 +86,7 @@ class UserPreferencesController extends AbstractController
      * or null when the value is acceptable. Keys are guaranteed by the caller
      * to be one of the known preference fields.
      */
-    private function validateValue(string $key, mixed $value): ?string
+    private function validateValue(string $key, mixed $value, User $user): ?string
     {
         return match ($key) {
             'timezone' => is_string($value) && in_array($value, \DateTimeZone::listIdentifiers(), true)
@@ -90,8 +101,43 @@ class UserPreferencesController extends AbstractController
             'notificationMatrix' => $this->validateMatrix($value),
             'emailDigest' => $this->validateDigest($value),
             'quietHours' => $this->validateQuietHours($value),
+            'landing' => $this->validateLanding($value, $user),
             default => sprintf('Unknown preference key: %s.', $key),
         };
+    }
+
+    /**
+     * Validate the "Start page" preference. `page` is whitelisted; for the
+     * 'space' destination a non-null `spaceId` must be a space the user
+     * belongs to. Unknown and forbidden spaces are rejected identically
+     * (404-shape) so the setting can't probe space existence.
+     */
+    private function validateLanding(mixed $value, User $user): ?string
+    {
+        if (!is_array($value)) {
+            return 'landing must be an object.';
+        }
+        $page = $value['page'] ?? null;
+        if (!is_string($page) || !in_array($page, User::LANDING_PAGES, true)) {
+            return 'landing.page must be one of: tasks, notifications, spaces, space.';
+        }
+        if ('space' !== $page) {
+            return null;
+        }
+        $spaceId = $value['spaceId'] ?? null;
+        // null = the personal "Private" space; no lookup needed.
+        if (null === $spaceId) {
+            return null;
+        }
+        $invalid = 'landing.spaceId must reference a space you belong to.';
+        if (!is_string($spaceId) || !Uuid::isValid($spaceId)) {
+            return $invalid;
+        }
+        $space = $this->em->getRepository(Space::class)->find(Uuid::fromString($spaceId));
+        if (null === $space || !$space->hasMember($user)) {
+            return $invalid;
+        }
+        return null;
     }
 
     private function validateMatrix(mixed $value): ?string
