@@ -16,16 +16,14 @@
 
 {$CADDY_EXTRA_CONFIG}
 
-{$SERVER_NAME:localhost} {
-	# Optional explicit TLS cert (Cloudflare Origin Certificate in prod). When
-	# TLS_DIRECTIVE is unset (dev, and prod before the origin-cert cutover) this
-	# expands to nothing and Caddy keeps its automatic HTTPS (Let's Encrypt for a
-	# public SERVER_NAME, internal cert for localhost). In prod behind the
-	# Cloudflare proxy, set it to `tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem`
-	# so the origin no longer depends on ACME renewal that the proxy can break.
-	# See docs/developer/deployment.md § Origin TLS behind Cloudflare.
-	{$TLS_DIRECTIVE}
-
+# Shared site body for both the public host(s) and the internal `php` host.
+# Factored into a snippet so the two site blocks below don't duplicate the
+# routing. The split exists because the internal `http://php` site MUST stay
+# HTTP-only (service-to-service calls hit http://php), and Caddy refuses to put
+# an explicit TLS cert (TLS_DIRECTIVE) on a block that also serves an HTTP :80
+# address. Keeping `php` in its own HTTP block lets the public block carry the
+# Cloudflare Origin Certificate without conflict.
+(app) {
 	log {
 		# Redact the authorization query parameter that can be set by Mercure
 		format filter {
@@ -154,6 +152,30 @@
 			hide *.php
 		}
 	}
+}
+
+# Public host(s): the domain(s) in SERVER_NAME (e.g. `madori.app, localhost` in
+# prod, `localhost` in dev). Optional explicit TLS cert (Cloudflare Origin
+# Certificate in prod). When TLS_DIRECTIVE is unset (dev, and prod before the
+# origin-cert cutover) this expands to nothing and Caddy keeps its automatic
+# HTTPS (Let's Encrypt for a public SERVER_NAME, internal cert for localhost).
+# In prod behind the Cloudflare proxy, set it to
+# `tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem` so the origin no
+# longer depends on ACME renewal that the proxy can break.
+# See docs/developer/deployment.md § Origin TLS behind Cloudflare.
+{$SERVER_NAME:localhost} {
+	{$TLS_DIRECTIVE}
+
+	import app
+}
+
+# Internal service-to-service host. The PWA and worker reach the API at
+# http://php (NEXT_PUBLIC_ENTRYPOINT / MERCURE_URL), so this site is HTTP-only
+# on port 80 — it deliberately carries no TLS so the public block above can hold
+# the explicit origin certificate. Kept as its own block (rather than appended
+# to SERVER_NAME) for exactly that reason.
+http://php {
+	import app
 }
 
 # Umami analytics dashboard on its own hostname, TLS-terminated by the same
