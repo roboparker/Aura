@@ -52,6 +52,7 @@ if [ "$is_main_worktree" = "1" ]; then
   postgres_port=5432
   mailpit_smtp_port=1025
   mailpit_web_port=8025
+  umami_port=3001
 else
   # Derive a port block from a hash of the absolute worktree path so the
   # same worktree always gets the same ports, and different worktrees
@@ -66,6 +67,7 @@ else
   postgres_port="$((25000 + block))"
   mailpit_smtp_port="$((26000 + block))"
   mailpit_web_port="$((27000 + block))"
+  umami_port="$((28000 + block))"
 fi
 
 read -r -d '' body <<EOF || true
@@ -80,6 +82,7 @@ HTTP3_PORT=$http3_port
 POSTGRES_PORT=$postgres_port
 MAILPIT_SMTP_PORT=$mailpit_smtp_port
 MAILPIT_WEB_PORT=$mailpit_web_port
+UMAMI_PORT=$umami_port
 
 APP_FRONTEND_URL=https://localhost:$https_port
 EOF

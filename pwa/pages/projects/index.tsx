@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { trackEvent } from "@/lib/analytics";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -95,6 +96,7 @@ const Projects = () => {
       setDescription("");
       setEditorResetKey((k) => k + 1);
       setActionError(null);
+      trackEvent("project-create");
       void refreshProjects();
     },
     onError: (err) => setActionError(errorMessage(err, "Failed to create project.")),
