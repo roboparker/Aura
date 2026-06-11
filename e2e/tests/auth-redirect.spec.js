@@ -127,9 +127,9 @@ test.describe("Auth redirect", () => {
   });
 
   // Each entry is a `?next=` value that should be rejected by `safeNextPath()`
-  // and fall back to /settings/profile. The list is the full set of attack
-  // vectors the helper guards against; if any of them ever land the user
-  // somewhere else, we want CI to scream.
+  // and fall back to /projects (the default post-login landing). The list is
+  // the full set of attack vectors the helper guards against; if any of them
+  // ever land the user somewhere else, we want CI to scream.
   const HOSTILE_NEXT_VALUES = [
     {
       label: "protocol-relative URL (`//host/...`)",
@@ -186,7 +186,7 @@ test.describe("Auth redirect", () => {
 
       // Falls back to the default landing page rather than wherever
       // the attacker tried to send us.
-      await expect(page).toHaveURL(/\/settings\/profile$/);
+      await expect(page).toHaveURL(/\/projects$/);
     });
   }
 });

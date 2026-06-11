@@ -12,7 +12,12 @@
  * redirector.
  */
 
-const FALLBACK_PATH = "/settings/profile";
+// Where a successful sign-in with no explicit `?next=` target lands —
+// and the safety fallback for an invalid/hostile `next` value. The
+// natural home is the user's workspace (their Private space is made
+// active on a fresh sign-in by ActiveSpaceContext), not the settings
+// shell.
+const FALLBACK_PATH = "/projects";
 
 // Arbitrary base used to round-trip user-supplied `next` through the
 // URL parser. The host/protocol are bogus so we can detect any value
