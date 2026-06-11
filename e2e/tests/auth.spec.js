@@ -65,10 +65,12 @@ test.describe("Authentication", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
 
-    // Should redirect to the Settings profile panel. The email now appears
-    // in two places after sign-in (sidebar header + profile identity form),
-    // so scope the assertion to the main panel.
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // A fresh sign-in lands on the default Start page — the workspace
+    // home (#406). The signed-in user's email shows on the profile panel,
+    // so navigate there to confirm. The email now appears in two places
+    // (sidebar header + profile identity form), so scope to the main panel.
+    await expect(page).toHaveURL(/\/projects/);
+    await page.goto(`${BASE_URL}/settings/profile`);
     await expect(
       page.getByRole("main").getByText(email),
     ).toBeVisible();
@@ -90,7 +92,8 @@ test.describe("Authentication", () => {
     await page.fill("#password", "admin123");
     await page.click('button[type="submit"]');
 
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the default Start page (workspace home, #406).
+    await expect(page).toHaveURL(/\/projects/);
 
     // Navigate to admin
     await page.goto(`${BASE_URL}/admin`);

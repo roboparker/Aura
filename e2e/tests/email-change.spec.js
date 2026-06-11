@@ -99,7 +99,8 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#email", newEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the default Start page (workspace home, #406).
+    await expect(page).toHaveURL(/\/projects/);
 
     // Now follow the revert link
     await page.goto(revertUrl);
@@ -111,7 +112,8 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#email", oldEmail);
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the default Start page (workspace home, #406).
+    await expect(page).toHaveURL(/\/projects/);
   });
 
   test("cannot request a change to an already-registered address", async ({
