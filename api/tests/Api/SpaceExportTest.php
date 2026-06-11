@@ -279,7 +279,9 @@ class SpaceExportTest extends ApiTestCase
         $this->assertInstanceOf(Email::class, $message);
         $text = $message->getTextBody();
         $this->assertIsString($text);
-        $this->assertSame(1, preg_match('#/exports/([0-9a-f]{64})#', $text, $matches));
+        if (1 !== preg_match('#/exports/([0-9a-f]{64})#', $text, $matches)) {
+            $this->fail('Export email did not contain a download link.');
+        }
 
         return $matches[1];
     }

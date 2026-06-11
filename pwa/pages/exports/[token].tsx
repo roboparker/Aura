@@ -55,7 +55,7 @@ const ExportDownloadPage = () => {
   useEffect(() => {
     if (!isAuthenticated || !exportToken) return;
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch(
           `${ENTRYPOINT}/space-exports/${encodeURIComponent(exportToken)}`,
