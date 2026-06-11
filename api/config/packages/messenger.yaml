@@ -27,6 +27,10 @@ framework:
             # retries + the failed dead-letter transport. SMTP latency never
             # touches the request.
             Symfony\Component\Mailer\Messenger\SendEmailMessage: async
+            # Space data exports: zipping a whole space (JSON + attachment
+            # bytes) is far too slow for a request — the POST inserts the
+            # row and queues this; the worker builds + emails the link.
+            App\Message\GenerateSpaceExport: async
 
 when@test:
     framework:

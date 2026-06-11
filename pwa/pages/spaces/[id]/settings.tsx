@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
+  Download,
   Lock,
   LockOpen,
   Mail,
@@ -136,6 +137,13 @@ const SpaceSettings = () => {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
 
+  // Space data export.
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<{
+    text: string;
+    kind: "success" | "error";
+  } | null>(null);
+
   const load = useCallback(async () => {
     if (!spaceId) return;
     setError(null);
@@ -248,6 +256,46 @@ const SpaceSettings = () => {
       setError(err instanceof Error ? err.message : "Failed to save changes.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExport = async () => {
+    if (!space) return;
+    setIsExporting(true);
+    setExportMessage(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/export`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      if (res.status === 409) {
+        setExportMessage({
+          text: "An export of this space is already being prepared — you'll get an email when it's ready.",
+          kind: "success",
+        });
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to request the export.");
+      }
+      setExportMessage({
+        text: "Export started — we'll email you a download link when it's ready. Links expire after 7 days.",
+        kind: "success",
+      });
+    } catch (err) {
+      setExportMessage({
+        text:
+          err instanceof Error ? err.message : "Failed to request the export.",
+        kind: "error",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -632,6 +680,43 @@ const SpaceSettings = () => {
         </Card>
           </>
         )}
+
+        {/* Export space data */}
+        <Card className="mb-6">
+          <CardContent className="pt-6 space-y-3">
+            <h2 className="font-semibold">Export space data</h2>
+            <div className="flex items-center justify-between gap-3 rounded-md border px-4 py-3">
+              <div className="min-w-0">
+                <p className="font-medium">Download everything in this space</p>
+                <p className="text-sm text-muted-foreground">
+                  Projects, tasks, pages, discussions, comments, and
+                  attachments, bundled as a zip. We&apos;ll email you a
+                  download link when it&apos;s ready — links expire after 7
+                  days.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={() => void handleExport()}
+                disabled={isExporting}
+              >
+                <Download className="h-4 w-4" aria-hidden />
+                {isExporting ? "Requesting…" : "Request export"}
+              </Button>
+            </div>
+            {exportMessage && (
+              <Alert
+                variant={
+                  exportMessage.kind === "error" ? "destructive" : "default"
+                }
+              >
+                <AlertDescription>{exportMessage.text}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Danger zone */}
         <Card className="mb-6 border-destructive/40">
