@@ -35,8 +35,8 @@ Key variables (set in `.env` or `compose.override.yaml`):
 | `HTTP3_PORT`                   | `443`                    | HTTP/3 (UDP) port        |
 | `MAILPIT_SMTP_PORT`            | `1025`                   | Mailpit SMTP port        |
 | `MAILPIT_WEB_PORT`             | `8025`                   | Mailpit web UI port      |
-| `UMAMI_SERVER_NAME`            | (unset)                  | Public hostname for the Umami dashboard (e.g. `analytics.example.com`); unset = dashboard not publicly exposed |
-| `UMAMI_PORT`                   | `3001`                   | Loopback-bound host port for the Umami dashboard (SSH-tunnel access) |
+| `UMAMI_SERVER_NAME`            | `analytics.localhost`    | Hostname for the Umami dashboard site block (prod: `analytics.<domain>` + DNS A record) |
+| `UMAMI_PORT`                   | `3001`                   | Loopback-bound host port for the Umami dashboard (SSH-tunnel fallback) |
 
 ### Parallel Worktree Stacks
 

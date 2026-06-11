@@ -101,9 +101,8 @@
 		# Umami analytics, proxied first-party so the tracker is same-origin
 		# (no extra DNS/cert, far less ad-block exposure). Only the tracker
 		# script and the collect endpoint are exposed — the Umami dashboard
-		# itself is NOT reachable through this host; it gets its own site
-		# block (see the {$UMAMI_SERVER_NAME} block at the bottom of this
-		# file), or the loopback-published port of the umami service.
+		# itself is NOT reachable through this host; it lives on the
+		# loopback-published port of the umami service (SSH tunnel in prod).
 		# The tracker derives its endpoint from the script src path, so
 		# /umami/script.js posts events to /umami/api/send. When the umami
 		# container isn't running (profile off) these paths 502; the PWA
@@ -148,16 +147,16 @@
 	}
 }
 
-# Public Umami dashboard. The official Umami image can't be served under a
-# sub-path (BASE_PATH is a build-time option), so the dashboard gets its own
-# hostname instead of living under /umami/ like the tracker endpoints above.
-# Point a DNS record at this server and set UMAMI_SERVER_NAME to the hostname
-# (e.g. analytics.example.com) — Caddy provisions the certificate
-# automatically; access is gated by Umami's own login. When the variable is
-# unset the block falls back to a loopback-only port inside the container
-# that is never published, so nothing is exposed; the SSH-tunnel route via
-# the loopback-published UMAMI_PORT keeps working either way.
-{$UMAMI_SERVER_NAME:localhost:8455} {
+# Umami analytics dashboard on its own hostname, TLS-terminated by the same
+# Caddy (prod sets UMAMI_SERVER_NAME=analytics.<domain> plus a DNS A record;
+# the dev default *.localhost resolves to loopback and gets an internal
+# cert, so this block is inert when the umami container isn't running —
+# requests just 502). Auth is Umami's own login; keep the admin password
+# strong, this is internet-reachable in prod. The loopback-published port
+# on the umami service remains as an SSH-tunnel fallback.
+{$UMAMI_SERVER_NAME:analytics.localhost} {
+	encode zstd br gzip
+
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"

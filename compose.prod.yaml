@@ -24,9 +24,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
   # Hard-require the Umami secret in prod (no insecure default). The
-  # dashboard is public at UMAMI_SERVER_NAME (set it in the server's .env,
-  # e.g. analytics.example.com — see the Caddyfile site block); the
-  # loopback-bound port (compose.yaml) remains as an SSH-tunnel fallback:
+  # dashboard is public at UMAMI_SERVER_NAME (set analytics.<domain> in the
+  # server's .env — see the Caddyfile site block); the loopback-bound port
+  # (compose.yaml) remains as an SSH-tunnel fallback:
   # ssh -L 3001:localhost:3001 <server>.
   umami:
     environment:
