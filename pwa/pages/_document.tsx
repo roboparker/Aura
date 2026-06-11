@@ -35,6 +35,8 @@ const Document = () => (
     suppressHydrationWarning
   >
     <Head>
+      <link rel="icon" href="/favicon.ico" sizes="48x48" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
       <script dangerouslySetInnerHTML={{ __html: codeThemeBootstrap }} />
     </Head>
     <body>
