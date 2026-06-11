@@ -4,6 +4,7 @@ namespace App\Scheduler;
 
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
+use App\Message\PruneSpaceExports;
 use App\Message\RunBackup;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
@@ -69,6 +70,11 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // means a run missed during downtime is caught up on the
                 // next worker boot instead of silently skipped.
                 RecurringMessage::cron('0 2 * * *', new RunBackup(), $utc),
+                // Space-export retention: delete export zips + rows past
+                // the app.space_export_retention_days window (default 7 —
+                // App\Service\SpaceExportPruner). 03:30 keeps it clear of
+                // the backup run.
+                RecurringMessage::cron('30 3 * * *', new PruneSpaceExports(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

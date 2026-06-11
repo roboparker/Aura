@@ -17,6 +17,15 @@
 {$CADDY_EXTRA_CONFIG}
 
 {$SERVER_NAME:localhost} {
+	# Optional explicit TLS cert (Cloudflare Origin Certificate in prod). When
+	# TLS_DIRECTIVE is unset (dev, and prod before the origin-cert cutover) this
+	# expands to nothing and Caddy keeps its automatic HTTPS (Let's Encrypt for a
+	# public SERVER_NAME, internal cert for localhost). In prod behind the
+	# Cloudflare proxy, set it to `tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem`
+	# so the origin no longer depends on ACME renewal that the proxy can break.
+	# See docs/developer/deployment.md § Origin TLS behind Cloudflare.
+	{$TLS_DIRECTIVE}
+
 	log {
 		# Redact the authorization query parameter that can be set by Mercure
 		format filter {
@@ -155,6 +164,11 @@
 # strong, this is internet-reachable in prod. The loopback-published port
 # on the umami service remains as an SSH-tunnel fallback.
 {$UMAMI_SERVER_NAME:analytics.localhost} {
+	# Same optional explicit TLS as the main block — the Cloudflare Origin
+	# Certificate's *.madori.app wildcard covers analytics.madori.app too, so the
+	# analytics host stops depending on ACME renewal once TLS_DIRECTIVE is set.
+	{$TLS_DIRECTIVE}
+
 	encode zstd br gzip
 
 	header {

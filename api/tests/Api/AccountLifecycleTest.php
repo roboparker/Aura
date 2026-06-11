@@ -110,6 +110,72 @@ class AccountLifecycleTest extends ApiTestCase
         );
     }
 
+    /**
+     * A waitlisted account holds no ROLE_USER, but the lifecycle endpoints
+     * are gated on IS_AUTHENTICATED_FULLY so the GDPR self-service actions
+     * (deactivate / export / delete) stay reachable while waiting.
+     */
+    public function testWaitlistedUserCanDeactivateAccount(): void
+    {
+        $waiter = $this->createWaitlistedUser('waiter@example.com');
+        $client = static::createClient();
+        $client->loginUser($waiter);
+
+        $client->request('POST', '/me/deactivate', [
+            'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $refreshed = $this->entityManager->getRepository(User::class)->find($waiter->getId());
+        $this->assertNotNull($refreshed);
+        $this->assertTrue($refreshed->isDeactivated());
+    }
+
+    public function testWaitlistedUserCanExportOwnData(): void
+    {
+        $waiter = $this->createWaitlistedUser('waiter@example.com');
+        $client = static::createClient();
+        $client->loginUser($waiter);
+
+        $client->request('POST', '/me/export', [
+            'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $profile = $this->arrayField($response->toArray(), 'profile');
+        $this->assertSame('waiter@example.com', $profile['email']);
+    }
+
+    public function testWaitlistedUserCanDeleteAccount(): void
+    {
+        $waiter = $this->createWaitlistedUser('waiter@example.com');
+        $client = static::createClient();
+        $client->loginUser($waiter);
+
+        $client->request('POST', '/me/delete', [
+            'json' => ['confirmEmail' => 'waiter@example.com', 'currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $this->assertNull(
+            $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'waiter@example.com']),
+        );
+    }
+
+    private function createWaitlistedUser(string $email): User
+    {
+        $user = $this->createUser($email);
+        $user->setWaitlisted(true);
+        $this->entityManager->flush();
+        return $user;
+    }
+
     private function makeTask(User $owner, string $title): Task
     {
         $task = new Task();

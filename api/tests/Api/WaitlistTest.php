@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
+use App\Entity\Space;
 use App\Entity\User;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -100,6 +101,61 @@ class WaitlistTest extends ApiTestCase
         // …but a ROLE_USER-gated endpoint is forbidden (no ROLE_USER).
         $client->request('GET', '/api-tokens');
         $this->assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * GDPR/CCPA: a waitlisted signup must still be able to export and delete
+     * its own data, even though it holds no ROLE_USER. Goes through the real
+     * signup path so the account carries the personal space created by
+     * UserPasswordHasherProcessor, and asserts deletion reaps it.
+     */
+    public function testWaitlistedSignupCanExportAndDeleteItself(): void
+    {
+        $this->setWaitlist(true);
+        $client = static::createClient();
+
+        $client->request('POST', '/users', [
+            'json' => [
+                'email' => 'leaver@example.com',
+                'plainPassword' => 'Password123!@#',
+                'givenName' => 'Wait',
+                'familyName' => 'Leaver',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $user = $this->reloadUser('leaver@example.com');
+        $this->assertTrue($user->isWaitlisted());
+
+        $space = $this->entityManager->getRepository(Space::class)
+            ->findOneBy(['createdBy' => $user, 'isPersonal' => true]);
+        $this->assertNotNull($space);
+        $spaceId = (string) $space->getId();
+
+        $client->loginUser($user);
+
+        // Export works despite the missing ROLE_USER.
+        $client->request('POST', '/me/export', [
+            'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+        $profile = $this->arrayField($this->body($client), 'profile');
+        $this->assertSame('leaver@example.com', $profile['email']);
+
+        // Delete works too, and reaps the personal space with the account.
+        $client->request('POST', '/me/delete', [
+            'json' => ['confirmEmail' => 'leaver@example.com', 'currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(204);
+
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $em->clear();
+        $this->assertNull($em->getRepository(User::class)->findOneBy(['email' => 'leaver@example.com']));
+        $this->assertNull($em->find(Space::class, $spaceId));
     }
 
     public function testAdminEndpointsRequireAdmin(): void

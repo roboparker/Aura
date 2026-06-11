@@ -8,6 +8,17 @@ services:
       APP_SECRET: ${APP_SECRET}
       MERCURE_PUBLISHER_JWT_KEY: ${CADDY_MERCURE_JWT_SECRET}
       MERCURE_SUBSCRIBER_JWT_KEY: ${CADDY_MERCURE_JWT_SECRET}
+      # Optional explicit TLS for the Caddy site blocks. Empty by default so the
+      # stack keeps automatic HTTPS; set in the server .env to
+      #   TLS_DIRECTIVE=tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem
+      # to serve a Cloudflare Origin Certificate (no ACME renewal). The cert/key
+      # are mounted read-only from ./certs below — place them there first.
+      TLS_DIRECTIVE: ${TLS_DIRECTIVE:-}
+    volumes:
+      # Cloudflare Origin Certificate (and key) for the origin, read-only. The
+      # host ./certs dir is untracked (gitignored) and survives `git reset
+      # --hard` on deploy. Inert until TLS_DIRECTIVE references these paths.
+      - ./certs:/etc/caddy/origin:ro
 
   # Reuses the prod php image (source + vendor baked in, no bind-mount).
   worker:
@@ -24,8 +35,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
   # Hard-require the Umami secret in prod (no insecure default). The
-  # dashboard port stays loopback-bound (see compose.yaml) — reach it via
-  # an SSH tunnel: ssh -L 3001:localhost:3001 <server>.
+  # dashboard is public at UMAMI_SERVER_NAME (set analytics.<domain> in the
+  # server's .env — see the Caddyfile site block); the loopback-bound port
+  # (compose.yaml) remains as an SSH-tunnel fallback:
+  # ssh -L 3001:localhost:3001 <server>.
   umami:
     environment:
       APP_SECRET: ${UMAMI_APP_SECRET}

@@ -71,7 +71,12 @@ security:
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
         - { path: ^/me/sessions, roles: ROLE_USER }
-        - { path: ^/me/(deactivate|export|delete)$, roles: ROLE_USER }
+        # Account lifecycle (GDPR/CCPA): any fully-authenticated account —
+        # including a waitlisted ROLE_WAITLISTED one, which holds no ROLE_USER
+        # — must be able to deactivate, export, and delete itself. The
+        # controller only operates on the current user and every action is
+        # step-up protected via SensitiveActionVerifier.
+        - { path: ^/me/(deactivate|export|delete)$, roles: IS_AUTHENTICATED_FULLY }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
         # User segments (A/B tests, beta gating, rollouts) — platform admins
