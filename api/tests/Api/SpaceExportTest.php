@@ -263,7 +263,6 @@ class SpaceExportTest extends ApiTestCase
         $this->entityManager->clear();
 
         $pruner = static::getContainer()->get(SpaceExportPruner::class);
-        assert($pruner instanceof SpaceExportPruner);
         $deleted = $pruner->prune();
 
         $this->assertSame(2, $deleted);

@@ -196,12 +196,12 @@ final class SpaceExportBuilder
                 'id' => (string) $space->getId(),
                 'name' => $space->getName(),
                 'description' => $space->getDescription(),
-                'isPersonal' => $space->isPersonal(),
+                'isPersonal' => $space->getIsPersonal(),
                 'visibility' => $space->getVisibility(),
                 'createdAt' => $space->getCreatedAt()->format(\DateTimeInterface::ATOM),
                 'createdBy' => $this->userRef($space->getCreatedBy()),
             ],
-            'members' => array_map($this->userRef(...), $space->getEffectiveUsers()),
+            'members' => array_values(array_map($this->userRef(...), $space->getEffectiveUsers())),
         ];
     }
 
@@ -306,7 +306,7 @@ final class SpaceExportBuilder
     /**
      * One IN-query comment lookup per parent kind, grouped by parent id.
      *
-     * @param list<Task>|list<Page>|list<Discussion> $parents
+     * @param array<int, Task>|array<int, Page>|array<int, Discussion> $parents
      *
      * @return array<string, list<array<string, mixed>>>
      */
