@@ -3,7 +3,10 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import {
+  markActiveSpaceLanding,
+  markActiveSpaceReset,
+} from "@/contexts/ActiveSpaceContext";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -41,7 +44,6 @@ interface Props {
 
 const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => {
   const { login } = useAuth();
-  const { selectActiveSpaceById } = useActiveSpace();
   const router = useRouter();
   const [ssoNotice, setSsoNotice] = useState<string | null>(null);
 
@@ -76,16 +78,25 @@ const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => 
           try {
             const result = await login(values.email, values.password);
             if (result.requiresTwoFactor) {
+              // The active-space landing decision is deferred to the 2FA
+              // step, where the user (and their preferences) resolve.
               onTwoFactorRequired(values.email);
               return;
             }
-            // No deep link → honor the user's "Start page" preference.
-            // For a specific space, prime the active space so the
-            // workspace home lands there. A valid `?next=` deep link
-            // wins, in which case we leave the active space untouched.
+            // Fresh sign-in → resolve the "Start page" preference (#406).
+            // A specific-space choice lands there; every other case (incl.
+            // a `?next=` deep link) resets to the Private space (#405).
             const landing = readLanding(result.user?.preferences);
-            if (!isSafeNextPath(next) && landing.page === "space") {
-              selectActiveSpaceById(landing.spaceId);
+            const userId = result.user?.id;
+            if (
+              !isSafeNextPath(next) &&
+              landing.page === "space" &&
+              landing.spaceId &&
+              userId
+            ) {
+              markActiveSpaceLanding(userId, landing.spaceId);
+            } else {
+              markActiveSpaceReset();
             }
             router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {

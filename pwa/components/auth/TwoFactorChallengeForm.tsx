@@ -3,7 +3,10 @@ import { useRouter } from "next/router";
 import { Formik, Form, useFormikContext } from "formik";
 import { Clock3, ShieldAlert } from "lucide-react";
 import { TwoFactorRateLimitError, useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import {
+  markActiveSpaceLanding,
+  markActiveSpaceReset,
+} from "@/contexts/ActiveSpaceContext";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -50,7 +53,6 @@ const TOTP_WINDOW_SECONDS = 30;
 
 const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
   const { submitTwoFactorCode } = useAuth();
-  const { selectActiveSpaceById } = useActiveSpace();
   const router = useRouter();
   // Wall-clock instant when the rate-limit bucket refills enough for
   // another attempt — null whenever we're not currently throttled. We
@@ -93,12 +95,18 @@ const TwoFactorChallengeForm = ({ next, mode, email, onCancel }: Props) => {
         onSubmit={async ({ code }, { setSubmitting, setStatus }) => {
           try {
             const user = await submitTwoFactorCode(code.trim());
-            // No deep link → honor the "Start page" preference, priming
-            // the active space for the "specific space" choice. A valid
-            // `?next=` deep link wins and leaves the active space alone.
+            // Fresh sign-in complete → resolve the "Start page" preference
+            // (#406). A specific-space choice lands there; every other
+            // case (incl. a `?next=` deep link) resets to Private (#405).
             const landing = readLanding(user.preferences);
-            if (!isSafeNextPath(next) && landing.page === "space") {
-              selectActiveSpaceById(landing.spaceId);
+            if (
+              !isSafeNextPath(next) &&
+              landing.page === "space" &&
+              landing.spaceId
+            ) {
+              markActiveSpaceLanding(user.id, landing.spaceId);
+            } else {
+              markActiveSpaceReset();
             }
             router.push(safeNextPath(next, landingPathFor(landing)));
           } catch (err) {

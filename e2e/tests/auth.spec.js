@@ -65,11 +65,13 @@ test.describe("Authentication", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
 
-    // A fresh sign-in lands on the default Start page — the workspace
-    // home (#406). The signed-in user's email shows on the profile panel,
-    // so navigate there to confirm. The email now appears in two places
-    // (sidebar header + profile identity form), so scope to the main panel.
+    // A fresh sign-in with no redirect lands on the workspace home
+    // (/projects) with the user's Private space active (#405).
     await expect(page).toHaveURL(/\/projects/);
+
+    // Confirm we're signed in as the right account. The email appears in
+    // two places (sidebar header + profile identity form), so open the
+    // profile panel and scope the assertion to the main panel.
     await page.goto(`${BASE_URL}/settings/profile`);
     await expect(
       page.getByRole("main").getByText(email),
@@ -92,7 +94,7 @@ test.describe("Authentication", () => {
     await page.fill("#password", "admin123");
     await page.click('button[type="submit"]');
 
-    // Fresh sign-in lands on the default Start page (workspace home, #406).
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
 
     // Navigate to admin

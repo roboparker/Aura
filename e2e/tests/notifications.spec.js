@@ -11,7 +11,7 @@ const uniqueEmail = () => shared("notifications");
 test.describe("Notifications", () => {
   test("authenticated users see the notification bell with a zero state", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    // Land on the account page (registerAndSignIn redirects there) — the
+    // Land on the workspace home (registerAndSignIn redirects there) — the
     // bell is part of the navbar and is visible on every authenticated route.
     const bell = page.locator('[data-testid="notification-bell"]');
     await expect(bell).toBeVisible();

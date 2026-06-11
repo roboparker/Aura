@@ -95,13 +95,6 @@ interface ActiveSpaceContextType {
   activeSpace: Space | null;
   /** Switch the active space. Persists the choice in localStorage. */
   setActiveSpace: (space: Space) => void;
-  /**
-   * Select the active space by id before its row is necessarily loaded —
-   * used by the post-login landing flow to honor the "Start page" space
-   * choice. Passing `null` clears the selection and falls back to the
-   * personal space. Persists like {@link setActiveSpace}.
-   */
-  selectActiveSpaceById: (spaceId: string | null) => void;
   /** Reload the user's space list — call after creating, deleting, or being invited to a space. */
   refresh: () => Promise<void>;
   /** Convenience: is the current user a direct admin in the active space? */
@@ -114,18 +107,68 @@ const ActiveSpaceContext = createContext<ActiveSpaceContextType | undefined>(
   undefined,
 );
 
-const STORAGE_KEY = "aura.activeSpaceId";
+// Per-user storage key — `aura.activeSpaceId.{userId}` — so two
+// accounts alternating on one browser never inherit each other's
+// selection. The legacy un-scoped key is dropped on sight (see below).
+const STORAGE_PREFIX = "aura.activeSpaceId";
+const LEGACY_STORAGE_KEY = "aura.activeSpaceId";
+const storageKeyFor = (userId: string) => `${STORAGE_PREFIX}.${userId}`;
+
+// sessionStorage flag set by the sign-in flow (see markActiveSpaceReset)
+// so the next active-space resolution starts in the personal space
+// rather than restoring whatever was last selected on this browser.
+const RESET_FLAG_KEY = "aura.activeSpaceReset";
+
+/**
+ * Called by the sign-in flow on a successful login so the post-login
+ * landing starts in the user's Private space instead of restoring the
+ * previous browser-local selection. Consumed once by ActiveSpaceContext
+ * when the authenticated user resolves; mid-session reloads (no flag)
+ * keep the currently selected space.
+ */
+export function markActiveSpaceReset() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(RESET_FLAG_KEY, "1");
+  } catch {
+    // Private-mode / storage-disabled browsers: the worst case is that
+    // a fresh sign-in restores the last space instead of Private, which
+    // is the pre-#405 behavior — acceptable, not worth surfacing.
+  }
+}
+
+/**
+ * Like {@link markActiveSpaceReset}, but lands a fresh sign-in in a
+ * specific space — the #406 "Start page" space choice — instead of the
+ * personal space. Writes the per-user key directly (the React context's
+ * `user` lags a just-completed login by a render, so we can't go through
+ * the context setter here) and clears any pending reset flag so the
+ * landing resolution in {@link ActiveSpaceProvider} restores this choice.
+ * If the chosen space later becomes inaccessible the resolver falls back
+ * to the personal space, same as any stale stored selection.
+ */
+export function markActiveSpaceLanding(userId: string, spaceId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(storageKeyFor(userId), spaceId);
+    window.sessionStorage.removeItem(RESET_FLAG_KEY);
+  } catch {
+    // Storage-disabled browsers: fall back to whatever the resolver
+    // settles on (the personal space) — acceptable, not worth surfacing.
+  }
+}
 
 /**
  * Loads the user's space list from `GET /spaces` (already scoped to
  * the caller by SpaceAccessExtension) and tracks the active space —
  * the one whose content the listings should show.
  *
- * The active-space choice is persisted in localStorage under
- * `aura.activeSpaceId` so it sticks across reloads. On first load
- * (or when the previous selection is no longer accessible — left the
- * space, deleted it, etc.) we fall back to the personal "Private"
- * space, which is always present.
+ * The active-space choice is persisted in localStorage under a
+ * per-user key (`aura.activeSpaceId.{userId}`) so it sticks across
+ * reloads. On a fresh sign-in (flagged by `markActiveSpaceReset`), on
+ * first load, or when the previous selection is no longer accessible
+ * (left the space, deleted it, etc.), we fall back to the personal
+ * "Private" space, which is always present.
  *
  * Mounted INSIDE AuthProvider so it can react to login/logout: spaces
  * are re-fetched whenever the authenticated user changes, and cleared
@@ -139,15 +182,34 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Restore the persisted choice once on mount. We can't read
-  // localStorage during the initial render in Next.js (no `window`
-  // server-side), so the active-space stays null on first paint and
-  // settles after this effect runs.
+  // Resolve the persisted choice whenever the authenticated user
+  // settles. We can't read localStorage during the initial render in
+  // Next.js (no `window` server-side), so the active-space stays null
+  // on first paint and settles after this effect runs.
+  //
+  // On a fresh sign-in (RESET_FLAG_KEY set by markActiveSpaceReset) we
+  // discard any stored choice and start in the personal space; on a
+  // plain reload we restore the per-user selection so it survives.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) setActiveSpaceId(stored);
-  }, []);
+    // Drop the legacy un-scoped key so a selection can never bleed
+    // across accounts on a shared browser.
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+
+    if (!user?.id) {
+      setActiveSpaceId(null);
+      return;
+    }
+
+    if (window.sessionStorage.getItem(RESET_FLAG_KEY)) {
+      window.sessionStorage.removeItem(RESET_FLAG_KEY);
+      window.localStorage.removeItem(storageKeyFor(user.id));
+      setActiveSpaceId(null);
+      return;
+    }
+
+    setActiveSpaceId(window.localStorage.getItem(storageKeyFor(user.id)));
+  }, [user?.id]);
 
   const fetchSpaces = useCallback(async () => {
     setIsLoading(true);
@@ -193,24 +255,15 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
     spaces[0] ??
     null;
 
-  const setActiveSpace = useCallback((space: Space) => {
-    setActiveSpaceId(space.id);
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, space.id);
-    }
-  }, []);
-
-  const selectActiveSpaceById = useCallback((spaceId: string | null) => {
-    setActiveSpaceId(spaceId);
-    if (typeof window === "undefined") return;
-    if (spaceId) {
-      window.localStorage.setItem(STORAGE_KEY, spaceId);
-    } else {
-      // Clear the persisted choice so the active space resolves to the
-      // personal "Private" space (the null-spaceId landing default).
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
+  const setActiveSpace = useCallback(
+    (space: Space) => {
+      setActiveSpaceId(space.id);
+      if (typeof window !== "undefined" && user?.id) {
+        window.localStorage.setItem(storageKeyFor(user.id), space.id);
+      }
+    },
+    [user],
+  );
 
   const isActiveSpaceAdmin = !!(
     activeSpace &&
@@ -227,7 +280,6 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
         personalSpace,
         activeSpace,
         setActiveSpace,
-        selectActiveSpaceById,
         refresh: fetchSpaces,
         isActiveSpaceAdmin,
         isLoading,

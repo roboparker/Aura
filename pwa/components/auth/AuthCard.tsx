@@ -3,7 +3,6 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { useSignupStatus } from "@/lib/useSignupStatus";
 import { isSafeNextPath, safeNextPath } from "@/lib/authRedirect";
 import { landingPathFor, readLanding } from "@/lib/landingDestination";
@@ -124,7 +123,6 @@ const twoFactorCopy = (mode: TwoFactorMode, email: string | null): CopyEntry => 
 const AuthCard = ({ defaultTab }: Props) => {
   const router = useRouter();
   const { isAuthenticated, isLoading, register, user } = useAuth();
-  const { selectActiveSpaceById } = useActiveSpace();
   const [step, setStep] = useState<AuthStep>(
     defaultTab === "signup" ? "signup-form" : "credentials",
   );
@@ -165,23 +163,13 @@ const AuthCard = ({ defaultTab }: Props) => {
     // (or accept-as-current-user if they happen to match). InviteSignup
     // handles the branching internally.
     if (!isLoading && isAuthenticated && !inviteToken) {
-      // No deep link → fall back to the user's "Start page" preference,
-      // priming the active space for the "specific space" choice.
+      // No deep link → fall back to the user's "Start page" preference.
+      // This is an already-authenticated bounce (not a fresh sign-in), so
+      // we don't touch the active space — that's owned by the sign-in flow.
       const landing = readLanding(user?.preferences);
-      if (!isSafeNextPath(next) && landing.page === "space") {
-        selectActiveSpaceById(landing.spaceId);
-      }
       router.replace(safeNextPath(next, landingPathFor(landing)));
     }
-  }, [
-    isLoading,
-    isAuthenticated,
-    next,
-    router,
-    inviteToken,
-    user?.preferences,
-    selectActiveSpaceById,
-  ]);
+  }, [isLoading, isAuthenticated, next, router, inviteToken, user?.preferences]);
 
   const queryIndex = router.asPath.indexOf("?");
   const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";

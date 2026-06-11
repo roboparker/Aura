@@ -65,6 +65,7 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
 
     // Change password — the form lives on the Security panel.
@@ -86,6 +87,7 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
   });
 
@@ -97,6 +99,7 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
 
     await page.goto(`${BASE_URL}/settings/security`);
@@ -121,6 +124,7 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
 
     await page.goto(`${BASE_URL}/settings/security`);
@@ -175,6 +179,7 @@ test.describe("Forgot password (reset via email)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
+    // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
   });
 
