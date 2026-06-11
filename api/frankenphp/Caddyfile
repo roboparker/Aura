@@ -101,8 +101,9 @@
 		# Umami analytics, proxied first-party so the tracker is same-origin
 		# (no extra DNS/cert, far less ad-block exposure). Only the tracker
 		# script and the collect endpoint are exposed — the Umami dashboard
-		# itself is NOT reachable through this host; it lives on the
-		# loopback-published port of the umami service (SSH tunnel in prod).
+		# itself is NOT reachable through this host; it gets its own site
+		# block (see the {$UMAMI_SERVER_NAME} block at the bottom of this
+		# file), or the loopback-published port of the umami service.
 		# The tracker derives its endpoint from the script src path, so
 		# /umami/script.js posts events to /umami/api/send. When the umami
 		# container isn't running (profile off) these paths 502; the PWA
@@ -145,4 +146,24 @@
 			hide *.php
 		}
 	}
+}
+
+# Public Umami dashboard. The official Umami image can't be served under a
+# sub-path (BASE_PATH is a build-time option), so the dashboard gets its own
+# hostname instead of living under /umami/ like the tracker endpoints above.
+# Point a DNS record at this server and set UMAMI_SERVER_NAME to the hostname
+# (e.g. analytics.example.com) — Caddy provisions the certificate
+# automatically; access is gated by Umami's own login. When the variable is
+# unset the block falls back to a loopback-only port inside the container
+# that is never published, so nothing is exposed; the SSH-tunnel route via
+# the loopback-published UMAMI_PORT keeps working either way.
+{$UMAMI_SERVER_NAME:localhost:8455} {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	reverse_proxy umami:3000
 }

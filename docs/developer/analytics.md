@@ -14,7 +14,9 @@ product whose core concept is a private space.
 browser ── GET  /umami/script.js ──┐
         ── POST /umami/api/send ───┤  Caddy (php container) ── reverse_proxy ──> umami:3000
                                    │
-operator ── SSH tunnel ── 127.0.0.1:${UMAMI_PORT:-3001} ──> umami dashboard
+operator ── https://${UMAMI_SERVER_NAME} ──┘  (public dashboard, Umami login)
+
+operator ── SSH tunnel ── 127.0.0.1:${UMAMI_PORT:-3001} ──> umami dashboard (fallback)
 ```
 
 - **`umami` compose service** (`ghcr.io/umami-software/umami:postgresql-latest`)
@@ -23,14 +25,24 @@ operator ── SSH tunnel ── 127.0.0.1:${UMAMI_PORT:-3001} ──> umami da
   never touch the `app` database, so Doctrine and the schema CI check are
   unaffected.
 - **First-party proxy**: Caddy (`api/frankenphp/Caddyfile`) exposes exactly
-  two paths — `/umami/script.js` (the tracker) and `/umami/api/send` (the
-  collect endpoint). The tracker derives its endpoint from the script path,
-  so everything stays on the app origin. The dashboard is *not* reachable
-  through the public host.
-- **Dashboard access** is via the umami service's published port, which is
-  loopback-bound (`127.0.0.1:${UMAMI_PORT:-3001}`). In production reach it
-  with an SSH tunnel: `ssh -L 3001:localhost:3001 <server>`, then open
-  http://localhost:3001.
+  two paths on the app host — `/umami/script.js` (the tracker) and
+  `/umami/api/send` (the collect endpoint). The tracker derives its endpoint
+  from the script path, so everything stays on the app origin. The dashboard
+  is *not* reachable through the app host.
+- **Dashboard (public)**: the dashboard gets its **own hostname** because the
+  official Umami image can't be served under a sub-path (`BASE_PATH` is a
+  build-time option). Point a DNS record at the server and set
+  `UMAMI_SERVER_NAME` (e.g. `analytics.example.com`) in the server's `.env`;
+  the Caddyfile's second site block reverse-proxies it to `umami:3000` and
+  Caddy provisions the TLS certificate automatically. Access is gated by
+  Umami's own login. When `UMAMI_SERVER_NAME` is unset the site block falls
+  back to a loopback-only port inside the container that is never published —
+  nothing is exposed.
+- **Dashboard (tunnel fallback)**: the umami service also publishes a
+  loopback-bound port (`127.0.0.1:${UMAMI_PORT:-3001}`). In production reach
+  it with an SSH tunnel: `ssh -L 3001:localhost:3001 <server>`, then open
+  http://localhost:3001 — useful before DNS is set up or if the public host
+  is ever dropped.
 - **Compose profile**: the service sits behind the `analytics` profile so CI
   stacks and a casual dev `docker compose up -d` don't boot it.
   `scripts/deploy.sh` exports `COMPOSE_PROFILES=analytics`, so production
@@ -73,13 +85,19 @@ so the suite and local work never emit events.
 
 1. Add `UMAMI_APP_SECRET=<long random string>` to the server's `.env`
    (`compose.prod.yaml` hard-requires it; generate with `openssl rand -hex 32`).
-2. Deploy (the next promote PR brings the umami service up and creates its
-   database).
-3. Tunnel in (`ssh -L 3001:localhost:3001 <server>`), log into
-   http://localhost:3001 as **admin / umami**, and change the password.
-4. Settings → Websites → Add website (name it after the domain). Copy the
+2. Add a DNS A record for the dashboard hostname (e.g.
+   `analytics.example.com`) pointing at the server, and set
+   `UMAMI_SERVER_NAME=analytics.example.com` in the server's `.env`.
+3. Deploy (the next promote PR brings the umami service up and creates its
+   database). Caddy provisions the certificate for the dashboard hostname on
+   first request.
+4. Log into `https://<UMAMI_SERVER_NAME>` as **admin / umami** and change the
+   password immediately — the login page is public, the password is the only
+   gate. (No DNS yet? Tunnel in instead: `ssh -L 3001:localhost:3001
+   <server>`, then http://localhost:3001.)
+5. Settings → Websites → Add website (name it after the domain). Copy the
    **Website ID**.
-5. Set `NEXT_PUBLIC_UMAMI_WEBSITE_ID=<id>` in `pwa/.env.production` and merge
+6. Set `NEXT_PUBLIC_UMAMI_WEBSITE_ID=<id>` in `pwa/.env.production` and merge
    — the ID is public (it ships in the page source), so committing it is
    fine. The next deploy bakes it into the PWA build and tracking goes live.
 

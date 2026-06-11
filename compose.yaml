@@ -18,6 +18,12 @@ services:
       MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
+      # Hostname for the public Umami dashboard site block in the Caddyfile.
+      # The default is a loopback-only port inside the container (never
+      # published), so nothing is exposed; set a real hostname (e.g.
+      # analytics.example.com, with DNS pointed at this server) to publish
+      # the dashboard — Caddy provisions the certificate automatically.
+      UMAMI_SERVER_NAME: ${UMAMI_SERVER_NAME:-localhost:8455}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
@@ -115,9 +121,10 @@ services:
   # `COMPOSE_PROFILES=analytics` in .env or `docker compose --profile
   # analytics up -d`. scripts/deploy.sh always deploys it in prod. The
   # tracker script + collect endpoint are proxied same-origin by Caddy
-  # (/umami/* in api/frankenphp/Caddyfile); the dashboard itself is only
-  # reachable through the published port below (loopback-bound in prod —
-  # see compose.prod.yaml — so access it via an SSH tunnel).
+  # (/umami/* in api/frankenphp/Caddyfile); the dashboard is served on its
+  # own hostname when UMAMI_SERVER_NAME is set (see the php service env +
+  # the Caddyfile), and is always reachable through the loopback-bound
+  # published port below (SSH tunnel in prod).
   # Uses its own `umami` database on the shared Postgres instance —
   # scripts/deploy.sh ensures it idempotently on every prod deploy; for a
   # local stack create it once with
