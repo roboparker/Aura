@@ -25,8 +25,13 @@ const TermsConsentField = ({ name = "acceptTerms" }: { name?: string }) => {
           id={id}
           checked={field.value}
           onCheckedChange={(checked) => {
+            // Mark touched without validating against the stale snapshot, then
+            // let setValue run the single validation pass that sees the new
+            // value. Validating on the touched update can re-assert the error
+            // using the previous (still-false) values, leaving the error shown
+            // under an already-checked box.
+            helpers.setTouched(true, false);
             helpers.setValue(checked === true);
-            helpers.setTouched(true);
           }}
           aria-invalid={showError}
           aria-describedby={showError ? `${id}-error` : undefined}
