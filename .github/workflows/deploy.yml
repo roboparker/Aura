@@ -72,8 +72,12 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/app-php:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/app-php:latest
-          cache-from: type=gha,scope=app-php
-          cache-to: type=gha,scope=app-php,mode=max
+          # Registry-backed cache, not type=gha: the Actions cache is
+          # branch-scoped and shares a 10GB repo pool with CI's caches, so
+          # infrequent deploy builds kept getting evicted and rebuilt cold.
+          # The :buildcache ref on GHCR is branch-agnostic and persistent.
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-php:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-php:buildcache,mode=max
 
       - name: Build & push pwa image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
@@ -84,8 +88,8 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/app-pwa:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/app-pwa:latest
-          cache-from: type=gha,scope=app-pwa
-          cache-to: type=gha,scope=app-pwa,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-pwa:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-pwa:buildcache,mode=max
 
   deploy:
     name: Deploy to production

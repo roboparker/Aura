@@ -18,6 +18,9 @@ services:
       MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
+      # Hostname for the Umami dashboard site block in the Caddyfile.
+      # Prod: analytics.<domain> (with a matching DNS A record).
+      UMAMI_SERVER_NAME: ${UMAMI_SERVER_NAME:-analytics.localhost}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
