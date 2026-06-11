@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { trackEvent } from "@/lib/analytics";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -99,6 +100,7 @@ const NewGroupPage = () => {
         );
       }
       const group: CreatedGroup = await res.json();
+      trackEvent("group-create");
 
       // Fan out invites. Existing users join immediately; unknown emails
       // get an email invite. Best-effort — a failed invite doesn't undo

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { ENTRYPOINT } from "../config/entrypoint";
+import { trackEvent } from "../lib/analytics";
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
 
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
@@ -280,6 +281,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         data["hydra:description"] || data.detail || "Registration failed.";
       throw new Error(message);
     }
+
+    trackEvent("signup", { invited: Boolean(input.inviteToken) });
   }, []);
 
   const changePassword = useCallback(async (

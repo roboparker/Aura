@@ -27,8 +27,9 @@
 #   HEALTH_TIMEOUT Seconds to wait for the stack to report healthy (default: 300)
 #
 # Notes:
-#   - Only ever brings up database/php/worker/pwa. A bare `up -d` would also
-#     start mailpit and publish its ports publicly — never do that in prod.
+#   - Only ever brings up database/php/worker/pwa/umami. A bare `up -d` would
+#     also start mailpit and publish its ports publicly — never do that in
+#     prod.
 #   - IMAGES_TAG is persisted into .env so later manual `docker compose`
 #     invocations keep operating on the deployed tag instead of :latest.
 #   - Requires IMAGES_PREFIX in .env (e.g. ghcr.io/<owner>/) so image refs
@@ -41,7 +42,13 @@ cd "$ROOT"
 
 COMPOSE_FILES="${COMPOSE_FILES:-compose.yaml compose.prod.yaml}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-300}"
-SERVICES=(database php worker pwa)
+SERVICES=(database php worker pwa umami)
+# Health gate only on the app itself — analytics (umami) must never hold a
+# deploy hostage or leave the maintenance page up.
+CORE_SERVICES=(database php worker pwa)
+# The umami service sits behind the `analytics` compose profile (so CI and
+# casual dev `up` skip it); activate it for every prod compose invocation.
+export COMPOSE_PROFILES="${COMPOSE_PROFILES:-analytics}"
 
 if [ -z "${IMAGES_TAG:-}" ]; then
   echo "IMAGES_TAG is required (commit SHA of the images to deploy)" >&2
@@ -87,6 +94,14 @@ compose exec -T php sh -c 'mkdir -p /app/var/maintenance && touch /app/var/maint
 log "running pre-deploy backup"
 compose run --rm --no-deps -T worker bin/console app:backup:run
 
+# 3.5. Ensure the umami analytics database exists (idempotent — umami keeps
+# its tables out of the app database, in its own DB on the same instance).
+# Best-effort — analytics must never block an app deploy.
+log "ensuring umami database exists"
+compose exec -T database sh -c \
+  "psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -tAc \"SELECT 1 FROM pg_database WHERE datname = 'umami'\" | grep -q 1 || createdb -U \"\$POSTGRES_USER\" umami" \
+  || log "WARN: could not ensure umami database (analytics may be unavailable)"
+
 # 4. Swap.
 log "swapping containers"
 compose up -d --no-build "${SERVICES[@]}"
@@ -104,7 +119,7 @@ fi
 log "waiting for stack health (timeout ${HEALTH_TIMEOUT}s)"
 deadline=$(( $(date +%s) + HEALTH_TIMEOUT ))
 while true; do
-  unhealthy="$(compose ps --format '{{.Service}} {{.Health}}' "${SERVICES[@]}" \
+  unhealthy="$(compose ps --format '{{.Service}} {{.Health}}' "${CORE_SERVICES[@]}" \
     | awk '$2 != "healthy" {print $1}' || true)"
   if [ -z "$unhealthy" ]; then
     break

@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { trackEvent } from "@/lib/analytics";
 import { displayName } from "@/lib/userDisplay";
 import { formatRelative } from "@/lib/relativeTime";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -209,6 +210,7 @@ const DiscussionsPanel = ({
       });
       if (!res.ok) throw new Error(await errorMessage(res));
       const created: Discussion = await res.json();
+      trackEvent("discussion-create", { category: newCategory });
       setDiscussions((prev) => sortDiscussions([created, ...prev]));
       setNewTitle("");
       setNewBody("");

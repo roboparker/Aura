@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { trackEvent } from "@/lib/analytics";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { type CommentLiveEvent } from "@/lib/useCommentLiveUpdates";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -361,6 +362,7 @@ const Tasks = () => {
       // server-side), so a local insert is both faster and resilient.
       const created: Task = await res.json();
       setTasks((prev) => [created, ...prev]);
+      trackEvent("task-create");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
       // Re-throw so NewTaskRow keeps the user's draft for retry.
