@@ -65,7 +65,8 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
 
     // Change password — the form lives on the Security panel.
     await page.goto(`${BASE_URL}/settings/security`);
@@ -86,7 +87,8 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
   });
 
   test("wrong current password shows error", async ({ page, request }) => {
@@ -97,7 +99,8 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
 
     await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "wrongpass");
@@ -121,7 +124,8 @@ test.describe("Change password (authenticated)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "OriginalPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
 
     await page.goto(`${BASE_URL}/settings/security`);
     await page.fill("#currentPassword", "OriginalPass1!");
@@ -175,7 +179,8 @@ test.describe("Forgot password (reset via email)", () => {
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/settings\/profile/);
+    // Fresh sign-in lands on the workspace home (#405).
+    await expect(page).toHaveURL(/\/projects/);
   });
 
   test("forgot-password returns success for unknown email (no enumeration)", async ({
