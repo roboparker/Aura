@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -19,6 +20,7 @@ import SidebarNav from "./SidebarNav";
 
 const Navbar = () => {
   const { isAuthenticated } = useAuth();
+  const { waitlistEnabled } = useSignupStatus();
 
   return (
     <nav className="border-b bg-background">
@@ -89,7 +91,9 @@ const Navbar = () => {
                 <Link href="/signin">Sign In</Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/signup">Sign Up</Link>
+                <Link href="/signup">
+                  {waitlistEnabled ? "Join the waitlist" : "Sign Up"}
+                </Link>
               </Button>
             </>
           )}

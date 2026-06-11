@@ -25,6 +25,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignupStatus } from "@/lib/useSignupStatus";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -544,6 +545,8 @@ const WRAP = "mx-auto w-full max-w-[1180px] px-6";
 
 const Home = () => {
   const { isAuthenticated } = useAuth();
+  const { waitlistEnabled } = useSignupStatus();
+  const signupCta = waitlistEnabled ? "Join the waitlist" : "Get started — free";
 
   return (
     <>
@@ -608,7 +611,7 @@ const Home = () => {
                 ) : (
                   <>
                     <Button asChild size="lg" className={GLOW}>
-                      <Link href="/signup">Get started — free</Link>
+                      <Link href="/signup">{signupCta}</Link>
                     </Button>
                     <Button asChild size="lg" variant="secondary">
                       <Link href="/signin">Sign in</Link>
@@ -778,7 +781,7 @@ const Home = () => {
                   </Button>
                 ) : (
                   <Button asChild size="lg" className={GLOW}>
-                    <Link href="/signup">Get started — free</Link>
+                    <Link href="/signup">{signupCta}</Link>
                   </Button>
                 )}
               </div>
