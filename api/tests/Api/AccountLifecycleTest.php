@@ -3,6 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\AccountExport;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Service\AccountDeletionService;
@@ -50,25 +51,41 @@ class AccountLifecycleTest extends ApiTestCase
         $this->assertTrue($refreshed->isDeactivated());
     }
 
-    public function testExportReturnsOwnData(): void
+    public function testExportQueuesArchiveAndEmailsLink(): void
     {
         $alice = $this->createUser('alice@example.com');
         $this->makeTask($alice, 'Export me');
         $client = static::createClient();
         $client->loginUser($alice);
 
+        // Async now: the POST queues a build and returns 202. Under the
+        // test sync:// transport the handler runs inline, so the row is
+        // already completed and the email already sent. The deep zip/token
+        // assertions live in App\Tests\Api\AccountExportTest.
         $client->request('POST', '/me/export', [
             'json' => ['currentPassword' => 'Password123!@#'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseIsSuccessful();
-        $response = $client->getResponse();
-        self::assertNotNull($response);
-        $body = $response->toArray();
-        $profile = $this->arrayField($body, 'profile');
-        $this->assertSame('alice@example.com', $profile['email']);
-        $tasks = $this->arrayField($body, 'tasks');
-        $this->assertNotEmpty($tasks);
+        $this->assertResponseStatusCodeSame(202);
+        $this->assertEmailCount(1);
+
+        $this->entityManager->clear();
+        $export = $this->entityManager->getRepository(AccountExport::class)->findOneBy([]);
+        $this->assertNotNull($export);
+        $this->assertSame(AccountExport::STATUS_COMPLETED, $export->getStatus());
+    }
+
+    public function testExportRejectsWithoutStepUp(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('POST', '/me/export', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(400);
     }
 
     public function testDeleteRejectsWrongEmail(): void

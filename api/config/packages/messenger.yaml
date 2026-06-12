@@ -31,6 +31,10 @@ framework:
             # bytes) is far too slow for a request — the POST inserts the
             # row and queues this; the worker builds + emails the link.
             App\Message\GenerateSpaceExport: async
+            # Account (GDPR) data exports: same rationale as the space export —
+            # the POST inserts the row and queues this; the worker zips the
+            # user's own data + uploaded files and emails the download link.
+            App\Message\GenerateAccountExport: async
 
 when@test:
     framework:
