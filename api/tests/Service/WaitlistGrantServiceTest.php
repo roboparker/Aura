@@ -21,9 +21,7 @@ class WaitlistGrantServiceTest extends KernelTestCase
         $this->em = $em;
         $this->em->createQuery('DELETE FROM App\Entity\User')->execute();
 
-        $granter = self::getContainer()->get(WaitlistGrantService::class);
-        assert($granter instanceof WaitlistGrantService);
-        $this->granter = $granter;
+        $this->granter = self::getContainer()->get(WaitlistGrantService::class);
     }
 
     public function testGrantPromotesWaitlistedAndSkipsFullAccounts(): void

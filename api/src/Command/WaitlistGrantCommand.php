@@ -72,7 +72,7 @@ final class WaitlistGrantCommand extends Command
         if ($all) {
             $candidates = $this->granter->findWaitlisted();
         } elseif (null !== $oldest) {
-            if (!is_string($oldest) || 1 !== preg_match('/^\d+$/', $oldest) || (int) $oldest < 1) {
+            if (1 !== preg_match('/^\d+$/', $oldest) || (int) $oldest < 1) {
                 $io->error('--oldest must be a positive integer.');
                 return Command::INVALID;
             }
