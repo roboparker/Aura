@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\WaitlistGrantService;
 use App\Service\WaitlistPromoter;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,6 +39,7 @@ class WaitlistController extends AbstractController
     public function __construct(
         private WaitlistSettings $settings,
         private WaitlistPromoter $promoter,
+        private WaitlistGrantService $granter,
         private EntityManagerInterface $em,
     ) {
     }
@@ -107,11 +109,13 @@ class WaitlistController extends AbstractController
         if (null === $user) {
             return $this->json(['error' => 'User not found.'], 404);
         }
-        if (!$user->isWaitlisted()) {
+
+        // Same shared path as the CLI (app:waitlist:grant): a non-waitlisted
+        // user comes back as skipped rather than promoted.
+        $result = $this->granter->grant([$user]);
+        if ([] === $result->promoted) {
             return $this->json(['error' => 'User is not on the waitlist.'], 422);
         }
-
-        $this->promoter->promoteOne($user);
 
         return $this->json([
             'promoted' => true,

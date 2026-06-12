@@ -4,24 +4,25 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\AccountExport;
 use App\Entity\User;
+use App\Message\GenerateAccountExport;
 use App\Repository\UserSessionRepository;
 use App\Service\AccountDeletionService;
 use App\Service\SensitiveActionVerifier;
-use App\Service\UserDataExporter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 /**
  * Account lifecycle actions for the Settings → Danger zone: deactivate
- * (soft, reversible on next sign-in), export (GDPR JSON), and delete (hard,
- * with author anonymization). All three are step-up protected via
+ * (soft, reversible on next sign-in), export (async GDPR archive), and delete
+ * (hard, with author anonymization). All three are step-up protected via
  * {@see SensitiveActionVerifier}.
  */
 class AccountLifecycleController extends AbstractController
@@ -32,9 +33,9 @@ class AccountLifecycleController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly SensitiveActionVerifier $verifier,
         private readonly UserSessionRepository $sessions,
-        private readonly UserDataExporter $exporter,
         private readonly AccountDeletionService $deletion,
         private readonly TokenStorageInterface $tokenStorage,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -57,8 +58,16 @@ class AccountLifecycleController extends AbstractController
         return $this->json(['ok' => true]);
     }
 
+    /**
+     * Queues a GDPR data export. The archive is built asynchronously
+     * ({@see \App\MessageHandler\GenerateAccountExportHandler}) and a
+     * tokenized download link is emailed to the requester when ready;
+     * {@see \App\Controller\AccountExportController} serves the status +
+     * bytes. Only one export per user is built at a time — a second request
+     * while one is in flight gets a 409.
+     */
     #[Route('/me/export', name: 'me_export', methods: ['POST'])]
-    public function export(Request $request, #[CurrentUser] ?User $user): Response
+    public function export(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
@@ -68,13 +77,27 @@ class AccountLifecycleController extends AbstractController
             return $this->json(['error' => $err[1]], $err[0]);
         }
 
-        $data = $this->exporter->export($user);
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        $inFlight = $this->em->getRepository(AccountExport::class)->findOneBy([
+            'requestedBy' => $user,
+            'status' => [AccountExport::STATUS_PENDING, AccountExport::STATUS_PROCESSING],
+        ]);
+        if (null !== $inFlight) {
+            return $this->json(
+                ['error' => 'An export is already being prepared. You\'ll get an email when it\'s ready.'],
+                409,
+            );
+        }
 
-        $response = new JsonResponse(false === $json ? '{}' : $json, 200, [], true);
-        $response->headers->set('Content-Disposition', 'attachment; filename="aura-export.json"');
+        $export = new AccountExport($user);
+        $this->em->persist($export);
+        $this->em->flush();
 
-        return $response;
+        $this->bus->dispatch(new GenerateAccountExport((string) $export->getId()));
+
+        return $this->json([
+            'id' => (string) $export->getId(),
+            'status' => $export->getStatus(),
+        ], 202);
     }
 
     #[Route('/me/delete', name: 'me_delete', methods: ['POST'])]
