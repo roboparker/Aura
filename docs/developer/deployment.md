@@ -128,13 +128,16 @@ This is wired up but **gated** so it has zero effect until switched on:
    *SSL/TLS → Origin Server → Create Certificate* (let Cloudflare generate the
    key; hostnames `madori.app` + `*.madori.app`; 15-year validity). Copy the
    **Origin Certificate** and **Private Key** PEM blocks.
-2. **Place the files on the server** (key readable only by root):
+2. **Place the files on the server** (key readable only by root). The server
+   checkout lives at `/opt/aura` — this directory name is intentionally kept
+   even though the product is "Madori", because renaming it changes the Docker
+   Compose project name and would orphan the named volumes (Postgres data):
    ```bash
-   mkdir -p /opt/madori/certs
+   mkdir -p /opt/aura/certs
    # paste the cert into cert.pem and the key into key.pem
-   chmod 600 /opt/madori/certs/key.pem
+   chmod 600 /opt/aura/certs/key.pem
    ```
-3. **Enable it** in `/opt/madori/.env`:
+3. **Enable it** in `/opt/aura/.env`:
    ```
    TLS_DIRECTIVE=tls /etc/caddy/origin/cert.pem /etc/caddy/origin/key.pem
    ```
