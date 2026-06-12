@@ -156,15 +156,19 @@ class AccountLifecycleTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($waiter);
 
+        // Async now: the POST queues a build and returns 202 even for a
+        // waitlisted account (the lifecycle endpoints stay reachable so the
+        // GDPR self-service works while waiting).
         $client->request('POST', '/me/export', [
             'json' => ['currentPassword' => 'Password123!@#'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseIsSuccessful();
-        $response = $client->getResponse();
-        self::assertNotNull($response);
-        $profile = $this->arrayField($response->toArray(), 'profile');
-        $this->assertSame('waiter@example.com', $profile['email']);
+        $this->assertResponseStatusCodeSame(202);
+
+        $this->entityManager->clear();
+        $export = $this->entityManager->getRepository(AccountExport::class)->findOneBy([]);
+        $this->assertNotNull($export);
+        $this->assertSame(AccountExport::STATUS_COMPLETED, $export->getStatus());
     }
 
     public function testWaitlistedUserCanDeleteAccount(): void
