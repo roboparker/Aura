@@ -12,10 +12,10 @@ interface Props {
 const GuidesIndex = ({ sections }: Props) => (
   <>
     <Head>
-      <title>Guides — Aura</title>
+      <title>Guides — Madori</title>
       <meta
         name="description"
-        content="User and developer documentation for Aura."
+        content="User and developer documentation for Madori."
       />
     </Head>
     <main className="bg-background">

@@ -1,6 +1,6 @@
-# Aura
+# Madori
 
-Aura is an API-first task and project management app. The backend is a Symfony / [API Platform](https://api-platform.com) service; the frontend is a Next.js PWA. The two run side-by-side behind FrankenPHP in development.
+Madori is an API-first task and project management app. The backend is a Symfony / [API Platform](https://api-platform.com) service; the frontend is a Next.js PWA. The two run side-by-side behind FrankenPHP in development.
 
 ## Features
 
@@ -92,9 +92,9 @@ Community:
 
 Copyright © 2026 Robert Parker.
 
-Aura is free software, licensed under the **GNU Affero General Public License
+Madori is free software, licensed under the **GNU Affero General Public License
 v3.0** — see [`LICENSE`](LICENSE). The AGPL's network-use clause means anyone
-who runs a modified Aura as a network service must offer their users the
+who runs a modified Madori as a network service must offer their users the
 corresponding source.
 
 Separate **commercial licenses** are available from the maintainer for parties

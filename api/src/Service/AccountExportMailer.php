@@ -27,13 +27,13 @@ final class AccountExportMailer
 
     public function sendExportReady(AccountExport $export, string $plainToken): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
         $recipient = $export->getRequestedBy();
 
         $email = (new TemplatedEmail())
             ->from($from)
             ->to($recipient->getEmail())
-            ->subject('Your Aura data export is ready')
+            ->subject('Your Madori data export is ready')
             ->htmlTemplate('emails/account_export.html.twig')
             ->textTemplate('emails/account_export.txt.twig')
             ->context([

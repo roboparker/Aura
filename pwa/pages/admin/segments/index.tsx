@@ -190,7 +190,7 @@ const AdminSegments: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Aura</title>
+          <title>Access Denied - Madori</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -207,7 +207,7 @@ const AdminSegments: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Segments - Aura Admin</title>
+        <title>Segments - Madori Admin</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-3xl mx-auto space-y-6">

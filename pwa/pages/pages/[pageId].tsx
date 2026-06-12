@@ -425,7 +425,7 @@ const PageDetailView = () => {
   return (
     <>
       <Head>
-        <title>{page ? `${page.title} - Aura` : "Page - Aura"}</title>
+        <title>{page ? `${page.title} - Madori` : "Page - Madori"}</title>
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">

@@ -39,7 +39,7 @@ const Admin: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Aura</title>
+          <title>Access Denied - Madori</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">

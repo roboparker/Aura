@@ -1,6 +1,6 @@
 # Data export — internals
 
-Aura has two asynchronous data exports that share the same machinery: a **space export** (an admin bundles a whole space's content) and an **account export** (a user downloads their own data for GDPR/CCPA). Both build a zip on the worker, mint a single-use download token at completion, email the requester a link, and prune the archive after a retention window.
+Madori has two asynchronous data exports that share the same machinery: a **space export** (an admin bundles a whole space's content) and an **account export** (a user downloads their own data for GDPR/CCPA). Both build a zip on the worker, mint a single-use download token at completion, email the requester a link, and prune the archive after a retention window.
 
 End users should read [../user/data-export.md](../user/data-export.md) instead.
 

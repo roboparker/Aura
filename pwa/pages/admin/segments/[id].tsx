@@ -248,7 +248,7 @@ const AdminSegmentDetail: NextPage = () => {
   return (
     <>
       <Head>
-        <title>{segment.name} - Aura Segments</title>
+        <title>{segment.name} - Madori Segments</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-3xl mx-auto space-y-6">

@@ -42,7 +42,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 class McpController extends AbstractController
 {
     public const PROTOCOL_VERSION = '2024-11-05';
-    public const SERVER_NAME = 'aura-mcp';
+    public const SERVER_NAME = 'madori-mcp';
 
     public function __construct(
         private McpToolRegistry $tools,

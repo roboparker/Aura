@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Aura ships a single, dark-only theme. These tokens are the baseline
+/* Madori ships a single, dark-only theme. These tokens are the baseline
    for the whole app — there is no light variant. The `.dark` class is
    still applied to <html> (see _document.tsx) so Tailwind's `dark:`
    variants and the code-fence `html.dark` rules keep resolving. */
@@ -91,10 +91,10 @@
     }
 }
 
-/* Slow pulse for the Aura wordmark icon on the auth pages — fades the
+/* Slow pulse for the Madori wordmark icon on the auth pages — fades the
    teal drop-shadow halo in and out so the logo feels "alive" without
-   demanding attention. Paired with .animate-aura-glow on the SVG. */
-@keyframes aura-glow-pulse {
+   demanding attention. Paired with .animate-madori-glow on the SVG. */
+@keyframes madori-glow-pulse {
     0%, 100% {
         filter:
             drop-shadow(0 0 12px rgb(62 221 180 / 0.95))
@@ -106,11 +106,11 @@
             drop-shadow(0 0 42px rgb(62 221 180 / 0.9));
     }
 }
-.animate-aura-glow {
-    animation: aura-glow-pulse 2.8s ease-in-out infinite;
+.animate-madori-glow {
+    animation: madori-glow-pulse 2.8s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-    .animate-aura-glow {
+    .animate-madori-glow {
         animation: none;
         filter:
             drop-shadow(0 0 12px rgb(62 221 180 / 0.95))

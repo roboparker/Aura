@@ -9,7 +9,7 @@ export interface RecentSearch {
   count?: number;
 }
 
-const KEY = "aura.recentSearches";
+const KEY = "madori.recentSearches";
 const CAP = 6;
 
 const read = (): RecentSearch[] => {

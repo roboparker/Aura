@@ -35,7 +35,7 @@ const NotificationsPage = () => {
     <SettingsShell
       active="notifications"
       title="Notifications"
-      description="Pick which Aura events reach you, and where."
+      description="Pick which Madori events reach you, and where."
       actions={<SaveIndicator status={saveStatus} />}
     >
       {saveError && (

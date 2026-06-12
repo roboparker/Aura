@@ -46,7 +46,7 @@ const SettingsShell = ({
   return (
     <>
       <Head>
-        <title>{title} · Settings - Aura</title>
+        <title>{title} · Settings - Madori</title>
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="mx-auto max-w-5xl px-4 py-10">

@@ -29,12 +29,12 @@ final class WaitlistJoinedMailer
 
     public function sendJoinedConfirmation(User $user): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $email = (new TemplatedEmail())
             ->from($from)
             ->to($user->getEmail())
-            ->subject("You're on the Aura waitlist")
+            ->subject("You're on the Madori waitlist")
             ->htmlTemplate('emails/waitlist_joined.html.twig')
             ->textTemplate('emails/waitlist_joined.txt.twig')
             ->context([

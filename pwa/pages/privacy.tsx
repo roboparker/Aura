@@ -6,10 +6,10 @@ const LAST_UPDATED = "June 9, 2026";
 const Privacy = () => (
   <>
     <Head>
-      <title>Privacy Policy — Aura</title>
+      <title>Privacy Policy — Madori</title>
       <meta
         name="description"
-        content="How Aura collects, uses, and protects your personal data."
+        content="How Madori collects, uses, and protects your personal data."
       />
     </Head>
 
@@ -27,7 +27,7 @@ const Privacy = () => (
         <div className="space-y-8 text-foreground leading-relaxed">
           <section>
             <p className="text-muted-foreground">
-              This Privacy Policy describes how Aura (the &quot;Service&quot;),
+              This Privacy Policy describes how Madori (the &quot;Service&quot;),
               operated by Robert Parker (&quot;we&quot;, &quot;us&quot;), collects,
               uses, and protects your personal data when you use it. By using
               the Service, you agree to the practices described here.

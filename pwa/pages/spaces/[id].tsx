@@ -363,7 +363,7 @@ const SpaceDetail = () => {
   return (
     <>
       <Head>
-        <title>{space ? `${space.name} - Aura` : "Space - Aura"}</title>
+        <title>{space ? `${space.name} - Madori` : "Space - Madori"}</title>
       </Head>
       <main className="min-h-screen bg-muted px-4 py-8">
         <div className="max-w-6xl mx-auto">

@@ -114,7 +114,7 @@ class AccountExportController extends AbstractController
     private function downloadFileName(AccountExport $export): string
     {
         return sprintf(
-            'aura-account-export-%s.zip',
+            'madori-account-export-%s.zip',
             $export->getCompletedAt()?->format('Y-m-d') ?? 'archive',
         );
     }

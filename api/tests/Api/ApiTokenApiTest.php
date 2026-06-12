@@ -38,7 +38,7 @@ class ApiTokenApiTest extends ApiTestCase
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
-        $this->assertStringStartsWith('aura_pat_', $this->stringField($body, 'plainToken'));
+        $this->assertStringStartsWith('madori_pat_', $this->stringField($body, 'plainToken'));
         $iri = $this->stringField($body, '@id');
 
         $client->request('DELETE', $iri);

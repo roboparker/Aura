@@ -125,7 +125,7 @@ const SpacesIndex = () => {
   return (
     <>
       <Head>
-        <title>Spaces - Aura</title>
+        <title>Spaces - Madori</title>
       </Head>
 
       <main className="px-6 py-8 max-w-7xl mx-auto">

@@ -1,6 +1,6 @@
 # Background job queue
 
-Aura runs background jobs through **Symfony Messenger** with the **Doctrine
+Madori runs background jobs through **Symfony Messenger** with the **Doctrine
 transport**, so the queue is just a table in the existing PostgreSQL
 database — no extra broker (Redis/RabbitMQ) to operate. Jobs are enqueued
 by the API during a request and drained by a long-running worker process.

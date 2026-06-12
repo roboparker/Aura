@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  * or project doesn't re-hit the API on every page.
  *
  * Renders nothing on the home page and on auth screens; the Navbar
- * keeps the Aura wordmark visible there instead. On every other
+ * keeps the Madori wordmark visible there instead. On every other
  * authenticated route it stands in for the wordmark and anchors back
  * to `/` via the Home icon at the start.
  */

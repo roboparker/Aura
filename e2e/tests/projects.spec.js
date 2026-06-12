@@ -20,7 +20,7 @@ test.describe("Projects", () => {
     await registerAndSignIn(page, email);
 
     await page.goto(`${BASE_URL}/projects`);
-    await expect(page).toHaveTitle("Projects - Aura");
+    await expect(page).toHaveTitle("Projects - Madori");
     await expect(page.locator("text=No projects yet")).toBeVisible();
 
     // Create

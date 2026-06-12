@@ -187,17 +187,17 @@ class EmailChangeController extends AbstractController
             rtrim($this->frontendUrl, '/'),
             $plainToken,
         );
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $email = (new Email())
             ->from($from)
             ->to($newEmail)
-            ->subject('Confirm your new Aura email address')
+            ->subject('Confirm your new Madori email address')
             ->text(sprintf(
                 "Hi,\n\n"
-                . "We received a request to change the email on your Aura account from %s to %s. "
+                . "We received a request to change the email on your Madori account from %s to %s. "
                 . "Click the link below to confirm:\n\n%s\n\n"
-                . "This link expires in %d hour(s). If you did not request this change, you can safely ignore this email — your account email won't change unless you click the link.\n\n— Aura",
+                . "This link expires in %d hour(s). If you did not request this change, you can safely ignore this email — your account email won't change unless you click the link.\n\n— Madori",
                 $user->getEmail(),
                 $newEmail,
                 $confirmUrl,
@@ -205,10 +205,10 @@ class EmailChangeController extends AbstractController
             ))
             ->html(sprintf(
                 '<p>Hi,</p>'
-                . '<p>We received a request to change the email on your Aura account from <strong>%1$s</strong> to <strong>%2$s</strong>. Click the link below to confirm:</p>'
+                . '<p>We received a request to change the email on your Madori account from <strong>%1$s</strong> to <strong>%2$s</strong>. Click the link below to confirm:</p>'
                 . '<p><a href="%3$s">%3$s</a></p>'
                 . '<p>This link expires in %4$d hour(s). If you did not request this change, you can safely ignore this email &mdash; your account email won&rsquo;t change unless you click the link.</p>'
-                . '<p>&mdash; Aura</p>',
+                . '<p>&mdash; Madori</p>',
                 htmlspecialchars($user->getEmail()),
                 htmlspecialchars($newEmail),
                 htmlspecialchars($confirmUrl),
@@ -226,19 +226,19 @@ class EmailChangeController extends AbstractController
             $revertToken,
         );
         $resetUrl = sprintf('%s/forgot-password', rtrim($this->frontendUrl, '/'));
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $email = (new Email())
             ->from($from)
             ->to($changeRequest->getOldEmail())
-            ->subject('Your Aura email address was changed')
+            ->subject('Your Madori email address was changed')
             ->text(sprintf(
                 "Hi,\n\n"
-                . "The email on your Aura account was changed from %s to %s.\n\n"
+                . "The email on your Madori account was changed from %s to %s.\n\n"
                 . "If this was you, no action is needed.\n\n"
                 . "If it wasn't, you can undo the change here:\n%s\n\n"
                 . "And reset your password to lock down the account:\n%s\n\n"
-                . "The undo link expires in %d days.\n\n— Aura",
+                . "The undo link expires in %d days.\n\n— Madori",
                 $changeRequest->getOldEmail(),
                 $changeRequest->getNewEmail(),
                 $revertUrl,
@@ -247,11 +247,11 @@ class EmailChangeController extends AbstractController
             ))
             ->html(sprintf(
                 '<p>Hi,</p>'
-                . '<p>The email on your Aura account was changed from <strong>%1$s</strong> to <strong>%2$s</strong>.</p>'
+                . '<p>The email on your Madori account was changed from <strong>%1$s</strong> to <strong>%2$s</strong>.</p>'
                 . '<p>If this was you, no action is needed.</p>'
                 . '<p>If it wasn&rsquo;t, you can <a href="%3$s">undo the change</a> and then <a href="%4$s">reset your password</a> to lock the account down.</p>'
                 . '<p>The undo link expires in %5$d days.</p>'
-                . '<p>&mdash; Aura</p>',
+                . '<p>&mdash; Madori</p>',
                 htmlspecialchars($changeRequest->getOldEmail()),
                 htmlspecialchars($changeRequest->getNewEmail()),
                 htmlspecialchars($revertUrl),

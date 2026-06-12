@@ -27,7 +27,7 @@ final class SpaceExportMailer
 
     public function sendExportReady(SpaceExport $export, string $plainToken): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
         $recipient = $export->getRequestedBy();
 
         $email = (new TemplatedEmail())

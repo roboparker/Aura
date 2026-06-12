@@ -65,7 +65,7 @@ class WaitlistTest extends ApiTestCase
         $email = $this->getMailerMessage();
         self::assertNotNull($email);
         $this->assertEmailAddressContains($email, 'To', 'waiter@example.com');
-        $this->assertEmailHeaderSame($email, 'Subject', "You're on the Aura waitlist");
+        $this->assertEmailHeaderSame($email, 'Subject', "You're on the Madori waitlist");
 
         $user = $this->reloadUser('waiter@example.com');
         $this->assertTrue($user->isWaitlisted());

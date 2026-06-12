@@ -1,14 +1,14 @@
 # Exporting your data
 
-You can download a copy of everything you've created in Aura — your profile, your settings, the content you authored, and the files you uploaded. This supports your right to a copy of your personal data under regulations like the GDPR and CCPA.
+You can download a copy of everything you've created in Madori — your profile, your settings, the content you authored, and the files you uploaded. This supports your right to a copy of your personal data under regulations like the GDPR and CCPA.
 
 ## Request your export
 
 1. Go to **Settings → Danger zone**.
 2. Under **Export my data**, click **Request export**.
 3. Confirm it's you: enter your **authentication code** if you have two-factor enabled, otherwise your **current password**.
-4. Aura starts building your archive in the background and shows a confirmation. You can close the dialog — you don't need to wait on the page.
-5. When the archive is ready, we email you a **download link**. Open the email and click through; you'll need to be signed in to Aura as yourself to download the file.
+4. Madori starts building your archive in the background and shows a confirmation. You can close the dialog — you don't need to wait on the page.
+5. When the archive is ready, we email you a **download link**. Open the email and click through; you'll need to be signed in to Madori as yourself to download the file.
 
 Building can take anywhere from a few seconds to a few minutes depending on how much content and how many files you have.
 
@@ -29,10 +29,10 @@ The export only contains **your own** data. Other people's content is referenced
 
 ## If the link has expired
 
-If you open the link and Aura says the export has expired, the 7-day window has passed and the archive has been deleted. Go back to **Settings → Danger zone** and request a fresh export.
+If you open the link and Madori says the export has expired, the 7-day window has passed and the archive has been deleted. Go back to **Settings → Danger zone** and request a fresh export.
 
 ## Still waiting for the email?
 
-- Check your spam or junk folder for a message from `no-reply@aura.test` (or your deployment's configured sender).
+- Check your spam or junk folder for a message from `no-reply@madori.test` (or your deployment's configured sender).
 - Large archives take longer to build. Give it a few minutes before assuming something went wrong.
 - If it never arrives, request the export again — and if that still fails, contact your administrator.

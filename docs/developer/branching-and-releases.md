@@ -2,7 +2,7 @@
 
 ## Overview
 
-Aura follows **GitHub Flow** — a lightweight, branch-based workflow where `main` is always deployable and all changes arrive via pull requests. Releases are tagged with **date-based build numbers**.
+Madori follows **GitHub Flow** — a lightweight, branch-based workflow where `main` is always deployable and all changes arrive via pull requests. Releases are tagged with **date-based build numbers**.
 
 There are exactly **two long-lived branches**:
 

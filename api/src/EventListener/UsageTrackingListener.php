@@ -30,7 +30,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
 final class UsageTrackingListener implements EventSubscriberInterface
 {
     /** Request attribute the resolved user is stashed under between request and terminate. */
-    private const USER_ATTR = '_aura_usage_user';
+    private const USER_ATTR = '_madori_usage_user';
 
     public function __construct(
         private Security $security,

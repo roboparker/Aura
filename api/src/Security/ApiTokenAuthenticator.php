@@ -19,7 +19,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
 
 /**
  * Authenticates `/mcp/*` requests from the `Authorization: Bearer
- * aura_pat_…` header. The plaintext is sha256-hashed and looked up
+ * madori_pat_…` header. The plaintext is sha256-hashed and looked up
  * against {@see ApiToken::tokenHash}; on a hit we attach the owning
  * {@see User} to the security token and stamp `lastUsedAt` so the
  * management UI can surface dormant tokens.
@@ -30,7 +30,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  */
 final class ApiTokenAuthenticator extends AbstractAuthenticator
 {
-    public const TOKEN_ATTR = '_aura_api_token';
+    public const TOKEN_ATTR = '_madori_api_token';
 
     public function __construct(
         private ApiTokenRepository $tokens,
@@ -92,7 +92,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator
         return new JsonResponse(
             ['error' => '' !== $messageKey ? $messageKey : 'Authentication failed.'],
             Response::HTTP_UNAUTHORIZED,
-            ['WWW-Authenticate' => 'Bearer realm="aura"'],
+            ['WWW-Authenticate' => 'Bearer realm="madori"'],
         );
     }
 

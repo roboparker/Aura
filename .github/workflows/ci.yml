@@ -290,7 +290,7 @@ jobs:
         run: docker compose -f compose.yaml -f compose.e2e.yaml up --wait --no-build
       -
         name: Load fixtures
-        # Fixture users (admin@aura.test / user@aura.test) are required by
+        # Fixture users (admin@madori.test / user@madori.test) are required by
         # several auth and admin E2E tests. Migrations run via the PHP
         # container entrypoint, but fixtures must be loaded explicitly.
         run: docker compose exec -T php bin/console doctrine:fixtures:load --no-interaction

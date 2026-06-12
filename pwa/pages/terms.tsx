@@ -6,10 +6,10 @@ const LAST_UPDATED = "June 9, 2026";
 const Terms = () => (
   <>
     <Head>
-      <title>Terms and Conditions — Aura</title>
+      <title>Terms and Conditions — Madori</title>
       <meta
         name="description"
-        content="The terms and conditions that govern your use of Aura."
+        content="The terms and conditions that govern your use of Madori."
       />
     </Head>
 
@@ -28,7 +28,7 @@ const Terms = () => (
           <section>
             <p className="text-muted-foreground">
               These Terms and Conditions (&quot;Terms&quot;) govern your access
-              to and use of Aura (the &quot;Service&quot;), operated by Robert
+              to and use of Madori (the &quot;Service&quot;), operated by Robert
               Parker (&quot;we&quot;, &quot;us&quot;). By creating an account or
               using the Service, you agree to be bound by these Terms. If you
               do not agree, do not use the Service.

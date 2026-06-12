@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import AuraWordmark from "@/components/auth/AuraWordmark";
+import MadoriWordmark from "@/components/auth/MadoriWordmark";
 import {
   DeleteAccountDialog,
   ExportDataDialog,
@@ -67,10 +67,10 @@ const Waitlist: NextPage = () => {
   return (
     <>
       <Head>
-        <title>You&apos;re on the waitlist - Aura</title>
+        <title>You&apos;re on the waitlist - Madori</title>
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
-        <AuraWordmark />
+        <MadoriWordmark />
         <Card className="w-full max-w-lg overflow-hidden">
           <CardHeader className="items-center text-center">
             <span className="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -78,7 +78,7 @@ const Waitlist: NextPage = () => {
             </span>
             <CardTitle className="text-2xl font-bold">You&apos;re on the waitlist</CardTitle>
             <CardDescription className="text-base">
-              Aura isn&apos;t open to everyone just yet. We&apos;re onboarding
+              Madori isn&apos;t open to everyone just yet. We&apos;re onboarding
               people in batches.
             </CardDescription>
           </CardHeader>

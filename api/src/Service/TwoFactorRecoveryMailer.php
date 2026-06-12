@@ -40,14 +40,14 @@ final class TwoFactorRecoveryMailer
         $accountUrl = $this->url('/account');
         $this->dispatch(
             $user,
-            'A recovery code was used on your Aura account',
+            'A recovery code was used on your Madori account',
             sprintf(
-                "Hi,\n\nA recovery code was just used to sign in to your Aura account (%s).\n\nIf this was you, you'll be prompted to either re-enroll a new authenticator or turn off two-factor authentication on your next page load. If this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Aura",
+                "Hi,\n\nA recovery code was just used to sign in to your Madori account (%s).\n\nIf this was you, you'll be prompted to either re-enroll a new authenticator or turn off two-factor authentication on your next page load. If this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Madori",
                 $user->getEmail(),
                 $accountUrl,
             ),
             sprintf(
-                '<p>Hi,</p><p>A recovery code was just used to sign in to your Aura account (%1$s).</p><p>If this was you, you\'ll be prompted to either re-enroll a new authenticator or turn off two-factor authentication on your next page load.</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Aura</p>',
+                '<p>Hi,</p><p>A recovery code was just used to sign in to your Madori account (%1$s).</p><p>If this was you, you\'ll be prompted to either re-enroll a new authenticator or turn off two-factor authentication on your next page load.</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Madori</p>',
                 htmlspecialchars($user->getEmail()),
                 htmlspecialchars($accountUrl),
             ),
@@ -61,12 +61,12 @@ final class TwoFactorRecoveryMailer
             $user,
             'Two-factor authentication was disabled',
             sprintf(
-                "Hi,\n\nTwo-factor authentication was just disabled on your Aura account (%s).\n\nIf this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Aura",
+                "Hi,\n\nTwo-factor authentication was just disabled on your Madori account (%s).\n\nIf this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Madori",
                 $user->getEmail(),
                 $accountUrl,
             ),
             sprintf(
-                '<p>Hi,</p><p>Two-factor authentication was just disabled on your Aura account (%1$s).</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Aura</p>',
+                '<p>Hi,</p><p>Two-factor authentication was just disabled on your Madori account (%1$s).</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Madori</p>',
                 htmlspecialchars($user->getEmail()),
                 htmlspecialchars($accountUrl),
             ),
@@ -80,12 +80,12 @@ final class TwoFactorRecoveryMailer
             $user,
             'A new authenticator was enrolled for your account',
             sprintf(
-                "Hi,\n\nA new two-factor authenticator was just enrolled on your Aura account (%s). Your previous recovery codes are no longer valid — you'll see a fresh set in your security settings.\n\nIf this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Aura",
+                "Hi,\n\nA new two-factor authenticator was just enrolled on your Madori account (%s). Your previous recovery codes are no longer valid — you'll see a fresh set in your security settings.\n\nIf this wasn't you, sign in and change your password immediately:\n\n%s\n\n— Madori",
                 $user->getEmail(),
                 $accountUrl,
             ),
             sprintf(
-                '<p>Hi,</p><p>A new two-factor authenticator was just enrolled on your Aura account (%1$s). Your previous recovery codes are no longer valid — you\'ll see a fresh set in your security settings.</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Aura</p>',
+                '<p>Hi,</p><p>A new two-factor authenticator was just enrolled on your Madori account (%1$s). Your previous recovery codes are no longer valid — you\'ll see a fresh set in your security settings.</p><p>If this wasn\'t you, <a href="%2$s">sign in and change your password immediately</a>.</p><p>— Madori</p>',
                 htmlspecialchars($user->getEmail()),
                 htmlspecialchars($accountUrl),
             ),
@@ -101,7 +101,7 @@ final class TwoFactorRecoveryMailer
 
         $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom)
             ? $this->mailerFrom
-            : 'no-reply@aura.test';
+            : 'no-reply@madori.test';
 
         $message = (new Email())
             ->from($from)

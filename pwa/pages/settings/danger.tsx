@@ -183,7 +183,7 @@ const DeleteCard = ({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Permanently removes your Aura account. This cannot be undone.
+          Permanently removes your Madori account. This cannot be undone.
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {DELETE_CONSEQUENCES.map((c) => (

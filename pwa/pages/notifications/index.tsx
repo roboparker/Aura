@@ -113,7 +113,7 @@ const NotificationsPage = () => {
   return (
     <>
       <Head>
-        <title>Notifications - Aura</title>
+        <title>Notifications - Madori</title>
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="mx-auto max-w-3xl space-y-5 px-4 py-8">

@@ -242,19 +242,19 @@ class PasswordController extends AbstractController
     private function sendResetEmail(User $user, string $plainToken): void
     {
         $resetUrl = sprintf('%s/reset-password?token=%s', rtrim($this->frontendUrl, '/'), $plainToken);
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $email = (new Email())
             ->from($from)
             ->to($user->getEmail())
-            ->subject('Reset your Aura password')
+            ->subject('Reset your Madori password')
             ->text(sprintf(
-                "Hi,\n\nWe received a request to reset your Aura password. Click the link below to set a new password:\n\n%s\n\nThis link expires in %d hour(s). If you did not request a password reset, you can safely ignore this email.\n\n— Aura",
+                "Hi,\n\nWe received a request to reset your Madori password. Click the link below to set a new password:\n\n%s\n\nThis link expires in %d hour(s). If you did not request a password reset, you can safely ignore this email.\n\n— Madori",
                 $resetUrl,
                 self::RESET_TOKEN_TTL_HOURS,
             ))
             ->html(sprintf(
-                '<p>Hi,</p><p>We received a request to reset your Aura password. Click the link below to set a new password:</p><p><a href="%1$s">%1$s</a></p><p>This link expires in %2$d hour(s). If you did not request a password reset, you can safely ignore this email.</p><p>— Aura</p>',
+                '<p>Hi,</p><p>We received a request to reset your Madori password. Click the link below to set a new password:</p><p><a href="%1$s">%1$s</a></p><p>This link expires in %2$d hour(s). If you did not request a password reset, you can safely ignore this email.</p><p>— Madori</p>',
                 htmlspecialchars($resetUrl),
                 self::RESET_TOKEN_TTL_HOURS,
             ));

@@ -54,7 +54,7 @@ class InviteFixtures extends Fixture implements DependentFixtureInterface
 
         // 1. Pending — links a new signup to a space + a group, invited by Uma.
         $pending = new UserInvite(
-            'newcomer@aura.test',
+            'newcomer@madori.test',
             hash('sha256', 'pending-invite-fixture'),
             $now->modify('+6 days'),
         );
@@ -66,7 +66,7 @@ class InviteFixtures extends Fixture implements DependentFixtureInterface
         //    Invited by Noah so the expired screen's "ask the sender" copy
         //    isn't always Uma.
         $expired = new UserInvite(
-            'expired-invite@aura.test',
+            'expired-invite@madori.test',
             hash('sha256', 'expired-invite-fixture'),
             $now->modify('-7 days'),
         );
@@ -77,7 +77,7 @@ class InviteFixtures extends Fixture implements DependentFixtureInterface
         //    lookup returns status='accepted' and the PWA shows the
         //    "this invite was already used" screen.
         $accepted = new UserInvite(
-            'accepted-invite@aura.test',
+            'accepted-invite@madori.test',
             hash('sha256', 'accepted-invite-fixture'),
             $now->modify('+6 days'),
         );

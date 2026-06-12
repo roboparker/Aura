@@ -131,7 +131,7 @@ const Groups = () => {
   return (
     <>
       <Head>
-        <title>Groups - Aura</title>
+        <title>Groups - Madori</title>
       </Head>
 
       <main className="px-6 py-8 max-w-6xl mx-auto">

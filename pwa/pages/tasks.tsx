@@ -1039,7 +1039,7 @@ const Tasks = () => {
   return (
     <>
       <Head>
-        <title>{pageTitle} - Aura</title>
+        <title>{pageTitle} - Madori</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-7xl mx-auto">

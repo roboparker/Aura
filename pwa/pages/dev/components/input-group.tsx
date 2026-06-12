@@ -42,7 +42,7 @@ const InputGroupPage = () => (
   </InputGroupAddon>
   <InputGroupInput placeholder="username" />
   <InputGroupAddon align="inline-end">
-    <InputGroupText>@aura.dev</InputGroupText>
+    <InputGroupText>@madori.dev</InputGroupText>
   </InputGroupAddon>
 </InputGroup>`,
         preview: (
@@ -53,7 +53,7 @@ const InputGroupPage = () => (
               </InputGroupAddon>
               <InputGroupInput placeholder="username" />
               <InputGroupAddon align="inline-end">
-                <InputGroupText>@aura.dev</InputGroupText>
+                <InputGroupText>@madori.dev</InputGroupText>
               </InputGroupAddon>
             </InputGroup>
           </div>

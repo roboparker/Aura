@@ -69,7 +69,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['token_hash'], name: 'idx_api_token_hash')]
 class ApiToken
 {
-    public const PLAINTEXT_PREFIX = 'aura_pat_';
+    public const PLAINTEXT_PREFIX = 'madori_pat_';
 
     public const MAX_NAME_LENGTH = 80;
 
@@ -99,7 +99,7 @@ class ApiToken
     private ?User $user = null;
 
     /**
-     * sha256 of the full plaintext (including the `aura_pat_` prefix).
+     * sha256 of the full plaintext (including the `madori_pat_` prefix).
      * 64-char hex column matches the existing PasswordResetToken layout.
      */
     #[ORM\Column(length: 64, unique: true)]
@@ -141,7 +141,7 @@ class ApiToken
 
     /**
      * Transient. Populated by the create processor with the plaintext
-     * bearer (`aura_pat_…`) so it can be returned exactly once in the
+     * bearer (`madori_pat_…`) so it can be returned exactly once in the
      * POST response. Never persisted, never read from a fresh entity.
      */
     #[Groups(['api_token:create'])]

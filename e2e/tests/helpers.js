@@ -121,7 +121,7 @@ const FIXTURE_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
  */
 async function signInAsFixtureUser(page) {
   await page.goto(`${BASE_URL}/signin`);
-  await page.fill("#email", "user@aura.test");
+  await page.fill("#email", "user@madori.test");
   await page.fill("#password", "user123");
   await page.click('button[type="submit"]');
 

@@ -16,7 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import AuraWordmark from "./AuraWordmark";
+import MadoriWordmark from "./MadoriWordmark";
 import AvatarColorPicker from "./AvatarColorPicker";
 import InviteSignup from "./InviteSignup";
 import SignInForm from "./SignInForm";
@@ -63,13 +63,13 @@ interface CopyEntry {
 const COPY: Record<Tab, { title: string; subtitle: string; switchLabel: string; switchCta: string; switchPath: string }> = {
   signin: {
     title: "Welcome back",
-    subtitle: "Sign in to your Aura workspace.",
-    switchLabel: "New to Aura?",
+    subtitle: "Sign in to your Madori workspace.",
+    switchLabel: "New to Madori?",
     switchCta: "Create an account",
     switchPath: "/signup",
   },
   signup: {
-    title: "Create your Aura account",
+    title: "Create your Madori account",
     subtitle: "Free for individual use. Add teammates anytime.",
     switchLabel: "Already have an account?",
     switchCta: "Sign in",
@@ -81,12 +81,12 @@ const COPY: Record<Tab, { title: string; subtitle: string; switchLabel: string; 
 const SIGNUP_COLOR_COPY: { title: string; subtitle: string } = {
   title: "Pick your avatar color",
   subtitle:
-    "Your initials show up everywhere in Aura. Pick a color you'll recognize at a glance — you can change it later.",
+    "Your initials show up everywhere in Madori. Pick a color you'll recognize at a glance — you can change it later.",
 };
 
 /** Header copy when the instance is in waitlist mode (signup form step). */
 const WAITLIST_SIGNUP_COPY: { title: string; subtitle: string } = {
-  title: "Join the Aura waitlist",
+  title: "Join the Madori waitlist",
   subtitle:
     "We're onboarding people in batches. Claim your spot and we'll email you the moment your account is ready.",
 };
@@ -254,7 +254,7 @@ const AuthCard = ({ defaultTab }: Props) => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
-      <AuraWordmark />
+      <MadoriWordmark />
       <Card className="w-full max-w-lg overflow-hidden p-0">
         {cardCopy && !isInviteSignup && (
           <CardHeader className="p-8 pb-6">

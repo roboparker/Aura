@@ -62,10 +62,10 @@ test.describe("Settings", () => {
     await page.getByTestId("api-token-name").fill("ci-test");
     await page.getByTestId("api-token-create").click();
 
-    // One-time plaintext shown, prefixed with aura_pat_.
+    // One-time plaintext shown, prefixed with madori_pat_.
     const plaintext = page.getByTestId("api-token-plaintext");
     await expect(plaintext).toBeVisible();
-    await expect(plaintext).toContainText("aura_pat_");
+    await expect(plaintext).toContainText("madori_pat_");
     await page.getByTestId("api-token-done").click();
 
     // Row appears; revoke it (the confirm() prompt is auto-accepted above).
@@ -91,7 +91,7 @@ test.describe("Settings", () => {
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/settings/profile`);
 
-    // Aura is dark-only: the appearance/theme picker is gone and the
+    // Madori is dark-only: the appearance/theme picker is gone and the
     // document is always tagged `dark`.
     await expect(
       page.locator('[data-testid="settings-appearance"]'),

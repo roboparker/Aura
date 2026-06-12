@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="Aura API">
-    <description>PHP_CodeSniffer ruleset for the Aura API — PSR-12 with a few project-specific tweaks.</description>
+<ruleset name="Madori API">
+    <description>PHP_CodeSniffer ruleset for the Madori API — PSR-12 with a few project-specific tweaks.</description>
 
     <file>src</file>
     <file>tests</file>
