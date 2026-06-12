@@ -35,6 +35,12 @@ parameters:
     app.space_export_dir: '%kernel.project_dir%/var/exports'
     app.space_export_retention_days: 7
 
+    # Account (GDPR) data exports share the same on-disk conventions as space
+    # exports — a zip under var/exports (filename-prefixed account-export-*),
+    # gated behind the authenticated token endpoint, pruned after N days.
+    app.account_export_dir: '%kernel.project_dir%/var/exports'
+    app.account_export_retention_days: 7
+
     # Per-user usage tracking (App\Service\UsageSnapshotBuilder /
     # CaptureUsageSnapshotHandler). `row_overhead_bytes` is the fixed
     # per-row cost folded into the logical db-size estimate (fixed

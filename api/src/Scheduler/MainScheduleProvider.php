@@ -5,6 +5,7 @@ namespace App\Scheduler;
 use App\Message\CaptureUsageSnapshot;
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
+use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
 use App\Message\RunBackup;
 use Symfony\Component\Lock\LockFactory;
@@ -76,6 +77,11 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // App\Service\SpaceExportPruner). 03:30 keeps it clear of
                 // the backup run.
                 RecurringMessage::cron('30 3 * * *', new PruneSpaceExports(), $utc),
+                // Account-export retention: same window as space exports
+                // (app.account_export_retention_days, default 7 —
+                // App\Service\AccountExportPruner). 03:45 keeps it clear of
+                // the space-export prune.
+                RecurringMessage::cron('45 3 * * *', new PruneAccountExports(), $utc),
                 // Per-user usage rollup: snapshot yesterday's disk/db/call
                 // usage + prune spent counter buckets (App\Service\
                 // UsageSnapshotBuilder). 03:15 lands after midnight (so the

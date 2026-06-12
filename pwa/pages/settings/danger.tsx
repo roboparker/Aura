@@ -146,8 +146,9 @@ const ExportCard = ({ twoFactorEnabled }: { twoFactorEnabled: boolean }) => {
       </CardHeader>
       <CardContent className="flex items-center justify-between gap-4">
         <p className="text-sm text-muted-foreground">
-          Download a JSON file of your profile, preferences, and the content you
-          authored.
+          Build a zip of your profile, preferences, the content you authored,
+          and the files you uploaded. We&apos;ll email you a download link when
+          it&apos;s ready — links expire after 7 days.
         </p>
         <Button type="button" variant="outline" onClick={() => setOpen(true)} data-testid="export-open">
           <Download className="mr-1 h-4 w-4" /> Request export

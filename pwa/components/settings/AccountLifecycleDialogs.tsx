@@ -63,6 +63,14 @@ export const ExportDataDialog = ({
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
+
+  const close = () => {
+    onOpenChange(false);
+    setValue("");
+    setError(null);
+    setDone(null);
+  };
 
   const submit = async () => {
     setSubmitting(true);
@@ -74,18 +82,21 @@ export const ExportDataDialog = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(stepUpBody(twoFactorEnabled, value)),
       });
+      if (res.status === 409) {
+        // An export is already being prepared — treat as success.
+        setDone(
+          "An export is already being prepared — we'll email you the download link when it's ready.",
+        );
+        setValue("");
+        return;
+      }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to export.");
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "aura-export.json";
-      a.click();
-      URL.revokeObjectURL(url);
-      onOpenChange(false);
+      setDone(
+        "Export started. We'll email you a download link when it's ready — the link expires after 7 days.",
+      );
       setValue("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed.");
@@ -95,31 +106,50 @@ export const ExportDataDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Export your data</DialogTitle>
-          <DialogDescription>Confirm to download your data.</DialogDescription>
+          <DialogDescription>
+            {done
+              ? "Check your inbox."
+              : "We'll build a zip of your data and email you a download link when it's ready."}
+          </DialogDescription>
         </DialogHeader>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        <StepUpField twoFactorEnabled={twoFactorEnabled} value={value} onChange={setValue} />
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void submit()}
-            disabled={submitting || value.trim() === ""}
-            data-testid="export-confirm"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Download"}
-          </Button>
-        </DialogFooter>
+        {done ? (
+          <>
+            <Alert>
+              <AlertDescription>{done}</AlertDescription>
+            </Alert>
+            <DialogFooter>
+              <Button type="button" onClick={close} data-testid="export-done">
+                Done
+              </Button>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <StepUpField twoFactorEnabled={twoFactorEnabled} value={value} onChange={setValue} />
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={close} disabled={submitting}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submit()}
+                disabled={submitting || value.trim() === ""}
+                data-testid="export-confirm"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Request export"}
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
