@@ -117,7 +117,10 @@ jobs:
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
               "set -euo pipefail
-               cd /opt/madori
+               # Server checkout dir stays /opt/aura even though the product is
+               # 'Madori': renaming it changes the Compose project name and would
+               # orphan the named volumes (Postgres data included).
+               cd /opt/aura
                git fetch -q origin production
                git checkout -q production
                git reset -q --hard origin/production
