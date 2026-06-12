@@ -147,14 +147,13 @@ class WaitlistTest extends ApiTestCase
 
         $client->loginUser($user);
 
-        // Export works despite the missing ROLE_USER.
+        // Export works despite the missing ROLE_USER — it now queues an
+        // async build and returns 202 (the link is emailed when ready).
         $client->request('POST', '/me/export', [
             'json' => ['currentPassword' => 'Password123!@#'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseIsSuccessful();
-        $profile = $this->arrayField($this->body($client), 'profile');
-        $this->assertSame('leaver@example.com', $profile['email']);
+        $this->assertResponseStatusCodeSame(202);
 
         // Delete works too, and reaps the personal space with the account.
         $client->request('POST', '/me/delete', [

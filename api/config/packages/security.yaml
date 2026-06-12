@@ -77,6 +77,11 @@ security:
         # controller only operates on the current user and every action is
         # step-up protected via SensitiveActionVerifier.
         - { path: ^/me/(deactivate|export|delete)$, roles: IS_AUTHENTICATED_FULLY }
+        # Account-export download landing: status + zip for the requester's
+        # GDPR export. Reachable by any fully-authenticated account (a
+        # waitlisted one too) so the emailed link works while waiting; the
+        # controller resolves the token only for the requester.
+        - { path: ^/account-exports/, roles: IS_AUTHENTICATED_FULLY }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
         # User segments (A/B tests, beta gating, rollouts) — platform admins
