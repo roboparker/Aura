@@ -326,7 +326,7 @@ const ProjectDetail = () => {
   return (
     <>
       <Head>
-        <title>{project ? `${project.title} - Aura` : "Project - Aura"}</title>
+        <title>{project ? `${project.title} - Madori` : "Project - Madori"}</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">

@@ -43,7 +43,7 @@ fi
 
 # Stable project slug from the worktree directory name.
 slug="$(basename "$ROOT" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/^-*//;s/-*$//')"
-project="aura-${slug:-main}"
+project="madori-${slug:-main}"
 
 if [ "$is_main_worktree" = "1" ]; then
   https_port=443

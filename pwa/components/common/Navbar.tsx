@@ -26,7 +26,7 @@ const Navbar = () => {
     <nav className="border-b bg-background">
       <div className="px-4 py-3 flex items-center gap-3">
         <div className="flex items-center gap-1 shrink-0">
-          {/* Signed-out viewers get the Aura wordmark as the home
+          {/* Signed-out viewers get the Madori wordmark as the home
               anchor; signed-in viewers get the Breadcrumbs trail
               below (with its own Home icon), so the wordmark would
               be redundant. Developer-facing doc links (API reference,
@@ -37,7 +37,7 @@ const Navbar = () => {
               href="/"
               className="font-bold text-lg no-underline text-foreground mr-2"
             >
-              Aura
+              Madori
             </Link>
           )}
         </div>

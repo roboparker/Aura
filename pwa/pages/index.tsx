@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 /* ────────────────────────────────────────────────────────────────────────
  * Logged-out marketing homepage.
  *
- * Translated from the "Landing Page" design in the Aura design file, mapped
+ * Translated from the "Landing Page" design in the Madori design file, mapped
  * onto the app's real tokens (primary = brand teal, card/muted/border) and
  * Tailwind/shadcn primitives. The top nav + footer come from the app shell
  * (Navbar + Footer in Layout), so this page renders hero → features →
@@ -551,10 +551,10 @@ const Home = () => {
   return (
     <>
       <Head>
-        <title>Aura — one calm place for your team&apos;s work</title>
+        <title>Madori — one calm place for your team&apos;s work</title>
         <meta
           name="description"
-          content="Aura organizes tasks, projects, long-form docs, and discussions into shared Spaces. A calm, collaborative workspace for small teams — no bloat, no busywork."
+          content="Madori organizes tasks, projects, long-form docs, and discussions into shared Spaces. A calm, collaborative workspace for small teams — no bloat, no busywork."
         />
       </Head>
 

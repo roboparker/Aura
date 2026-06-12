@@ -44,7 +44,7 @@ const TermsConsentField = ({ name = "acceptTerms" }: { name?: string }) => {
             showError && "text-destructive",
           )}
         >
-          I agree to Aura&apos;s{" "}
+          I agree to Madori&apos;s{" "}
           <Link
             href="/terms"
             target="_blank"

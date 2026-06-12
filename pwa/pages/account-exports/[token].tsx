@@ -157,7 +157,7 @@ const AccountExportDownloadPage = () => {
   return (
     <>
       <Head>
-        <title>Data export - Aura</title>
+        <title>Data export - Madori</title>
       </Head>
       <div className="container mx-auto max-w-lg px-4 py-16">
         <Card>

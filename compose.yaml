@@ -19,7 +19,7 @@ services:
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}
       MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
-      MAILER_FROM: ${MAILER_FROM:-no-reply@aura.test}
+      MAILER_FROM: ${MAILER_FROM:-no-reply@madori.test}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       # Hostname for the Umami dashboard site block in the Caddyfile.
@@ -92,7 +92,7 @@ services:
       SERVER_NAME: php-worker
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-16}&charset=${POSTGRES_CHARSET:-utf8}
       MAILER_DSN: ${MAILER_DSN:-smtp://mailpit:1025}
-      MAILER_FROM: ${MAILER_FROM:-no-reply@aura.test}
+      MAILER_FROM: ${MAILER_FROM:-no-reply@madori.test}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}

@@ -180,7 +180,7 @@ const Projects = () => {
   return (
     <>
       <Head>
-        <title>Projects - Aura</title>
+        <title>Projects - Madori</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">

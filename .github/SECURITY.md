@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in Aura, please report it responsibly. **Do not open a public issue.**
+If you discover a security vulnerability in Madori, please report it responsibly. **Do not open a public issue.**
 
 Instead, please report vulnerabilities via [GitHub's private vulnerability reporting](https://github.com/roboparker/Aura/security/advisories/new).
 
@@ -19,7 +19,7 @@ Only the latest release on `main` is actively supported with security updates.
 
 ## Scope
 
-This policy covers the Aura application code including:
+This policy covers the Madori application code including:
 
 - API (PHP/Symfony backend)
 - PWA (Next.js frontend)

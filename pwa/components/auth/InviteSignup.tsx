@@ -699,7 +699,7 @@ function mailtoFor(email: string): string | null {
   if (!SAFE_EMAIL_RE.test(email)) return null;
   const [local, domain] = email.split("@");
   const subject = encodeURIComponent(
-    "Aura invite expired — could you send a fresh one?",
+    "Madori invite expired — could you send a fresh one?",
   );
   return `mailto:${encodeURIComponent(local)}@${encodeURIComponent(domain)}?subject=${subject}`;
 }

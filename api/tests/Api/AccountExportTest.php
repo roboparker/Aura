@@ -190,7 +190,7 @@ class AccountExportTest extends ApiTestCase
 
         // Seed a prior completed export, with a real file on disk to prove
         // the supersede deletes both row and file.
-        $oldFile = tempnam(sys_get_temp_dir(), 'aura-account-export-old-');
+        $oldFile = tempnam(sys_get_temp_dir(), 'madori-account-export-old-');
         $this->assertIsString($oldFile);
         $previous = new AccountExport($alice);
         $previous->setStatus(AccountExport::STATUS_COMPLETED);
@@ -226,7 +226,7 @@ class AccountExportTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
 
-        $expiredFile = tempnam(sys_get_temp_dir(), 'aura-account-export-test-');
+        $expiredFile = tempnam(sys_get_temp_dir(), 'madori-account-export-test-');
         $this->assertIsString($expiredFile);
 
         $expired = new AccountExport($alice);

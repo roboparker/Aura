@@ -73,7 +73,7 @@ const ConfirmEmailChange = () => {
   return (
     <>
       <Head>
-        <title>Confirm Email Change - Aura</title>
+        <title>Confirm Email Change - Madori</title>
       </Head>
       <main className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-md">

@@ -68,7 +68,7 @@ const RevertEmailChange = () => {
   return (
     <>
       <Head>
-        <title>Undo Email Change - Aura</title>
+        <title>Undo Email Change - Madori</title>
       </Head>
       <main className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-md">

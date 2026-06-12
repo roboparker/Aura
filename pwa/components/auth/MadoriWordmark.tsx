@@ -1,9 +1,9 @@
 /**
- * Aura logo + wordmark for the auth pages. The icon is a rounded outline
+ * Madori logo + wordmark for the auth pages. The icon is a rounded outline
  * square with an inner solid square in the brand teal, surrounded by a
  * soft glow via `drop-shadow`. Sized for the sign-in / sign-up header.
  */
-const AuraWordmark = () => (
+const MadoriWordmark = () => (
   <div className="flex items-center gap-3">
     <svg
       viewBox="0 0 32 32"
@@ -11,7 +11,7 @@ const AuraWordmark = () => (
       height="40"
       fill="none"
       aria-hidden="true"
-      className="text-primary animate-aura-glow"
+      className="text-primary animate-madori-glow"
     >
       {/* Solid background-coloured inner rect fills the hollow center
           so `drop-shadow` only paints a glow around the OUTER edge of
@@ -35,8 +35,8 @@ const AuraWordmark = () => (
         strokeWidth="5"
       />
     </svg>
-    <span className="text-3xl font-bold tracking-tight text-foreground">Aura</span>
+    <span className="text-3xl font-bold tracking-tight text-foreground">Madori</span>
   </div>
 );
 
-export default AuraWordmark;
+export default MadoriWordmark;

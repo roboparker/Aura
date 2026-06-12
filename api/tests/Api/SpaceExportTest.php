@@ -266,7 +266,7 @@ class SpaceExportTest extends ApiTestCase
 
         // Seed a prior completed export for this space, with a real file
         // on disk to prove the supersede deletes both row and file.
-        $oldFile = tempnam(sys_get_temp_dir(), 'aura-export-old-');
+        $oldFile = tempnam(sys_get_temp_dir(), 'madori-export-old-');
         $this->assertIsString($oldFile);
         $previous = new SpaceExport($space, $alice);
         $previous->setStatus(SpaceExport::STATUS_COMPLETED);
@@ -304,7 +304,7 @@ class SpaceExportTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Shared');
 
-        $expiredFile = tempnam(sys_get_temp_dir(), 'aura-export-test-');
+        $expiredFile = tempnam(sys_get_temp_dir(), 'madori-export-test-');
         $this->assertIsString($expiredFile);
 
         $expired = new SpaceExport($space, $alice);

@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Pending invitation for an email address to create an Aura account. There
+ * Pending invitation for an email address to create an Madori account. There
  * is at most one UserInvite per email — repeat invites add additional
  * GroupInvite rows under the existing UserInvite rather than starting a
  * parallel one. That way a single signup email and token covers every

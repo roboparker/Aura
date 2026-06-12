@@ -185,7 +185,7 @@ const AdminWaitlist: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Aura</title>
+          <title>Access Denied - Madori</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -204,7 +204,7 @@ const AdminWaitlist: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Waitlist - Aura Admin</title>
+        <title>Waitlist - Madori Admin</title>
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto space-y-6">
@@ -230,7 +230,7 @@ const AdminWaitlist: NextPage = () => {
             <CardHeader>
               <CardTitle>Waitlist mode</CardTitle>
               <CardDescription>
-                When on, new sign-ups join the waitlist and can&apos;t use Aura
+                When on, new sign-ups join the waitlist and can&apos;t use Madori
                 until you open signups. Turning it off grants access to everyone
                 waiting and emails them.
               </CardDescription>

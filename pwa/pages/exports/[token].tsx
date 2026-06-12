@@ -161,7 +161,7 @@ const ExportDownloadPage = () => {
   return (
     <>
       <Head>
-        <title>Space export - Aura</title>
+        <title>Space export - Madori</title>
       </Head>
       <div className="container mx-auto max-w-lg px-4 py-16">
         <Card>

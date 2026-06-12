@@ -64,7 +64,7 @@ const ApiTokensTable = () => {
     <div className="space-y-3" data-testid="api-tokens">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Use these to authenticate Aura&apos;s REST + MCP APIs as you.
+          Use these to authenticate Madori&apos;s REST + MCP APIs as you.
         </p>
         <Button
           type="button"

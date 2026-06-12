@@ -117,7 +117,7 @@ jobs:
               -o StrictHostKeyChecking=yes \
               "${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}" \
               "set -euo pipefail
-               cd /opt/aura
+               cd /opt/madori
                git fetch -q origin production
                git checkout -q production
                git reset -q --hard origin/production

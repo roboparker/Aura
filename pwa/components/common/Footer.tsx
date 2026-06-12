@@ -105,7 +105,7 @@ const Footer = () => (
         </div>
       </div>
       <p className="mt-8 text-xs text-muted-foreground">
-        Aura — source-available under the{" "}
+        Madori — source-available under the{" "}
         <a
           href="https://github.com/roboparker/Aura/blob/main/LICENSE"
           target="_blank"

@@ -150,7 +150,7 @@ const NewGroupPage = () => {
   return (
     <>
       <Head>
-        <title>Create a group — Aura</title>
+        <title>Create a group — Madori</title>
       </Head>
 
       <main className="px-4 py-10 max-w-2xl mx-auto">

@@ -25,7 +25,7 @@ export const CODE_THEME_PRESETS: readonly CodeThemePreset[] = [
 ];
 
 export const DEFAULT_CODE_THEME_ID = "vs";
-export const CODE_THEME_STORAGE_KEY = "aura.codeTheme";
+export const CODE_THEME_STORAGE_KEY = "madori.codeTheme";
 
 export const isKnownCodeThemeId = (id: string | null | undefined): boolean =>
   typeof id === "string" && CODE_THEME_PRESETS.some((p) => p.id === id);

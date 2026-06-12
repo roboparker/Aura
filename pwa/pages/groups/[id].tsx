@@ -201,7 +201,7 @@ const GroupDetail = () => {
         .catch(() => ({}));
       if (data.status === "invited") {
         setMemberInfo(
-          `${submitted} doesn't have an Aura account yet — we sent them an invitation email.`,
+          `${submitted} doesn't have an Madori account yet — we sent them an invitation email.`,
         );
       }
       setNewMemberEmail("");
@@ -322,7 +322,7 @@ const GroupDetail = () => {
   return (
     <>
       <Head>
-        <title>{group ? `${group.title} - Aura` : "Group - Aura"}</title>
+        <title>{group ? `${group.title} - Madori` : "Group - Madori"}</title>
       </Head>
       <main className="px-6 py-8 max-w-6xl mx-auto">
         <Link

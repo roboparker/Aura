@@ -303,7 +303,7 @@ const SearchPage = () => {
   return (
     <>
       <Head>
-        <title>{filters.q ? `Search: ${filters.q}` : "Search"} - Aura</title>
+        <title>{filters.q ? `Search: ${filters.q}` : "Search"} - Madori</title>
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="mx-auto max-w-3xl space-y-5 px-4 py-8">

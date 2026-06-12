@@ -30,10 +30,10 @@ class UserFixtures extends Fixture
      * @var list<array{reference: string, email: string, given: string, family: string}>
      */
     private const TEAM_USERS = [
-        ['reference' => 'user-noah', 'email' => 'noah@team.aura.test',  'given' => 'Noah',  'family' => 'Kim'],
-        ['reference' => 'user-emma', 'email' => 'emma@team.aura.test',  'given' => 'Emma',  'family' => 'Reyes'],
-        ['reference' => 'user-liam', 'email' => 'liam@team.aura.test',  'given' => 'Liam',  'family' => 'Patel'],
-        ['reference' => 'user-ava',  'email' => 'ava@team.aura.test',   'given' => 'Ava',   'family' => 'Okafor'],
+        ['reference' => 'user-noah', 'email' => 'noah@team.madori.test',  'given' => 'Noah',  'family' => 'Kim'],
+        ['reference' => 'user-emma', 'email' => 'emma@team.madori.test',  'given' => 'Emma',  'family' => 'Reyes'],
+        ['reference' => 'user-liam', 'email' => 'liam@team.madori.test',  'given' => 'Liam',  'family' => 'Patel'],
+        ['reference' => 'user-ava',  'email' => 'ava@team.madori.test',   'given' => 'Ava',   'family' => 'Okafor'],
     ];
 
     /**
@@ -76,7 +76,7 @@ class UserFixtures extends Fixture
     public function load(ObjectManager $manager): void
     {
         $admin = new User();
-        $admin->setEmail('admin@aura.test');
+        $admin->setEmail('admin@madori.test');
         $admin->setRoles(['ROLE_ADMIN']);
         $admin->setGivenName('Ada');
         $admin->setFamilyName('Admin');
@@ -85,7 +85,7 @@ class UserFixtures extends Fixture
         $manager->persist($admin);
 
         $user = new User();
-        $user->setEmail('user@aura.test');
+        $user->setEmail('user@madori.test');
         $user->setRoles(['ROLE_USER']);
         $user->setGivenName('Uma');
         $user->setFamilyName('User');

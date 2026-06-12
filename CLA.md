@@ -1,11 +1,11 @@
-# Aura Contributor License Agreement (CLA)
+# Madori Contributor License Agreement (CLA)
 
-Thank you for your interest in contributing to **Aura** (the "Project"),
+Thank you for your interest in contributing to **Madori** (the "Project"),
 maintained by Robert Parker (the "Owner").
 
-Aura is distributed to the public under the **GNU Affero General Public
+Madori is distributed to the public under the **GNU Affero General Public
 License v3.0** (see [`LICENSE`](LICENSE)). To keep the Project sustainable,
-the Owner also offers Aura under separate **commercial licenses** to parties
+the Owner also offers Madori under separate **commercial licenses** to parties
 who do not wish to comply with the AGPL. For that dual-licensing model to
 work, the Owner needs the rights described below for every contribution.
 

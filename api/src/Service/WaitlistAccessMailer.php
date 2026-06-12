@@ -29,12 +29,12 @@ final class WaitlistAccessMailer
 
     public function sendAccessGranted(User $user): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $email = (new TemplatedEmail())
             ->from($from)
             ->to($user->getEmail())
-            ->subject('Your Aura account is ready')
+            ->subject('Your Madori account is ready')
             ->htmlTemplate('emails/waitlist_access.html.twig')
             ->textTemplate('emails/waitlist_access.txt.twig')
             ->context([

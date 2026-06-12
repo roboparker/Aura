@@ -56,7 +56,7 @@ class McpTest extends ApiTestCase
         $client = static::createClient();
         $client->request('POST', '/mcp', [
             'json' => ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'initialize'],
-            'headers' => ['Authorization' => 'Bearer aura_pat_not-a-real-token'],
+            'headers' => ['Authorization' => 'Bearer madori_pat_not-a-real-token'],
         ]);
         $this->assertResponseStatusCodeSame(401);
     }
@@ -85,7 +85,7 @@ class McpTest extends ApiTestCase
         $this->assertSame('2.0', $body['jsonrpc']);
         $serverInfo = $body['result']['serverInfo'] ?? null;
         $this->assertIsArray($serverInfo);
-        $this->assertSame('aura-mcp', $serverInfo['name']);
+        $this->assertSame('madori-mcp', $serverInfo['name']);
         $capabilities = $body['result']['capabilities'] ?? null;
         $this->assertIsArray($capabilities);
         $this->assertArrayHasKey('tools', $capabilities);

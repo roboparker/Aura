@@ -10,7 +10,7 @@ test.describe("Authentication", () => {
     const email = uniqueEmail();
 
     await page.goto(`${BASE_URL}/signup`);
-    await expect(page).toHaveTitle("Sign Up - Aura");
+    await expect(page).toHaveTitle("Sign Up - Madori");
 
     // Step 1 — form. The redesigned signup no longer has a confirm
     // field; the strength meter does the safety work instead.
@@ -59,7 +59,7 @@ test.describe("Authentication", () => {
 
     // Sign in via UI
     await page.goto(`${BASE_URL}/signin`);
-    await expect(page).toHaveTitle("Sign In - Aura");
+    await expect(page).toHaveTitle("Sign In - Madori");
 
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");
@@ -90,7 +90,7 @@ test.describe("Authentication", () => {
 
   test("sign in with fixture admin user accesses admin page", async ({ page }) => {
     await page.goto(`${BASE_URL}/signin`);
-    await page.fill("#email", "admin@aura.test");
+    await page.fill("#email", "admin@madori.test");
     await page.fill("#password", "admin123");
     await page.click('button[type="submit"]');
 

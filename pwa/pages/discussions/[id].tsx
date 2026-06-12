@@ -376,7 +376,7 @@ const DiscussionDetailPage = () => {
     <>
       <Head>
         <title>
-          {discussion ? `${discussion.title} - Aura` : "Discussion - Aura"}
+          {discussion ? `${discussion.title} - Madori` : "Discussion - Madori"}
         </title>
       </Head>
       <main className="min-h-screen bg-muted">

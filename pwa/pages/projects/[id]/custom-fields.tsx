@@ -106,7 +106,7 @@ const CustomFieldsPage = () => {
     <>
       <Head>
         <title>
-          {project ? `Custom fields - ${project.title}` : "Custom fields"} - Aura
+          {project ? `Custom fields - ${project.title}` : "Custom fields"} - Madori
         </title>
       </Head>
       <main className="min-h-screen bg-muted">

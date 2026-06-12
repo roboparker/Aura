@@ -1,6 +1,6 @@
 # MCP server
 
-Aura ships an integrated [Model Context Protocol](https://modelcontextprotocol.io/) server so AI assistants like Claude Desktop and Claude Code can read and edit tasks, projects, and comments through the same authorization rules as the PWA.
+Madori ships an integrated [Model Context Protocol](https://modelcontextprotocol.io/) server so AI assistants like Claude Desktop and Claude Code can read and edit tasks, projects, and comments through the same authorization rules as the PWA.
 
 The server is mounted at `POST /mcp` on the same FrankenPHP process that serves the API. There is no separate process to run.
 
@@ -21,7 +21,7 @@ Protocol version: `2024-11-05`.
 Send a personal access token in the `Authorization` header:
 
 ```
-Authorization: Bearer aura_pat_<secret>
+Authorization: Bearer madori_pat_<secret>
 ```
 
 ### Minting a token
@@ -29,7 +29,7 @@ Authorization: Bearer aura_pat_<secret>
 Authenticate to the PWA, then `POST /api-tokens` with a name (and optional `scopes` allow-list and `expiresAt`):
 
 ```bash
-curl -X POST https://your-aura/api-tokens \
+curl -X POST https://your-madori/api-tokens \
   -H 'Content-Type: application/ld+json' \
   -H 'Cookie: PHPSESSID=...' \
   -d '{"name": "Local CLI"}'
@@ -71,10 +71,10 @@ The dispatcher distinguishes JSON-RPC errors (malformed envelopes, unknown metho
 ```json
 {
   "mcpServers": {
-    "aura": {
-      "url": "https://your-aura-instance.com/mcp",
+    "madori": {
+      "url": "https://your-madori-instance.com/mcp",
       "headers": {
-        "Authorization": "Bearer aura_pat_PASTE_YOUR_TOKEN_HERE"
+        "Authorization": "Bearer madori_pat_PASTE_YOUR_TOKEN_HERE"
       }
     }
   }
@@ -86,9 +86,9 @@ For local dev (default `compose.yaml` ports):
 ```json
 {
   "mcpServers": {
-    "aura": {
+    "madori": {
       "url": "https://localhost/mcp",
-      "headers": { "Authorization": "Bearer aura_pat_PASTE_YOUR_TOKEN_HERE" }
+      "headers": { "Authorization": "Bearer madori_pat_PASTE_YOUR_TOKEN_HERE" }
     }
   }
 }
@@ -98,7 +98,7 @@ A copy-paste-ready file lives at [`api/config/mcp-server.json`](../../api/config
 
 ## Implementation notes
 
-- Token storage mirrors `PasswordResetToken` and `UserInvite`: 32 random bytes, prefixed `aura_pat_`, hashed with sha256 on persist. The cleartext is shown once and never again.
+- Token storage mirrors `PasswordResetToken` and `UserInvite`: 32 random bytes, prefixed `madori_pat_`, hashed with sha256 on persist. The cleartext is shown once and never again.
 - The `/mcp` firewall is stateless and declared before `main`, so `json_login` and the SchebTwoFactorBundle listener never see `/mcp` traffic.
 - Tools live under `api/src/Mcp/Tool/` and are auto-registered via the `app.mcp_tool` tag (`_instanceof` in `services.yaml`). To add a new tool, implement `App\Mcp\Tool\McpToolInterface` — that's the entire wiring.
 - All tools share `App\Mcp\McpAuthorization` (rules duplicated from the entity `security:` expressions), `App\Mcp\McpEntitySerializer` (plain-array shape, no JSON-LD envelope), and `App\Mcp\McpInputHelper` (UUID/date/string coercion + Symfony validator integration).

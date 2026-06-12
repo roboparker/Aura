@@ -41,10 +41,10 @@ const SECTION_LABELS: Record<string, string> = {
 const GuidePage = ({ doc, sectionLabel }: Props) => (
   <>
     <Head>
-      <title>{`${doc.title} — Aura guides`}</title>
+      <title>{`${doc.title} — Madori guides`}</title>
       <meta
         name="description"
-        content={`${doc.title} — ${sectionLabel} documentation for Aura.`}
+        content={`${doc.title} — ${sectionLabel} documentation for Madori.`}
       />
     </Head>
     <main className="bg-background">

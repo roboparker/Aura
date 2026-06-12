@@ -9,9 +9,9 @@ scheb_two_factor:
         - Symfony\Component\Security\Http\Authenticator\Token\PostAuthenticationToken
     totp:
         # Shown by authenticator apps next to the OTP code so users can
-        # tell their Aura account apart from other TOTP entries.
-        issuer: Aura
-        server_name: Aura
+        # tell their Madori account apart from other TOTP entries.
+        issuer: Madori
+        server_name: Madori
         # 15-second leeway covers the most common race ("I started typing
         # the code as it rolled over"). Must stay below the 30-second
         # TOTP period (otphp throws if leeway >= period).
