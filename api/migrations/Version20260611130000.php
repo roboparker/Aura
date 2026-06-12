@@ -21,7 +21,7 @@ use Doctrine\Migrations\AbstractMigration;
  *
  * See App\Service\UsageRecorder and App\Service\UsageSnapshotBuilder.
  */
-final class Version20260611120000 extends AbstractMigration
+final class Version20260611130000 extends AbstractMigration
 {
     public function getDescription(): string
     {
