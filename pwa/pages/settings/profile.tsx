@@ -21,7 +21,7 @@ const ProfilePage = () => {
     <SettingsShell
       active="profile"
       title="Profile"
-      description="How you appear to teammates across Aura."
+      description="How you appear to teammates across Madori."
       actions={<SaveIndicator status={saveStatus} />}
     >
       {saveError && (

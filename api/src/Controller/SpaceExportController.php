@@ -175,7 +175,7 @@ class SpaceExportController extends AbstractController
         }
 
         return sprintf(
-            'aura-export-%s-%s.zip',
+            'madori-export-%s-%s.zip',
             $slug,
             $export->getCompletedAt()?->format('Y-m-d') ?? 'archive',
         );

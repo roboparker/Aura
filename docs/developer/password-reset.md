@@ -160,7 +160,7 @@ https://<APP_FRONTEND_URL>/reset-password?token=<plainToken>
 ```
 
 - `APP_FRONTEND_URL` is autowired from env.
-- `MAILER_FROM` falls back to `no-reply@aura.test` if unset (dev convenience; staging/prod should set it).
+- `MAILER_FROM` falls back to `no-reply@madori.test` if unset (dev convenience; staging/prod should set it).
 - The email is plain text + HTML, no attachments, no tracking pixels.
 
 Local dev mail lands in Mailpit at the worktree's `mailpit UI` port (see [deployment.md](deployment.md)).

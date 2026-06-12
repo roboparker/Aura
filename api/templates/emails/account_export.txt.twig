@@ -1,7 +1,7 @@
 {# @var recipient \App\Entity\User #}
 Hi {{ recipient.givenName ?: recipient.email }},
 
-Your Aura data export is ready. It contains your profile, preferences, and
+Your Madori data export is ready. It contains your profile, preferences, and
 the content you authored — tasks, projects, pages, discussions, comments,
 tags, API tokens, and the files you uploaded — as a zip archive.
 
@@ -10,7 +10,7 @@ Download your export: {{ downloadUrl }}
 This link expires on {{ expiresAt|date('F j, Y') }} — after that the archive
 is deleted and you'll need to request a new export.
 
-You'll need to be signed in to Aura as yourself to download the file — the
+You'll need to be signed in to Madori as yourself to download the file — the
 link only works for your account, not for anyone who happens to receive it.
 
-— Aura
+— Madori

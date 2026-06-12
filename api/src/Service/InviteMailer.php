@@ -8,7 +8,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
 /**
- * Renders and sends the "you've been invited to Aura" email so the
+ * Renders and sends the "you've been invited to Madori" email so the
  * group-invite and space-invite flows share one body. The single
  * UserInvite per email may carry both group and space attachments,
  * and the message lists every one currently attached so the
@@ -36,7 +36,7 @@ final class InviteMailer
             rtrim($this->frontendUrl, '/'),
             $plainToken,
         );
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test';
+        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
 
         $targets = $this->collectTargetLabels($invite);
         $contextLine = $this->formatContextLine($targets);
@@ -44,15 +44,15 @@ final class InviteMailer
         $message = (new Email())
             ->from($from)
             ->to($invite->getEmail())
-            ->subject('You\'ve been invited to join Aura')
+            ->subject('You\'ve been invited to join Madori')
             ->text(sprintf(
-                "Hi,\n\nYou've been invited to join %s on Aura. Create your account to accept:\n\n%s\n\nThis invitation expires in %d days. If you weren't expecting this, you can safely ignore the email.\n\n— Aura",
+                "Hi,\n\nYou've been invited to join %s on Madori. Create your account to accept:\n\n%s\n\nThis invitation expires in %d days. If you weren't expecting this, you can safely ignore the email.\n\n— Madori",
                 $contextLine,
                 $signupUrl,
                 $ttlDays,
             ))
             ->html(sprintf(
-                '<p>Hi,</p><p>You\'ve been invited to join %1$s on Aura. Create your account to accept:</p><p><a href="%2$s">%2$s</a></p><p>This invitation expires in %3$d days. If you weren\'t expecting this, you can safely ignore the email.</p><p>— Aura</p>',
+                '<p>Hi,</p><p>You\'ve been invited to join %1$s on Madori. Create your account to accept:</p><p><a href="%2$s">%2$s</a></p><p>This invitation expires in %3$d days. If you weren\'t expecting this, you can safely ignore the email.</p><p>— Madori</p>',
                 htmlspecialchars($contextLine),
                 htmlspecialchars($signupUrl),
                 $ttlDays,
@@ -90,7 +90,7 @@ final class InviteMailer
     private function formatContextLine(array $labels): string
     {
         return match (count($labels)) {
-            0 => 'an Aura workspace',
+            0 => 'an Madori workspace',
             1 => 'the ' . $labels[0],
             2 => 'the ' . $labels[0] . ' and the ' . $labels[1],
             default => 'these workspaces: ' . implode(', ', $labels),

@@ -6,7 +6,7 @@ const ApiTokensPage = () => (
   <SettingsShell
     active="api-tokens"
     title="API tokens"
-    description="Personal access tokens for Aura's REST + MCP APIs."
+    description="Personal access tokens for Madori's REST + MCP APIs."
   >
     <Card>
       <CardContent className="pt-6">

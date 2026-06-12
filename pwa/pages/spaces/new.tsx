@@ -169,7 +169,7 @@ const NewSpacePage = () => {
   return (
     <>
       <Head>
-        <title>Create a space — Aura</title>
+        <title>Create a space — Madori</title>
       </Head>
 
       <main className="px-4 py-10 max-w-2xl mx-auto">

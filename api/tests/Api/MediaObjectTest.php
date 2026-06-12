@@ -22,7 +22,7 @@ class MediaObjectTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
 
-        $this->tempDir = sys_get_temp_dir() . '/aura-media-test-' . uniqid();
+        $this->tempDir = sys_get_temp_dir() . '/madori-media-test-' . uniqid();
         mkdir($this->tempDir, 0777, true);
     }
 

@@ -4,7 +4,7 @@ import AuthCard from "@/components/auth/AuthCard";
 const SignUp = () => (
   <>
     <Head>
-      <title>Sign Up - Aura</title>
+      <title>Sign Up - Madori</title>
     </Head>
     <AuthCard defaultTab="signup" />
   </>

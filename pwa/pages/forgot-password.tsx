@@ -14,7 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FormikField } from "@/components/ui/formik-field";
-import AuraWordmark from "@/components/auth/AuraWordmark";
+import MadoriWordmark from "@/components/auth/MadoriWordmark";
 
 interface ForgotPasswordValues {
   email: string;
@@ -81,10 +81,10 @@ const ForgotPassword = () => {
   return (
     <>
       <Head>
-        <title>Reset your password — Aura</title>
+        <title>Reset your password — Madori</title>
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
-        <AuraWordmark />
+        <MadoriWordmark />
         <Card className="w-full max-w-lg overflow-hidden p-0">
           {submitted ? (
             <CardContent
@@ -106,7 +106,7 @@ const ForgotPassword = () => {
                   <span className="text-foreground font-medium">
                     {sentEmail}
                   </span>{" "}
-                  has an Aura account, we just sent a reset link. It expires in
+                  has an Madori account, we just sent a reset link. It expires in
                   1 hour.
                 </p>
               </div>

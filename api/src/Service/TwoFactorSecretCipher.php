@@ -30,7 +30,7 @@ final class TwoFactorSecretCipher
         // alternative would be to hard-fail at boot, which would break dev
         // environments that haven't filled in .env.local. Production deploys
         // must override APP_SECRET; we don't try to enforce that here.
-        $this->key = hash_hkdf('sha256', $appSecret, 32, 'aura-totp-secret-v1');
+        $this->key = hash_hkdf('sha256', $appSecret, 32, 'madori-totp-secret-v1');
     }
 
     public function encrypt(string $plaintext): string

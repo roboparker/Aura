@@ -47,7 +47,7 @@ test.describe("Groups", () => {
     await registerAndSignIn(ownerPage, ownerEmail);
 
     await ownerPage.goto(`${BASE_URL}/groups`);
-    await expect(ownerPage).toHaveTitle("Groups - Aura");
+    await expect(ownerPage).toHaveTitle("Groups - Madori");
     await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
 
     // Create via the empty-state call to action → /groups/new.

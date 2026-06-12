@@ -124,7 +124,7 @@ const PagesIndex = () => {
   return (
     <>
       <Head>
-        <title>Pages - Aura</title>
+        <title>Pages - Madori</title>
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">

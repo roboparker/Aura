@@ -4,7 +4,7 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const NavbarPage = () => (
   <ComponentDoc
     name="Navbar"
-    description="Top app bar. Signed-out visitors get the Aura wordmark as the home anchor plus Sign In / Sign Up buttons. Signed-in viewers get the Breadcrumbs trail (replacing the wordmark) + SearchBar in the flexible middle, OverdueBadge + NotificationBell on the right, and a mobile-only Sheet trigger that mounts SidebarNav inside a slide-over. Developer doc links live in the Footer, not the navbar."
+    description="Top app bar. Signed-out visitors get the Madori wordmark as the home anchor plus Sign In / Sign Up buttons. Signed-in viewers get the Breadcrumbs trail (replacing the wordmark) + SearchBar in the flexible middle, OverdueBadge + NotificationBell on the right, and a mobile-only Sheet trigger that mounts SidebarNav inside a slide-over. Developer doc links live in the Footer, not the navbar."
     importPath={`import Navbar from "@/components/common/Navbar";`}
     examples={[
       {

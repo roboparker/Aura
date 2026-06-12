@@ -240,7 +240,7 @@ const RecoveryStep = ({ codes, onDone }: RecoveryStepProps) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "aura-recovery-codes.txt";
+    a.download = "madori-recovery-codes.txt";
     a.click();
     URL.revokeObjectURL(url);
   };

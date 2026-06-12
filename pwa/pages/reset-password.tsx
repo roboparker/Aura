@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { FormikField } from "@/components/ui/formik-field";
-import AuraWordmark from "@/components/auth/AuraWordmark";
+import MadoriWordmark from "@/components/auth/MadoriWordmark";
 import PasswordStrengthMeter from "@/components/auth/PasswordStrengthMeter";
 import {
   MIN_PASSWORD_LENGTH,
@@ -59,7 +59,7 @@ const validate = (values: ResetPasswordValues) => {
 
 const PageShell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
-    <AuraWordmark />
+    <MadoriWordmark />
     <Card className="w-full max-w-lg overflow-hidden p-0">{children}</Card>
     <p className="text-xs text-muted-foreground tracking-wide">
       <Link href="/privacy" className="hover:text-foreground">
@@ -346,7 +346,7 @@ const ResetPassword = () => {
   return (
     <>
       <Head>
-        <title>Set a new password — Aura</title>
+        <title>Set a new password — Madori</title>
       </Head>
       <PageShell>{renderBody()}</PageShell>
     </>

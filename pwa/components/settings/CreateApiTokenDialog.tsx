@@ -103,7 +103,7 @@ const CreateApiTokenDialog = ({
               <DialogTitle>Token created</DialogTitle>
               <DialogDescription>
                 Copy it now — this is the only time the full token is shown.
-                Aura stores only a hash and can&apos;t display it again.
+                Madori stores only a hash and can&apos;t display it again.
               </DialogDescription>
             </DialogHeader>
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">

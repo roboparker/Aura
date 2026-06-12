@@ -270,7 +270,7 @@ const ReenrollScanStep = ({ secret, qrDataUri, onDone }: ReenrollScanStepProps) 
     <DialogHeader>
       <DialogTitle>Scan the new QR code</DialogTitle>
       <DialogDescription>
-        Add Aura to your authenticator app, then enter the 6-digit code it
+        Add Madori to your authenticator app, then enter the 6-digit code it
         shows to finish re-enrollment.
       </DialogDescription>
     </DialogHeader>

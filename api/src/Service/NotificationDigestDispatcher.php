@@ -124,7 +124,7 @@ final class NotificationDigestDispatcher
         );
 
         $email = (new TemplatedEmail())
-            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test')
+            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test')
             ->to($recipient->getEmail())
             ->subject($subject)
             ->htmlTemplate('emails/notification_digest.html.twig')

@@ -26,7 +26,7 @@ const FALLBACK_PATH = "/projects";
 // otherwise have to hand-code: backslashes (browsers normalise these
 // to forward slashes for http(s) URLs), tabs/CR/LF in the input,
 // percent-encoded weirdness, scheme-relative URLs, etc.
-const SANITIZER_BASE = "https://aura.invalid";
+const SANITIZER_BASE = "https://madori.invalid";
 
 /**
  * Whether `candidate` is a safe relative path we can redirect to.

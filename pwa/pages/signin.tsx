@@ -4,7 +4,7 @@ import AuthCard from "@/components/auth/AuthCard";
 const SignIn = () => (
   <>
     <Head>
-      <title>Sign In - Aura</title>
+      <title>Sign In - Madori</title>
     </Head>
     <AuthCard defaultTab="signin" />
   </>

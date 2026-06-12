@@ -1,4 +1,4 @@
-# git-cliff configuration for Aura.
+# git-cliff configuration for Madori.
 #
 # Generates a Keep-a-Changelog–formatted CHANGELOG.md from conventional
 # commit messages. Tag format is YYYY.MM.DD.N — git-cliff doesn't need

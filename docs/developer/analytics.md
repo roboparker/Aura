@@ -1,6 +1,6 @@
 # Analytics (self-hosted Umami)
 
-Aura ships with optional, self-hosted, privacy-first analytics powered by
+Madori ships with optional, self-hosted, privacy-first analytics powered by
 [Umami](https://umami.is/). It is cookieless (no consent banner required),
 honors Do Not Track, stores everything on our own infrastructure, and is
 served first-party so it survives most ad blockers. Google Analytics was

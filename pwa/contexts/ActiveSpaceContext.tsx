@@ -107,17 +107,17 @@ const ActiveSpaceContext = createContext<ActiveSpaceContextType | undefined>(
   undefined,
 );
 
-// Per-user storage key — `aura.activeSpaceId.{userId}` — so two
+// Per-user storage key — `madori.activeSpaceId.{userId}` — so two
 // accounts alternating on one browser never inherit each other's
 // selection. The legacy un-scoped key is dropped on sight (see below).
-const STORAGE_PREFIX = "aura.activeSpaceId";
-const LEGACY_STORAGE_KEY = "aura.activeSpaceId";
+const STORAGE_PREFIX = "madori.activeSpaceId";
+const LEGACY_STORAGE_KEY = "madori.activeSpaceId";
 const storageKeyFor = (userId: string) => `${STORAGE_PREFIX}.${userId}`;
 
 // sessionStorage flag set by the sign-in flow (see markActiveSpaceReset)
 // so the next active-space resolution starts in the personal space
 // rather than restoring whatever was last selected on this browser.
-const RESET_FLAG_KEY = "aura.activeSpaceReset";
+const RESET_FLAG_KEY = "madori.activeSpaceReset";
 
 /**
  * Called by the sign-in flow on a successful login so the post-login
@@ -164,7 +164,7 @@ export function markActiveSpaceLanding(userId: string, spaceId: string) {
  * the one whose content the listings should show.
  *
  * The active-space choice is persisted in localStorage under a
- * per-user key (`aura.activeSpaceId.{userId}`) so it sticks across
+ * per-user key (`madori.activeSpaceId.{userId}`) so it sticks across
  * reloads. On a fresh sign-in (flagged by `markActiveSpaceReset`), on
  * first load, or when the previous selection is no longer accessible
  * (left the space, deleted it, etc.), we fall back to the personal

@@ -2,7 +2,7 @@
 
 ## System Overview
 
-Aura follows an API-first architecture built on API Platform. The runtime is orchestrated via Docker Compose: the FrankenPHP API, the Next.js PWA, a PostgreSQL database, and a background **worker** that drains the Postgres-backed Symfony Messenger queue (see [job-queue.md](job-queue.md)). Local dev also runs a **Mailpit** SMTP catcher so outbound email can be inspected without a real mail server.
+Madori follows an API-first architecture built on API Platform. The runtime is orchestrated via Docker Compose: the FrankenPHP API, the Next.js PWA, a PostgreSQL database, and a background **worker** that drains the Postgres-backed Symfony Messenger queue (see [job-queue.md](job-queue.md)). Local dev also runs a **Mailpit** SMTP catcher so outbound email can be inspected without a real mail server.
 
 ```mermaid
 graph TD

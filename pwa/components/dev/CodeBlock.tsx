@@ -18,7 +18,7 @@ const CodeBlock = ({ code, language = "tsx", className }: CodeBlockProps) => {
     window.setTimeout(() => setCopied(false), 1500);
   };
 
-  // `themes` is from prism-react-renderer; Aura is dark-only.
+  // `themes` is from prism-react-renderer; Madori is dark-only.
   const prismTheme = themes.vsDark;
 
   return (

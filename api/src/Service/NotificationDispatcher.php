@@ -226,7 +226,7 @@ final class NotificationDispatcher
         $target = $notification->getTargetUrl();
 
         $email = (new TemplatedEmail())
-            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@aura.test')
+            ->from((null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test')
             ->to($recipient->getEmail())
             ->subject($notification->getTitle())
             ->htmlTemplate('emails/notification.html.twig')
