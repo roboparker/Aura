@@ -25,7 +25,7 @@ class UserUsageCounterRepository extends ServiceEntityRepository
      */
     public function pruneBefore(\DateTimeImmutable $cutoff): int
     {
-        return (int) $this->createQueryBuilder('c')
+        return $this->createQueryBuilder('c')
             ->delete()
             ->where('c.day < :cutoff')
             ->setParameter('cutoff', $cutoff->format('Y-m-d'))

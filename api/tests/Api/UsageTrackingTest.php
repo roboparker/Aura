@@ -74,27 +74,25 @@ class UsageTrackingTest extends ApiTestCase
 
         $container = static::getContainer();
         $recorder = $container->get(UsageRecorder::class);
-        assert($recorder instanceof UsageRecorder);
         $recorder->recordApiCall($alice);
         $recorder->recordApiCall($alice);
         $recorder->recordApiCall($alice);
         $recorder->recordMcpCall($alice);
 
         $builder = $container->get(UsageSnapshotBuilder::class);
-        assert($builder instanceof UsageSnapshotBuilder);
         $today = new \DateTimeImmutable('today', new \DateTimeZone('UTC'));
         $written = $builder->capture($today);
 
         $this->assertSame(1, $written);
 
-        $row = $this->entityManager->getConnection()->fetchAssociative(
+        $row = $this->connection()->fetchAssociative(
             'SELECT api_calls, mcp_calls, disk_bytes FROM user_usage_snapshot WHERE captured_on = :d',
             ['d' => $today->format('Y-m-d')],
         );
         $this->assertIsArray($row);
-        $this->assertSame(3, (int) $row['api_calls']);
-        $this->assertSame(1, (int) $row['mcp_calls']);
-        $this->assertSame(0, (int) $row['disk_bytes']);
+        $this->assertSame(3, $this->intOf($row['api_calls']));
+        $this->assertSame(1, $this->intOf($row['mcp_calls']));
+        $this->assertSame(0, $this->intOf($row['disk_bytes']));
     }
 
     private function counterFor(User $user, string $metric): int
@@ -102,18 +100,28 @@ class UsageTrackingTest extends ApiTestCase
         $id = $user->getId();
         self::assertNotNull($id);
 
-        // Read from a fresh connection off the current container: the test
-        // client reboots the kernel per request, which can stale the EM
-        // captured in setUp. The recorder autocommits, so a new connection
-        // sees the rows.
-        $doctrine = static::getContainer()->get('doctrine');
-        assert($doctrine instanceof \Doctrine\Persistence\ManagerRegistry);
-        $value = $doctrine->getConnection()->fetchOne(
+        // The recorder autocommits, so a fresh query off the current
+        // container sees the rows even after the test client reboots the
+        // kernel between requests.
+        $value = $this->connection()->fetchOne(
             'SELECT count FROM user_usage_counter WHERE user_id = :u AND metric = :m',
             ['u' => $id->toRfc4122(), 'm' => $metric],
         );
 
-        return false === $value ? 0 : (int) $value;
+        return $this->intOf($value);
+    }
+
+    private function connection(): \Doctrine\DBAL\Connection
+    {
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+
+        return $em->getConnection();
+    }
+
+    private function intOf(mixed $value): int
+    {
+        return is_numeric($value) ? (int) $value : 0;
     }
 
     private function mintToken(User $user, string $name): string
@@ -135,7 +143,6 @@ class UsageTrackingTest extends ApiTestCase
     {
         $container = static::getContainer();
         $hasher = $container->get(UserPasswordHasherInterface::class);
-        assert($hasher instanceof UserPasswordHasherInterface);
 
         $user = new User();
         $user->setEmail($email);
