@@ -8,6 +8,7 @@ use App\Mcp\McpException;
 use App\Mcp\McpToolRegistry;
 use App\Mcp\Tool\McpToolInterface;
 use App\Security\ApiTokenAuthenticator;
+use App\Service\UsageRecorder;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -46,6 +47,7 @@ class McpController extends AbstractController
     public function __construct(
         private McpToolRegistry $tools,
         private LoggerInterface $logger,
+        private UsageRecorder $usage,
     ) {
     }
 
@@ -227,6 +229,11 @@ class McpController extends AbstractController
         /** @var array<string, mixed> $arguments */
 
         $result = $tool->invoke($arguments, $user);
+
+        // Count the successful tool dispatch against the bearer's owning
+        // user. UsageRecorder swallows its own failures, so this can't break
+        // the tool result.
+        $this->usage->recordMcpCall($user);
 
         // Wrap the structured result so older clients that only read
         // `content[].text` still see the data. Newer clients read
