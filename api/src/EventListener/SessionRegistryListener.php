@@ -15,6 +15,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
+use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
 
 /**
  * Keeps the {@see UserSession} registry in sync with cookie/session-backed
@@ -64,6 +65,13 @@ final class SessionRegistryListener implements EventSubscriberInterface
             return;
         }
         if ($request->attributes->has(ApiTokenAuthenticator::TOKEN_ATTR)) {
+            return;
+        }
+
+        // While an admin is impersonating someone the underlying session row
+        // still belongs to the admin — don't rewrite it to the impersonated
+        // user or spawn a phantom session for them.
+        if ($this->tokenStorage->getToken() instanceof SwitchUserToken) {
             return;
         }
 

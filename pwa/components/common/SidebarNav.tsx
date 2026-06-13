@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, VenetianMask } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar from "@/components/user/UserAvatar";
@@ -58,10 +58,15 @@ interface SidebarNavProps {
  * account quick-actions stay in sync across both surfaces.
  */
 const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, stopImpersonation } = useAuth();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
+  const impersonator = user?.impersonator ?? null;
   const wrap = itemWrapper ?? ((c) => c);
+
+  const handleStopImpersonation = () => {
+    void stopImpersonation().then(() => router.push("/"));
+  };
 
   if (!isAuthenticated || !user) return null;
 
@@ -146,6 +151,22 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
                   size="sm"
                   className={cn(
                     "justify-start w-full",
+                    router.pathname.startsWith("/admin/users") &&
+                      "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href="/admin/users">Users</Link>
+                </Button>,
+              )}
+            </span>
+            <span>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "justify-start w-full",
                     router.pathname.startsWith("/admin/waitlist") &&
                       "bg-accent text-accent-foreground",
                   )}
@@ -186,6 +207,30 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
           </>
         )}
       </nav>
+
+      {/* While impersonating, a prominent way out lives at the bottom of
+          the side menu (mirrors the global top banner). Only the firewall's
+          switch_user exit restores the admin's own session. */}
+      {impersonator && (
+        <div className="border-t border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40">
+          <p className="px-1 pb-2 text-xs text-amber-800 dark:text-amber-200">
+            Impersonating{" "}
+            <span className="font-semibold">{displayName(user)}</span>
+          </p>
+          {wrap(
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleStopImpersonation}
+              className="w-full border-amber-400 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+              data-testid="stop-impersonation"
+            >
+              <VenetianMask className="mr-1.5 h-4 w-4" />
+              Stop impersonation
+            </Button>,
+          )}
+        </div>
+      )}
 
       {/* Sign Out is an action (handler), not a destination — keep it
           as a button anchored to the bottom of the sidebar so it
