@@ -45,13 +45,12 @@ const Navbar = () => {
 
         {/* When signed in, the breadcrumb trail sits left of the
             search bar and replaces the wordmark as the home anchor.
-            Both trail and search share the flexible middle column —
-            the breadcrumb shrinks first so the search bar keeps a
-            usable footprint on narrow viewports. */}
+            The breadcrumb is content-sized (and shrinks first) so the
+            search bar takes the full remaining width of the middle. */}
         {isAuthenticated && (
           <>
-            <Breadcrumbs className="hidden md:flex flex-1 min-w-0" />
-            <SearchBar className="flex-1 min-w-0 max-w-3xl" />
+            <Breadcrumbs className="hidden md:flex min-w-0 shrink" />
+            <SearchBar className="flex-1 min-w-0 mx-8 lg:mx-16" />
             <SearchOverlay />
           </>
         )}

@@ -177,7 +177,7 @@ const AdminUsers: NextPage = () => {
                       className="flex items-center gap-3 rounded-md border p-3"
                       data-testid="users-row"
                     >
-                      <UserAvatar user={u} size="sm" />
+                      <UserAvatar user={u} size="sm" shape="square" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
                           {displayName(u)}
@@ -226,8 +226,8 @@ const AdminUsers: NextPage = () => {
                 {target ? displayName(target) : ""}
               </span>{" "}
               ({target?.email}). A banner stays on screen and a “Stop
-              impersonation” link sits at the bottom of the side menu until you
-              switch back.
+              impersonation” option sits in the account menu until you switch
+              back.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
