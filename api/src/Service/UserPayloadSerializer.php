@@ -102,7 +102,7 @@ final class UserPayloadSerializer
 
         return [
             'id' => (string) $admin->getId(),
-            'email' => (string) $admin->getEmail(),
+            'email' => $admin->getEmail(),
             'name' => trim($admin->getGivenName() . ' ' . $admin->getFamilyName()),
         ];
     }

@@ -35,22 +35,22 @@ final class ImpersonationAuditSubscriber implements EventSubscriberInterface
 
     public function onSwitchUser(SwitchUserEvent $event): void
     {
+        $token = $event->getToken();
         $target = $event->getTargetUser();
-        $current = $event->getToken()->getUser();
 
-        if ($event->getToken() instanceof SwitchUserToken) {
+        if ($token instanceof SwitchUserToken) {
             // Switch-out: target is the admin, current token holds the
             // impersonated account being unwrapped.
             $this->logger->info('Impersonation ended', [
                 'admin' => $this->ref($target),
-                'impersonated' => $this->ref($current),
+                'impersonated' => $this->ref($token->getUser()),
             ]);
 
             return;
         }
 
         $this->logger->info('Impersonation started', [
-            'admin' => $this->ref($current),
+            'admin' => $this->ref($token?->getUser()),
             'impersonated' => $this->ref($target),
         ]);
     }
@@ -58,7 +58,7 @@ final class ImpersonationAuditSubscriber implements EventSubscriberInterface
     private function ref(mixed $user): string
     {
         return $user instanceof User
-            ? sprintf('%s <%s>', (string) $user->getId(), (string) $user->getEmail())
+            ? sprintf('%s <%s>', (string) $user->getId(), $user->getEmail())
             : 'unknown';
     }
 }
