@@ -44,8 +44,16 @@ class TwoFactorSecretCipherTest extends TestCase
     {
         $cipher = $this->cipher();
         $envelope = $cipher->encrypt('JBSWY3DPEHPK3PXP');
-        // Flip a character in the base64 body — the AEAD tag check must fail.
-        $tampered = substr($envelope, 0, -2) . ($envelope[-2] === 'A' ? 'B' : 'A') . $envelope[-1];
+
+        // Flip a bit in the last byte of the blob (the AEAD tag) — decryption
+        // must fail. We decode/flip/re-encode rather than poking the base64
+        // string directly: the char next to the '=' padding only carries its
+        // top bits into the plaintext, so flipping it can be a decode no-op
+        // that leaves the ciphertext intact (a source of flakiness).
+        $blob = base64_decode(substr($envelope, strlen('tfa1:')), true);
+        $this->assertNotFalse($blob);
+        $blob[strlen($blob) - 1] = $blob[strlen($blob) - 1] ^ "\x01";
+        $tampered = 'tfa1:' . base64_encode($blob);
 
         $this->assertNull($cipher->decrypt($tampered));
     }

@@ -238,7 +238,7 @@ const HeroAppMock = () => (
 
     <div className="flex h-[332px] bg-card">
       {/* projects + pages sidebar */}
-      <div className="w-[168px] shrink-0 overflow-hidden border-r bg-background px-2.5 py-3">
+      <div className="hidden w-[168px] shrink-0 overflow-hidden border-r bg-background px-2.5 py-3 sm:block">
         <div className="px-1 pb-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
           Projects
         </div>
@@ -332,7 +332,7 @@ const HeroAppMock = () => (
               >
                 {t.title}
               </span>
-              <span className="shrink-0">
+              <span className="hidden shrink-0 sm:inline-block">
                 <TagChip tag={t.tag} />
               </span>
               <span className="w-12 shrink-0 text-right font-mono text-[10.5px] text-muted-foreground">
@@ -705,7 +705,7 @@ const Home = () => {
             <h2 className="mt-3.5 text-2xl font-semibold tracking-tight text-foreground">
               Everything else a real team needs.
             </h2>
-            <div className="mt-8 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            <div className="mt-8 grid grid-cols-1 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
               {STRIP.map(({ icon: Icon, label }) => (
                 <div
                   key={label}
