@@ -3,7 +3,7 @@ import Link from "next/link";
 const Footer = () => (
   <footer className="mt-12 border-t bg-background">
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Product
@@ -76,7 +76,7 @@ const Footer = () => (
             </li>
           </ul>
         </div>
-        <div className="col-span-2 sm:col-span-1">
+        <div className="sm:col-span-1">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Project
           </h3>
