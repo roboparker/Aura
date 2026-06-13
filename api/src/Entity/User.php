@@ -270,7 +270,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     ];
 
     /** Per-category impersonation access levels, least → most permissive. */
-    public const IMPERSONATION_LEVELS = ['hidden', 'view', 'edit'];
+    public const IMPERSONATION_LEVELS = ['none', 'view', 'edit'];
 
     public const DEFAULT_PREFERENCES = [
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
@@ -307,17 +307,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         'canBeImpersonated' => false,
         // Per-category access granted to an admin WHILE impersonating (only
         // meaningful when canBeImpersonated is true). Each category is
-        // 'hidden' | 'view' | 'edit'; default 'hidden' across the board, so
+        // 'none' | 'view' | 'edit'; default 'none' across the board, so
         // turning impersonation on grants nothing until the user opts in per
         // category. Enforced by App\EventListener\ImpersonationAccessListener.
         'impersonationAccess' => [
-            'tasks' => 'hidden',
-            'projects' => 'hidden',
-            'pages' => 'hidden',
-            'discussions' => 'hidden',
-            'comments' => 'hidden',
-            'notifications' => 'hidden',
-            'files' => 'hidden',
+            'tasks' => 'none',
+            'projects' => 'none',
+            'pages' => 'none',
+            'discussions' => 'none',
+            'comments' => 'none',
+            'notifications' => 'none',
+            'files' => 'none',
         ],
     ];
 
@@ -531,9 +531,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
-     * The access level ('hidden' | 'view' | 'edit') an impersonating admin
+     * The access level ('none' | 'view' | 'edit') an impersonating admin
      * has for the given content category. Unknown / malformed values fall
-     * back to the safe default 'hidden'. Read by
+     * back to the safe default 'none'. Read by
      * {@see \App\EventListener\ImpersonationAccessListener}.
      */
     public function getImpersonationLevel(string $category): string
@@ -543,7 +543,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
 
         return is_string($level) && in_array($level, self::IMPERSONATION_LEVELS, true)
             ? $level
-            : 'hidden';
+            : 'none';
     }
 
     // --- TOTP two-factor (Scheb) ---

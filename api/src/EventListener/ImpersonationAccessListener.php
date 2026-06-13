@@ -21,7 +21,7 @@ use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
  *
  *  - Requests are mapped to a content category by path prefix and to an
  *    action by HTTP method (GET/HEAD = view, anything else = edit).
- *  - The target's per-category level decides: 'hidden' blocks everything,
+ *  - The target's per-category level decides: 'none' blocks everything,
  *    'view' allows reads only, 'edit' allows reads + writes.
  *  - Endpoints that aren't a content category (the app shell, profile,
  *    spaces/groups structure, auth) allow reads so the impersonated UI can
@@ -109,6 +109,7 @@ final class ImpersonationAccessListener
             return; // Read-only access.
         }
 
+        // 'none' (any method) or 'view' + write → denied.
         throw new AccessDeniedHttpException(sprintf(
             'Your impersonation access to "%s" does not permit this action.',
             $category,

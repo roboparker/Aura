@@ -169,7 +169,7 @@ class UserPreferencesController extends AbstractController
                 );
             }
             if (!is_string($level) || !in_array($level, User::IMPERSONATION_LEVELS, true)) {
-                return sprintf('impersonationAccess.%s must be one of: hidden, view, edit.', $category);
+                return sprintf('impersonationAccess.%s must be one of: none, view, edit.', $category);
             }
         }
         return null;

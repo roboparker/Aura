@@ -168,7 +168,7 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testImpersonationAccessDefaultsToAllHidden(): void
+    public function testImpersonationAccessDefaultsToAllNone(): void
     {
         $alice = $this->createUser('alice@example.com');
 
@@ -181,8 +181,8 @@ class UserPreferencesTest extends ApiTestCase
         self::assertNotNull($response);
         $access = $response->toArray()['impersonationAccess'];
         $this->assertIsArray($access);
-        $this->assertSame('hidden', $access['tasks']);
-        $this->assertSame('hidden', $access['notifications']);
+        $this->assertSame('none', $access['tasks']);
+        $this->assertSame('none', $access['notifications']);
     }
 
     public function testPatchPartialImpersonationAccessPreservesOthers(): void
@@ -203,7 +203,7 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertIsArray($access);
         $this->assertSame('edit', $access['tasks']);
         // Untouched categories keep their default.
-        $this->assertSame('hidden', $access['pages']);
+        $this->assertSame('none', $access['pages']);
     }
 
     public function testPatchRejectsUnknownImpersonationCategory(): void

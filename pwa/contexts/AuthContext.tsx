@@ -57,7 +57,7 @@ export interface UserPreferences {
   impersonationAccess: Record<ImpersonationCategory, ImpersonationLevel>;
 }
 
-export type ImpersonationLevel = "hidden" | "view" | "edit";
+export type ImpersonationLevel = "none" | "view" | "edit";
 
 export type ImpersonationCategory =
   | "tasks"

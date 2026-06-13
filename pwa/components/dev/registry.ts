@@ -37,6 +37,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "color-swatch-picker", name: "ColorSwatchPicker", category: "Form", description: "Stateless radiogroup row of color swatches with a saving pulse state." },
   { slug: "email-chip-input", name: "EmailChipInput", category: "Form", description: "Controlled multi-email chip input with paste-split, validation ring, and colored tiles." },
   { slug: "label", name: "Label", category: "Form", description: "Accessible label associated to a form control." },
+  { slug: "permission-tree", name: "PermissionTree", category: "Form", description: "Reusable nested None/Custom/All permission editor over a flat leaf→level map." },
   { slug: "popover", name: "Popover", category: "Overlay", description: "Floating content anchored to a trigger." },
   { slug: "separator", name: "Separator", category: "Primitive", description: "Horizontal or vertical divider." },
   { slug: "sheet", name: "Sheet", category: "Overlay", description: "Side-anchored drawer." },

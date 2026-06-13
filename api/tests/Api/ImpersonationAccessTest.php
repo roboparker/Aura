@@ -30,10 +30,10 @@ class ImpersonationAccessTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testHiddenCategoryBlocksRead(): void
+    public function testNoneCategoryBlocksRead(): void
     {
         $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
-        $member = $this->createImpersonableUser('member@example.com', ['tasks' => 'hidden']);
+        $member = $this->createImpersonableUser('member@example.com', ['tasks' => 'none']);
         $this->createTask($member, 'Member task');
 
         $client = $this->impersonate($admin, 'member@example.com');
@@ -99,10 +99,10 @@ class ImpersonationAccessTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(403);
     }
 
-    public function testShellReadsAllowedEvenWhenEverythingHidden(): void
+    public function testShellReadsAllowedEvenWhenEverythingNone(): void
     {
         $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
-        // Default matrix is all-hidden; opt in to impersonation only.
+        // Default matrix is all-none; opt in to impersonation only.
         $this->createImpersonableUser('member@example.com', []);
 
         $client = $this->impersonate($admin, 'member@example.com');
