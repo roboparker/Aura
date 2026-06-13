@@ -168,9 +168,16 @@ class ImpersonationTest extends ApiTestCase
         $client->request('GET', '/api/me?_switch_user=_exit');
         $this->assertResponseIsSuccessful();
 
-        // Member revokes consent.
-        $member->setPreferences(['canBeImpersonated' => false]);
-        $this->entityManager->flush();
+        // Member revokes consent. Mutate through the live container EM and
+        // clear its identity map so the next request's user provider reloads
+        // the fresh `canBeImpersonated = false` rather than a cached instance.
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $fresh = $em->getRepository(User::class)->findOneBy(['email' => 'member@example.com']);
+        self::assertNotNull($fresh);
+        $fresh->setPreferences(['canBeImpersonated' => false]);
+        $em->flush();
+        $em->clear();
 
         // Now the same switch is rejected.
         $client->request('GET', '/api/me?_switch_user=member@example.com');

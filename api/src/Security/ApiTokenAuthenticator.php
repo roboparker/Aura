@@ -18,20 +18,18 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 
 /**
- * Authenticates `Authorization: Bearer madori_pat_…` requests on BOTH the
- * stateless `mcp` firewall and the main REST firewall, so a token can drive
- * the same API surface its owner can. The plaintext is sha256-hashed and
- * looked up against {@see ApiToken::tokenHash}; on a hit we attach the owning
- * {@see User} to the security token and stamp `lastUsedAt`.
+ * Authenticates `Authorization: Bearer madori_pat_…` requests. It backs two
+ * STATELESS firewalls: `mcp` (path `^/mcp`) and `api_token` (the REST API,
+ * matched by the Bearer header via {@see BearerTokenRequestMatcher}), so a
+ * token drives the same API surface its owner can without ever touching a
+ * session. The plaintext is sha256-hashed and looked up against
+ * {@see ApiToken::tokenHash}; on a hit we attach the owning {@see User} to the
+ * security token and stamp `lastUsedAt`.
  *
  * What the token may actually do is decided downstream by its
  * {@see \App\Security\Access\AccessPolicy} (REST: AccessPolicyListener; MCP:
  * McpToolPolicy). The matched ApiToken is stashed on the request so both
  * surfaces can read the policy without re-loading it.
- *
- * `supports()` only returns true when the Bearer header is present, and the
- * request is marked stateless, so the cookie / json_login / 2FA flow on the
- * main firewall is never affected by tokens.
  *
  * Failure responses are JSON rather than the default HTML error page.
  */
@@ -83,9 +81,6 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator
         // REST AccessPolicyListener + the MCP controller) can read the
         // token's policy without re-loading from the DB.
         $request->attributes->set(self::TOKEN_ATTR, $token);
-        // Bearer auth is stateless even on the stateful main firewall — don't
-        // persist a session for an API-token request.
-        $request->attributes->set('_stateless', true);
 
         return new SelfValidatingPassport(
             new UserBadge($user->getUserIdentifier(), fn () => $user),
