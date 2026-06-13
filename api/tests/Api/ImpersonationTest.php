@@ -39,7 +39,7 @@ class ImpersonationTest extends ApiTestCase
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
         // follow it (as a real fetch would) to land on the swapped /api/me.
-        $client->followRedirects();
+        $client->getKernelBrowser()->followRedirects();
         $client->loginUser($admin);
 
         $client->request('GET', '/api/me?_switch_user=member@example.com');
@@ -61,7 +61,7 @@ class ImpersonationTest extends ApiTestCase
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
         // follow it (as a real fetch would) to land on the swapped /api/me.
-        $client->followRedirects();
+        $client->getKernelBrowser()->followRedirects();
         $client->loginUser($admin);
 
         $client->request('GET', '/api/me');
@@ -77,7 +77,7 @@ class ImpersonationTest extends ApiTestCase
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
         // follow it (as a real fetch would) to land on the swapped /api/me.
-        $client->followRedirects();
+        $client->getKernelBrowser()->followRedirects();
         $client->loginUser($admin);
 
         // Switch into the non-admin member...
@@ -98,7 +98,7 @@ class ImpersonationTest extends ApiTestCase
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
         // follow it (as a real fetch would) to land on the swapped /api/me.
-        $client->followRedirects();
+        $client->getKernelBrowser()->followRedirects();
         $client->loginUser($admin);
 
         $client->request('GET', '/api/me?_switch_user=member@example.com');
@@ -124,7 +124,7 @@ class ImpersonationTest extends ApiTestCase
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
         // follow it (as a real fetch would) to land on the swapped /api/me.
-        $client->followRedirects();
+        $client->getKernelBrowser()->followRedirects();
         $client->loginUser($member);
 
         $client->request('GET', '/api/me?_switch_user=victim@example.com');
