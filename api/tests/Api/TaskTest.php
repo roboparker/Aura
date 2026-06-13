@@ -133,7 +133,7 @@ class TaskTest extends ApiTestCase
         $this->assertJsonContains(['totalItems' => 2]);
     }
 
-    public function testAdminSeesAllTasks(): void
+    public function testAdminIsScopedLikeNormalUser(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
@@ -142,13 +142,16 @@ class TaskTest extends ApiTestCase
         $this->createTask($alice, 'A1');
         $this->createTask($bob, 'B1');
         $this->createTask($bob, 'B2');
+        $this->createTask($admin, 'Admin task');
 
         $client = static::createClient();
         $client->loginUser($admin);
         $client->request('GET', '/tasks');
 
         $this->assertResponseIsSuccessful();
-        $this->assertJsonContains(['totalItems' => 3]);
+        // No admin bypass: the admin sees only their own task, not other
+        // users'. Cross-user reach is via impersonation (switch_user) only.
+        $this->assertJsonContains(['totalItems' => 1]);
     }
 
     public function testGetOwnTask(): void

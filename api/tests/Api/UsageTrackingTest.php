@@ -132,7 +132,7 @@ class UsageTrackingTest extends ApiTestCase
         $token->setName($name);
         $token->setTokenHash(hash('sha256', $plain));
         $token->setExpiresAt(null);
-        $token->setScopes([]);
+        $token->setAccessPolicy(null);
         $this->entityManager->persist($token);
         $this->entityManager->flush();
 

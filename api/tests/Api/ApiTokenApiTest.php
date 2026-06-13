@@ -31,7 +31,10 @@ class ApiTokenApiTest extends ApiTestCase
         $client->loginUser($alice);
 
         $client->request('POST', '/api-tokens', [
-            'json' => ['name' => 'ci', 'scopes' => ['read:tasks']],
+            'json' => [
+                'name' => 'ci',
+                'accessPolicy' => ['categories' => ['tasks' => 'view'], 'items' => []],
+            ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -49,14 +52,17 @@ class ApiTokenApiTest extends ApiTestCase
         $this->assertCount(0, $remaining);
     }
 
-    public function testCreateRejectsUnknownScope(): void
+    public function testCreateRejectsInvalidAccessPolicy(): void
     {
         $alice = $this->createUser('alice@example.com');
         $client = static::createClient();
         $client->loginUser($alice);
 
         $client->request('POST', '/api-tokens', [
-            'json' => ['name' => 'bad', 'scopes' => ['bogus:scope']],
+            'json' => [
+                'name' => 'bad',
+                'accessPolicy' => ['categories' => ['tasks' => 'bogus'], 'items' => []],
+            ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);

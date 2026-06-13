@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Check, Copy, Loader2 } from "lucide-react";
 import {
-  API_SCOPES,
   EXPIRY_OPTIONS,
   createApiToken,
   expiryIsoFromDays,
@@ -9,7 +8,6 @@ import {
 } from "@/lib/apiTokens";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +18,50 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import PermissionTree, {
+  type PermissionLevel,
+  type PermissionNode,
+} from "@/components/common/PermissionTree";
+
+const LEVELS: PermissionLevel[] = [
+  { value: "none", label: "None" },
+  { value: "view", label: "View" },
+  { value: "edit", label: "Edit" },
+];
+
+const NODES: PermissionNode[] = [
+  {
+    key: "content",
+    label: "Content",
+    description: "tasks, projects, pages, discussions, comments",
+    children: [
+      { key: "tasks", label: "Tasks" },
+      { key: "projects", label: "Projects" },
+      { key: "pages", label: "Pages" },
+      { key: "discussions", label: "Discussions" },
+      { key: "comments", label: "Comments" },
+    ],
+  },
+  { key: "notifications", label: "Notifications" },
+  { key: "files", label: "Files" },
+];
+
+const ALL_CATEGORIES = [
+  "tasks",
+  "projects",
+  "pages",
+  "discussions",
+  "comments",
+  "notifications",
+  "files",
+];
+
+// When a token is restricted, start everything at read-only — a useful,
+// least-surprising baseline the user tightens or loosens.
+const defaultAccess = (): Record<string, string> =>
+  Object.fromEntries(ALL_CATEGORIES.map((c) => [c, "view"]));
 
 interface CreateApiTokenDialogProps {
   open: boolean;
@@ -36,7 +77,8 @@ const CreateApiTokenDialog = ({
 }: CreateApiTokenDialogProps) => {
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState("90");
-  const [scopes, setScopes] = useState<string[]>(["read:tasks"]);
+  const [restricted, setRestricted] = useState(false);
+  const [access, setAccess] = useState<Record<string, string>>(defaultAccess);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedApiToken | null>(null);
@@ -45,16 +87,12 @@ const CreateApiTokenDialog = ({
   const reset = () => {
     setName("");
     setExpiry("90");
-    setScopes(["read:tasks"]);
+    setRestricted(false);
+    setAccess(defaultAccess());
     setError(null);
     setCreated(null);
     setCopied(false);
   };
-
-  const toggleScope = (value: string) =>
-    setScopes((prev) =>
-      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value],
-    );
 
   const submit = async () => {
     setSubmitting(true);
@@ -63,7 +101,7 @@ const CreateApiTokenDialog = ({
       const option = EXPIRY_OPTIONS.find((o) => o.value === expiry);
       const token = await createApiToken({
         name: name.trim(),
-        scopes,
+        accessPolicy: restricted ? { categories: access, items: {} } : null,
         expiresAt: expiryIsoFromDays(option?.days ?? null),
       });
       setCreated(token);
@@ -87,7 +125,6 @@ const CreateApiTokenDialog = ({
 
   const close = () => {
     onOpenChange(false);
-    // Reset after the close animation so the form is fresh next open.
     window.setTimeout(reset, 200);
   };
 
@@ -180,30 +217,32 @@ const CreateApiTokenDialog = ({
             </div>
 
             <div className="space-y-2">
-              <Label>Scopes</Label>
-              <div className="space-y-2">
-                {API_SCOPES.map((s) => (
-                  <label
-                    key={s.value}
-                    className="flex items-start gap-2 rounded-md border border-input p-2 text-sm"
-                  >
-                    <Checkbox
-                      checked={scopes.includes(s.value)}
-                      onCheckedChange={() => toggleScope(s.value)}
-                      data-testid={`api-token-scope-${s.value}`}
-                    />
-                    <span>
-                      <span className="font-mono font-medium">{s.label}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {s.description}
-                      </span>
-                    </span>
-                  </label>
-                ))}
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <Label htmlFor="api-token-restrict">Restrict permissions</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Off = the token can do everything you can. On = limit it per
+                    category.
+                  </p>
+                </div>
+                <Switch
+                  id="api-token-restrict"
+                  checked={restricted}
+                  onCheckedChange={setRestricted}
+                  aria-label="Restrict token permissions"
+                />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Leave all unchecked for an unrestricted token.
-              </p>
+              {restricted ? (
+                <div className="rounded-md border p-3">
+                  <PermissionTree
+                    levels={LEVELS}
+                    nodes={NODES}
+                    values={access}
+                    masterLabel="Token can access"
+                    onChange={setAccess}
+                  />
+                </div>
+              ) : null}
             </div>
 
             <DialogFooter>

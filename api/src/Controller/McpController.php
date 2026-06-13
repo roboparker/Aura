@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\ApiToken;
 use App\Entity\User;
 use App\Mcp\McpException;
+use App\Mcp\McpToolPolicy;
 use App\Mcp\McpToolRegistry;
 use App\Mcp\Tool\McpToolInterface;
 use App\Security\ApiTokenAuthenticator;
@@ -215,11 +216,15 @@ class McpController extends AbstractController
             throw McpException::notFound(sprintf('Tool "%s"', $name));
         }
 
-        // Per-tool scope check on the matched ApiToken. An empty scope
-        // list (the common case) allows all tools.
+        // Per-tool access-policy check on the matched ApiToken. A token with
+        // no policy (the common case) is unrestricted; otherwise the tool's
+        // category/action must be permitted by the policy.
         $apiToken = $request->attributes->get(ApiTokenAuthenticator::TOKEN_ATTR);
-        if ($apiToken instanceof ApiToken && !$apiToken->allowsTool($name)) {
-            throw McpException::forbidden(sprintf('Tool "%s" is not in this token\'s scopes.', $name));
+        if ($apiToken instanceof ApiToken) {
+            $policy = $apiToken->toAccessPolicy();
+            if (null !== $policy && !McpToolPolicy::allows($policy, $name)) {
+                throw McpException::forbidden(sprintf('Tool "%s" is outside this token\'s access scope.', $name));
+            }
         }
 
         $arguments = $params['arguments'] ?? [];

@@ -123,6 +123,169 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testCanBeImpersonatedDefaultsToFalse(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/preferences');
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertFalse($response->toArray()['canBeImpersonated']);
+    }
+
+    public function testPatchTogglesCanBeImpersonated(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['canBeImpersonated' => true],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['canBeImpersonated']);
+    }
+
+    public function testPatchRejectsNonBooleanCanBeImpersonated(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['canBeImpersonated' => 'yes'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testImpersonationAccessDefaultsToAllNone(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/preferences');
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $access = $response->toArray()['impersonationAccess'];
+        $this->assertIsArray($access);
+        $this->assertSame('none', $access['tasks']);
+        $this->assertSame('none', $access['notifications']);
+    }
+
+    public function testPatchPartialImpersonationAccessPreservesOthers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationAccess' => ['tasks' => 'edit']],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $access = $response->toArray()['impersonationAccess'];
+        $this->assertIsArray($access);
+        $this->assertSame('edit', $access['tasks']);
+        // Untouched categories keep their default.
+        $this->assertSame('none', $access['pages']);
+    }
+
+    public function testPatchRejectsUnknownImpersonationCategory(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationAccess' => ['widgets' => 'view']],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsInvalidImpersonationLevel(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationAccess' => ['tasks' => 'admin']],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchAcceptsImpersonationItemOverride(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $uuid = '0192c5b1-1111-7000-8000-000000000001';
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationItemAccess' => ['project' => [$uuid => 'view']]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $itemAccess = $response->toArray()['impersonationItemAccess'];
+        $this->assertIsArray($itemAccess);
+        $project = $itemAccess['project'];
+        $this->assertIsArray($project);
+        $this->assertSame('view', $project[$uuid]);
+        // Other item types keep their (empty) defaults.
+        $this->assertSame([], $itemAccess['task']);
+    }
+
+    public function testPatchRejectsUnknownImpersonationItemType(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationItemAccess' => ['widget' => []]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsNonUuidImpersonationItemKey(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['impersonationItemAccess' => ['project' => ['not-a-uuid' => 'view']]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testPatchAcceptsValidTimezone(): void
     {
         $alice = $this->createUser('alice@example.com');

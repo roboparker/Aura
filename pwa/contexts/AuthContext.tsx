@@ -42,7 +42,46 @@ export interface UserPreferences {
   quietHours: QuietHoursPref;
   /** Where a fresh sign-in (no deep link) lands. */
   landing: LandingPreference;
+  /**
+   * Opt-in to admin impersonation (switch_user). Off by default; when
+   * false, platform admins cannot impersonate this account — enforced
+   * server-side by the ImpersonationVoter, not just here.
+   */
+  canBeImpersonated: boolean;
+  /**
+   * Per-content-category access granted to an admin while impersonating
+   * (only meaningful when canBeImpersonated is true). Each category is
+   * "none" | "view" | "edit"; enforced server-side by the
+   * ImpersonationAccessListener.
+   */
+  impersonationAccess: Record<ImpersonationCategory, ImpersonationLevel>;
+  /**
+   * Per-item overrides keyed by addressable item type → { uuid → level }.
+   * An entry wins over its category default; enforced server-side by the
+   * ImpersonationAccessListener (item routes) + ImpersonationItemScope (lists).
+   */
+  impersonationItemAccess: Record<
+    ImpersonationItemType,
+    Record<string, ImpersonationLevel>
+  >;
 }
+
+export type ImpersonationLevel = "none" | "view" | "edit";
+
+export type ImpersonationCategory =
+  | "tasks"
+  | "projects"
+  | "pages"
+  | "discussions"
+  | "comments"
+  | "notifications"
+  | "files";
+
+export type ImpersonationItemType =
+  | "project"
+  | "page"
+  | "task"
+  | "discussion";
 
 export interface TwoFactorStatus {
   enabled: boolean;

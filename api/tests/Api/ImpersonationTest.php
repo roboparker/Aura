@@ -34,7 +34,7 @@ class ImpersonationTest extends ApiTestCase
     public function testAdminCanImpersonateAndPayloadSurfacesImpersonator(): void
     {
         $admin = $this->createTestUser('admin@example.com', 'Password123!@#', ['ROLE_ADMIN']);
-        $this->createTestUser('member@example.com');
+        $this->createTestUser('member@example.com', impersonable: true);
 
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
@@ -72,7 +72,7 @@ class ImpersonationTest extends ApiTestCase
     public function testImpersonatedSessionLosesAdminAccess(): void
     {
         $admin = $this->createTestUser('admin@example.com', 'Password123!@#', ['ROLE_ADMIN']);
-        $this->createTestUser('member@example.com');
+        $this->createTestUser('member@example.com', impersonable: true);
 
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
@@ -93,7 +93,7 @@ class ImpersonationTest extends ApiTestCase
     public function testExitRestoresAdmin(): void
     {
         $admin = $this->createTestUser('admin@example.com', 'Password123!@#', ['ROLE_ADMIN']);
-        $this->createTestUser('member@example.com');
+        $this->createTestUser('member@example.com', impersonable: true);
 
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
@@ -119,7 +119,9 @@ class ImpersonationTest extends ApiTestCase
     public function testNonAdminCannotImpersonate(): void
     {
         $member = $this->createTestUser('member@example.com');
-        $this->createTestUser('victim@example.com');
+        // Victim has opted in, so the rejection isolates the missing
+        // ROLE_ADMIN rather than conflating it with the consent gate.
+        $this->createTestUser('victim@example.com', impersonable: true);
 
         $client = static::createClient();
         // switch_user replies with a 302 to the same URL minus ?_switch_user;
@@ -128,6 +130,57 @@ class ImpersonationTest extends ApiTestCase
         $client->loginUser($member);
 
         $client->request('GET', '/api/me?_switch_user=victim@example.com');
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testAdminCannotImpersonateUserWhoHasNotOptedIn(): void
+    {
+        $admin = $this->createTestUser('admin@example.com', 'Password123!@#', ['ROLE_ADMIN']);
+        // Default: canBeImpersonated is off, so even an admin is blocked.
+        $this->createTestUser('member@example.com');
+
+        $client = static::createClient();
+        $client->getKernelBrowser()->followRedirects();
+        $client->loginUser($admin);
+
+        $client->request('GET', '/api/me?_switch_user=member@example.com');
+        $this->assertResponseStatusCodeSame(403);
+
+        // The session is unchanged — still the admin, no impersonation.
+        $client->request('GET', '/api/me');
+        $this->assertResponseIsSuccessful();
+        $this->assertSame('admin@example.com', $this->stringField($this->body($client), 'email'));
+    }
+
+    public function testRevokingConsentBlocksFurtherImpersonation(): void
+    {
+        $admin = $this->createTestUser('admin@example.com', 'Password123!@#', ['ROLE_ADMIN']);
+        $member = $this->createTestUser('member@example.com', impersonable: true);
+
+        $client = static::createClient();
+        $client->getKernelBrowser()->followRedirects();
+        $client->loginUser($admin);
+
+        // Opted in → impersonation works.
+        $client->request('GET', '/api/me?_switch_user=member@example.com');
+        $this->assertResponseIsSuccessful();
+        $this->assertSame('member@example.com', $this->stringField($this->body($client), 'email'));
+        $client->request('GET', '/api/me?_switch_user=_exit');
+        $this->assertResponseIsSuccessful();
+
+        // Member revokes consent. Mutate through the live container EM and
+        // clear its identity map so the next request's user provider reloads
+        // the fresh `canBeImpersonated = false` rather than a cached instance.
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $fresh = $em->getRepository(User::class)->findOneBy(['email' => 'member@example.com']);
+        self::assertNotNull($fresh);
+        $fresh->setPreferences(['canBeImpersonated' => false]);
+        $em->flush();
+        $em->clear();
+
+        // Now the same switch is rejected.
+        $client->request('GET', '/api/me?_switch_user=member@example.com');
         $this->assertResponseStatusCodeSame(403);
     }
 
@@ -144,8 +197,12 @@ class ImpersonationTest extends ApiTestCase
     /**
      * @param list<string> $roles
      */
-    private function createTestUser(string $email, string $plainPassword = 'Password123!@#', array $roles = []): User
-    {
+    private function createTestUser(
+        string $email,
+        string $plainPassword = 'Password123!@#',
+        array $roles = [],
+        bool $impersonable = false,
+    ): User {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 
         $user = new User();
@@ -155,6 +212,9 @@ class ImpersonationTest extends ApiTestCase
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');
         $user->setPassword($hasher->hashPassword($user, $plainPassword));
+        if ($impersonable) {
+            $user->setPreferences(['canBeImpersonated' => true]);
+        }
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();

@@ -12,10 +12,14 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Scopes PushSubscription queries so non-admin users only see (and can
+ * Scopes PushSubscription queries so users only see (and can
  * delete) their own subscriptions. Mirrors NotificationRecipientExtension
  * — item-level filtering means cross-user DELETE returns 404 instead of
  * leaking the existence of someone else's subscription id.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's subscriptions only by impersonating them (`switch_user`), which
+ * works because the filter resolves against the impersonated user.
  */
 final class PushSubscriptionUserExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -47,10 +51,6 @@ final class PushSubscriptionUserExtension implements QueryCollectionExtensionInt
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (PushSubscription::class !== $resourceClass) {
-            return;
-        }
-
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
 

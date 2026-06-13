@@ -12,9 +12,13 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters UserGroup queries so non-admin users only see groups they own or
+ * Filters UserGroup queries so users only see groups they own or
  * belong to. Item lookups for non-member groups return 404 rather than 403,
  * matching the existence-hiding behavior used elsewhere (Project, Task).
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's groups only by impersonating them (`switch_user`), which works
+ * because the filter resolves against the impersonated user.
  */
 final class UserGroupAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -46,10 +50,6 @@ final class UserGroupAccessExtension implements QueryCollectionExtensionInterfac
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (UserGroup::class !== $resourceClass) {
-            return;
-        }
-
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
 

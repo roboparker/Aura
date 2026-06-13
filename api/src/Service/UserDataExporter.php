@@ -124,7 +124,7 @@ final class UserDataExporter
         return array_map(static fn (\App\Entity\ApiToken $t): array => [
             'id' => (string) $t->getId(),
             'name' => $t->getName(),
-            'scopes' => $t->getScopes(),
+            'accessPolicy' => $t->getAccessPolicy(),
             'createdAt' => $t->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'lastUsedAt' => $t->getLastUsedAt()?->format(\DateTimeInterface::ATOM),
         ], $rows);
