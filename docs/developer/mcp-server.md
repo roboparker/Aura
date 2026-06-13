@@ -26,7 +26,7 @@ Authorization: Bearer madori_pat_<secret>
 
 ### Minting a token
 
-Authenticate to the PWA, then `POST /api-tokens` with a name (and optional `scopes` allow-list and `expiresAt`):
+Authenticate to the PWA, then `POST /api-tokens` with a name (and optional `accessPolicy` and `expiresAt`):
 
 ```bash
 curl -X POST https://your-madori/api-tokens \
@@ -37,9 +37,21 @@ curl -X POST https://your-madori/api-tokens \
 
 The response includes a one-shot `plainToken` field — copy it; subsequent `GET /api-tokens` calls do not return it again. The persisted database row stores only the sha256 hash.
 
-`scopes` is an array drawn from a fixed **resource vocabulary** (`ApiToken::SCOPE_VOCABULARY`), `Assert\Choice`-validated: `read:tasks`, `write:tasks`, `read:projects`, `write:projects`, `read:pages`, `admin`. The empty array (default) means "all tools." Each registered tool maps to a required scope via `App\Mcp\ScopeMap`, with `write:*` implying the matching `read:*` and `admin` acting as a superset — so e.g. `["read:tasks", "read:projects"]` yields a read-only token. (Raw tool names like `get_task` are **not** valid scope values and will be rejected.)
+A token acts **as its owner**. By default (`accessPolicy: null`) it can do exactly what the owner can. To narrow it, send an `accessPolicy` in the shared none/view/edit model (`App\Security\Access\AccessPolicy` — the same shape used for admin-impersonation consent):
 
-`POST /api-tokens` and `GET /api-tokens` use the cookie-based PWA session (firewall: `main`); the `/mcp` firewall is independent and accepts only Bearer tokens.
+```json
+{
+  "name": "Read-only support bot",
+  "accessPolicy": {
+    "categories": { "tasks": "view", "projects": "view" },
+    "items": { "project": { "<uuid>": "edit" } }
+  }
+}
+```
+
+`categories` keys are `tasks` / `projects` / `pages` / `discussions` / `comments` / `notifications` / `files`; `items` keys are `project` / `page` / `task` / `discussion` mapping a UUID to a level (an item override wins over its category). Omitted categories default to `none`. The **same policy governs both the REST API and MCP**: REST requests are gated by `App\EventListener\AccessPolicyListener` (path→category, method→view/edit) + per-item collection filtering; MCP tool calls are gated by `App\Mcp\McpToolPolicy` (each tool → category + read/write). MCP enforcement is category-level (tool ids aren't parsed for per-item overrides).
+
+Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and the main REST firewall (the authenticator only engages when the Bearer header is present and keeps the request stateless). `POST /api-tokens` and `GET /api-tokens` themselves use the cookie-based PWA session.
 
 ### Revoking
 

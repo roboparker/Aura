@@ -14,16 +14,22 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Task queries so non-admin users only see tasks they can act on:
+ * Filters Task queries so users only see tasks they can act on:
  * tasks they own directly, plus any task attached to a project whose
  * space they belong to (#185). Applies to both collection and item
  * queries as defense-in-depth against leaks; operation-level `security`
  * already covers item access.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's tasks only by impersonating them (`switch_user`), which works
+ * because the filter resolves against the impersonated user.
  */
 final class TaskOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
-    public function __construct(private Security $security)
-    {
+    public function __construct(
+        private Security $security,
+        private AccessPolicyItemScope $accessPolicyItemScope,
+    ) {
     }
 
     public function applyToCollection(
@@ -34,6 +40,17 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         array $context = [],
     ): void {
         $this->applyFilter($queryBuilder, $resourceClass);
+
+        // Drop tasks hidden by per-item impersonation overrides (no-op when
+        // not impersonating). Item routes are guarded by the listener.
+        if (Task::class === $resourceClass) {
+            $this->accessPolicyItemScope->applyToCollection(
+                $queryBuilder,
+                $queryBuilder->getRootAliases()[0],
+                'task',
+                'task_access_imp',
+            );
+        }
     }
 
     public function applyToItem(
@@ -50,10 +67,6 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (Task::class !== $resourceClass) {
-            return;
-        }
-
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
 

@@ -1,34 +1,24 @@
 import { ENTRYPOINT } from "@/config/entrypoint";
 
 /**
- * Personal access token types + the scope vocabulary, mirrored from the
- * backend `App\Entity\ApiToken::SCOPE_VOCABULARY`. Keep in lock-step — the
- * server rejects unknown scopes with a 422.
+ * Personal access token types. A token acts as its owner, optionally narrowed
+ * by `accessPolicy` — the shared none/view/edit-per-category(+item) shape from
+ * `App\Security\Access\AccessPolicy`. `null` = unrestricted (acts as owner).
  */
+export interface TokenAccessPolicy {
+  categories: Record<string, string>;
+  items: Record<string, Record<string, string>>;
+}
+
 export interface ApiTokenRow {
   "@id": string;
   id: string;
   name: string;
-  scopes: string[];
+  accessPolicy: TokenAccessPolicy | null;
   lastUsedAt: string | null;
   expiresAt: string | null;
   createdAt: string;
 }
-
-export interface ApiScope {
-  value: string;
-  label: string;
-  description: string;
-}
-
-export const API_SCOPES: ApiScope[] = [
-  { value: "read:tasks", label: "read:tasks", description: "View tasks, comments, attachments" },
-  { value: "write:tasks", label: "write:tasks", description: "Create & edit tasks (and delete)" },
-  { value: "read:projects", label: "read:projects", description: "List & read project metadata" },
-  { value: "write:projects", label: "write:projects", description: "Create & edit projects" },
-  { value: "read:pages", label: "read:pages", description: "Read pages content" },
-  { value: "admin", label: "admin", description: "Full read + write across your workspace" },
-];
 
 export interface ExpiryOption {
   value: string;
@@ -73,7 +63,7 @@ export interface CreatedApiToken extends ApiTokenRow {
 
 export const createApiToken = async (input: {
   name: string;
-  scopes: string[];
+  accessPolicy: TokenAccessPolicy | null;
   expiresAt: string | null;
 }): Promise<CreatedApiToken> => {
   const res = await fetch(`${ENTRYPOINT}/api-tokens`, {

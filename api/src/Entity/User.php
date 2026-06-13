@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Security\Access\AccessPolicy;
 use App\Service\AvatarColorService;
 use App\State\UserPasswordHasherProcessor;
 use App\Validator\PasswordPolicy;
@@ -253,6 +254,46 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      */
     public const LANDING_PAGES = ['tasks', 'notifications', 'spaces', 'space'];
 
+    /**
+     * Content categories an impersonating admin's access is scoped to (see
+     * the `impersonationAccess` preference + App\EventListener\
+     * AccessPolicyListener). Each maps to one or more API path
+     * prefixes in the listener.
+     */
+    public const IMPERSONATION_CATEGORIES = [
+        'tasks',
+        'projects',
+        'pages',
+        'discussions',
+        'comments',
+        'notifications',
+        'files',
+    ];
+
+    /** Per-category impersonation access levels, least → most permissive. */
+    public const IMPERSONATION_LEVELS = ['none', 'view', 'edit'];
+
+    /**
+     * Addressable content types that support per-item impersonation overrides
+     * (an override for a specific id wins over its category default). Each
+     * maps to one of IMPERSONATION_CATEGORIES.
+     */
+    public const IMPERSONATION_ITEM_TYPES = ['project', 'page', 'task', 'discussion'];
+
+    /** @var array<string, string> item type → owning category */
+    private const IMPERSONATION_ITEM_CATEGORY = [
+        'project' => 'projects',
+        'page' => 'pages',
+        'task' => 'tasks',
+        'discussion' => 'discussions',
+    ];
+
+    /** The category an item-override type rolls up to, or null if unknown. */
+    public static function impersonationCategoryForItemType(string $type): ?string
+    {
+        return self::IMPERSONATION_ITEM_CATEGORY[$type] ?? null;
+    }
+
     public const DEFAULT_PREFERENCES = [
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
         // scheduling + reminder display and digest/quiet-hours math.
@@ -280,6 +321,37 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // personal "Private" space). Default matches #405: land in the
         // workspace with the personal space active.
         'landing' => ['page' => 'space', 'spaceId' => null],
+        // Privacy: when false (the default), platform admins CANNOT
+        // impersonate this account via the firewall's switch_user feature.
+        // The user must explicitly opt in. Enforced server-side by
+        // App\Security\ImpersonationVoter, so this flag is authoritative —
+        // not just a UI hint.
+        'canBeImpersonated' => false,
+        // Per-category access granted to an admin WHILE impersonating (only
+        // meaningful when canBeImpersonated is true). Each category is
+        // 'none' | 'view' | 'edit'; default 'none' across the board, so
+        // turning impersonation on grants nothing until the user opts in per
+        // category. Enforced by App\EventListener\AccessPolicyListener.
+        'impersonationAccess' => [
+            'tasks' => 'none',
+            'projects' => 'none',
+            'pages' => 'none',
+            'discussions' => 'none',
+            'comments' => 'none',
+            'notifications' => 'none',
+            'files' => 'none',
+        ],
+        // Per-item overrides keyed by item type → { uuid => 'none'|'view'|
+        // 'edit' }. An entry wins over its category default in
+        // `impersonationAccess`; absent ids inherit the category default.
+        // Empty by default. Enforced by AccessPolicyListener (item
+        // routes) + AccessPolicyItemScope (collection row filtering).
+        'impersonationItemAccess' => [
+            'project' => [],
+            'page' => [],
+            'task' => [],
+            'discussion' => [],
+        ],
     ];
 
     public function getId(): ?Uuid
@@ -479,6 +551,95 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     {
         $this->preferences = $preferences;
         return $this;
+    }
+
+    /**
+     * Whether this account has opted in to admin impersonation
+     * (switch_user). Off by default — see {@see DEFAULT_PREFERENCES}.
+     * Read by {@see \App\Security\ImpersonationVoter}.
+     */
+    public function canBeImpersonated(): bool
+    {
+        return true === ($this->getPreferences()['canBeImpersonated'] ?? false);
+    }
+
+    /**
+     * The access level ('none' | 'view' | 'edit') an impersonating admin
+     * has for the given content category. Unknown / malformed values fall
+     * back to the safe default 'none'. Read by
+     * {@see \App\EventListener\AccessPolicyListener}.
+     */
+    public function getImpersonationLevel(string $category): string
+    {
+        $access = $this->getPreferences()['impersonationAccess'] ?? [];
+        $level = is_array($access) ? ($access[$category] ?? null) : null;
+
+        return is_string($level) && in_array($level, self::IMPERSONATION_LEVELS, true)
+            ? $level
+            : 'none';
+    }
+
+    /**
+     * The effective impersonation level for one specific item: its per-item
+     * override if set, otherwise the item type's category default. Read by
+     * {@see \App\EventListener\AccessPolicyListener} for item routes.
+     */
+    public function getImpersonationItemLevel(string $type, string $id): string
+    {
+        $itemAccess = $this->getPreferences()['impersonationItemAccess'] ?? [];
+        $perType = is_array($itemAccess) ? ($itemAccess[$type] ?? null) : null;
+        if (is_array($perType)) {
+            $level = $perType[$id] ?? null;
+            if (is_string($level) && in_array($level, self::IMPERSONATION_LEVELS, true)) {
+                return $level;
+            }
+        }
+
+        $category = self::impersonationCategoryForItemType($type);
+
+        return null !== $category ? $this->getImpersonationLevel($category) : 'none';
+    }
+
+    /**
+     * Partition the per-item overrides for one item type into the ids hidden
+     * ('none') and the ids explicitly made visible ('view' | 'edit'). Used by
+     * {@see \App\Doctrine\AccessPolicyItemScope} to filter collection rows.
+     *
+     * @return array{none: list<string>, visible: list<string>}
+     */
+    public function impersonationItemPartition(string $type): array
+    {
+        $none = [];
+        $visible = [];
+        $itemAccess = $this->getPreferences()['impersonationItemAccess'] ?? [];
+        $perType = is_array($itemAccess) ? ($itemAccess[$type] ?? null) : null;
+        if (is_array($perType)) {
+            foreach ($perType as $id => $level) {
+                if (!is_string($id) || !is_string($level)) {
+                    continue;
+                }
+                if ('none' === $level) {
+                    $none[] = $id;
+                } elseif ('view' === $level || 'edit' === $level) {
+                    $visible[] = $id;
+                }
+            }
+        }
+
+        return ['none' => $none, 'visible' => $visible];
+    }
+
+    /**
+     * This user's admin-impersonation consent expressed as the shared
+     * {@see AccessPolicy} the actor-agnostic enforcement engine consumes.
+     */
+    public function getImpersonationPolicy(): AccessPolicy
+    {
+        $prefs = $this->getPreferences();
+        $categories = is_array($prefs['impersonationAccess'] ?? null) ? $prefs['impersonationAccess'] : [];
+        $items = is_array($prefs['impersonationItemAccess'] ?? null) ? $prefs['impersonationItemAccess'] : [];
+
+        return new AccessPolicy($categories, $items);
     }
 
     // --- TOTP two-factor (Scheb) ---

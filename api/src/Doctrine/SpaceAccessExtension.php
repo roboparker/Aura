@@ -14,11 +14,14 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Space queries so non-admin users only see spaces they
- * belong to — directly via `SpaceMembership` or transitively via a
- * `UserGroup` listed in `SpaceGroupMembership`. Item lookups for
- * non-member spaces return 404 rather than 403, mirroring
- * ProjectAccessExtension.
+ * Filters Space queries so users only see spaces they belong to —
+ * directly via `SpaceMembership` or transitively via a `UserGroup`
+ * listed in `SpaceGroupMembership`. Item lookups for non-member spaces
+ * return 404 rather than 403, mirroring ProjectAccessExtension.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's spaces only by impersonating them (`switch_user`), which works
+ * because the filter resolves against the impersonated user.
  *
  * Implemented as an EXISTS subquery on the root query (rather than a
  * join) so the Space's `userMemberships` and `groupMemberships`
@@ -57,9 +60,6 @@ final class SpaceAccessExtension implements
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (Space::class !== $resourceClass) {
-            return;
-        }
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
         $user = $this->security->getUser();

@@ -21,4 +21,9 @@ final class DiscussionAccessExtension extends AbstractSpaceAccessExtension
     {
         return 'disc_access';
     }
+
+    protected function getImpersonationItemType(): string
+    {
+        return 'discussion';
+    }
 }

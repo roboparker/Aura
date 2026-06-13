@@ -78,6 +78,44 @@ class SpaceTest extends ApiTestCase
         $this->assertJsonContains(['totalItems' => 1]);
     }
 
+    public function testAdminListShowsOnlyOwnSpaces(): void
+    {
+        $alice = $this->createUserWithPersonalSpace('alice@example.com');
+        // Bob is an instance admin (ROLE_ADMIN) but not a member of
+        // alice's shared space.
+        $bob = $this->createUserWithPersonalSpace('bob@example.com');
+        $bob->setRoles(['ROLE_USER', 'ROLE_ADMIN']);
+        $this->entityManager->flush();
+        $this->createSharedSpace($alice, 'Alice solo shared');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('GET', '/spaces');
+
+        $this->assertResponseIsSuccessful();
+        // The admin's collection listing is membership-scoped: bob sees
+        // only his own personal space, not alice's shared space.
+        $this->assertJsonContains(['totalItems' => 1]);
+    }
+
+    public function testAdminGetNonMemberSpaceItemReturns404(): void
+    {
+        $alice = $this->createUserWithPersonalSpace('alice@example.com');
+        $bob = $this->createUserWithPersonalSpace('bob@example.com');
+        $bob->setRoles(['ROLE_USER', 'ROLE_ADMIN']);
+        $this->entityManager->flush();
+        $shared = $this->createSharedSpace($alice, 'Alice solo shared');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        // No admin item bypass: an admin who isn't a member sees the same
+        // existence-hiding 404 as anyone else. Cross-user reach is via
+        // impersonation (switch_user) only.
+        $client->request('GET', '/spaces/' . $shared->getId());
+
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testGetOtherUsersPersonalSpaceReturns404(): void
     {
         $alice = $this->createUserWithPersonalSpace('alice@example.com');

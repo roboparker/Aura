@@ -7,14 +7,15 @@ use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
-use App\Mcp\ScopeMap;
 use App\Repository\ApiTokenRepository;
+use App\Security\Access\AccessPolicy;
 use App\State\ApiTokenCreateProcessor;
 use App\State\ApiTokenDeleteProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Personal access token bound to a single user, used to authenticate
@@ -26,9 +27,13 @@ use Symfony\Component\Validator\Constraints as Assert;
  * the pattern already established by {@see PasswordResetToken} and
  * {@see UserInvite}, just with a different prefix and longer entropy.
  *
- * `scopes` is a free-form JSON array. The current implementation treats
- * the empty array as "all MCP tools allowed"; future iterations can
- * narrow per-tool access without a schema change.
+ * A token acts AS its owner, optionally narrowed by `accessPolicy` — the
+ * same {@see AccessPolicy} shape used for admin-impersonation consent
+ * (per-category + per-item none/view/edit). `null` means "unrestricted":
+ * the token can do exactly what its owner can in the app. The policy is
+ * enforced uniformly across the REST API + MCP by the shared engine
+ * (App\Security\Access\ActorPolicyResolver + AccessPolicyListener /
+ * AccessPolicyItemScope on REST; the MCP controller on tool dispatch).
  */
 #[ApiResource(
     shortName: 'ApiToken',
@@ -73,20 +78,6 @@ class ApiToken
 
     public const MAX_NAME_LENGTH = 80;
 
-    /**
-     * Resource-oriented scope vocabulary the UI offers and the API accepts.
-     * Tools are mapped to these via {@see ScopeMap}; `admin` is the superset.
-     * An empty scope list means "all tools" (the personal-token default).
-     */
-    public const SCOPE_VOCABULARY = [
-        'read:tasks',
-        'write:tasks',
-        'read:projects',
-        'write:projects',
-        'read:pages',
-        'admin',
-    ];
-
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -112,20 +103,16 @@ class ApiToken
     private string $name = '';
 
     /**
-     * Allow-list of MCP tool names the token may invoke. Empty array means
-     * "all tools" — the common case for personal tokens. Stored as JSON so
-     * granular scope work later doesn't need a schema migration.
+     * Optional capability narrowing for this token, in the shared
+     * {@see AccessPolicy} shape: `{ categories: { tasks: 'view', … },
+     * items: { project: { '<uuid>': 'edit' } } }`. `null` = unrestricted
+     * (acts exactly as the owner). Validated by {@see validateAccessPolicy()}.
      *
-     * @var string[]
+     * @var array<string, mixed>|null
      */
-    #[ORM\Column(type: 'json')]
+    #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['api_token:read', 'api_token:write'])]
-    #[Assert\Choice(
-        choices: self::SCOPE_VOCABULARY,
-        multiple: true,
-        message: 'Unknown scope. Allowed: {{ choices }}.',
-    )]
-    private array $scopes = [];
+    private ?array $accessPolicy = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['api_token:read'])]
@@ -201,20 +188,35 @@ class ApiToken
         return $this;
     }
 
-    /** @return string[] */
-    public function getScopes(): array
+    /** @return array<string, mixed>|null */
+    public function getAccessPolicy(): ?array
     {
-        return $this->scopes;
+        return $this->accessPolicy;
     }
 
-    /** @param string[] $scopes */
-    public function setScopes(array $scopes): static
+    /** @param array<string, mixed>|null $accessPolicy */
+    public function setAccessPolicy(?array $accessPolicy): static
     {
-        $this->scopes = array_values(array_unique(array_filter(
-            $scopes,
-            static fn (string $v) => '' !== $v,
-        )));
+        $this->accessPolicy = $accessPolicy;
         return $this;
+    }
+
+    /**
+     * The token's capability narrowing as a runtime {@see AccessPolicy}, or
+     * null when unrestricted (acts exactly as its owner).
+     */
+    public function toAccessPolicy(): ?AccessPolicy
+    {
+        if (null === $this->accessPolicy) {
+            return null;
+        }
+        $categories = $this->accessPolicy['categories'] ?? [];
+        $items = $this->accessPolicy['items'] ?? [];
+
+        return new AccessPolicy(
+            is_array($categories) ? $categories : [],
+            is_array($items) ? $items : [],
+        );
     }
 
     public function getLastUsedAt(): ?\DateTimeImmutable
@@ -253,12 +255,49 @@ class ApiToken
     }
 
     /**
-     * True when the token's scope set permits the named tool. Resolution
-     * (resource scopes, `admin` superset, write⇒read, empty⇒all) lives in
-     * {@see ScopeMap} so it can be unit-tested and shared.
+     * Validates the optional accessPolicy blob: a `{categories, items}` object
+     * over the known categories / item types / none-view-edit levels. Runs on
+     * POST via the validator; null (unrestricted) is always valid.
      */
-    public function allowsTool(string $tool): bool
+    #[Assert\Callback]
+    public function validateAccessPolicy(ExecutionContextInterface $context): void
     {
-        return ScopeMap::isToolAllowed($this->scopes, $tool);
+        if (null === $this->accessPolicy) {
+            return;
+        }
+        $categories = $this->accessPolicy['categories'] ?? [];
+        $items = $this->accessPolicy['items'] ?? [];
+        if (!is_array($categories) || !is_array($items)) {
+            $context->buildViolation('accessPolicy must be an object with categories and items.')
+                ->atPath('accessPolicy')->addViolation();
+            return;
+        }
+        foreach ($categories as $cat => $level) {
+            if (
+                !is_string($cat) || !in_array($cat, AccessPolicy::CATEGORIES, true)
+                || !is_string($level) || !in_array($level, AccessPolicy::LEVELS, true)
+            ) {
+                $context->buildViolation('accessPolicy.categories has an unknown category or level.')
+                    ->atPath('accessPolicy')->addViolation();
+                return;
+            }
+        }
+        foreach ($items as $type => $map) {
+            if (!is_string($type) || !in_array($type, AccessPolicy::ITEM_TYPES, true) || !is_array($map)) {
+                $context->buildViolation('accessPolicy.items has an unknown item type.')
+                    ->atPath('accessPolicy')->addViolation();
+                return;
+            }
+            foreach ($map as $id => $level) {
+                if (
+                    !is_string($id) || !Uuid::isValid($id)
+                    || !is_string($level) || !in_array($level, AccessPolicy::LEVELS, true)
+                ) {
+                    $context->buildViolation('accessPolicy.items entries must be UUID → none|view|edit.')
+                        ->atPath('accessPolicy')->addViolation();
+                    return;
+                }
+            }
+        }
     }
 }

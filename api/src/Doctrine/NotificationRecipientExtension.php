@@ -12,9 +12,13 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Notification queries so non-admin users only see notifications
+ * Filters Notification queries so users only see notifications
  * addressed to them. Item-level filtering means cross-user lookups return
  * 404 rather than leak existence.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's notifications only by impersonating them (`switch_user`), which
+ * works because the filter resolves against the impersonated user.
  */
 final class NotificationRecipientExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -46,10 +50,6 @@ final class NotificationRecipientExtension implements QueryCollectionExtensionIn
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (Notification::class !== $resourceClass) {
-            return;
-        }
-
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
 

@@ -12,7 +12,8 @@ test.describe("Notifications", () => {
   test("authenticated users see the notification bell with a zero state", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     // Land on the workspace home (registerAndSignIn redirects there) — the
-    // bell is part of the navbar and is visible on every authenticated route.
+    // bell lives in the sidebar header and is visible on every authenticated
+    // route (#nav-refresh).
     const bell = page.locator('[data-testid="notification-bell"]');
     await expect(bell).toBeVisible();
     // No notifications yet → no count badge rendered.

@@ -12,9 +12,13 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters Tag queries so non-admin users only see their own tags. Mirrors
+ * Filters Tag queries so users only see their own tags. Mirrors
  * TaskOwnerExtension; applied at both collection and item level to keep
  * cross-user tag lookups (including as task.tags members) returning 404.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's tags only by impersonating them (`switch_user`), which works
+ * because the filter resolves against the impersonated user.
  */
 final class TagOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -46,10 +50,6 @@ final class TagOwnerExtension implements QueryCollectionExtensionInterface, Quer
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (Tag::class !== $resourceClass) {
-            return;
-        }
-
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
 

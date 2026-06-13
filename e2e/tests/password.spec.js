@@ -79,10 +79,10 @@ test.describe("Change password (authenticated)", () => {
       page.locator('[data-testid="change-password-success"]')
     ).toBeVisible();
 
-    // Sign out and sign back in with the new password. The Sign Out button
-    // lives inside the right-side "My Account" sheet.
+    // Sign out and sign back in with the new password. Sign Out now
+    // lives in the sidebar header's account dropdown (#nav-refresh).
     await openAccountMenu(page);
-    await page.click('button:has-text("Sign Out")');
+    await page.locator('[data-testid="user-menu-signout"]').click();
     await page.goto(`${BASE_URL}/signin`);
     await page.fill("#email", email);
     await page.fill("#password", "BrandNewPass1!");

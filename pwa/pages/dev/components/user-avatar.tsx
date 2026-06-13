@@ -16,7 +16,7 @@ const lin = {
 const UserAvatarPage = () => (
   <ComponentDoc
     name="UserAvatar"
-    description="Renders the uploaded image when present, otherwise white initials on the user's `personalizedColor` (a contrast-safe palette picked at signup). Sizes: sm (32px), md (40px), lg (96px)."
+    description="Renders the uploaded image when present, otherwise white initials on the user's `personalizedColor` (a contrast-safe palette picked at signup). Sizes: sm (32px), md (40px), lg (96px). Shape: circle (default) or square (rounded edges, used in the sidebar header)."
     importPath={`import UserAvatar from "@/components/user/UserAvatar";`}
     examples={[
       {
@@ -33,6 +33,17 @@ const UserAvatarPage = () => (
             <UserAvatar user={ada} size="sm" />
             <UserAvatar user={ada} size="md" />
             <UserAvatar user={lin} size="lg" />
+          </div>
+        ),
+      },
+      {
+        title: "Square shape (rounded edges)",
+        code: `<UserAvatar user={ada} shape="square" />`,
+        preview: (
+          <div className="flex items-center gap-4">
+            <UserAvatar user={ada} size="sm" shape="square" />
+            <UserAvatar user={ada} size="md" shape="square" />
+            <UserAvatar user={lin} size="lg" shape="square" />
           </div>
         ),
       },

@@ -166,11 +166,14 @@ test.describe("Groups", () => {
     ).toBeVisible();
   });
 
-  test("sidebar shows Groups link when authenticated", async ({ page }) => {
+  test("account menu shows Manage Groups link when authenticated", async ({
+    page,
+  }) => {
     await registerAndSignIn(page, uniqueEmail());
     await openAccountMenu(page);
-    await expect(page.locator("nav >> text=Groups")).toBeVisible();
-    await page.locator("nav >> text=Groups").click();
+    const groupsItem = page.getByRole("menuitem", { name: "Manage Groups" });
+    await expect(groupsItem).toBeVisible();
+    await groupsItem.click();
     await expect(page).toHaveURL(/\/groups/);
   });
 });

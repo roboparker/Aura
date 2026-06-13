@@ -10,6 +10,7 @@ import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
 import WaitlistGate from "@/components/auth/WaitlistGate";
 import Footer from "./Footer";
+import ImpersonationBanner from "./ImpersonationBanner";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
@@ -26,17 +27,23 @@ const AppShell = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    // Persistent left sidebar (`md:` and up) when signed in; the navbar's
-    // mobile Sheet handles the small-screen case. Sidebar renders nothing
-    // for unauthenticated visitors so the marketing/auth screens keep their
-    // original full-width layout. Sidebar sits outside the navbar+content
-    // column so it spans the full viewport height.
-    <div className="flex min-h-screen">
-      <Sidebar />
-      <div className="flex-1 min-w-0 flex flex-col">
+    // Full-width sticky header (ImpersonationBanner above the top bar,
+    // pinned together) spanning the whole viewport; below it a row of
+    // persistent left sidebar (`md:` and up) + content. The navbar's
+    // mobile Sheet handles the small-screen sidebar case. The Sidebar
+    // renders nothing for unauthenticated visitors so the marketing/auth
+    // screens keep their original full-width layout.
+    <div className="flex min-h-screen flex-col">
+      <div className="sticky top-0 z-30">
+        <ImpersonationBanner />
         <Navbar />
-        <div className="flex-1">{children}</div>
-        <Footer />
+      </div>
+      <div className="flex flex-1 min-h-0">
+        <Sidebar />
+        <div className="flex-1 min-w-0 flex flex-col">
+          <div className="flex-1">{children}</div>
+          <Footer />
+        </div>
       </div>
     </div>
   );
