@@ -63,6 +63,16 @@ class UserPreferencesController extends AbstractController
             if (null !== $error) {
                 return $this->json(['error' => $error], 422);
             }
+            // Preferences merge shallowly at the top level, so a partial
+            // impersonationAccess patch (only the categories that changed)
+            // would otherwise drop the rest. Merge it over the current full
+            // matrix to keep unspecified categories intact.
+            if ('impersonationAccess' === $key && is_array($value)) {
+                $existing = is_array($current['impersonationAccess'] ?? null)
+                    ? $current['impersonationAccess']
+                    : [];
+                $value = array_merge($existing, $value);
+            }
             // `landing.spaceId` only carries meaning for the 'space'
             // page — normalise it away for the other destinations so a
             // stale id can't linger on the stored object.
@@ -98,6 +108,7 @@ class UserPreferencesController extends AbstractController
             'emailNotificationsEnabled', 'pushNotificationsEnabled', 'canBeImpersonated' => is_bool($value)
                 ? null
                 : sprintf('%s must be a boolean.', $key),
+            'impersonationAccess' => $this->validateImpersonationAccess($value),
             'notificationMatrix' => $this->validateMatrix($value),
             'emailDigest' => $this->validateDigest($value),
             'quietHours' => $this->validateQuietHours($value),
@@ -136,6 +147,30 @@ class UserPreferencesController extends AbstractController
         $space = $this->em->getRepository(Space::class)->find(Uuid::fromString($spaceId));
         if (null === $space || !$space->hasMember($user)) {
             return $invalid;
+        }
+        return null;
+    }
+
+    /**
+     * Validate the per-category impersonation access matrix. Accepts a
+     * partial object (only the categories being changed); each value must be
+     * a known category mapped to one of the access levels.
+     */
+    private function validateImpersonationAccess(mixed $value): ?string
+    {
+        if (!is_array($value)) {
+            return 'impersonationAccess must be an object.';
+        }
+        foreach ($value as $category => $level) {
+            if (!is_string($category) || !in_array($category, User::IMPERSONATION_CATEGORIES, true)) {
+                return sprintf(
+                    'Unknown impersonation category: %s.',
+                    is_string($category) ? $category : gettype($category),
+                );
+            }
+            if (!is_string($level) || !in_array($level, User::IMPERSONATION_LEVELS, true)) {
+                return sprintf('impersonationAccess.%s must be one of: hidden, view, edit.', $category);
+            }
         }
         return null;
     }

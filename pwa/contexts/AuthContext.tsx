@@ -48,7 +48,25 @@ export interface UserPreferences {
    * server-side by the ImpersonationVoter, not just here.
    */
   canBeImpersonated: boolean;
+  /**
+   * Per-content-category access granted to an admin while impersonating
+   * (only meaningful when canBeImpersonated is true). Each category is
+   * "hidden" | "view" | "edit"; enforced server-side by the
+   * ImpersonationAccessListener.
+   */
+  impersonationAccess: Record<ImpersonationCategory, ImpersonationLevel>;
 }
+
+export type ImpersonationLevel = "hidden" | "view" | "edit";
+
+export type ImpersonationCategory =
+  | "tasks"
+  | "projects"
+  | "pages"
+  | "discussions"
+  | "comments"
+  | "notifications"
+  | "files";
 
 export interface TwoFactorStatus {
   enabled: boolean;

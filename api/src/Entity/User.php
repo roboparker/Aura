@@ -253,6 +253,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      */
     public const LANDING_PAGES = ['tasks', 'notifications', 'spaces', 'space'];
 
+    /**
+     * Content categories an impersonating admin's access is scoped to (see
+     * the `impersonationAccess` preference + App\EventListener\
+     * ImpersonationAccessListener). Each maps to one or more API path
+     * prefixes in the listener.
+     */
+    public const IMPERSONATION_CATEGORIES = [
+        'tasks',
+        'projects',
+        'pages',
+        'discussions',
+        'comments',
+        'notifications',
+        'files',
+    ];
+
+    /** Per-category impersonation access levels, least → most permissive. */
+    public const IMPERSONATION_LEVELS = ['hidden', 'view', 'edit'];
+
     public const DEFAULT_PREFERENCES = [
         // IANA time-zone identifier (e.g. "America/New_York"). Anchors
         // scheduling + reminder display and digest/quiet-hours math.
@@ -286,6 +305,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // App\Security\ImpersonationVoter, so this flag is authoritative —
         // not just a UI hint.
         'canBeImpersonated' => false,
+        // Per-category access granted to an admin WHILE impersonating (only
+        // meaningful when canBeImpersonated is true). Each category is
+        // 'hidden' | 'view' | 'edit'; default 'hidden' across the board, so
+        // turning impersonation on grants nothing until the user opts in per
+        // category. Enforced by App\EventListener\ImpersonationAccessListener.
+        'impersonationAccess' => [
+            'tasks' => 'hidden',
+            'projects' => 'hidden',
+            'pages' => 'hidden',
+            'discussions' => 'hidden',
+            'comments' => 'hidden',
+            'notifications' => 'hidden',
+            'files' => 'hidden',
+        ],
     ];
 
     public function getId(): ?Uuid
@@ -495,6 +528,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function canBeImpersonated(): bool
     {
         return true === ($this->getPreferences()['canBeImpersonated'] ?? false);
+    }
+
+    /**
+     * The access level ('hidden' | 'view' | 'edit') an impersonating admin
+     * has for the given content category. Unknown / malformed values fall
+     * back to the safe default 'hidden'. Read by
+     * {@see \App\EventListener\ImpersonationAccessListener}.
+     */
+    public function getImpersonationLevel(string $category): string
+    {
+        $access = $this->getPreferences()['impersonationAccess'] ?? [];
+        $level = is_array($access) ? ($access[$category] ?? null) : null;
+
+        return is_string($level) && in_array($level, self::IMPERSONATION_LEVELS, true)
+            ? $level
+            : 'hidden';
     }
 
     // --- TOTP two-factor (Scheb) ---
