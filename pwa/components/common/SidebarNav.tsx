@@ -32,9 +32,16 @@ const PERSONAL_NAV_LINKS = [
 // Backend tooling surfaced inside the PWA chrome. The Mercure debugger
 // is served by Caddy (FrankenPHP), not Next.js, so it's a regular <a>
 // link rather than a <Link>. Admin-only.
-const ADMIN_EXTERNAL_LINKS = [
-  { href: "/.well-known/mercure/ui/", label: "Mercure" },
-];
+//
+// The debugger UI only exists when Caddy is started with the `demo`
+// Mercure directive (MERCURE_EXTRA_DIRECTIVES=demo), which we set only
+// in dev + e2e. Production leaves it unset, so /.well-known/mercure/ui/
+// 404s there — hence we omit the link from production builds entirely
+// rather than surface a dead admin link.
+const ADMIN_EXTERNAL_LINKS =
+  process.env.NODE_ENV === "production"
+    ? []
+    : [{ href: "/.well-known/mercure/ui/", label: "Mercure" }];
 
 interface SidebarNavProps {
   /**
