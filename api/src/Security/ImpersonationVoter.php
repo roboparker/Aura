@@ -7,6 +7,7 @@ namespace App\Security;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Authorization\Voter\Vote;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 /**
@@ -29,6 +30,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * Switch-OUT (?_switch_user=_exit) is unaffected — the listener unwraps the
  * SwitchUserToken without consulting this attribute — so an admin can always
  * leave an impersonation session even if the target later revokes consent.
+ *
+ * @extends Voter<string, mixed>
  */
 final class ImpersonationVoter extends Voter
 {
@@ -41,8 +44,12 @@ final class ImpersonationVoter extends Voter
         return 'ROLE_ALLOWED_TO_SWITCH' === $attribute && $subject instanceof User;
     }
 
-    protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token): bool
-    {
+    protected function voteOnAttribute(
+        string $attribute,
+        mixed $subject,
+        TokenInterface $token,
+        ?Vote $vote = null,
+    ): bool {
         // Only platform admins may impersonate at all. isGranted('ROLE_ADMIN')
         // recurses into the decision manager, but this voter abstains on
         // ROLE_ADMIN (supports() requires ROLE_ALLOWED_TO_SWITCH), so there's
