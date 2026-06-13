@@ -9,6 +9,24 @@ const {
 
 const uniqueEmail = () => shared("discussions");
 
+/**
+ * Open a discussion row's "…" overflow menu and click one of its items.
+ *
+ * Pinning re-sorts the row from the "All discussions" section into the
+ * "Pinned" section, which unmounts and remounts the row. A click on the
+ * freshly-remounted trigger can race the remount and fail to open the
+ * portal menu, so retry the open until the target item is actually
+ * visible before clicking it.
+ */
+async function clickRowMenuItem(page, row, testid) {
+  const item = page.locator(`[data-testid="${testid}"]`);
+  await expect(async () => {
+    await row.locator('[data-testid="discussion-row-menu"]').click();
+    await expect(item).toBeVisible({ timeout: 2000 });
+  }).toPass();
+  await item.click();
+}
+
 test.describe("Discussions", () => {
   test("space member can post, filter, edit, pin, and delete a discussion", async ({
     page,
@@ -54,11 +72,9 @@ test.describe("Discussions", () => {
 
     // Admin pin / unpin from the list — actions live in the row's
     // "…" overflow menu (rendered in a portal once opened).
-    await discussion.locator('[data-testid="discussion-row-menu"]').click();
-    await page.locator('[data-testid="discussion-toggle-pin"]').click();
+    await clickRowMenuItem(page, discussion, "discussion-toggle-pin");
     await expect(discussion.locator('[aria-label="Pinned"]')).toBeVisible();
-    await discussion.locator('[data-testid="discussion-row-menu"]').click();
-    await page.locator('[data-testid="discussion-toggle-pin"]').click();
+    await clickRowMenuItem(page, discussion, "discussion-toggle-pin");
     await expect(discussion.locator('[aria-label="Pinned"]')).toHaveCount(0);
 
     // Drill into the detail page via the row's title link.
