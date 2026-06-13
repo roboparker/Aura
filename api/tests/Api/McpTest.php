@@ -282,11 +282,15 @@ class McpTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(202);
     }
 
-    public function testTokenScopesEnforceAllowList(): void
+    public function testTokenAccessPolicyEnforcesReadOnly(): void
     {
         $alice = $this->createUser('alice@example.com');
         $task = $this->makeTask($alice, 'Read me');
-        $plain = $this->mintToken($alice, 'Read-only', scopes: ['read:tasks']);
+        // tasks=view: reads allowed, writes denied.
+        $plain = $this->mintToken($alice, 'Read-only', accessPolicy: [
+            'categories' => ['tasks' => 'view'],
+            'items' => [],
+        ]);
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
@@ -304,19 +308,19 @@ class McpTest extends ApiTestCase
         $this->assertIsArray($content);
         $this->assertIsArray($content[0]);
         $this->assertIsString($content[0]['text']);
-        $this->assertStringContainsString('scopes', $content[0]['text']);
+        $this->assertStringContainsString('scope', $content[0]['text']);
     }
 
-    public function testEveryRegisteredToolHasAScope(): void
+    public function testEveryRegisteredToolHasAPolicyMapping(): void
     {
-        // Guards against a new MCP tool silently defaulting to "allowed for
-        // any scope" — every tool must be mapped in ScopeMap.
+        // Guards against a new MCP tool silently defaulting to "allowed under
+        // any policy" — every tool must be mapped in McpToolPolicy.
         $registry = static::getContainer()->get(\App\Mcp\McpToolRegistry::class);
         foreach ($registry->all() as $tool) {
             $name = $tool->getName();
             $this->assertNotNull(
-                \App\Mcp\ScopeMap::requiredScope($name),
-                sprintf('MCP tool "%s" has no scope mapping in ScopeMap.', $name),
+                \App\Mcp\McpToolPolicy::mapping($name),
+                sprintf('MCP tool "%s" has no mapping in McpToolPolicy.', $name),
             );
         }
     }
@@ -378,17 +382,21 @@ class McpTest extends ApiTestCase
     }
 
     /**
-     * @param list<string> $scopes
+     * @param array<string, mixed>|null $accessPolicy
      */
-    private function mintToken(User $user, string $name, ?\DateTimeImmutable $expiresAt = null, array $scopes = []): string
-    {
+    private function mintToken(
+        User $user,
+        string $name,
+        ?\DateTimeImmutable $expiresAt = null,
+        ?array $accessPolicy = null,
+    ): string {
         $plain = ApiToken::PLAINTEXT_PREFIX . bin2hex(random_bytes(16));
         $token = new ApiToken();
         $token->setUser($user);
         $token->setName($name);
         $token->setTokenHash(hash('sha256', $plain));
         $token->setExpiresAt($expiresAt);
-        $token->setScopes($scopes);
+        $token->setAccessPolicy($accessPolicy);
         $this->entityManager->persist($token);
         $this->entityManager->flush();
         return $plain;

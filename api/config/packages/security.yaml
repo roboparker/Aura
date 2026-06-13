@@ -34,6 +34,14 @@ security:
             stateless: false
             provider: app_user_provider
             user_checker: App\Security\UserChecker
+            # API tokens (Authorization: Bearer madori_pat_…) authenticate the
+            # REST API as their owner, scoped by the token's AccessPolicy
+            # (enforced by App\EventListener\AccessPolicyListener). The
+            # authenticator only engages when the Bearer header is present and
+            # marks the request stateless, so the cookie/json_login/2FA path is
+            # untouched. Tokens also work on the dedicated `mcp` firewall above.
+            custom_authenticators:
+                - App\Security\ApiTokenAuthenticator
             json_login:
                 check_path: auth_login
                 username_path: email

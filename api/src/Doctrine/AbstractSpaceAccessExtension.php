@@ -35,7 +35,7 @@ abstract class AbstractSpaceAccessExtension implements
 {
     public function __construct(
         protected Security $security,
-        protected ImpersonationItemScope $impersonationItemScope,
+        protected AccessPolicyItemScope $accessPolicyItemScope,
     ) {
     }
 
@@ -48,7 +48,7 @@ abstract class AbstractSpaceAccessExtension implements
     /**
      * The per-item impersonation override type for this resource (e.g.
      * 'project'), or null when the resource has no item-level overrides
-     * (CustomFieldDefinition). Drives ImpersonationItemScope filtering.
+     * (CustomFieldDefinition). Drives AccessPolicyItemScope filtering.
      */
     abstract protected function getImpersonationItemType(): ?string;
 
@@ -65,7 +65,7 @@ abstract class AbstractSpaceAccessExtension implements
         // not impersonating). Item routes are guarded by the listener.
         $itemType = $this->getImpersonationItemType();
         if (null !== $itemType && $this->getResourceClass() === $resourceClass) {
-            $this->impersonationItemScope->applyToCollection(
+            $this->accessPolicyItemScope->applyToCollection(
                 $queryBuilder,
                 $queryBuilder->getRootAliases()[0],
                 $itemType,

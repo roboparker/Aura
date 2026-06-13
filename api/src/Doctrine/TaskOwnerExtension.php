@@ -28,7 +28,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
 {
     public function __construct(
         private Security $security,
-        private ImpersonationItemScope $impersonationItemScope,
+        private AccessPolicyItemScope $accessPolicyItemScope,
     ) {
     }
 
@@ -44,7 +44,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         // Drop tasks hidden by per-item impersonation overrides (no-op when
         // not impersonating). Item routes are guarded by the listener.
         if (Task::class === $resourceClass) {
-            $this->impersonationItemScope->applyToCollection(
+            $this->accessPolicyItemScope->applyToCollection(
                 $queryBuilder,
                 $queryBuilder->getRootAliases()[0],
                 'task',

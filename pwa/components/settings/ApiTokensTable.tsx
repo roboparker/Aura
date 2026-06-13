@@ -94,7 +94,7 @@ const ApiTokensTable = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Scopes</TableHead>
+                <TableHead>Access</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Last used</TableHead>
                 <TableHead className="text-right">Action</TableHead>
@@ -106,15 +106,36 @@ const ApiTokensTable = () => {
                   <TableCell className="font-medium">{t.name}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {t.scopes.length === 0 ? (
-                        <Badge variant="secondary">all</Badge>
-                      ) : (
-                        t.scopes.map((s) => (
-                          <Badge key={s} variant="outline" className="font-mono text-xs">
-                            {s}
-                          </Badge>
-                        ))
-                      )}
+                      {(() => {
+                        const policy = t.accessPolicy;
+                        if (!policy) {
+                          return <Badge variant="secondary">Full</Badge>;
+                        }
+                        const grants = Object.entries(policy.categories ?? {}).filter(
+                          ([, lvl]) => lvl !== "none",
+                        );
+                        const itemCount = Object.values(policy.items ?? {}).reduce(
+                          (n, m) => n + Object.keys(m ?? {}).length,
+                          0,
+                        );
+                        if (grants.length === 0 && itemCount === 0) {
+                          return <Badge variant="outline">No access</Badge>;
+                        }
+                        return (
+                          <>
+                            {grants.map(([cat, lvl]) => (
+                              <Badge key={cat} variant="outline" className="font-mono text-xs">
+                                {cat}:{lvl}
+                              </Badge>
+                            ))}
+                            {itemCount > 0 ? (
+                              <Badge variant="outline" className="text-xs">
+                                +{itemCount} item{itemCount === 1 ? "" : "s"}
+                              </Badge>
+                            ) : null}
+                          </>
+                        );
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

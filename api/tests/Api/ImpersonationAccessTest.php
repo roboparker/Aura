@@ -12,7 +12,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * Per-category scoping of an impersonated admin session, driven by the
  * target user's `impersonationAccess` consent matrix and enforced by
- * App\EventListener\ImpersonationAccessListener.
+ * App\EventListener\AccessPolicyListener.
  */
 class ImpersonationAccessTest extends ApiTestCase
 {

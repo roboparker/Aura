@@ -7,6 +7,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Security\Access\AccessPolicy;
 use App\Service\AvatarColorService;
 use App\State\UserPasswordHasherProcessor;
 use App\Validator\PasswordPolicy;
@@ -256,7 +257,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Content categories an impersonating admin's access is scoped to (see
      * the `impersonationAccess` preference + App\EventListener\
-     * ImpersonationAccessListener). Each maps to one or more API path
+     * AccessPolicyListener). Each maps to one or more API path
      * prefixes in the listener.
      */
     public const IMPERSONATION_CATEGORIES = [
@@ -330,7 +331,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // meaningful when canBeImpersonated is true). Each category is
         // 'none' | 'view' | 'edit'; default 'none' across the board, so
         // turning impersonation on grants nothing until the user opts in per
-        // category. Enforced by App\EventListener\ImpersonationAccessListener.
+        // category. Enforced by App\EventListener\AccessPolicyListener.
         'impersonationAccess' => [
             'tasks' => 'none',
             'projects' => 'none',
@@ -343,8 +344,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // Per-item overrides keyed by item type → { uuid => 'none'|'view'|
         // 'edit' }. An entry wins over its category default in
         // `impersonationAccess`; absent ids inherit the category default.
-        // Empty by default. Enforced by ImpersonationAccessListener (item
-        // routes) + ImpersonationItemScope (collection row filtering).
+        // Empty by default. Enforced by AccessPolicyListener (item
+        // routes) + AccessPolicyItemScope (collection row filtering).
         'impersonationItemAccess' => [
             'project' => [],
             'page' => [],
@@ -566,7 +567,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      * The access level ('none' | 'view' | 'edit') an impersonating admin
      * has for the given content category. Unknown / malformed values fall
      * back to the safe default 'none'. Read by
-     * {@see \App\EventListener\ImpersonationAccessListener}.
+     * {@see \App\EventListener\AccessPolicyListener}.
      */
     public function getImpersonationLevel(string $category): string
     {
@@ -581,7 +582,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * The effective impersonation level for one specific item: its per-item
      * override if set, otherwise the item type's category default. Read by
-     * {@see \App\EventListener\ImpersonationAccessListener} for item routes.
+     * {@see \App\EventListener\AccessPolicyListener} for item routes.
      */
     public function getImpersonationItemLevel(string $type, string $id): string
     {
@@ -602,7 +603,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /**
      * Partition the per-item overrides for one item type into the ids hidden
      * ('none') and the ids explicitly made visible ('view' | 'edit'). Used by
-     * {@see \App\Doctrine\ImpersonationItemScope} to filter collection rows.
+     * {@see \App\Doctrine\AccessPolicyItemScope} to filter collection rows.
      *
      * @return array{none: list<string>, visible: list<string>}
      */
@@ -626,6 +627,19 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         }
 
         return ['none' => $none, 'visible' => $visible];
+    }
+
+    /**
+     * This user's admin-impersonation consent expressed as the shared
+     * {@see AccessPolicy} the actor-agnostic enforcement engine consumes.
+     */
+    public function getImpersonationPolicy(): AccessPolicy
+    {
+        $prefs = $this->getPreferences();
+        $categories = is_array($prefs['impersonationAccess'] ?? null) ? $prefs['impersonationAccess'] : [];
+        $items = is_array($prefs['impersonationItemAccess'] ?? null) ? $prefs['impersonationItemAccess'] : [];
+
+        return new AccessPolicy($categories, $items);
     }
 
     // --- TOTP two-factor (Scheb) ---
