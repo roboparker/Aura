@@ -9,6 +9,7 @@ import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import SaveIndicator from "@/components/settings/SaveIndicator";
+import ImpersonationItemExceptions from "@/components/settings/ImpersonationItemExceptions";
 import PermissionTree, {
   type PermissionLevel,
   type PermissionNode,
@@ -119,6 +120,10 @@ const ImpersonationConsent = () => {
             change. Account security actions (password, two-factor, deletion)
             can never be performed while impersonating.
           </p>
+
+          <div className="mt-3 border-t pt-3">
+            <ImpersonationItemExceptions />
+          </div>
         </div>
       ) : null}
 

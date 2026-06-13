@@ -10,24 +10,33 @@ use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
+use Symfony\Component\Uid\Uuid;
 
 /**
- * Scopes what an admin can do/see WHILE impersonating, per the target
- * user's `impersonationAccess` consent matrix.
+ * Scopes what an admin can do/see WHILE impersonating, per the target user's
+ * impersonation consent — both the per-category matrix (`impersonationAccess`)
+ * and per-item overrides (`impersonationItemAccess`).
  *
  * The master gate (may this admin impersonate this user at all?) is
  * App\Security\ImpersonationVoter. Once a session is impersonating — i.e.
- * carries a SwitchUserToken — this listener narrows it further:
+ * carries a SwitchUserToken — this listener narrows it further. Each request
+ * maps to an action by HTTP method (GET/HEAD = view, else = edit) and to one
+ * of three shapes by path:
  *
- *  - Requests are mapped to a content category by path prefix and to an
- *    action by HTTP method (GET/HEAD = view, anything else = edit).
- *  - The target's per-category level decides: 'none' blocks everything,
- *    'view' allows reads only, 'edit' allows reads + writes.
- *  - Endpoints that aren't a content category (the app shell, profile,
- *    spaces/groups structure, auth) allow reads so the impersonated UI can
- *    load and the admin can navigate + stop impersonating, but block ALL
- *    writes — so nothing outside an explicitly-granted content category can
- *    be mutated, including the target's own impersonation settings.
+ *  - Item route of an addressable type (`/projects/{id}`, `/pages/{id}`,
+ *    `/tasks/{id}`, `/discussions/{id}`, and their sub-resources): governed by
+ *    the EFFECTIVE item level (per-item override, else the category default).
+ *  - Collection of an addressable type (`/projects`, `/tasks`, …): reads are
+ *    always allowed because ImpersonationItemScope filters the rows down to
+ *    what's viewable (an empty list, never a leak); writes (e.g. POST create)
+ *    require the category to be 'edit'.
+ *  - Any other content category (`/comments`, `/notifications`, `/media-objects`):
+ *    governed wholesale by the category level.
+ *  - Non-content endpoints (app shell, `/api/me`, `/spaces`, `/groups`, auth):
+ *    reads allowed so the impersonated UI loads and the admin can navigate +
+ *    stop impersonating; ALL writes blocked — which also prevents an
+ *    impersonator from editing the target's own `/me/preferences` (and thus
+ *    the consent matrix).
  *
  * Account-takeover actions (change password, disable 2FA, delete/export the
  * account) are independently protected by SensitiveActionVerifier's step-up
@@ -59,6 +68,19 @@ final class ImpersonationAccessListener
         'media-objects' => 'files',
     ];
 
+    /**
+     * First path segment → addressable item type (the prefixes that carry
+     * per-item overrides). A subset of PREFIX_TO_CATEGORY.
+     *
+     * @var array<string, string>
+     */
+    private const PREFIX_TO_ITEM_TYPE = [
+        'projects' => 'project',
+        'pages' => 'page',
+        'tasks' => 'task',
+        'discussions' => 'discussion',
+    ];
+
     public function __construct(private Security $security)
     {
     }
@@ -86,12 +108,12 @@ final class ImpersonationAccessListener
         }
         $isRead = \in_array($method, ['GET', 'HEAD'], true);
 
-        $segment = explode('/', ltrim($request->getPathInfo(), '/'))[0];
-        $category = self::PREFIX_TO_CATEGORY[$segment] ?? null;
+        $segments = explode('/', ltrim($request->getPathInfo(), '/'));
+        $first = $segments[0];
+        $category = self::PREFIX_TO_CATEGORY[$first] ?? null;
 
         if (null === $category) {
-            // Non-content endpoint: allow reads (app shell, /api/me, spaces
-            // listing, the switch-out control), deny every write.
+            // Non-content endpoint: allow reads, deny every write.
             if (!$isRead) {
                 throw new AccessDeniedHttpException(
                     'Writes outside granted content are not permitted during impersonation.',
@@ -101,16 +123,47 @@ final class ImpersonationAccessListener
             return;
         }
 
-        $level = $target->getImpersonationLevel($category);
+        $itemType = self::PREFIX_TO_ITEM_TYPE[$first] ?? null;
+        $id = $segments[1] ?? null;
+
+        if (null !== $itemType && is_string($id) && Uuid::isValid($id)) {
+            // Item route (or a sub-resource of one): effective per-item level.
+            $this->enforce($target->getImpersonationItemLevel($itemType, $id), $isRead, $category);
+
+            return;
+        }
+
+        if (null !== $itemType) {
+            // Collection of an addressable type. Reads are filtered row-by-row
+            // by ImpersonationItemScope, so always allow them; writes (create)
+            // need the category itself to be editable.
+            if ($isRead || 'edit' === $target->getImpersonationLevel($category)) {
+                return;
+            }
+
+            throw $this->denied($category);
+        }
+
+        // Non-addressable content category: wholesale category gate.
+        $this->enforce($target->getImpersonationLevel($category), $isRead, $category);
+    }
+
+    private function enforce(string $level, bool $isRead, string $category): void
+    {
         if ('edit' === $level) {
-            return; // Full access to this category.
+            return; // Read + write.
         }
         if ('view' === $level && $isRead) {
-            return; // Read-only access.
+            return; // Read-only.
         }
 
         // 'none' (any method) or 'view' + write → denied.
-        throw new AccessDeniedHttpException(sprintf(
+        throw $this->denied($category);
+    }
+
+    private function denied(string $category): AccessDeniedHttpException
+    {
+        return new AccessDeniedHttpException(sprintf(
             'Your impersonation access to "%s" does not permit this action.',
             $category,
         ));

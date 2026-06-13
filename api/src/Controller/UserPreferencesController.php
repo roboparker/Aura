@@ -73,6 +73,16 @@ class UserPreferencesController extends AbstractController
                     : [];
                 $value = array_merge($existing, $value);
             }
+            // Same shallow-merge guard for per-item overrides, but only at the
+            // item-type level: a patch carrying `{ project: {...} }` replaces
+            // the whole project map (so omitting an id removes that override)
+            // while leaving the other item types intact.
+            if ('impersonationItemAccess' === $key && is_array($value)) {
+                $existing = is_array($current['impersonationItemAccess'] ?? null)
+                    ? $current['impersonationItemAccess']
+                    : [];
+                $value = array_merge($existing, $value);
+            }
             // `landing.spaceId` only carries meaning for the 'space'
             // page — normalise it away for the other destinations so a
             // stale id can't linger on the stored object.
@@ -109,6 +119,7 @@ class UserPreferencesController extends AbstractController
                 ? null
                 : sprintf('%s must be a boolean.', $key),
             'impersonationAccess' => $this->validateImpersonationAccess($value),
+            'impersonationItemAccess' => $this->validateImpersonationItemAccess($value),
             'notificationMatrix' => $this->validateMatrix($value),
             'emailDigest' => $this->validateDigest($value),
             'quietHours' => $this->validateQuietHours($value),
@@ -170,6 +181,38 @@ class UserPreferencesController extends AbstractController
             }
             if (!is_string($level) || !in_array($level, User::IMPERSONATION_LEVELS, true)) {
                 return sprintf('impersonationAccess.%s must be one of: none, view, edit.', $category);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Validate per-item impersonation overrides: { itemType: { uuid: level } }.
+     * Item type must be addressable; keys must be UUIDs; levels are the same
+     * none/view/edit set. A patch may carry only the types being changed.
+     */
+    private function validateImpersonationItemAccess(mixed $value): ?string
+    {
+        if (!is_array($value)) {
+            return 'impersonationItemAccess must be an object.';
+        }
+        foreach ($value as $type => $items) {
+            if (!is_string($type) || !in_array($type, User::IMPERSONATION_ITEM_TYPES, true)) {
+                return sprintf(
+                    'Unknown impersonation item type: %s.',
+                    is_string($type) ? $type : gettype($type),
+                );
+            }
+            if (!is_array($items)) {
+                return sprintf('impersonationItemAccess.%s must be an object.', $type);
+            }
+            foreach ($items as $id => $level) {
+                if (!is_string($id) || !Uuid::isValid($id)) {
+                    return sprintf('impersonationItemAccess.%s keys must be item UUIDs.', $type);
+                }
+                if (!is_string($level) || !in_array($level, User::IMPERSONATION_LEVELS, true)) {
+                    return sprintf('impersonationItemAccess.%s.%s must be one of: none, view, edit.', $type, $id);
+                }
             }
         }
         return null;

@@ -26,8 +26,10 @@ use Symfony\Bundle\SecurityBundle\Security;
  */
 final class TaskOwnerExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
-    public function __construct(private Security $security)
-    {
+    public function __construct(
+        private Security $security,
+        private ImpersonationItemScope $impersonationItemScope,
+    ) {
     }
 
     public function applyToCollection(
@@ -38,6 +40,17 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         array $context = [],
     ): void {
         $this->applyFilter($queryBuilder, $resourceClass);
+
+        // Drop tasks hidden by per-item impersonation overrides (no-op when
+        // not impersonating). Item routes are guarded by the listener.
+        if (Task::class === $resourceClass) {
+            $this->impersonationItemScope->applyToCollection(
+                $queryBuilder,
+                $queryBuilder->getRootAliases()[0],
+                'task',
+                'task_access_imp',
+            );
+        }
     }
 
     public function applyToItem(

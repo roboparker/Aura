@@ -33,8 +33,10 @@ abstract class AbstractSpaceAccessExtension implements
     QueryCollectionExtensionInterface,
     QueryItemExtensionInterface
 {
-    public function __construct(protected Security $security)
-    {
+    public function __construct(
+        protected Security $security,
+        protected ImpersonationItemScope $impersonationItemScope,
+    ) {
     }
 
     /** Fully-qualified class name of the resource this extension scopes. */
@@ -42,6 +44,13 @@ abstract class AbstractSpaceAccessExtension implements
 
     /** Collision-free prefix for the EXISTS subquery aliases. */
     abstract protected function getAliasPrefix(): string;
+
+    /**
+     * The per-item impersonation override type for this resource (e.g.
+     * 'project'), or null when the resource has no item-level overrides
+     * (CustomFieldDefinition). Drives ImpersonationItemScope filtering.
+     */
+    abstract protected function getImpersonationItemType(): ?string;
 
     public function applyToCollection(
         QueryBuilder $queryBuilder,
@@ -51,6 +60,18 @@ abstract class AbstractSpaceAccessExtension implements
         array $context = [],
     ): void {
         $this->applyFilter($queryBuilder, $resourceClass);
+
+        // Drop rows hidden by per-item impersonation overrides (no-op when
+        // not impersonating). Item routes are guarded by the listener.
+        $itemType = $this->getImpersonationItemType();
+        if (null !== $itemType && $this->getResourceClass() === $resourceClass) {
+            $this->impersonationItemScope->applyToCollection(
+                $queryBuilder,
+                $queryBuilder->getRootAliases()[0],
+                $itemType,
+                $this->getAliasPrefix() . '_imp',
+            );
+        }
     }
 
     public function applyToItem(

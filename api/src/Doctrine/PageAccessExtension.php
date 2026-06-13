@@ -20,4 +20,9 @@ final class PageAccessExtension extends AbstractSpaceAccessExtension
     {
         return 'page_access';
     }
+
+    protected function getImpersonationItemType(): ?string
+    {
+        return 'page';
+    }
 }

@@ -21,4 +21,11 @@ final class CustomFieldDefinitionAccessExtension extends AbstractSpaceAccessExte
     {
         return 'cfd_access';
     }
+
+    protected function getImpersonationItemType(): ?string
+    {
+        // CFDs follow their project's space + the 'projects' category default;
+        // they aren't individually addressable for per-item overrides.
+        return null;
+    }
 }

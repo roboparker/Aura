@@ -30,15 +30,89 @@ class ImpersonationAccessTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testNoneCategoryBlocksRead(): void
+    public function testNoneCategoryFiltersItemsFromList(): void
     {
         $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
         $member = $this->createImpersonableUser('member@example.com', ['tasks' => 'none']);
         $this->createTask($member, 'Member task');
 
         $client = $this->impersonate($admin, 'member@example.com');
+        // Addressable-type lists aren't blocked wholesale — they're filtered
+        // to what's viewable. With tasks=none and no overrides, that's empty.
         $client->request('GET', '/tasks');
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 0]);
+    }
+
+    public function testNoneItemBlocksDirectAccess(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $member = $this->createImpersonableUser('member@example.com', ['tasks' => 'none']);
+        $task = $this->createTask($member, 'Member task');
+
+        $client = $this->impersonate($admin, 'member@example.com');
+        $client->request('GET', '/tasks/' . $task->getId());
         $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testItemOverrideElevatesAboveNoneCategory(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $member = $this->createUser('member@example.com');
+        $granted = $this->createTask($member, 'Granted task');
+        $hidden = $this->createTask($member, 'Hidden task');
+        // Category none, but one task explicitly elevated to edit.
+        $member->setPreferences([
+            'canBeImpersonated' => true,
+            'impersonationAccess' => ['tasks' => 'none'],
+            'impersonationItemAccess' => ['task' => [(string) $granted->getId() => 'edit']],
+        ]);
+        $this->entityManager->flush();
+
+        $client = $this->impersonate($admin, 'member@example.com');
+
+        // List shows only the elevated task.
+        $client->request('GET', '/tasks');
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 1]);
+
+        // The elevated task is editable; the other is invisible.
+        $client->request('PATCH', '/tasks/' . $granted->getId(), [
+            'json' => ['title' => 'Edited'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $client->request('GET', '/tasks/' . $hidden->getId());
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testItemOverrideHidesBelowViewCategory(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $member = $this->createUser('member@example.com');
+        $visible = $this->createTask($member, 'Visible task');
+        $hidden = $this->createTask($member, 'Hidden task');
+        // Category view, but one task explicitly hidden.
+        $member->setPreferences([
+            'canBeImpersonated' => true,
+            'impersonationAccess' => ['tasks' => 'view'],
+            'impersonationItemAccess' => ['task' => [(string) $hidden->getId() => 'none']],
+        ]);
+        $this->entityManager->flush();
+
+        $client = $this->impersonate($admin, 'member@example.com');
+
+        // List drops the hidden task.
+        $client->request('GET', '/tasks');
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 1]);
+
+        $client->request('GET', '/tasks/' . $hidden->getId());
+        $this->assertResponseStatusCodeSame(403);
+
+        $client->request('GET', '/tasks/' . $visible->getId());
+        $this->assertResponseIsSuccessful();
     }
 
     public function testViewAllowsReadButBlocksWrite(): void
@@ -154,15 +228,20 @@ class ImpersonationAccessTest extends ApiTestCase
     }
 
     /**
-     * @param array<string, string> $access partial impersonationAccess matrix
+     * @param array<string, string>                $access     partial category matrix
+     * @param array<string, array<string, string>> $itemAccess partial per-item overrides
      */
-    private function createImpersonableUser(string $email, array $access): User
+    private function createImpersonableUser(string $email, array $access, array $itemAccess = []): User
     {
         $user = $this->createUser($email);
-        $user->setPreferences([
+        $prefs = [
             'canBeImpersonated' => true,
             'impersonationAccess' => $access,
-        ]);
+        ];
+        if ([] !== $itemAccess) {
+            $prefs['impersonationItemAccess'] = $itemAccess;
+        }
+        $user->setPreferences($prefs);
         $this->entityManager->flush();
 
         return $user;
