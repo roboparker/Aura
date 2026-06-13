@@ -78,7 +78,7 @@ Aura/                 # repo/folder name is unchanged; the product is "Madori"
 - **UI components**: shadcn/ui — Radix-based source components owned in `pwa/components/ui/` (button, input, label, card, alert, badge, checkbox, dropdown-menu, separator, textarea). `cn()` helper in `pwa/lib/utils.ts`. Design tokens (CSS variables under `:root` + `@theme inline`) live in `pwa/styles/globals.css`. The `pwa/components.json` config means `npx shadcn@latest add <component>` will drop new ones into `pwa/components/ui/` automatically.
 - **State**: @tanstack/react-query
 - **Forms**: Formik. shadcn's `Form` is react-hook-form-based, so we use a thin `FormikField` helper in `pwa/components/ui/formik-field.tsx` that wires `<Field as={Input}>` + `Label` + `ErrorMessage` together.
-- **Admin**: @api-platform/admin (mounted at `/admin`) — off-limits for shadcn, it has its own UI system.
+- **Admin**: Bespoke Next.js pages under `pwa/pages/admin/` (`/admin/users` with impersonation, `/admin/waitlist`, `/admin/segments`) built with the same shadcn/ui + Tailwind system as the rest of the app — there is no separate admin SPA.
 - **Rich text**: BlockNote (WYSIWYG markdown editor) + react-markdown / remark-gfm (read-only rendering). Shared editor lives in `pwa/components/editor/`.
 - **Avatars**: Reusable `UserAvatar` in `pwa/components/user/`. Renders the uploaded image when present, otherwise white initials on the user's `personalizedColor` (contrast-safe palette picked at registration).
 - **Icons**: lucide-react.
