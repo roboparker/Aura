@@ -97,8 +97,8 @@ test.describe("Authentication", () => {
     // Fresh sign-in lands on the workspace home (#405).
     await expect(page).toHaveURL(/\/projects/);
 
-    // Navigate to admin
-    await page.goto(`${BASE_URL}/admin`);
+    // Navigate to the admin users page
+    await page.goto(`${BASE_URL}/admin/users`);
     // Admin page should load (not show access denied)
     await expect(page.locator("text=Access Denied")).not.toBeVisible();
   });
@@ -109,8 +109,8 @@ test.describe("Authentication", () => {
     // `App\DataFixtures\UserFixtures`. The helper walks both steps.
     await signInAsFixtureUser(page);
 
-    // Navigate to admin — should show access denied
-    await page.goto(`${BASE_URL}/admin`);
+    // Navigate to the admin users page — should show access denied
+    await page.goto(`${BASE_URL}/admin/users`);
     await expect(page.locator("text=Access Denied")).toBeVisible();
   });
 

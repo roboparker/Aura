@@ -34,7 +34,7 @@ graph TD
 
 ### PWA (Next.js)
 - **Rendering**: Server-side rendering via Next.js
-- **Admin panel**: Auto-generated admin UI at `/admin` via `@api-platform/admin`
+- **Admin**: Bespoke Next.js admin pages under `/admin/*` (users, waitlist, segments) built with the same shadcn/ui + Tailwind system as the rest of the app
 - **API communication**: Hydra/JSON-LD client via API Platform's client libraries
 - **Styling**: Tailwind CSS v4 with PostCSS
 

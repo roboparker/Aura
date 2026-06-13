@@ -9,7 +9,7 @@ Madori is an API-first task and project management app. The backend is a Symfony
 - **Groups** — reusable, owner-managed sets of users with email-based invitations. Invitees get a signup link and are auto-joined on registration.
 - **Accounts** — sign up / sign in on a unified page, verified email-change flow, password reset, profile pictures, and personalized avatar colors.
 - **Real-time updates** via Mercure (server-sent events) on collaborative resources.
-- **Auto-generated admin UI** at `/admin` via `@api-platform/admin`.
+- **Admin tools** at `/admin/users`, `/admin/waitlist`, and `/admin/segments` for user, waitlist, and segment management.
 
 ## Repository layout
 
