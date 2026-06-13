@@ -4,6 +4,7 @@ const {
   BASE_URL,
   uniqueEmail: shared,
   registerAndSignIn,
+  openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("settings");
@@ -136,11 +137,11 @@ test.describe("Settings", () => {
     );
   });
 
-  test("settings link in the sidebar opens the shell", async ({ page }) => {
+  test("settings link in the account menu opens the shell", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    const settingsLink = page
-      .locator('[data-testid="app-sidebar"]')
-      .getByRole("link", { name: "Settings" });
+    // Personal links live in the top-bar account menu now (#nav-refresh).
+    await openAccountMenu(page);
+    const settingsLink = page.getByRole("menuitem", { name: "Settings" });
     await expect(settingsLink).toBeVisible();
     await settingsLink.click();
     await expect(page).toHaveURL(/\/settings\/profile/);
