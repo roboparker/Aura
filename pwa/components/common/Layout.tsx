@@ -10,6 +10,7 @@ import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
 import WaitlistGate from "@/components/auth/WaitlistGate";
 import Footer from "./Footer";
+import ImpersonationBanner from "./ImpersonationBanner";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
@@ -34,6 +35,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex-1 min-w-0 flex flex-col">
+        <ImpersonationBanner />
         <Navbar />
         <div className="flex-1">{children}</div>
         <Footer />

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
 
 /**
  * Single source of truth for the `/api/me`-shaped user payload.
@@ -22,6 +24,7 @@ final class UserPayloadSerializer
     public function __construct(
         private TwoFactorRecoveryState $recoveryState,
         private SegmentEvaluator $segmentEvaluator,
+        private Security $security,
     ) {
     }
 
@@ -75,6 +78,32 @@ final class UserPayloadSerializer
                 // {@see \App\EventSubscriber\TwoFactorRecoveryListener}.
                 'recoveryPending' => $this->recoveryState->isPending(),
             ],
+            // When an admin is impersonating this user, surface who the real
+            // operator is so the PWA can show the impersonation banner +
+            // "Stop impersonation" control. Null in the normal case.
+            'impersonator' => $this->impersonator(),
+        ];
+    }
+
+    /**
+     * @return array{id: string, email: string, name: string}|null
+     */
+    private function impersonator(): ?array
+    {
+        $token = $this->security->getToken();
+        if (!$token instanceof SwitchUserToken) {
+            return null;
+        }
+
+        $admin = $token->getOriginalToken()->getUser();
+        if (!$admin instanceof User) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $admin->getId(),
+            'email' => (string) $admin->getEmail(),
+            'name' => trim($admin->getGivenName() . ' ' . $admin->getFamilyName()),
         ];
     }
 }

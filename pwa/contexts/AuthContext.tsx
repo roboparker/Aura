@@ -92,6 +92,13 @@ export interface User {
   // Inlined so the security-card render doesn't have to chase a separate
   // /me/2fa/status request — the API merges defaults for legacy rows.
   twoFactor: TwoFactorStatus;
+  /**
+   * Set only while an admin is impersonating this account (the firewall's
+   * switch_user feature). Identifies the real operator so the PWA can show
+   * the impersonation banner + "Stop impersonation" control. Null/absent in
+   * the normal case.
+   */
+  impersonator?: { id: string; email: string; name: string } | null;
 }
 
 /**
@@ -140,6 +147,14 @@ interface AuthContextType {
   submitTwoFactorCode: (code: string) => Promise<User>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => void;
+  /**
+   * Admin-only: start impersonating the user with this email (the firewall's
+   * switch_user). Resolves once the session has swapped and the context holds
+   * the impersonated user. Throws on failure (e.g. not an admin).
+   */
+  impersonateUser: (email: string) => Promise<void>;
+  /** End an active impersonation, restoring the admin's own session. */
+  stopImpersonation: () => Promise<void>;
   /**
    * Confirms the current owner's identity (TOTP if 2FA is on, password
    * otherwise) and rotates the password. The PWA chooses the right
@@ -372,6 +387,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {});
   }, []);
 
+  // Impersonation rides the firewall's switch_user listener: any main-firewall
+  // request carrying ?_switch_user swaps the token for that request. We route
+  // it through /api/me so the same call returns the swapped user payload.
+  const switchUser = useCallback(async (identifier: string): Promise<User> => {
+    const res = await fetchWithTimeout(
+      `${ENTRYPOINT}/api/me?_switch_user=${encodeURIComponent(identifier)}`,
+      { credentials: "include" },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || data.detail || "Couldn't switch user.");
+    }
+    const data = (await res.json()) as User;
+    setUser(data);
+    return data;
+  }, []);
+
+  const impersonateUser = useCallback(
+    async (email: string) => {
+      await switchUser(email);
+    },
+    [switchUser],
+  );
+
+  const stopImpersonation = useCallback(async () => {
+    await switchUser("_exit");
+  }, [switchUser]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -382,6 +425,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         submitTwoFactorCode,
         register,
         logout,
+        impersonateUser,
+        stopImpersonation,
         changePassword,
         requestPasswordReset,
         resetPassword,
