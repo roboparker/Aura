@@ -123,6 +123,51 @@ class UserPreferencesTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testCanBeImpersonatedDefaultsToFalse(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/preferences');
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertFalse($response->toArray()['canBeImpersonated']);
+    }
+
+    public function testPatchTogglesCanBeImpersonated(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['canBeImpersonated' => true],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $this->assertTrue($response->toArray()['canBeImpersonated']);
+    }
+
+    public function testPatchRejectsNonBooleanCanBeImpersonated(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['canBeImpersonated' => 'yes'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testPatchAcceptsValidTimezone(): void
     {
         $alice = $this->createUser('alice@example.com');

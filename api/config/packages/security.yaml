@@ -8,10 +8,12 @@ security:
                 class: App\Entity\User
                 property: email
 
-    # Platform admins may impersonate any user for testing/debugging via the
-    # firewall's switch_user listener (see the `main` firewall below).
-    role_hierarchy:
-        ROLE_ADMIN: [ROLE_ALLOWED_TO_SWITCH]
+    # NOTE: ROLE_ALLOWED_TO_SWITCH is intentionally NOT granted here.
+    # Admin impersonation (switch_user) is authorized per-target by
+    # App\Security\ImpersonationVoter, which requires ROLE_ADMIN AND the
+    # target user's `canBeImpersonated` opt-in (off by default). Granting
+    # the role via role_hierarchy would let the built-in RoleVoter approve
+    # the switch and bypass that consent check.
 
     firewalls:
         dev:
@@ -60,11 +62,12 @@ security:
                 failure_handler: App\Security\TwoFactorJsonHandler
             logout:
                 path: /auth/logout
-            # Admin impersonation. Gated on ROLE_ALLOWED_TO_SWITCH (granted to
-            # ROLE_ADMIN via role_hierarchy above). Start by hitting any
-            # main-firewall route with ?_switch_user=<email>; stop with
-            # ?_switch_user=_exit. The PWA drives both through /api/me so the
-            # same request returns the swapped user payload.
+            # Admin impersonation. Authorized per-target by
+            # App\Security\ImpersonationVoter (ROLE_ADMIN + the target's
+            # `canBeImpersonated` opt-in). Start by hitting any main-firewall
+            # route with ?_switch_user=<email>; stop with ?_switch_user=_exit.
+            # The PWA drives both through /api/me so the same request returns
+            # the swapped user payload.
             switch_user: true
 
     access_control:

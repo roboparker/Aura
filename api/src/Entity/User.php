@@ -280,6 +280,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         // personal "Private" space). Default matches #405: land in the
         // workspace with the personal space active.
         'landing' => ['page' => 'space', 'spaceId' => null],
+        // Privacy: when false (the default), platform admins CANNOT
+        // impersonate this account via the firewall's switch_user feature.
+        // The user must explicitly opt in. Enforced server-side by
+        // App\Security\ImpersonationVoter, so this flag is authoritative —
+        // not just a UI hint.
+        'canBeImpersonated' => false,
     ];
 
     public function getId(): ?Uuid
@@ -479,6 +485,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     {
         $this->preferences = $preferences;
         return $this;
+    }
+
+    /**
+     * Whether this account has opted in to admin impersonation
+     * (switch_user). Off by default — see {@see DEFAULT_PREFERENCES}.
+     * Read by {@see \App\Security\ImpersonationVoter}.
+     */
+    public function canBeImpersonated(): bool
+    {
+        return true === ($this->getPreferences()['canBeImpersonated'] ?? false);
     }
 
     // --- TOTP two-factor (Scheb) ---

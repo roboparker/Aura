@@ -42,6 +42,12 @@ export interface UserPreferences {
   quietHours: QuietHoursPref;
   /** Where a fresh sign-in (no deep link) lands. */
   landing: LandingPreference;
+  /**
+   * Opt-in to admin impersonation (switch_user). Off by default; when
+   * false, platform admins cannot impersonate this account — enforced
+   * server-side by the ImpersonationVoter, not just here.
+   */
+  canBeImpersonated: boolean;
 }
 
 export interface TwoFactorStatus {

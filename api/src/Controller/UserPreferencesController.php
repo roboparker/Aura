@@ -95,7 +95,7 @@ class UserPreferencesController extends AbstractController
             'notificationFrequency' => is_string($value) && in_array($value, User::ALLOWED_FREQUENCIES, true)
                 ? null
                 : 'notificationFrequency must be one of: realtime, hourly, daily.',
-            'emailNotificationsEnabled', 'pushNotificationsEnabled' => is_bool($value)
+            'emailNotificationsEnabled', 'pushNotificationsEnabled', 'canBeImpersonated' => is_bool($value)
                 ? null
                 : sprintf('%s must be a boolean.', $key),
             'notificationMatrix' => $this->validateMatrix($value),
