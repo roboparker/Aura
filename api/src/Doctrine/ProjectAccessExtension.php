@@ -21,7 +21,7 @@ final class ProjectAccessExtension extends AbstractSpaceAccessExtension
         return 'project_access';
     }
 
-    protected function getImpersonationItemType(): ?string
+    protected function getImpersonationItemType(): string
     {
         return 'project';
     }
