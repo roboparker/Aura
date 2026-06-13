@@ -5,10 +5,11 @@ import { displayName } from "@/lib/userDisplay";
 import { Button } from "@/components/ui/button";
 
 /**
- * Sticky bar shown across the top whenever an admin is impersonating another
- * user (the firewall's switch_user). Keeps the operator aware they're acting
- * as someone else and offers a one-click way back to their own session. The
- * side menu carries the same "Stop impersonation" control.
+ * Full-width bar shown above the sticky top bar whenever an admin is
+ * impersonating another user (the firewall's switch_user). Keeps the operator
+ * aware they're acting as someone else and offers a one-click way back to their
+ * own session. The top-bar account menu carries the same "Stop impersonation"
+ * control, so the exit stays reachable once this bar scrolls out of view.
  *
  * Renders nothing in the normal case, so it costs no layout when absent.
  */
@@ -25,7 +26,7 @@ const ImpersonationBanner = () => {
 
   return (
     <div
-      className="sticky top-0 z-50 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
       role="status"
       data-testid="impersonation-banner"
     >

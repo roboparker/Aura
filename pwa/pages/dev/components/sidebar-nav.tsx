@@ -4,7 +4,7 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const SidebarNavPage = () => (
   <ComponentDoc
     name="SidebarNav"
-    description="Shared navigation surface used by both the persistent Sidebar (md and up) and the mobile Sheet variant in the Navbar. Renders the signed-in user header, the SpaceSwitcher, personal links (My Tasks, Notifications, Groups, Settings), an Admin section for ROLE_ADMIN users (Admin, Waitlist, Segments, and the external Mercure debugger), and a Sign Out button anchored to the bottom."
+    description="Shared navigation surface used by both the persistent Sidebar (md and up) and the mobile Sheet variant in the Navbar. Renders the SpaceSwitcher and an Admin section for ROLE_ADMIN users (Admin, Waitlist, Segments, and the external Mercure debugger). The account menu (avatar, personal links, sign out) and notification bell live in the top bar — see UserMenu / Navbar."
     importPath={`import SidebarNav from "@/components/common/SidebarNav";`}
     examples={[
       {

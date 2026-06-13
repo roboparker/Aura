@@ -11,20 +11,21 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import NotificationBell from "@/components/notifications/NotificationBell";
 import OverdueBadge from "@/components/tasks/OverdueBadge";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import SearchOverlay from "@/components/search/SearchOverlay";
 import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
+import UserMenu from "./UserMenu";
 
 const Navbar = () => {
   const { isAuthenticated } = useAuth();
   const { waitlistEnabled } = useSignupStatus();
 
   return (
-    <nav className="border-b bg-background">
-      <div className="px-4 py-3 flex items-center gap-3">
+    <nav className="sticky top-0 z-30 h-14 w-full border-b bg-background">
+      <div className="flex h-full items-center gap-3 px-4">
         <div className="flex items-center gap-1 shrink-0">
           {/* Signed-out viewers get the Madori wordmark as the home
               anchor; signed-in viewers get the Breadcrumbs trail
@@ -60,7 +61,8 @@ const Navbar = () => {
             <>
               <OverdueBadge enabled={isAuthenticated} />
               <NotificationBell enabled={isAuthenticated} />
-              {/* Mobile-only entry to the same nav surface — the
+              <UserMenu />
+              {/* Mobile-only entry to the space/admin nav — the
                   persistent Sidebar takes over on `md` and up. */}
               <Sheet>
                 <SheetTrigger asChild>

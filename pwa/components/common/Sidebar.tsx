@@ -14,7 +14,7 @@ const Sidebar = () => {
   if (!isAuthenticated) return null;
   return (
     <aside
-      className="hidden md:flex sticky top-0 h-screen w-60 shrink-0 border-r bg-background flex-col"
+      className="hidden md:flex sticky top-14 h-[calc(100vh-3.5rem)] w-60 shrink-0 border-r bg-background flex-col"
       data-testid="app-sidebar"
     >
       <SidebarNav />
