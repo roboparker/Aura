@@ -27,6 +27,10 @@ use Symfony\Bundle\SecurityBundle\Security;
  *
  * The branches OR together, and the per-comment commentable_type
  * keeps them mutually exclusive on a given row.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's comments only by impersonating them (`switch_user`), which
+ * works because the filter resolves against the impersonated user.
  */
 final class CommentAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
@@ -58,9 +62,6 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if (Comment::class !== $resourceClass) {
-            return;
-        }
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
         $user = $this->security->getUser();

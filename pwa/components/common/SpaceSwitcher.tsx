@@ -46,6 +46,18 @@ const SpaceSwitcher = () => {
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
 
+  // Cap the inline list at the 5 most recent spaces; the rest live
+  // behind the "All spaces" link below. Always keep the active space in
+  // view so its selected accent strip stays meaningful even when it's
+  // not among the most recently touched.
+  const RECENT_LIMIT = 5;
+  const recent = sorted.slice(0, RECENT_LIMIT);
+  if (activeSpace && !recent.some((s) => s.id === activeSpace.id)) {
+    recent.pop();
+    recent.unshift(activeSpace);
+  }
+  const hiddenCount = spaces.length - recent.length;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -71,7 +83,7 @@ const SpaceSwitcher = () => {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-[240px] p-1">
-        {sorted.map((space) => {
+        {recent.map((space) => {
           const isActive = space.id === activeSpace.id;
           return (
             <DropdownMenuItem
@@ -110,7 +122,7 @@ const SpaceSwitcher = () => {
         <DropdownMenuItem asChild>
           <Link href="/spaces" className="gap-2 cursor-pointer">
             <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
-            All spaces
+            {hiddenCount > 0 ? `See all spaces (${spaces.length})` : "All spaces"}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

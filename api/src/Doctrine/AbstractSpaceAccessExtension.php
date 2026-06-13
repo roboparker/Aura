@@ -13,13 +13,17 @@ use Symfony\Bundle\SecurityBundle\Security;
 /**
  * Shared base for the access extensions that scope a resource to the spaces
  * the current user belongs to (#185). All of them have the same shape:
- * skip for admins, require an authenticated User, then AND an EXISTS
- * predicate over the resource's `space` FK matching direct membership
- * (`SpaceMembership`) OR transitive membership via a `UserGroup`
- * (`SpaceGroupMembership`). EXISTS subqueries (rather than joins on the
- * root) keep the resource's own collections from being partially hydrated
- * by the access predicate, and unreachable item lookups return 404 rather
- * than 403 so existence isn't leaked.
+ * require an authenticated User, then AND an EXISTS predicate over the
+ * resource's `space` FK matching direct membership (`SpaceMembership`) OR
+ * transitive membership via a `UserGroup` (`SpaceGroupMembership`). EXISTS
+ * subqueries (rather than joins on the root) keep the resource's own
+ * collections from being partially hydrated by the access predicate, and
+ * unreachable item lookups return 404 rather than 403 so existence isn't
+ * leaked.
+ *
+ * Instance admins are scoped like everyone else — they reach another
+ * user's data only by impersonating them (`switch_user`), which works
+ * because the filter resolves against the impersonated user.
  *
  * Concrete extensions only declare which resource they guard and a unique
  * alias prefix for the subqueries; the EXISTS fragment itself lives in
@@ -63,9 +67,6 @@ abstract class AbstractSpaceAccessExtension implements
     private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
     {
         if ($this->getResourceClass() !== $resourceClass) {
-            return;
-        }
-        if ($this->security->isGranted('ROLE_ADMIN')) {
             return;
         }
         $user = $this->security->getUser();
