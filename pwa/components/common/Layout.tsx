@@ -27,15 +27,17 @@ const AppShell = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    // Full-width sticky top bar spanning the whole viewport; below it a
-    // row of persistent left sidebar (`md:` and up) + content. The
-    // navbar's mobile Sheet handles the small-screen sidebar case. The
-    // Sidebar renders nothing for unauthenticated visitors so the
-    // marketing/auth screens keep their original full-width layout. The
-    // ImpersonationBanner (when active) sits above the sticky top bar.
+    // Full-width sticky header (ImpersonationBanner above the top bar,
+    // pinned together) spanning the whole viewport; below it a row of
+    // persistent left sidebar (`md:` and up) + content. The navbar's
+    // mobile Sheet handles the small-screen sidebar case. The Sidebar
+    // renders nothing for unauthenticated visitors so the marketing/auth
+    // screens keep their original full-width layout.
     <div className="flex min-h-screen flex-col">
-      <ImpersonationBanner />
-      <Navbar />
+      <div className="sticky top-0 z-30">
+        <ImpersonationBanner />
+        <Navbar />
+      </div>
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <div className="flex-1 min-w-0 flex flex-col">

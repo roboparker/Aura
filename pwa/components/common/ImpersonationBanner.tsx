@@ -26,7 +26,7 @@ const ImpersonationBanner = () => {
 
   return (
     <div
-      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+      className="flex min-h-11 flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-300 bg-amber-100 px-4 py-2 text-sm text-amber-900 md:h-11 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
       role="status"
       data-testid="impersonation-banner"
     >

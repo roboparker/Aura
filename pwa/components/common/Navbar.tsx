@@ -24,7 +24,7 @@ const Navbar = () => {
   const { waitlistEnabled } = useSignupStatus();
 
   return (
-    <nav className="sticky top-0 z-30 h-14 w-full border-b bg-background">
+    <nav className="h-14 w-full border-b bg-background">
       <div className="flex h-full items-center gap-3 px-4">
         <div className="flex items-center gap-1 shrink-0">
           {/* Signed-out viewers get the Madori wordmark as the home
