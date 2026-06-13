@@ -76,7 +76,8 @@ const LevelButtons = ({
 const ImpersonationItemExceptions = () => {
   const { user } = useAuth();
   const { persist } = usePreferencePersist();
-  const itemAccess = user?.preferences?.impersonationItemAccess ?? {};
+  const itemAccess: Record<string, Record<string, ImpersonationLevel>> =
+    user?.preferences?.impersonationItemAccess ?? {};
 
   const setOverride = (
     type: string,
