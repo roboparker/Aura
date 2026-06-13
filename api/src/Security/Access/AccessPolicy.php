@@ -47,8 +47,9 @@ final class AccessPolicy
     ];
 
     /**
-     * @param array<string, mixed>                $categories category => level
-     * @param array<string, array<string, mixed>> $items      type => (id => level)
+     * @param array<string, mixed> $categories category => level
+     * @param array<string, mixed> $items      type => (id => level) map; values
+     *                                          are validated per-access, not by type
      */
     public function __construct(
         private array $categories,
