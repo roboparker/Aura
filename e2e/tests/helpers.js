@@ -80,12 +80,11 @@ async function createTaskInline(page, title, options = {}) {
 }
 
 /**
- * No-op since the authenticated navigation moved from a triggered
- * right-side Sheet to a persistent left sidebar (`<aside>` mounted
- * by Layout). On the desktop viewport Playwright uses, every link
- * the old "account menu" exposed is already visible without a
- * click, so callers don't need to open anything. Kept as a function
- * so the call sites don't have to know about the layout change.
+ * Open the user account menu in the sidebar header (#nav-refresh).
+ * The personal links (My Tasks, Manage Groups, Settings) and Sign Out
+ * now live in a dropdown opened by the avatar/chevron trigger rather
+ * than as always-visible sidebar links. Callers can read menu items
+ * (role="menuitem") once this resolves.
  *
  * @param {import('@playwright/test').Page} page
  */
@@ -97,6 +96,7 @@ async function openAccountMenu(page) {
     state: "attached",
     timeout: 5000,
   });
+  await page.locator('[data-testid="user-menu-trigger"]').first().click();
 }
 
 /**

@@ -57,6 +57,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "footer", name: "Footer", category: "Layout", description: "Static site footer with product, developer, and project link columns." },
   { slug: "sidebar", name: "Sidebar", category: "Layout", description: "Persistent left navigation column (md and up, authenticated only)." },
   { slug: "sidebar-nav", name: "SidebarNav", category: "Layout", description: "Shared nav contents used by the persistent sidebar and the mobile sheet." },
+  { slug: "user-menu", name: "UserMenu", category: "Layout", description: "Top-bar account menu: square avatar + chevron trigger over a dropdown with name/email, personal links, and sign out." },
   { slug: "search-bar", name: "SearchBar", category: "Layout", description: "Navbar task search with debounced autocomplete; ⌘K opens the SearchOverlay palette." },
   { slug: "search-overlay", name: "SearchOverlay", category: "Layout", description: "⌘K command palette: suggestion chips, recent searches, keyboard nav." },
   { slug: "space-switcher", name: "SpaceSwitcher", category: "Layout", description: "Active-space dropdown that persists the choice via ActiveSpaceContext." },
