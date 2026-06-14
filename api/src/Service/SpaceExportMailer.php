@@ -3,9 +3,8 @@
 namespace App\Service;
 
 use App\Entity\SpaceExport;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * Sends the "your space export is ready" email once the worker has built
@@ -17,21 +16,15 @@ use Symfony\Component\Mailer\MailerInterface;
 final class SpaceExportMailer
 {
     public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
+        private readonly MailDispatcher $mail,
     ) {
     }
 
     public function sendExportReady(SpaceExport $export, string $plainToken): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
         $recipient = $export->getRequestedBy();
 
         $email = (new TemplatedEmail())
-            ->from($from)
             ->to($recipient->getEmail())
             ->subject(sprintf('Your export of "%s" is ready', $export->getSpace()->getName()))
             ->htmlTemplate('emails/space_export.html.twig')
@@ -39,10 +32,10 @@ final class SpaceExportMailer
             ->context([
                 'recipient' => $recipient,
                 'space' => $export->getSpace(),
-                'downloadUrl' => rtrim($this->frontendUrl, '/') . '/exports/' . $plainToken,
+                'downloadUrl' => $this->mail->frontendLink('/exports/' . $plainToken),
                 'expiresAt' => $export->getExpiresAt(),
             ]);
 
-        $this->mailer->send($email);
+        $this->mail->send($email);
     }
 }

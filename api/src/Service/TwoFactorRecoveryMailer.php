@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Component\Mime\Email;
 
 /**
@@ -27,17 +26,13 @@ use Symfony\Component\Mime\Email;
 final class TwoFactorRecoveryMailer
 {
     public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
+        private readonly MailDispatcher $mail,
     ) {
     }
 
     public function sendBackupCodeUsed(User $user): void
     {
-        $accountUrl = $this->url('/account');
+        $accountUrl = $this->mail->frontendLink('/account');
         $this->dispatch(
             $user,
             'A recovery code was used on your Madori account',
@@ -56,7 +51,7 @@ final class TwoFactorRecoveryMailer
 
     public function sendDisabled(User $user): void
     {
-        $accountUrl = $this->url('/account');
+        $accountUrl = $this->mail->frontendLink('/account');
         $this->dispatch(
             $user,
             'Two-factor authentication was disabled',
@@ -75,7 +70,7 @@ final class TwoFactorRecoveryMailer
 
     public function sendReconfigured(User $user): void
     {
-        $accountUrl = $this->url('/account');
+        $accountUrl = $this->mail->frontendLink('/account');
         $this->dispatch(
             $user,
             'A new authenticator was enrolled for your account',
@@ -99,22 +94,12 @@ final class TwoFactorRecoveryMailer
             return;
         }
 
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom)
-            ? $this->mailerFrom
-            : 'no-reply@madori.test';
-
         $message = (new Email())
-            ->from($from)
             ->to($to)
             ->subject($subject)
             ->text($text)
             ->html($html);
 
-        $this->mailer->send($message);
-    }
-
-    private function url(string $path): string
-    {
-        return rtrim($this->frontendUrl, '/') . $path;
+        $this->mail->send($message);
     }
 }
