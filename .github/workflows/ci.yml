@@ -264,8 +264,12 @@ jobs:
       -
         name: PWA unit tests
         # Vitest over the pure logic in pwa/lib (query parsing, validation
-        # mapping, password strength). Component coverage stays in e2e.
-        run: docker compose exec -T pwa pnpm test
+        # mapping, password strength, auth-redirect sanitisation, …).
+        # `test:coverage` enforces the minimum-coverage floor declared in
+        # pwa/vitest.config.ts over the tested-module allowlist, so a PR
+        # that drops a covered branch fails here. Component coverage stays
+        # in the e2e suite.
+        run: docker compose exec -T pwa pnpm test:coverage
 
   e2e:
     name: E2E

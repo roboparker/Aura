@@ -37,6 +37,25 @@ Use lowercase `kebab-case` for branch names.
 - **PHP**: Follow [Symfony coding standards](https://symfony.com/doc/current/contributing/code/standards.html)
 - **TypeScript/React**: Follow the existing patterns in the codebase
 
+### Testing
+
+Every PR must keep CI green, which includes the test suites:
+
+- **API** — PHPUnit (`bin/phpunit`). New endpoints, services, and behaviour
+  changes need tests under `api/tests/`.
+- **PWA** — Vitest over the framework-free logic in `pwa/lib`
+  (`pnpm test`). A **minimum-coverage floor** is enforced on PRs via
+  `pnpm test:coverage`: the modules listed in `coverage.include` in
+  [`pwa/vitest.config.ts`](../pwa/vitest.config.ts) must stay above the
+  configured thresholds (lines/statements ≥ 85%, functions ≥ 90%,
+  branches ≥ 75%). When you add a new pure-logic helper under `pwa/lib`,
+  add it (and its `*.test.ts`) to that allowlist so the gate keeps it
+  covered. Component/integration coverage lives in the Playwright **e2e**
+  suite rather than the unit layer.
+
+If your change is genuinely untestable in these layers (pure infra/config),
+say so in the PR description.
+
 See `docs/developer/branching-and-releases.md` for the full branching and release strategy.
 
 ## License
