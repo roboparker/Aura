@@ -23,11 +23,17 @@ test.describe("Projects", () => {
     await expect(page).toHaveTitle("Projects - Madori");
     await expect(page.locator("text=No projects yet")).toBeVisible();
 
-    // Create
+    // Create — the form lives behind the "New project" toggle now.
     const title = `Launch plan ${Date.now()}`;
+    await page.getByTestId("new-project-button").click();
     await page.fill("#title", title);
     await fillDescription(page, undefined, "Q3 marketing push");
     await page.click('button[type="submit"]');
+
+    // Creating navigates to the new project's detail page; head back to
+    // the list to verify it renders there.
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await page.goto(`${BASE_URL}/projects`);
 
     const item = page.locator('[data-testid="project-item"]', { hasText: title });
     await expect(item).toBeVisible();
@@ -35,9 +41,6 @@ test.describe("Projects", () => {
 
     // Creator is auto-added as a member via ProjectOwnerProcessor.
     await expect(item.locator('[data-testid="project-member"]')).toContainText(email);
-
-    // Form clears after submit
-    await expect(page.locator("#title")).toHaveValue("");
 
     // Edit — update title and description
     await item.getByRole("button", { name: /^Edit$/ }).click();
@@ -61,6 +64,7 @@ test.describe("Projects", () => {
   test("description supports markdown formatting", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/projects`);
+    await page.getByTestId("new-project-button").click();
 
     const title = `Markdown project ${Date.now()}`;
     await page.fill("#title", title);
@@ -77,6 +81,11 @@ test.describe("Projects", () => {
     await page.keyboard.type("second item");
 
     await page.click('button[type="submit"]');
+
+    // Creating navigates to the new project's detail page; head back to
+    // the list to verify the rendered markdown there.
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await page.goto(`${BASE_URL}/projects`);
 
     const item = page.locator('[data-testid="project-item"]', { hasText: title });
     // MarkdownView renders headings as real <h1> elements and list items as <li>.
@@ -95,8 +104,13 @@ test.describe("Projects", () => {
     const alicePage = await aliceContext.newPage();
     await registerAndSignIn(alicePage, aliceEmail);
     await alicePage.goto(`${BASE_URL}/projects`);
+    await alicePage.getByTestId("new-project-button").click();
     await alicePage.fill("#title", aliceProject);
     await alicePage.click('button[type="submit"]');
+    // Creating navigates to the new project's detail page; head back to
+    // the list to verify it renders there.
+    await expect(alicePage).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await alicePage.goto(`${BASE_URL}/projects`);
     await expect(
       alicePage.locator('[data-testid="project-item"]', { hasText: aliceProject }),
     ).toBeVisible();

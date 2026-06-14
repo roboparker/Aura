@@ -2,12 +2,14 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { trackEvent } from "@/lib/analytics";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { contentSectionFor } from "@/lib/contentSections";
+import { cn } from "@/lib/utils";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -55,6 +57,7 @@ const PagesIndex = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace } = useActiveSpace();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [search, setSearch] = useState("");
 
@@ -86,6 +89,8 @@ const PagesIndex = () => {
   });
   const pages = pagesQuery.data ?? [];
   const isLoading = pagesQuery.isLoading;
+  const pagesMeta = contentSectionFor("pages");
+  const PagesIcon = pagesMeta.icon;
   const error = pagesQuery.isError
     ? pagesQuery.error instanceof Error
       ? pagesQuery.error.message
@@ -105,6 +110,8 @@ const PagesIndex = () => {
       trackEvent("page-create");
       setNewTitle("");
       setShowComposer(false);
+      // Refresh the sidebar nav list (shares the ["pages"] key prefix).
+      void queryClient.invalidateQueries({ queryKey: ["pages"] });
       if (created) await router.push(`/pages/${created.id}`);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create.");
@@ -130,7 +137,18 @@ const PagesIndex = () => {
         <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
           <header className="flex items-start justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold">Pages</h1>
+              <div className="flex items-center gap-2">
+                <PagesIcon className={cn("h-6 w-6 shrink-0", pagesMeta.iconClass)} />
+                <h1 className="text-2xl font-bold">Pages</h1>
+                {!isLoading && (
+                  <span
+                    className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                    data-testid="pages-count"
+                  >
+                    {pages.length}
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {activeSpace
                   ? `Long-form documents in ${activeSpace.name}.`

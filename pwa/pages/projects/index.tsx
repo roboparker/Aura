@@ -8,6 +8,8 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { trackEvent } from "@/lib/analytics";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { contentSectionFor } from "@/lib/contentSections";
+import { cn } from "@/lib/utils";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,6 +44,9 @@ const Projects = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  // The create form is hidden behind a "New project" toggle (mirrors the
+  // Pages page) rather than sitting open by default.
+  const [showComposer, setShowComposer] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   // Bumped after a successful create so the MarkdownEditor remounts empty.
@@ -79,9 +84,12 @@ const Projects = () => {
   const projects = projectsQuery.data ?? [];
   const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["projects"] });
 
+  const projectsMeta = contentSectionFor("projects");
+  const ProjectsIcon = projectsMeta.icon;
+
   const createMutation = useMutation({
     mutationFn: () =>
-      apiSend("POST", "/projects", {
+      apiSend<Project>("POST", "/projects", {
         errorMessage: "Failed to create project.",
         body: {
           title: title.trim(),
@@ -91,13 +99,17 @@ const Projects = () => {
           ...(spaceIri ? { space: spaceIri } : {}),
         },
       }),
-    onSuccess: () => {
+    onSuccess: (created) => {
       setTitle("");
       setDescription("");
       setEditorResetKey((k) => k + 1);
+      setShowComposer(false);
       setActionError(null);
       trackEvent("project-create");
+      // Refresh the list (and the sidebar, which shares the ["projects"]
+      // key prefix), then jump straight into the new project.
       void refreshProjects();
+      if (created) void router.push(`/projects/${created.id}`);
     },
     onError: (err) => setActionError(errorMessage(err, "Failed to create project.")),
   });
@@ -184,41 +196,64 @@ const Projects = () => {
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-6">Projects</h1>
+          <header className="flex items-start justify-between gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <ProjectsIcon className={cn("h-6 w-6 shrink-0", projectsMeta.iconClass)} />
+              <h1 className="text-2xl font-bold">Projects</h1>
+              {!projectsQuery.isLoading && (
+                <span
+                  className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                  data-testid="projects-count"
+                >
+                  {projects.length}
+                </span>
+              )}
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setShowComposer((v) => !v)}
+              data-testid="new-project-button"
+            >
+              {showComposer ? "Cancel" : "New project"}
+            </Button>
+          </header>
 
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <form onSubmit={handleCreate} className="space-y-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="title">Title</Label>
-                  <Input
-                    id="title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                    maxLength={255}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="description">
-                    Description{" "}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
-                  </Label>
-                  <MarkdownEditor
-                    key={editorResetKey}
-                    id="description"
-                    ariaLabel="Description"
-                    value={description}
-                    onChange={setDescription}
-                  />
-                </div>
-                <Button type="submit" disabled={createMutation.isPending || !title.trim()}>
-                  {createMutation.isPending ? "Adding..." : "Add Project"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          {showComposer && (
+            <Card className="mb-6">
+              <CardContent className="pt-6">
+                <form onSubmit={handleCreate} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="title">Title</Label>
+                    <Input
+                      id="title"
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      required
+                      maxLength={255}
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="description">
+                      Description{" "}
+                      <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <MarkdownEditor
+                      key={editorResetKey}
+                      id="description"
+                      ariaLabel="Description"
+                      value={description}
+                      onChange={setDescription}
+                    />
+                  </div>
+                  <Button type="submit" disabled={createMutation.isPending || !title.trim()}>
+                    {createMutation.isPending ? "Adding..." : "Add Project"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -232,7 +267,7 @@ const Projects = () => {
             <Card>
               <CardContent className="pt-6">
                 <p className="text-muted-foreground">
-                  No projects yet. Create one above to start collaborating.
+                  No projects yet. Click &ldquo;New project&rdquo; to start collaborating.
                 </p>
               </CardContent>
             </Card>
