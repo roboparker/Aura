@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, History, Pencil, Plus } from "lucide-react";
+import { CircleCheck, Copy, GripVertical, History, Plus, Settings } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 import CustomFieldSheet from "./CustomFieldSheet";
 import CustomFieldChangeLog from "./CustomFieldChangeLog";
 import { fieldHandle } from "./handle";
-import { kindLabelFor, subtypeLabelFor } from "./kind-editors";
+import { KIND_BADGE, kindLabelFor, subtypeLabelFor } from "./kind-editors";
 import type {
   CustomFieldDefinition,
   FieldStatsResponse,
@@ -51,12 +51,22 @@ interface Collection<T> {
 
 interface Props {
   projectIri: string;
-  /** Active space name, surfaced in the reference editor scope note. */
+  /** Project title — slugified for the header `slug · N fields` badge. */
+  projectTitle: string;
+  /** Active space name, surfaced in the admin notice + reference scope note. */
   spaceName?: string;
   isSpaceAdmin: boolean;
 }
 
 const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
+
+/** `Spring Collection Launch` → `spring-collection-launch` (header badge). */
+const slugify = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -76,7 +86,12 @@ const sortByPosition = (
     (a, b) => a.position - b.position || a.name.localeCompare(b.name),
   );
 
-const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => {
+const CustomFieldsManager = ({
+  projectIri,
+  projectTitle,
+  spaceName,
+  isSpaceAdmin,
+}: Props) => {
   const projectId = projectIdFromIri(projectIri);
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,6 +101,7 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
   const [changeLogOpen, setChangeLogOpen] = useState(false);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -135,6 +151,8 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
   const nextPosition =
     defs.length > 0 ? Math.max(...defs.map((d) => d.position)) + 1 : 0;
 
+  const slug = slugify(projectTitle) || "project";
+
   const openCreate = () => {
     setEditing(null);
     setSheetOpen(true);
@@ -158,6 +176,40 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
   const handleDeleted = (def: CustomFieldDefinition) => {
     setDefs((prev) => prev.filter((d) => d["@id"] !== def["@id"]));
   };
+
+  // Client-side duplicate — there's no copy endpoint, so we POST a fresh
+  // definition mirroring the source's kind/subtype/config/footer/nullable
+  // with a " copy" name suffix at the end of the column order.
+  const handleDuplicate = useCallback(
+    async (def: CustomFieldDefinition) => {
+      setLoadError(null);
+      try {
+        const res = await fetch(`${ENTRYPOINT}/custom_field_definitions`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/ld+json" },
+          body: JSON.stringify({
+            name: `${def.name} copy`,
+            kind: def.kind,
+            subtype: def.subtype,
+            config: def.config,
+            nullable: def.nullable,
+            footer: def.footer,
+            project: projectIri,
+            position: nextPosition,
+          }),
+        });
+        if (!res.ok) throw new Error(await errorMessage(res));
+        const saved: CustomFieldDefinition = await res.json();
+        handleSaved(saved);
+      } catch (err) {
+        setLoadError(
+          err instanceof Error ? err.message : "Failed to duplicate field.",
+        );
+      }
+    },
+    [projectIri, nextPosition],
+  );
 
   const persistOrder = useCallback(
     async (ordered: CustomFieldDefinition[]) => {
@@ -202,28 +254,75 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
   );
 
   return (
-    <div className="space-y-4" data-testid="custom-fields-manager">
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => setChangeLogOpen(true)}
-          data-testid="custom-fields-changelog"
-        >
-          <History className="mr-1 h-3.5 w-3.5" /> Change log
-        </Button>
-        {isSpaceAdmin && (
+    <div className="space-y-6" data-testid="custom-fields-manager">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold">Custom fields</h1>
+            <Badge
+              variant="outline"
+              className="font-mono text-xs font-normal text-muted-foreground"
+            >
+              {slug} · {defs.length} {defs.length === 1 ? "field" : "fields"}
+            </Badge>
+          </div>
+          <p className="max-w-2xl text-sm text-muted-foreground">
+            Schema for every task in this project. Each field has a kind,
+            subtype, footer aggregation, and a required flag.
+            <br />
+            Only space admins can edit definitions.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           <Button
             type="button"
+            variant="outline"
             size="sm"
-            onClick={openCreate}
-            data-testid="custom-field-add"
+            onClick={() => setChangeLogOpen(true)}
+            data-testid="custom-fields-changelog"
           >
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
+            <History className="mr-1 h-3.5 w-3.5" /> Change log
           </Button>
-        )}
+          {isSpaceAdmin && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={openCreate}
+              data-testid="custom-field-add"
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" /> Add field
+            </Button>
+          )}
+        </div>
       </div>
+
+      {!noticeDismissed && (
+        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm">
+          <CircleCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+          <p className="flex-1 text-muted-foreground">
+            {isSpaceAdmin ? (
+              <>
+                You&apos;re editing as a{" "}
+                <span className="font-medium text-foreground">space admin</span>.
+                Members in {spaceName ?? "this space"} can use these fields on
+                tasks but can&apos;t change definitions.
+              </>
+            ) : (
+              <>
+                Only space admins can edit definitions. You can use these fields
+                on tasks in {spaceName ?? "this space"}.
+              </>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => setNoticeDismissed(true)}
+            className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground transition hover:text-foreground"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {loadError && (
         <Alert variant="destructive">
@@ -263,7 +362,9 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
                 <TableHead>Required</TableHead>
                 <TableHead>Footer</TableHead>
                 <TableHead className="text-right">Filled</TableHead>
-                {isSpaceAdmin && <TableHead className="w-16 text-right">Actions</TableHead>}
+                {isSpaceAdmin && (
+                  <TableHead className="w-20 text-right">Actions</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -285,6 +386,7 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
                       isSpaceAdmin={isSpaceAdmin}
                       draggable={isSpaceAdmin && defs.length > 1}
                       onEdit={() => openEdit(def)}
+                      onDuplicate={() => void handleDuplicate(def)}
                     />
                   ))}
                 </SortableContext>
@@ -320,6 +422,7 @@ const CustomFieldsManager = ({ projectIri, spaceName, isSpaceAdmin }: Props) => 
         valueCount={editingValueCount}
         onSaved={handleSaved}
         onDeleted={isSpaceAdmin ? handleDeleted : undefined}
+        onDuplicate={isSpaceAdmin ? handleDuplicate : undefined}
       />
 
       <CustomFieldChangeLog
@@ -338,6 +441,7 @@ const FieldRow = ({
   isSpaceAdmin,
   draggable,
   onEdit,
+  onDuplicate,
 }: {
   def: CustomFieldDefinition;
   total: number;
@@ -345,9 +449,11 @@ const FieldRow = ({
   isSpaceAdmin: boolean;
   draggable: boolean;
   onEdit: () => void;
+  onDuplicate: () => void;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: def["@id"], disabled: !draggable });
+  const badge = KIND_BADGE[def.kind];
 
   return (
     <TableRow
@@ -370,29 +476,44 @@ const FieldRow = ({
         )}
       </TableCell>
       <TableCell>
-        <div className="font-medium" data-testid="custom-field-name">
-          {def.name}
-        </div>
-        <div className="font-mono text-xs text-muted-foreground">
-          {fieldHandle(def.name)}
+        <div className="flex items-baseline gap-2">
+          <span className="font-medium" data-testid="custom-field-name">
+            {def.name}
+          </span>
+          <span className="font-mono text-xs text-muted-foreground">
+            {fieldHandle(def.name)}
+          </span>
         </div>
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className="font-normal">
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+            badge.wrap,
+          )}
+        >
+          <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
           {kindLabelFor(def.kind).toLowerCase()} ·{" "}
           {subtypeLabelFor(def.kind, def.subtype).toLowerCase()}
-        </Badge>
+        </span>
       </TableCell>
       <TableCell>
         {def.nullable ? (
-          <span className="text-sm text-muted-foreground">Optional</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-input bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50" />
+            Optional
+          </span>
         ) : (
-          <Badge variant="secondary">Required</Badge>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            Required
+          </span>
         )}
       </TableCell>
       <TableCell>
         {def.footer ? (
-          <span className="text-sm font-medium uppercase">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <span className="h-3.5 w-3.5 rounded-[3px] border border-muted-foreground/40" />
             {def.footer.kind}
           </span>
         ) : (
@@ -400,20 +521,34 @@ const FieldRow = ({
         )}
       </TableCell>
       <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-        {filled}/{total}
+        {filled} / {total}
       </TableCell>
       {isSpaceAdmin && (
         <TableCell className="text-right">
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onEdit}
-            aria-label={`Edit ${def.name}`}
-            data-testid="custom-field-edit"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex items-center justify-end gap-0.5">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={onEdit}
+              aria-label={`Edit ${def.name}`}
+              data-testid="custom-field-edit"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={onDuplicate}
+              aria-label={`Duplicate ${def.name}`}
+              data-testid="custom-field-duplicate"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </TableCell>
       )}
     </TableRow>

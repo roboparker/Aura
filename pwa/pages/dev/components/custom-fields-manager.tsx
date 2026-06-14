@@ -11,6 +11,8 @@ const CustomFieldsManagerPage = () => (
         title: "Live manager (read-only demo)",
         code: `<CustomFieldsManager
   projectIri="/projects/<uuid>"
+  projectTitle="Spring Collection Launch"
+  spaceName="Acme Marketing"
   isSpaceAdmin={true}
 />`,
         // Rendering the live manager here would issue a network call
