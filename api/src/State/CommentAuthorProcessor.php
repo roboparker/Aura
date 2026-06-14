@@ -5,13 +5,11 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Comment;
-use App\Entity\User;
+use App\Security\AuthenticatedUserResolver;
 use App\Service\CommentActivityNotifier;
 use App\Service\CommentMentionService;
 use App\Service\CommentMercurePublisher;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
  * Stamps the comment with the currently authenticated user before
@@ -31,7 +29,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private Security $security,
+        private AuthenticatedUserResolver $auth,
         private CommentMercurePublisher $publisher,
         private CommentMentionService $mentions,
         private CommentActivityNotifier $activity,
@@ -43,10 +41,7 @@ final class CommentAuthorProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Comment
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
-            throw new UnauthorizedHttpException('Bearer', 'You must be authenticated to comment.');
-        }
+        $user = $this->auth->requireUser('comment');
 
         $data->setAuthor($user);
 

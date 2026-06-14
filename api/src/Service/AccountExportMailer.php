@@ -3,9 +3,8 @@
 namespace App\Service;
 
 use App\Entity\AccountExport;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * Sends the "your account export is ready" email once the worker has built
@@ -17,31 +16,25 @@ use Symfony\Component\Mailer\MailerInterface;
 final class AccountExportMailer
 {
     public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
+        private readonly MailDispatcher $mail,
     ) {
     }
 
     public function sendExportReady(AccountExport $export, string $plainToken): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
         $recipient = $export->getRequestedBy();
 
         $email = (new TemplatedEmail())
-            ->from($from)
             ->to($recipient->getEmail())
             ->subject('Your Madori data export is ready')
             ->htmlTemplate('emails/account_export.html.twig')
             ->textTemplate('emails/account_export.txt.twig')
             ->context([
                 'recipient' => $recipient,
-                'downloadUrl' => rtrim($this->frontendUrl, '/') . '/account-exports/' . $plainToken,
+                'downloadUrl' => $this->mail->frontendLink('/account-exports/' . $plainToken),
                 'expiresAt' => $export->getExpiresAt(),
             ]);
 
-        $this->mailer->send($email);
+        $this->mail->send($email);
     }
 }
