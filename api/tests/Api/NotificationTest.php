@@ -155,7 +155,10 @@ class NotificationTest extends ApiTestCase
         $task->setOwner($alice);
         $task->setTitle('Standup');
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
-        $task->setReminders(['1h', '15m']);
+        $task->setReminders([
+            ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false],
+            ['type' => 'relative', 'value' => 15, 'unit' => 'minutes', 'repeat' => false],
+        ]);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
 
@@ -165,7 +168,7 @@ class NotificationTest extends ApiTestCase
         $this->entityManager->clear();
         $rows = $this->entityManager->getRepository(Notification::class)->findAll();
         $this->assertCount(1, $rows);
-        $this->assertSame('1h', $rows[0]->getReminderOffset());
+        $this->assertSame('rel:1:hours', $rows[0]->getReminderOffset());
         $this->assertSame(Notification::TYPE_TASK_REMINDER, $rows[0]->getType());
     }
 
@@ -176,7 +179,7 @@ class NotificationTest extends ApiTestCase
         $task->setOwner($alice);
         $task->setTitle('Standup');
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
-        $task->setReminders(['1h']);
+        $task->setReminders([['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]]);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
 
@@ -195,7 +198,7 @@ class NotificationTest extends ApiTestCase
         $task->setOwner($alice);
         $task->setTitle('Already done');
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
-        $task->setReminders(['1h']);
+        $task->setReminders([['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]]);
         $task->setCompletedOn(new \DateTimeImmutable('-5 minutes'));
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -221,7 +224,7 @@ class NotificationTest extends ApiTestCase
         $task->setProject($project);
         $task->setTitle('Standup');
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
-        $task->setReminders(['1h']);
+        $task->setReminders([['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]]);
         $task->addAssignee($bob);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -250,8 +253,8 @@ class NotificationTest extends ApiTestCase
         $this->assertEmailHeaderSame($message, 'To', 'alice@example.com');
         $this->assertEmailHeaderSame($message, 'Subject', 'Reminder: Standup');
         $this->assertEmailHtmlBodyContains($message, 'Standup');
-        $this->assertEmailHtmlBodyContains($message, 'due in 1 hour');
-        $this->assertEmailTextBodyContains($message, 'due in 1 hour');
+        $this->assertEmailHtmlBodyContains($message, '1 hour before due');
+        $this->assertEmailTextBodyContains($message, '1 hour before due');
     }
 
     public function testDispatcherSkipsEmailWhenUserDisabledIt(): void
@@ -312,7 +315,7 @@ class NotificationTest extends ApiTestCase
         $task->setOwner($owner);
         $task->setTitle($title);
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
-        $task->setReminders(['1h']);
+        $task->setReminders([['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]]);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
         return $task;

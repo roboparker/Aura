@@ -2,7 +2,7 @@
 {# @var recipient \App\Entity\User #}
 Hi {{ recipient.givenName ?: recipient.email }},
 
-This is a reminder that "{{ task.title }}" is due in {{ offsetLabel }}{% if task.dueDate %} ({{ task.dueDate|date('M j, Y g:i a') }}){% endif %}.
+This is a reminder for "{{ task.title }}" — {{ offsetLabel }}{% if task.dueDate %} (due {{ task.dueDate|date('M j, Y g:i a') }}){% endif %}.
 {% if task.recurrenceRule %}
 
 This task recurs on a schedule, so a fresh occurrence will be created once you mark this one complete.

@@ -491,6 +491,129 @@ class TaskTest extends ApiTestCase
         $this->assertSame(1, $count);
     }
 
+    public function testCompletingWeeklyByDayRecurrenceAdvancesToNextSelectedWeekday(): void
+    {
+        // 2026-06-01 is a Monday; with byDay = Mon/Wed/Fri the next
+        // occurrence after a Monday is the Wednesday of the same week.
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'ByDay recurring');
+        $task->setDueDate(new \DateTimeImmutable('2026-06-01T08:00:00+00:00'));
+        $task->setRecurrenceRule([
+            'frequency' => 'weekly',
+            'interval' => 1,
+            'byDay' => ['MO', 'WE', 'FR'],
+        ]);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-06-01T12:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Task::class);
+        /** @var Task[] $pending */
+        $pending = array_values(array_filter(
+            $repo->findBy(['title' => 'ByDay recurring']),
+            fn (Task $t) => null === $t->getCompletedOn(),
+        ));
+        $this->assertCount(1, $pending);
+        $this->assertNotNull($pending[0]->getDueDate());
+        $this->assertSame('2026-06-03', $pending[0]->getDueDate()->format('Y-m-d'));
+    }
+
+    public function testCountOneRecurrenceDoesNotSpawn(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Last occurrence');
+        $task->setDueDate(new \DateTimeImmutable('2026-06-01T08:00:00+00:00'));
+        $task->setRecurrenceRule([
+            'frequency' => 'daily',
+            'interval' => 1,
+            'ends' => ['type' => 'count', 'count' => 1],
+        ]);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-06-01T12:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $count = (int) $this->entityManager->createQuery(
+            'SELECT COUNT(t) FROM App\Entity\Task t WHERE t.title = :title',
+        )->setParameter('title', 'Last occurrence')->getSingleScalarResult();
+        $this->assertSame(1, $count, 'A count=1 series must not spawn a successor.');
+    }
+
+    public function testCountBasedRecurrenceSpawnsWithDecrementedCount(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->createTask($alice, 'Counted');
+        $task->setDueDate(new \DateTimeImmutable('2026-06-01T08:00:00+00:00'));
+        $task->setRecurrenceRule([
+            'frequency' => 'daily',
+            'interval' => 1,
+            'ends' => ['type' => 'count', 'count' => 2],
+        ]);
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('PATCH', '/tasks/' . $task->getId(), [
+            'json' => ['completedOn' => '2026-06-01T12:00:00+00:00'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $this->entityManager->clear();
+        $repo = $this->entityManager->getRepository(Task::class);
+        /** @var Task[] $pending */
+        $pending = array_values(array_filter(
+            $repo->findBy(['title' => 'Counted']),
+            fn (Task $t) => null === $t->getCompletedOn(),
+        ));
+        $this->assertCount(1, $pending, 'A count=2 series spawns exactly one successor.');
+        $rule = $pending[0]->getRecurrenceRule();
+        $this->assertNotNull($rule);
+        $this->assertSame(['type' => 'count', 'count' => 1], $rule['ends'] ?? null);
+    }
+
+    public function testRecurrencePreviewReturnsNextOccurrences(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/recurrence-preview', [
+            'json' => [
+                'dueDate' => '2026-06-01T08:00:00+00:00',
+                'rule' => ['frequency' => 'daily', 'interval' => 2],
+                'count' => 3,
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $body = json_decode((string) $client->getResponse()->getContent(), true);
+        $this->assertIsArray($body);
+        $occurrences = $body['occurrences'] ?? null;
+        $this->assertIsArray($occurrences);
+        $this->assertCount(3, $occurrences);
+        $this->assertIsString($occurrences[0]);
+        $this->assertStringStartsWith('2026-06-03', $occurrences[0]);
+        $this->assertStringStartsWith('2026-06-05', $occurrences[1]);
+        $this->assertStringStartsWith('2026-06-07', $occurrences[2]);
+    }
+
     public function testCreateTaskWithReminders(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -501,17 +624,47 @@ class TaskTest extends ApiTestCase
             'json' => [
                 'title' => 'Take medication',
                 'dueDate' => '2026-06-01T08:00:00+00:00',
-                'reminders' => ['1h', '15m'],
+                'reminders' => [
+                    ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false],
+                    ['type' => 'relative', 'value' => 15, 'unit' => 'minutes', 'repeat' => false],
+                ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
 
         $this->assertResponseStatusCodeSame(201);
         $task = $this->reloadTaskByTitle('Take medication');
-        $this->assertSame(['1h', '15m'], $task->getReminders());
+        $this->assertSame(
+            [
+                ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false],
+                ['type' => 'relative', 'value' => 15, 'unit' => 'minutes', 'repeat' => false],
+            ],
+            $task->getReminders(),
+        );
     }
 
-    public function testRemindersWithoutDueDateAreRejected(): void
+    public function testCreateTaskWithAbsoluteReminderNeedsNoDueDate(): void
+    {
+        // Absolute reminders fire on their own clock, so they don't require
+        // a due date the way relative reminders do.
+        $alice = $this->createUser('alice@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tasks', [
+            'json' => [
+                'title' => 'Standalone absolute',
+                'reminders' => [
+                    ['type' => 'absolute', 'at' => '2026-06-01T09:00:00+00:00', 'repeat' => true],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+
+        $this->assertResponseStatusCodeSame(201);
+    }
+
+    public function testRelativeRemindersWithoutDueDateAreRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
 
@@ -520,7 +673,9 @@ class TaskTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Orphan reminder',
-                'reminders' => ['1h'],
+                'reminders' => [
+                    ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false],
+                ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -528,7 +683,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testInvalidReminderOffsetIsRejected(): void
+    public function testInvalidReminderShapeIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
 
@@ -536,9 +691,11 @@ class TaskTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
-                'title' => 'Bad offset',
+                'title' => 'Bad unit',
                 'dueDate' => '2026-06-01T08:00:00+00:00',
-                'reminders' => ['2h'],
+                'reminders' => [
+                    ['type' => 'relative', 'value' => 2, 'unit' => 'fortnights', 'repeat' => false],
+                ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -546,7 +703,7 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testDuplicateReminderOffsetIsRejected(): void
+    public function testDuplicateReminderIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
 
@@ -554,9 +711,12 @@ class TaskTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
-                'title' => 'Dup offset',
+                'title' => 'Dup reminder',
                 'dueDate' => '2026-06-01T08:00:00+00:00',
-                'reminders' => ['1h', '1h'],
+                'reminders' => [
+                    ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false],
+                    ['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => true],
+                ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
