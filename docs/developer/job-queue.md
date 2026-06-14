@@ -17,7 +17,7 @@ email was sent inline, putting SMTP latency on the request's critical path.
 | Piece | Location |
 | --- | --- |
 | Transport config + routing | [api/config/packages/messenger.yaml](../../api/config/packages/messenger.yaml) |
-| Queue table | `messenger_messages` (created by `Version20260606130000`) |
+| Queue table | `messenger_messages` (created by `Version20260606140000`) |
 | Async email message | `Symfony\Component\Mailer\Messenger\SendEmailMessage` (framework-provided) |
 | Email producers | every `*Mailer` service / controller that calls `MailerInterface::send()` (e.g. [NotificationDispatcher.php](../../api/src/Service/NotificationDispatcher.php), `InviteMailer`, `PasswordController`) |
 | Recurring-job schedule | [api/src/Scheduler/MainScheduleProvider.php](../../api/src/Scheduler/MainScheduleProvider.php) (symfony/scheduler, consumed as the `scheduler_default` transport) |
