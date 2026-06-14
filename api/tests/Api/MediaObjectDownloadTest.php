@@ -134,6 +134,39 @@ class MediaObjectDownloadTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testUserWithOwnProjectTaskCannotDownloadForeignAttachment(): void
+    {
+        // Regression for the gated-download authorization OR-clause: it must
+        // be parenthesized. Before the fix the query read
+        //   (:media MEMBER OF t.attachments AND t.owner = :user)
+        //     OR EXISTS(space-membership) OR EXISTS(group-membership)
+        // so the attachment check only gated the owner branch. Any user who
+        // owned even one project-bound task in a space they belong to (the
+        // normal steady state) satisfied a membership EXISTS for *any* media
+        // id and could download another tenant's attachment.
+        $attacker = $this->createUser('attacker@example.com');
+        $victim = $this->createUser('victim@example.com');
+
+        // The precondition that made a membership EXISTS branch true: the
+        // attacker owns a task attached to a project whose space they're in.
+        $attackerProject = $this->createProject($attacker);
+        $this->createTask($attacker, 'Attacker task', $attackerProject);
+
+        // The victim's private attachment lives on a task in the victim's own
+        // space — the attacker is not a member of it.
+        $victimProject = $this->createProject($victim);
+        $media = $this->seedAttachment($victim, 'secret.pdf', 'TOPSECRET');
+        $victimTask = $this->createTask($victim, 'Victim task', $victimProject);
+        $victimTask->addAttachment($media);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($attacker);
+        $client->request('GET', '/media-objects/' . $media->getId() . '/download');
+        // 404 — the attacker has no relationship to this media at all.
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testUnknownMediaIdReturns404(): void
     {
         $alice = $this->createUser('alice@example.com');
