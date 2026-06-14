@@ -593,7 +593,7 @@ class TaskTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/recurrence-preview', [
+        $response = $client->request('POST', '/recurrence-preview', [
             'json' => [
                 'dueDate' => '2026-06-01T08:00:00+00:00',
                 'rule' => ['frequency' => 'daily', 'interval' => 2],
@@ -603,15 +603,19 @@ class TaskTest extends ApiTestCase
         ]);
 
         $this->assertResponseIsSuccessful();
-        $body = json_decode((string) $client->getResponse()->getContent(), true);
-        $this->assertIsArray($body);
+        $body = $response->toArray();
         $occurrences = $body['occurrences'] ?? null;
         $this->assertIsArray($occurrences);
         $this->assertCount(3, $occurrences);
-        $this->assertIsString($occurrences[0]);
-        $this->assertStringStartsWith('2026-06-03', $occurrences[0]);
-        $this->assertStringStartsWith('2026-06-05', $occurrences[1]);
-        $this->assertStringStartsWith('2026-06-07', $occurrences[2]);
+        $first = $occurrences[0];
+        $second = $occurrences[1];
+        $third = $occurrences[2];
+        $this->assertIsString($first);
+        $this->assertIsString($second);
+        $this->assertIsString($third);
+        $this->assertStringStartsWith('2026-06-03', $first);
+        $this->assertStringStartsWith('2026-06-05', $second);
+        $this->assertStringStartsWith('2026-06-07', $third);
     }
 
     public function testCreateTaskWithReminders(): void

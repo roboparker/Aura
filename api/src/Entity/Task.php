@@ -395,8 +395,9 @@ class Task
     public function setReminders(?array $reminders): static
     {
         // Normalise empty array to null so we have one canonical "no
-        // reminders" representation for downstream queries.
-        $this->reminders = (null === $reminders || [] === $reminders) ? null : array_values($reminders);
+        // reminders" representation for downstream queries. Input is already
+        // a list, so no array_values reindex is needed.
+        $this->reminders = (null === $reminders || [] === $reminders) ? null : $reminders;
         return $this;
     }
 

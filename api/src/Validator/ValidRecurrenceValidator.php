@@ -89,8 +89,9 @@ final class ValidRecurrenceValidator extends ConstraintValidator
      */
     private function validateMonthly(array $rule, ValidRecurrence $constraint): bool
     {
+        // `?? 'day'` already collapses an absent/null mode to "day".
         $mode = $rule['monthlyMode'] ?? 'day';
-        if ('day' === $mode || null === $mode) {
+        if ('day' === $mode) {
             return true;
         }
         if ('weekday' !== $mode) {

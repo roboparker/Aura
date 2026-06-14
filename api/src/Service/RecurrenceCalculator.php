@@ -43,7 +43,7 @@ final class RecurrenceCalculator
      *
      * @param array<array-key, mixed> $rule
      *
-     * @return \DateTimeImmutable[]
+     * @return list<\DateTimeImmutable>
      */
     public function nextOccurrences(\DateTimeImmutable $after, array $rule, int $limit): array
     {
