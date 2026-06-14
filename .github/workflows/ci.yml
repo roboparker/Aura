@@ -113,13 +113,24 @@ jobs:
         name: Run migrations
         run: docker compose exec -T php bin/console -e test doctrine:migrations:migrate --no-interaction
       -
-        name: Run PHPUnit
+        name: Run PHPUnit (with coverage)
         # PHPUnit's deprecation tracker accumulates context across the whole
         # suite, so peak memory grows with test count. The default 128M was
         # tight even before; 512M then started tipping over as the suite
         # grew, so we run unbounded here — GitHub runners have GBs free and
         # the limit was only ever an accidental ceiling, not a real budget.
-        run: docker compose exec -T php php -d memory_limit=-1 bin/phpunit
+        #
+        # Coverage rides along on this single run: XDEBUG_MODE=coverage flips
+        # the (installed-but-off) Xdebug driver on for this process only, and
+        # --coverage-clover writes the report the floor gate reads next. One
+        # suite execution covers both the pass/fail signal and the floor.
+        run: docker compose exec -T -e XDEBUG_MODE=coverage php php -d memory_limit=-1 bin/phpunit --coverage-clover var/coverage.xml
+      -
+        name: Enforce coverage floor
+        # Fails the build when line coverage of api/src drops below the floor.
+        # The floor is a *minimum* regression guard (measured ~75.5%), not a
+        # target — ratchet the trailing floor argument up as coverage climbs.
+        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 70
 
   phpstan:
     name: PHPStan
