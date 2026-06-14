@@ -151,23 +151,6 @@ const CustomFieldsPage = () => {
                     <span className="text-foreground">Custom fields</span>
                   </nav>
 
-                  <div className="space-y-1">
-                    <h1 className="text-2xl font-bold">Custom fields</h1>
-                    <p className="text-sm text-muted-foreground">
-                      Schema for every task in this project. Each field has a
-                      kind, subtype, footer aggregation, and a required flag.
-                      Only space admins can edit definitions.
-                    </p>
-                  </div>
-
-                  <Alert>
-                    <AlertDescription>
-                      {isSpaceAdmin
-                        ? `You're editing as a space admin. Members in ${space?.name ?? "this space"} can use these fields on tasks but can't change definitions.`
-                        : `Only space admins can edit definitions. You can use these fields on tasks in ${space?.name ?? "this space"}.`}
-                    </AlertDescription>
-                  </Alert>
-
                   {error && (
                     <Alert variant="destructive">
                       <AlertDescription>{error}</AlertDescription>
@@ -176,6 +159,7 @@ const CustomFieldsPage = () => {
 
                   <CustomFieldsManager
                     projectIri={project["@id"]}
+                    projectTitle={project.title}
                     spaceName={space?.name}
                     isSpaceAdmin={isSpaceAdmin}
                   />

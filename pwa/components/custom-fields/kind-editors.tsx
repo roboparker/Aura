@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, GripVertical, Plus, X } from "lucide-react";
+import { Check, GripVertical, Info, Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -150,6 +150,67 @@ export const subtypeLabelFor = (
 ): string =>
   KIND_DESCRIPTORS[kind]?.subtypes.find((s) => s.value === subtype)?.label ??
   subtype;
+
+/**
+ * Per-kind accent palette for the KIND pill (field table) and the
+ * descriptor dot (sheet). Tailwind needs static class strings, so each
+ * kind enumerates its full set rather than interpolating a color name.
+ */
+export const KIND_BADGE: Record<
+  CustomFieldKind,
+  { wrap: string; dot: string }
+> = {
+  text: { wrap: "border-amber-500/30 bg-amber-500/10 text-amber-300", dot: "bg-amber-400" },
+  numeric: { wrap: "border-rose-500/30 bg-rose-500/10 text-rose-300", dot: "bg-rose-400" },
+  date: { wrap: "border-sky-500/30 bg-sky-500/10 text-sky-300", dot: "bg-sky-400" },
+  boolean: { wrap: "border-violet-500/30 bg-violet-500/10 text-violet-300", dot: "bg-violet-400" },
+  select: { wrap: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300", dot: "bg-emerald-400" },
+  reference: { wrap: "border-teal-500/30 bg-teal-500/10 text-teal-300", dot: "bg-teal-400" },
+};
+
+/**
+ * `CONFIG · KIND · SUBTYPE` section label shown above the per-kind editor.
+ * The subtype segment is dropped when it duplicates the kind (e.g. a
+ * `date.date` field reads `CONFIG · DATE`, not `CONFIG · DATE · DATE`).
+ */
+export const configSectionLabel = (
+  kind: CustomFieldKind,
+  subtype: CustomFieldSubtype,
+): string => {
+  const parts = [kind.toUpperCase()];
+  if (subtype.toLowerCase() !== kind.toLowerCase()) {
+    parts.push(subtype.toUpperCase());
+  }
+  return `CONFIG · ${parts.join(" · ")}`;
+};
+
+/**
+ * Hue angle (0–360°) of an sRGB hex color in the OKLCH space, rounded to
+ * a whole degree — surfaced as `oklch · {hue}°` next to each select
+ * option swatch so admins can tell two similar swatches apart. Returns
+ * null for an unparseable hex.
+ */
+export const hexToOklchHue = (hex: string): number | null => {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return null;
+  const int = parseInt(match[1], 16);
+  const toLinear = (c: number) =>
+    c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  const r = toLinear(((int >> 16) & 255) / 255);
+  const g = toLinear(((int >> 8) & 255) / 255);
+  const b = toLinear((int & 255) / 255);
+  const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const lc = Math.cbrt(l);
+  const mc = Math.cbrt(m);
+  const sc = Math.cbrt(s);
+  const oa = 1.9779984951 * lc - 2.428592205 * mc + 0.4505937099 * sc;
+  const ob = 0.0259040371 * lc + 0.7827717662 * mc - 0.808675766 * sc;
+  let hue = (Math.atan2(ob, oa) * 180) / Math.PI;
+  if (hue < 0) hue += 360;
+  return Math.round(hue);
+};
 
 /**
  * Target-type cards for the reference editor. Selecting a card changes
@@ -295,34 +356,52 @@ const TextEditor = ({
   update,
 }: SubEditorProps & { subtype: CustomFieldSubtype }) => (
   <div className="space-y-3">
-    <div className="grid grid-cols-2 gap-3">
-      <NumberField
-        id="cf-text-min"
-        label="Min length"
-        value={config.minLength}
-        onChange={(v) => update({ minLength: v })}
-      />
-      <NumberField
-        id="cf-text-max"
-        label="Max length"
-        value={config.maxLength}
-        onChange={(v) => update({ maxLength: v })}
-      />
+    <div className="space-y-1.5">
+      <Label htmlFor="cf-text-max">Max length</Label>
+      <div className="relative">
+        <Input
+          id="cf-text-max"
+          type="number"
+          value={config.maxLength !== undefined ? String(config.maxLength) : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") {
+              update({ maxLength: undefined });
+              return;
+            }
+            const parsed = Number(v);
+            if (Number.isFinite(parsed)) update({ maxLength: parsed });
+          }}
+          className="pr-14"
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+          chars
+        </span>
+      </div>
     </div>
     <div className="space-y-1.5">
-      <Label htmlFor="cf-text-pattern">
-        Pattern{" "}
-        <span className="text-muted-foreground text-xs">(regex, optional)</span>
+      <Label htmlFor="cf-text-pattern" className="flex items-baseline gap-2">
+        Pattern
+        <span className="text-xs font-normal text-muted-foreground">
+          JS-style RegExp · optional
+        </span>
       </Label>
-      <Input
-        id="cf-text-pattern"
-        value={config.pattern ?? ""}
-        onChange={(e) =>
-          update({ pattern: e.target.value === "" ? undefined : e.target.value })
-        }
-        placeholder={subtype === "url" ? "^https?://" : "^[A-Z]{2,}$"}
-        data-testid="custom-field-pattern-input"
-      />
+      <div className="flex items-center gap-1.5 rounded-md border border-input bg-background px-2 focus-within:ring-2 focus-within:ring-ring">
+        <span className="font-mono text-sm text-muted-foreground">/</span>
+        <input
+          id="cf-text-pattern"
+          value={config.pattern ?? ""}
+          onChange={(e) =>
+            update({
+              pattern: e.target.value === "" ? undefined : e.target.value,
+            })
+          }
+          placeholder={subtype === "url" ? "^https?://" : "^[A-Z]{2,}$"}
+          className="flex-1 bg-transparent py-2 font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+          data-testid="custom-field-pattern-input"
+        />
+        <span className="font-mono text-sm text-muted-foreground">/</span>
+      </div>
     </div>
     {config.pattern && (
       <PatternCheck pattern={config.pattern} isUrl={subtype === "url"} />
@@ -507,10 +586,13 @@ const DateEditor = ({
         onChange={(v) => update({ max: v === "" ? undefined : v })}
       />
     </div>
-    <p className="text-xs text-muted-foreground">
-      Values outside this range are rejected at save time. Leave a bound
-      empty to disable the check on that side.
-    </p>
+    <div className="flex gap-2 rounded-md border border-input bg-muted/30 p-3 text-xs text-muted-foreground">
+      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <p>
+        Values outside this range are rejected with a row-level error. Empty
+        bounds disable the check on that side.
+      </p>
+    </div>
   </div>
 );
 
@@ -654,7 +736,12 @@ const SelectEditor = ({
 
   return (
     <div className="space-y-2" data-testid="custom-field-options">
-      <Label>Options</Label>
+      <Label className="flex items-baseline gap-2">
+        Options
+        <span className="text-xs font-normal text-muted-foreground">
+          Drag to reorder
+        </span>
+      </Label>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -726,6 +813,7 @@ const SortableOptionRow = ({
     useSortable({ id: String(index) });
   const [colorOpen, setColorOpen] = useState(false);
   const color = option.color ?? AVATAR_PALETTE[0];
+  const hue = hexToOklchHue(color);
 
   return (
     <div
@@ -772,6 +860,11 @@ const SortableOptionRow = ({
         aria-label={`Option ${index + 1}`}
         data-testid="custom-field-option-input"
       />
+      {hue !== null && (
+        <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
+          oklch · {hue}°
+        </span>
+      )}
       {typeof usage === "number" && (
         <Badge variant="secondary" className="shrink-0 tabular-nums">
           {usage}

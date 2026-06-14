@@ -5,10 +5,16 @@ import {
   useMemo,
   useState,
 } from "react";
-import { Trash2 } from "lucide-react";
+import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,10 +28,14 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
   CustomFieldConfigEditor,
+  KIND_BADGE,
   KIND_DESCRIPTORS,
   KIND_ORDER,
+  configSectionLabel,
   defaultConfigFor,
   fallbackSubtypeFor,
+  kindLabelFor,
+  subtypeLabelFor,
 } from "./kind-editors";
 import { fieldHandle } from "./handle";
 import type {
@@ -57,6 +67,8 @@ interface Props {
   valueCount?: number;
   onSaved: (def: CustomFieldDefinition) => void;
   onDeleted?: (def: CustomFieldDefinition) => void;
+  /** Duplicate the field being edited (header overflow menu). */
+  onDuplicate?: (def: CustomFieldDefinition) => void;
 }
 
 const FOOTER_LABELS: Record<FooterKind, string> = {
@@ -87,6 +99,7 @@ const CustomFieldSheet = ({
   valueCount,
   onSaved,
   onDeleted,
+  onDuplicate,
 }: Props) => {
   const isEdit = Boolean(initial);
 
@@ -289,15 +302,45 @@ const CustomFieldSheet = ({
         }}
       >
         <SheetHeader className="border-b px-5 py-4">
-          <SheetTitle className="text-sm font-semibold uppercase tracking-wide">
-            {isEdit ? "Edit field" : "New field"}
-          </SheetTitle>
-          <p className="text-xs text-muted-foreground">
-            <span className="font-mono">{handle}</span>
-            {isEdit && typeof valueCount === "number" && (
-              <> · {valueCount} {valueCount === 1 ? "value" : "values"}</>
+          <div className="flex items-center gap-2 pr-9">
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", KIND_BADGE[kind].dot)} />
+            <SheetTitle className="text-sm font-semibold uppercase tracking-wide">
+              {isEdit ? "Edit field" : "New field"}
+            </SheetTitle>
+            <span className="truncate font-mono text-xs text-muted-foreground">
+              {handle}
+            </span>
+            {isEdit && initial && onDuplicate && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="ml-auto mr-6 h-7 w-7"
+                    aria-label="Field actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      onDuplicate(initial);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <Copy className="mr-2 h-3.5 w-3.5" /> Duplicate field
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          </p>
+          </div>
+          {isEdit && typeof valueCount === "number" && (
+            <p className="text-xs text-muted-foreground">
+              {valueCount} {valueCount === 1 ? "value" : "values"} on tasks
+            </p>
+          )}
         </SheetHeader>
 
         <form
@@ -356,15 +399,48 @@ const CustomFieldSheet = ({
               </div>
             </div>
 
-            <CustomFieldConfigEditor
-              kind={kind}
-              subtype={subtype}
-              config={config}
-              onChange={setConfig}
-              onSubtypeChange={handleSubtypeChange}
-              spaceName={spaceName}
-              optionStats={optionStats}
-            />
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span
+                className={cn("h-1.5 w-1.5 rounded-full", KIND_BADGE[kind].dot)}
+              />
+              <span className="text-muted-foreground">
+                {kindLabelFor(kind).toLowerCase()} ·{" "}
+                {subtypeLabelFor(kind, subtype).toLowerCase()}
+              </span>
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                nullable = {String(nullable)}
+              </span>
+            </div>
+
+            {kind !== "boolean" && (
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {configSectionLabel(kind, subtype)}
+                </p>
+                <CustomFieldConfigEditor
+                  kind={kind}
+                  subtype={subtype}
+                  config={config}
+                  onChange={setConfig}
+                  onSubtypeChange={handleSubtypeChange}
+                  spaceName={spaceName}
+                  optionStats={optionStats}
+                />
+              </div>
+            )}
+
+            {kind === "select" && (
+              <ToggleRow
+                id="cf-select-multi"
+                label="Allow multi-select"
+                description="Tasks can hold multiple values · subtype = select.multi"
+                checked={subtype === "multi"}
+                onCheckedChange={(checked) =>
+                  handleSubtypeChange(checked ? "multi" : "single")
+                }
+                testId="custom-field-select-multi-input"
+              />
+            )}
 
             {multiSupported && (
               <ToggleRow
@@ -396,9 +472,62 @@ const CustomFieldSheet = ({
               <Label>
                 Footer aggregation{" "}
                 <span className="text-muted-foreground text-xs">
-                  (shown at the bottom of the task list)
+                  (roll-up shown at the bottom of the task list)
                 </span>
               </Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="cf-footer-fn"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Function
+                  </Label>
+                  <select
+                    id="cf-footer-fn"
+                    value={footer?.kind ?? "none"}
+                    onChange={(e) =>
+                      toggleFooter(
+                        e.target.value === "none"
+                          ? null
+                          : (e.target.value as FooterKind),
+                      )
+                    }
+                    className="block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    data-testid="custom-field-footer-function"
+                  >
+                    <option value="none">None</option>
+                    {descriptor.footerKinds.map((fk) => (
+                      <option key={fk} value={fk}>
+                        {FOOTER_LABELS[fk]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="cf-footer-label"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Label override
+                  </Label>
+                  <Input
+                    id="cf-footer-label"
+                    value={footer?.label ?? ""}
+                    onChange={(e) =>
+                      footer &&
+                      setFooter({
+                        kind: footer.kind,
+                        label:
+                          e.target.value === "" ? undefined : e.target.value,
+                      })
+                    }
+                    placeholder="Use field name"
+                    disabled={!footer}
+                    data-testid="custom-field-footer-label"
+                  />
+                </div>
+              </div>
               <div
                 className="flex flex-wrap gap-1.5"
                 data-testid="custom-field-footer-pills"
@@ -417,19 +546,6 @@ const CustomFieldSheet = ({
                   />
                 ))}
               </div>
-              {footer && (
-                <Input
-                  value={footer.label ?? ""}
-                  onChange={(e) =>
-                    setFooter({
-                      kind: footer.kind,
-                      label: e.target.value === "" ? undefined : e.target.value,
-                    })
-                  }
-                  placeholder="Label override (defaults to field name)"
-                  data-testid="custom-field-footer-label"
-                />
-              )}
             </div>
 
             {error && (
@@ -526,9 +642,9 @@ const FooterPill = ({
     onClick={onClick}
     aria-pressed={active}
     className={cn(
-      "rounded-full border px-3 py-1 text-xs font-medium transition",
+      "rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition",
       active
-        ? "border-primary bg-primary text-primary-foreground"
+        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
         : "border-input text-muted-foreground hover:text-foreground",
     )}
   >
