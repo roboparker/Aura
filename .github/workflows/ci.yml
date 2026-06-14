@@ -127,10 +127,11 @@ jobs:
         run: docker compose exec -T -e XDEBUG_MODE=coverage php php -d memory_limit=-1 bin/phpunit --coverage-clover var/coverage.xml
       -
         name: Enforce coverage floor
-        # Fails the build when line coverage of api/src drops below the floor.
-        # The floor is a *minimum* regression guard (measured ~75.5%), not a
+        # Fails the build when line coverage of api/src drops below the floor
+        # (DataFixtures are excluded from coverage — see phpunit.xml.dist).
+        # The floor is a *minimum* regression guard (measured ~85%), not a
         # target — ratchet the trailing floor argument up as coverage climbs.
-        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 70
+        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 84
 
   phpstan:
     name: PHPStan

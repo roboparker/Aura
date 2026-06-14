@@ -46,13 +46,14 @@ Every PR must keep CI green, which includes the test suites:
   enforced on PRs: the *Tests* CI job runs the suite with coverage
   (`XDEBUG_MODE=coverage … --coverage-clover`) and then
   [`api/bin/coverage-check.php`](../api/bin/coverage-check.php) fails the build
-  if `api/src` line coverage drops below the floor (currently 70%; measured
-  ~75.5%). To check locally:
+  if `api/src` line coverage drops below the floor (currently 84%; measured
+  ~85%). Dev/test seeders under `src/DataFixtures` are excluded from coverage
+  (see `api/phpunit.xml.dist`). To check locally:
 
   ```bash
   docker compose exec -e XDEBUG_MODE=coverage php php -d memory_limit=-1 \
     bin/phpunit --coverage-clover var/coverage.xml
-  docker compose exec php php bin/coverage-check.php var/coverage.xml 70
+  docker compose exec php php bin/coverage-check.php var/coverage.xml 84
   ```
 - **PWA** — Vitest over the framework-free logic in `pwa/lib`
   (`pnpm test`). A **minimum-coverage floor** is enforced on PRs via
