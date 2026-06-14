@@ -16,20 +16,129 @@ export interface Tag {
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 
+export type Weekday = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+
+// Picker order is Sun-first to match the mock's S M T W T F S row.
+export const WEEKDAYS: Weekday[] = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
+
+export const WEEKDAY_LABELS: Record<Weekday, string> = {
+  MO: "Mon",
+  TU: "Tue",
+  WE: "Wed",
+  TH: "Thu",
+  FR: "Fri",
+  SA: "Sat",
+  SU: "Sun",
+};
+
+// Single-letter labels for the compact day picker (the duplicate S/T are fine
+// because position disambiguates, exactly like the mock).
+export const WEEKDAY_INITIALS: Record<Weekday, string> = {
+  SU: "S",
+  MO: "M",
+  TU: "T",
+  WE: "W",
+  TH: "T",
+  FR: "F",
+  SA: "S",
+};
+
+export type MonthlyMode = "day" | "weekday";
+
+export type RecurrenceEnds =
+  | { type: "until"; until: string } // YYYY-MM-DD
+  | { type: "count"; count: number };
+
+// The rule mirrors the API's expanded JSON shape. Only frequency + interval
+// are required; the rest specialise weekly (byDay) and monthly (monthlyMode +
+// bySetPos), plus an optional end condition. A bare {frequency, interval} is
+// still valid, so legacy rows and the simple list picker keep working.
 export interface RecurrenceRule {
   frequency: RecurrenceFrequency;
   interval: number;
+  byDay?: Weekday[];
+  monthlyMode?: MonthlyMode;
+  bySetPos?: number; // 1..5 or -1 (last)
+  ends?: RecurrenceEnds | null;
 }
 
-// Allowlist of reminder offsets the API accepts on Task.reminders. Kept in
-// the same order the picker renders so checkbox state ↔ JSON array stay
-// trivially aligned.
-export const REMINDER_OFFSETS = ["15m", "1h", "1d"] as const;
-export type ReminderOffset = (typeof REMINDER_OFFSETS)[number];
-export const REMINDER_LABELS: Record<ReminderOffset, string> = {
-  "15m": "15 minutes before",
-  "1h": "1 hour before",
-  "1d": "1 day before",
+export type ReminderUnit = "minutes" | "hours" | "days";
+
+// A reminder is either relative to the due date or pinned to an absolute
+// timestamp; either may "repeat daily until done". Mirrors the API shape.
+export type Reminder =
+  | { type: "relative"; value: number; unit: ReminderUnit; repeat: boolean }
+  | { type: "absolute"; at: string; repeat: boolean };
+
+// Quick presets surfaced as checkboxes in the simple list due-date popover.
+// The rich per-reminder editor lives in the task drawer.
+export interface ReminderPreset {
+  /** Short, stable id for test selectors / DOM keys. */
+  id: string;
+  key: string;
+  label: string;
+  reminder: Reminder;
+}
+export const REMINDER_PRESETS: ReminderPreset[] = [
+  {
+    id: "15m",
+    key: "rel:15:minutes",
+    label: "15 minutes before",
+    reminder: { type: "relative", value: 15, unit: "minutes", repeat: false },
+  },
+  {
+    id: "1h",
+    key: "rel:1:hours",
+    label: "1 hour before",
+    reminder: { type: "relative", value: 1, unit: "hours", repeat: false },
+  },
+  {
+    id: "1d",
+    key: "rel:1:days",
+    label: "1 day before",
+    reminder: { type: "relative", value: 1, unit: "days", repeat: false },
+  },
+];
+
+// Canonical key for a reminder — mirrors ReminderScheduler::canonicalKey on
+// the API so the UI can dedup / toggle presets consistently. Ignores the
+// `repeat` flag (same as the server) so a preset matches regardless.
+export const reminderKey = (r: Reminder): string =>
+  r.type === "relative"
+    ? `rel:${r.value}:${r.unit}`
+    : `abs:${r.at}`;
+
+const REMINDER_UNIT_SINGULAR: Record<ReminderUnit, string> = {
+  minutes: "minute",
+  hours: "hour",
+  days: "day",
+};
+
+const absoluteReminderFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+// Human label for one reminder, e.g. "30 minutes before due" / "On Apr 2,
+// 9:00 AM". Used in the drawer list + the read-only summaries.
+export const describeReminder = (r: Reminder): string => {
+  if (r.type === "relative") {
+    if (r.value === 0) return "When due";
+    const unit = REMINDER_UNIT_SINGULAR[r.unit];
+    return `${r.value} ${unit}${r.value === 1 ? "" : "s"} before due`;
+  }
+  const at = new Date(r.at);
+  return Number.isNaN(at.getTime())
+    ? "At a set time"
+    : `On ${absoluteReminderFormatter.format(at)}`;
+};
+
+export const summarizeReminders = (reminders: Reminder[] | null): string => {
+  if (!reminders || reminders.length === 0) return "";
+  if (reminders.length === 1) return describeReminder(reminders[0]);
+  return `${reminders.length} reminders`;
 };
 
 export interface Task {
@@ -45,7 +154,7 @@ export interface Task {
   // delete-rights for the task owner without an extra fetch.
   owner: { "@id": string };
   recurrenceRule: RecurrenceRule | null;
-  reminders: ReminderOffset[] | null;
+  reminders: Reminder[] | null;
   // Attachments embed inline under `task:read`. The PWA uploads via
   // `POST /media-objects?kind=attachment`, then PATCHes the IRI here.
   attachments: Attachment[];
@@ -64,10 +173,41 @@ export const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
   yearly: "year",
 };
 
+// 1 → "1st", 2 → "2nd", -1 → "last" (for monthly "2nd Thursday").
+export const ordinalLabel = (n: number): string => {
+  if (n === -1) return "last";
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
+};
+
+// Compact one-line summary matching the mock chips: "Daily · every 2 days",
+// "Weekly · Mon / Wed / Fri", "Monthly · 2nd Thursday".
 export const formatRecurrenceSummary = (rule: RecurrenceRule): string => {
-  const noun = FREQUENCY_LABELS[rule.frequency];
-  if (rule.interval === 1) return `Every ${noun}`;
-  return `Every ${rule.interval} ${noun}s`;
+  switch (rule.frequency) {
+    case "daily":
+      return rule.interval === 1 ? "Daily" : `Daily · every ${rule.interval} days`;
+    case "weekly": {
+      const base = rule.interval === 1 ? "Weekly" : `Weekly · every ${rule.interval} weeks`;
+      if (rule.byDay && rule.byDay.length > 0) {
+        const days = WEEKDAYS.filter((d) => rule.byDay?.includes(d))
+          .map((d) => WEEKDAY_LABELS[d])
+          .join(" / ");
+        return `${base} · ${days}`;
+      }
+      return base;
+    }
+    case "monthly": {
+      if (rule.monthlyMode === "weekday" && rule.byDay && rule.byDay[0] && rule.bySetPos) {
+        return `Monthly · ${ordinalLabel(rule.bySetPos)} ${WEEKDAY_LABELS[rule.byDay[0]]}`;
+      }
+      return rule.interval === 1 ? "Monthly" : `Monthly · every ${rule.interval} months`;
+    }
+    case "yearly":
+      return rule.interval === 1 ? "Yearly" : `Yearly · every ${rule.interval} years`;
+    default:
+      return "Repeats";
+  }
 };
 
 // "manual" maps to the persisted `position` order — drag-to-reorder is only

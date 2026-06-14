@@ -10,13 +10,11 @@ const uniqueEmail = () => shared("custom-fields");
 
 const openCustomFields = async (page, projectTitle) => {
   await page.goto(`${BASE_URL}/projects`);
+  // The create form lives behind the "New project" toggle.
+  await page.getByTestId("new-project-button").click();
   await page.fill("#title", projectTitle);
   await page.click('button[type="submit"]');
-  const projectItem = page.locator('[data-testid="project-item"]', {
-    hasText: projectTitle,
-  });
-  await expect(projectItem).toBeVisible();
-  await projectItem.locator(`a[href^="/projects/"]`).first().click();
+  // Creating navigates straight to the new project's detail page.
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
   await page.click('[data-testid="project-custom-fields-link"]');
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/custom-fields$/);

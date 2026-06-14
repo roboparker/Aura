@@ -39,7 +39,7 @@ import {
   plainTextDescription,
   removeComment,
   type RecurrenceRule,
-  type ReminderOffset,
+  type Reminder,
   type SortKey,
   type SortState,
   type Tag,
@@ -578,7 +578,7 @@ const Tasks = () => {
 
   const handleRemindersChange = async (
     task: Task,
-    nextReminders: ReminderOffset[] | null,
+    nextReminders: Reminder[] | null,
   ) => {
     const previous = tasks;
     setTasks(

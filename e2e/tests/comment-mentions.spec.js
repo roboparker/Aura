@@ -36,17 +36,14 @@ test.describe("Comment @-mentions", () => {
     // space (#185).
     await alicePage.goto(`${BASE_URL}/projects`);
     const projectTitle = `Mentions-${Date.now()}`;
+    // The create form lives behind the "New project" toggle; creating
+    // navigates straight to the new project's detail page.
+    await alicePage.getByTestId("new-project-button").click();
     await alicePage.fill("#title", projectTitle);
     await alicePage.click('button[type="submit"]');
-    const projectItem = alicePage.locator('[data-testid="project-item"]', {
-      hasText: projectTitle,
-    });
-    await expect(projectItem).toBeVisible();
-
-    // Open the project detail page and add Bob to the space via the
-    // shared "Manage members in space" link.
-    await projectItem.locator(`a[href^="/projects/"]`).first().click();
     await expect(alicePage).toHaveURL(/\/projects\/[a-f0-9-]+/);
+
+    // Add Bob to the space via the POST /projects/{id}/members shim.
     const projectIdMatch = alicePage.url().match(/\/projects\/([a-f0-9-]+)/);
     if (!projectIdMatch) throw new Error("Couldn't extract project ID from URL.");
     const projectId = projectIdMatch[1];

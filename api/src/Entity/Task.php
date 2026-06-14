@@ -152,27 +152,32 @@ class Task
     private ?\DateTimeImmutable $dueDate = null;
 
     /**
-     * Optional recurrence rule. Persisted as a JSON object with shape
-     * `{"frequency": "daily"|"weekly"|"monthly"|"yearly", "interval": int}`.
-     * Validated in detail by {@see ValidRecurrence}; the cross-field rule
-     * (recurrence requires a due date) lives there too. When set, completing
-     * the task triggers {@see TaskUpdateProcessor} to clone the next
-     * occurrence with `dueDate` advanced by the rule.
+     * Optional recurrence rule. Persisted as a JSON object. The base shape is
+     * `{"frequency": "daily"|"weekly"|"monthly"|"yearly", "interval": int}`,
+     * optionally extended with `byDay` (weekday tokens), `monthlyMode`,
+     * `bySetPos`, and an `ends` end-condition — see
+     * {@see \App\Service\RecurrenceCalculator} for the full shape. Validated
+     * by {@see ValidRecurrence} (and the cross-field rule that recurrence
+     * requires a due date). When set, completing the task triggers
+     * {@see TaskUpdateProcessor} to clone the next occurrence.
      *
-     * @var array{frequency: string, interval: int}|null
+     * @var array<string, mixed>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
     private ?array $recurrenceRule = null;
 
     /**
-     * Reminder offsets to fire ahead of the due date. Each item is one of
-     * the strings in {@see ValidReminders::ALLOWED_OFFSETS} (e.g. "15m",
-     * "1h", "1d"). Empty array and null are equivalent — both mean "no
-     * reminders". Validated by {@see ValidReminders}, which also enforces
-     * the cross-field rule that reminders need a due date.
+     * Reminders to fire around the due date. Each entry is an object — either
+     * relative (`{type:"relative", value:int, unit:"minutes"|"hours"|"days",
+     * repeat:bool}`, fired `value` units before the due date) or absolute
+     * (`{type:"absolute", at:ISO-8601, repeat:bool}`, fired at a fixed time).
+     * `repeat` means "repeat daily until done". Empty array and null are
+     * equivalent — both mean "no reminders". Validated by {@see ValidReminders}.
+     * Typed loosely (`list<mixed>`) because the JSON payload isn't shape-checked
+     * until the validator runs — entries are guarded with `is_array()` there.
      *
-     * @var string[]|null
+     * @var list<mixed>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
@@ -360,7 +365,7 @@ class Task
     }
 
     /**
-     * @return array{frequency: string, interval: int}|null
+     * @return array<string, mixed>|null
      */
     public function getRecurrenceRule(): ?array
     {
@@ -368,7 +373,7 @@ class Task
     }
 
     /**
-     * @param array{frequency: string, interval: int}|null $recurrenceRule
+     * @param array<string, mixed>|null $recurrenceRule
      */
     public function setRecurrenceRule(?array $recurrenceRule): static
     {
@@ -377,7 +382,7 @@ class Task
     }
 
     /**
-     * @return string[]|null
+     * @return list<mixed>|null
      */
     public function getReminders(): ?array
     {
@@ -385,13 +390,14 @@ class Task
     }
 
     /**
-     * @param string[]|null $reminders
+     * @param list<mixed>|null $reminders
      */
     public function setReminders(?array $reminders): static
     {
         // Normalise empty array to null so we have one canonical "no
-        // reminders" representation for downstream queries.
-        $this->reminders = (null === $reminders || [] === $reminders) ? null : array_values($reminders);
+        // reminders" representation for downstream queries. Input is already
+        // a list, so no array_values reindex is needed.
+        $this->reminders = (null === $reminders || [] === $reminders) ? null : $reminders;
         return $this;
     }
 

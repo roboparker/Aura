@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
+use App\Mcp\TaskRelationWarmer;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\ORM\Tools\Pagination\Paginator;
@@ -17,6 +18,7 @@ final class ListTasksTool implements McpToolInterface
         private EntityManagerInterface $em,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private TaskRelationWarmer $warmer,
     ) {
     }
 
@@ -51,8 +53,9 @@ final class ListTasksTool implements McpToolInterface
 
     public function invoke(array $arguments, User $user): array
     {
-        $page = $this->input->pagination($arguments)['page'];
-        $limit = $this->input->pagination($arguments)['limit'];
+        $pagination = $this->input->pagination($arguments);
+        $page = $pagination['page'];
+        $limit = $pagination['limit'];
 
         $qb = $this->buildBaseQuery($user);
 
@@ -99,11 +102,10 @@ final class ListTasksTool implements McpToolInterface
 
         $paginator = new Paginator($qb->getQuery(), fetchJoinCollection: true);
         $total = count($paginator);
-        $items = [];
-        foreach ($paginator as $task) {
-            /** @var Task $task */
-            $items[] = $this->serializer->task($task);
-        }
+        /** @var list<Task> $tasks */
+        $tasks = array_values(iterator_to_array($paginator));
+        $this->warmer->warm($tasks);
+        $items = array_map(fn (Task $task) => $this->serializer->task($task), $tasks);
 
         return [
             'items' => $items,

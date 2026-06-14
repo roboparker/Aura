@@ -274,7 +274,9 @@ test.describe("Tasks", () => {
     const persisted = (json.member ?? json["hydra:member"] ?? []).find(
       (t) => t.title === title,
     );
-    expect(persisted.reminders).toEqual(["1h"]);
+    expect(persisted.reminders).toEqual([
+      { type: "relative", value: 1, unit: "hours", repeat: false },
+    ]);
   });
 
   test("user can reorder tasks via keyboard drag", async ({ page }) => {

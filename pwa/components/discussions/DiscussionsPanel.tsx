@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Lock,
   MessageSquare,
@@ -112,6 +113,7 @@ const DiscussionsPanel = ({
   isSpaceAdmin,
   onCountChange,
 }: Props) => {
+  const queryClient = useQueryClient();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -212,6 +214,8 @@ const DiscussionsPanel = ({
       const created: Discussion = await res.json();
       trackEvent("discussion-create", { category: newCategory });
       setDiscussions((prev) => sortDiscussions([created, ...prev]));
+      // Refresh the sidebar nav list (shares the ["discussions"] key prefix).
+      void queryClient.invalidateQueries({ queryKey: ["discussions"] });
       setNewTitle("");
       setNewBody("");
       setNewCategory("general");

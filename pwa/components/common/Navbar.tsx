@@ -17,6 +17,7 @@ import SearchOverlay from "@/components/search/SearchOverlay";
 import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
+import SpaceSwitcher from "./SpaceSwitcher";
 import UserMenu from "./UserMenu";
 
 const Navbar = () => {
@@ -26,11 +27,12 @@ const Navbar = () => {
   return (
     <nav className="h-14 w-full border-b bg-background">
       <div className="flex h-full items-center gap-3 px-4">
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Signed-out viewers get the Madori wordmark as the home
-              anchor; signed-in viewers get the Breadcrumbs trail
-              below (with its own Home icon), so the wordmark would
-              be redundant. Developer-facing doc links (API reference,
+              anchor; signed-in viewers get the active-space switcher
+              here on the left (md+) plus the Breadcrumbs trail below
+              (with its own Home icon), so the wordmark would be
+              redundant. Developer-facing doc links (API reference,
               component library, guides) live in the page Footer to
               keep the navbar focused on the active session. */}
           {!isAuthenticated && (
@@ -40,6 +42,11 @@ const Navbar = () => {
             >
               Madori
             </Link>
+          )}
+          {isAuthenticated && (
+            <div className="hidden md:block w-44 lg:w-52">
+              <SpaceSwitcher />
+            </div>
           )}
         </div>
 
@@ -79,6 +86,7 @@ const Navbar = () => {
                     <SheetTitle>Main navigation</SheetTitle>
                   </SheetHeader>
                   <SidebarNav
+                    includeSpaceSwitcher
                     itemWrapper={(child) => (
                       <SheetClose asChild>{child}</SheetClose>
                     )}
