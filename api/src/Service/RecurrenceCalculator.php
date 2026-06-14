@@ -60,8 +60,11 @@ final class RecurrenceCalculator
             'weekly' => $this->weeklyDates($after, $interval, $this->byDayNumbers($rule)),
             'monthly' => $this->monthlyDates($after, $interval, $rule),
             'yearly' => $this->yearlyDates($after, $interval),
-            default => [],
+            default => null,
         };
+        if (null === $generator) {
+            return [];
+        }
 
         foreach ($generator as $date) {
             if (null !== $until && $date > $until) {
@@ -102,6 +105,9 @@ final class RecurrenceCalculator
         }
     }
 
+    /**
+     * @return \Generator<int, \DateTimeImmutable>
+     */
     private function yearlyDates(\DateTimeImmutable $after, int $interval): \Generator
     {
         $cursor = $after;
