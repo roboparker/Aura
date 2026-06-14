@@ -41,7 +41,7 @@ final class RecurrenceCalculator
      * occurrences via the rule's `ends.count` and stops spawning itself, so
      * the preview can pass the remaining count as `$limit`.
      *
-     * @param array<string, mixed> $rule
+     * @param array<array-key, mixed> $rule
      *
      * @return \DateTimeImmutable[]
      */
@@ -81,7 +81,7 @@ final class RecurrenceCalculator
      * ended (past `until`, or generation produced nothing). Count-based
      * limits are the caller's concern.
      *
-     * @param array<string, mixed> $rule
+     * @param array<array-key, mixed> $rule
      */
     public function nextDueDate(\DateTimeImmutable $current, array $rule): ?\DateTimeImmutable
     {
@@ -89,8 +89,6 @@ final class RecurrenceCalculator
     }
 
     /**
-     * @param array<string, mixed> $rule
-     *
      * @return \Generator<int, \DateTimeImmutable>
      */
     private function dailyDates(\DateTimeImmutable $after, int $interval): \Generator
@@ -161,7 +159,7 @@ final class RecurrenceCalculator
      *  - "weekday": the Nth weekday of the month (bySetPos + byDay[0]), e.g.
      *    "2nd Thursday"; -1 means the last such weekday.
      *
-     * @param array<string, mixed> $rule
+     * @param array<array-key, mixed> $rule
      *
      * @return \Generator<int, \DateTimeImmutable>
      */
@@ -235,7 +233,7 @@ final class RecurrenceCalculator
     }
 
     /**
-     * @param array<string, mixed> $rule
+     * @param array<array-key, mixed> $rule
      *
      * @return int[]
      */
@@ -255,7 +253,7 @@ final class RecurrenceCalculator
     }
 
     /**
-     * @param array<string, mixed> $rule
+     * @param array<array-key, mixed> $rule
      */
     private function parseUntil(array $rule): ?\DateTimeImmutable
     {

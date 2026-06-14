@@ -174,8 +174,10 @@ class Task
      * (`{type:"absolute", at:ISO-8601, repeat:bool}`, fired at a fixed time).
      * `repeat` means "repeat daily until done". Empty array and null are
      * equivalent — both mean "no reminders". Validated by {@see ValidReminders}.
+     * Typed loosely (`list<mixed>`) because the JSON payload isn't shape-checked
+     * until the validator runs — entries are guarded with `is_array()` there.
      *
-     * @var list<array<string, mixed>>|null
+     * @var list<mixed>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
     #[Groups(['task:read', 'task:write'])]
@@ -380,7 +382,7 @@ class Task
     }
 
     /**
-     * @return list<array<string, mixed>>|null
+     * @return list<mixed>|null
      */
     public function getReminders(): ?array
     {
@@ -388,7 +390,7 @@ class Task
     }
 
     /**
-     * @param list<array<string, mixed>>|null $reminders
+     * @param list<mixed>|null $reminders
      */
     public function setReminders(?array $reminders): static
     {

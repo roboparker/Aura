@@ -9,18 +9,18 @@ import {
 } from "@/components/ui/popover";
 import RecurrencePicker from "@/components/tasks/RecurrencePicker";
 import {
-  REMINDER_LABELS,
-  REMINDER_OFFSETS,
+  REMINDER_PRESETS,
   addDays,
   addMonths,
   formatDueDate,
   formatRecurrenceSummary,
   isoToLocalDate,
   localDateToIso,
+  reminderKey,
   todayLocalMidnight,
   type DueDateStatus,
   type RecurrenceRule,
-  type ReminderOffset,
+  type Reminder,
 } from "@/components/tasks/taskHelpers";
 import { cn } from "@/lib/utils";
 
@@ -38,8 +38,8 @@ interface DueDateCellProps {
    *  checkboxes for each allowed offset inside the same popover. Clearing
    *  the date also clears reminders (the server-side validator rejects
    *  reminders without an anchor). */
-  remindersValue?: ReminderOffset[] | null;
-  onRemindersChange?: (next: ReminderOffset[] | null) => void | Promise<void>;
+  remindersValue?: Reminder[] | null;
+  onRemindersChange?: (next: Reminder[] | null) => void | Promise<void>;
   /** Toggles overdue/today colouring. Completed tasks pass `"none"` so a missed
    *  deadline doesn't keep glowing red after the work is done. */
   status?: DueDateStatus;
@@ -103,12 +103,13 @@ const DueDateCell = ({
     status === "today" && "text-amber-600 dark:text-amber-400 font-medium",
   );
 
-  const toggleReminder = (offset: ReminderOffset) => {
+  const togglePreset = (preset: (typeof REMINDER_PRESETS)[number]) => {
     if (!onRemindersChange) return;
     const current = remindersValue ?? [];
-    const next = current.includes(offset)
-      ? current.filter((o) => o !== offset)
-      : [...current, offset];
+    const has = current.some((r) => reminderKey(r) === preset.key);
+    const next = has
+      ? current.filter((r) => reminderKey(r) !== preset.key)
+      : [...current, preset.reminder];
     void onRemindersChange(next.length === 0 ? null : next);
   };
 
@@ -211,21 +212,23 @@ const DueDateCell = ({
             <p className="text-xs font-medium text-muted-foreground px-1">
               Remind me
             </p>
-            {REMINDER_OFFSETS.map((offset) => {
-              const checked = (remindersValue ?? []).includes(offset);
+            {REMINDER_PRESETS.map((preset) => {
+              const checked = (remindersValue ?? []).some(
+                (r) => reminderKey(r) === preset.key,
+              );
               return (
                 <label
-                  key={offset}
+                  key={preset.id}
                   className="flex items-center gap-2 px-1 py-1 text-sm cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggleReminder(offset)}
+                    onChange={() => togglePreset(preset)}
                     className="h-3.5 w-3.5"
-                    data-testid={`${testIdPrefix}-reminder-${offset}`}
+                    data-testid={`${testIdPrefix}-reminder-${preset.id}`}
                   />
-                  {REMINDER_LABELS[offset]}
+                  {preset.label}
                 </label>
               );
             })}

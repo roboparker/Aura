@@ -84,6 +84,9 @@ final class TaskReminderDispatcher
 
             $dueDate = $task->getDueDate();
             foreach ($reminders as $reminder) {
+                if (!is_array($reminder)) {
+                    continue;
+                }
                 foreach ($this->scheduler->dueFires($reminder, $dueDate, $now) as $fire) {
                     $key = $fire['key'];
                     $label = $this->scheduler->describe($reminder);

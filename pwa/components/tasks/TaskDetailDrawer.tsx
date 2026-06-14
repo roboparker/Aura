@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Calendar as CalendarIcon, Bell, Repeat } from "lucide-react";
+import { Repeat } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,11 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
 import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
 import AttachmentsPanel from "@/components/tasks/AttachmentsPanel";
+import DueDateCell from "@/components/tasks/DueDateCell";
+import RecurrenceEditor from "@/components/tasks/RecurrenceEditor";
+import RemindersEditor from "@/components/tasks/RemindersEditor";
 import CommentsPanel from "@/components/common/CommentsPanel";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldValueList, {
@@ -19,6 +27,12 @@ import CustomFieldValueList, {
 } from "@/components/tasks/CustomFieldValueList";
 import type { AvatarUser } from "@/components/user/UserAvatar";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import {
+  dueDateStatus,
+  formatRecurrenceSummary,
+  type RecurrenceRule,
+  type Reminder,
+} from "@/components/tasks/taskHelpers";
 import { parseViolations, type ViolationMap } from "@/lib/violations";
 
 interface DrawerAttachment {
@@ -48,8 +62,8 @@ interface DrawerTask {
   completedOn: string | null;
   dueDate: string | null;
   owner: { "@id": string };
-  recurrenceRule: { frequency: string; interval: number } | null;
-  reminders: string[] | null;
+  recurrenceRule: RecurrenceRule | null;
+  reminders: Reminder[] | null;
   attachments: DrawerAttachment[];
   tags: TagOption[];
   assignees: AssigneeOption[];
@@ -64,33 +78,6 @@ interface Collection<T> {
 
 const membersOf = <T,>(data: Collection<T>): T[] =>
   data.member ?? data["hydra:member"] ?? [];
-
-const REMINDER_LABELS: Record<string, string> = {
-  "15m": "15 minutes before",
-  "1h": "1 hour before",
-  "1d": "1 day before",
-};
-
-const recurrenceSummary = (
-  rule: { frequency: string; interval: number } | null,
-): string | null => {
-  if (!rule) return null;
-  const noun =
-    { daily: "day", weekly: "week", monthly: "month", yearly: "year" }[
-      rule.frequency
-    ] ?? rule.frequency;
-  return rule.interval === 1 ? `Every ${noun}` : `Every ${rule.interval} ${noun}s`;
-};
-
-const formatDue = (iso: string | null): string => {
-  if (!iso) return "No due date";
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
 
 export interface TaskDetailDrawerProps {
   taskId: string | null;
@@ -127,6 +114,7 @@ const TaskDetailDrawer = ({
   const [loading, setLoading] = useState(false);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recurrenceOpen, setRecurrenceOpen] = useState(false);
 
   // Load the task whenever the drawer opens on a new id.
   useEffect(() => {
@@ -395,7 +383,28 @@ const TaskDetailDrawer = ({
                   className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
                   data-testid="task-detail-title"
                 />
+                {task.completedOn && (
+                  <span className="mt-1.5 shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
+                    Done
+                  </span>
+                )}
               </div>
+              {task.tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
+                  {task.tags.map((tag) => (
+                    <span
+                      key={tag["@id"]}
+                      className="rounded px-1.5 py-0.5 text-xs font-medium"
+                      style={{
+                        backgroundColor: `${tag.color}22`,
+                        color: tag.color,
+                      }}
+                    >
+                      {tag.title}
+                    </span>
+                  ))}
+                </div>
+              )}
               <TabsList variant="line" className="mt-3">
                 <TabsTrigger value="details" data-testid="task-tab-details">
                   Details
@@ -443,30 +452,54 @@ const TaskDetailDrawer = ({
                     />
                   </Row>
                   <Row label="Due">
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <CalendarIcon className="h-3.5 w-3.5" />
-                      {formatDue(task.dueDate)}
-                    </span>
+                    <DueDateCell
+                      value={task.dueDate}
+                      onChange={(next) => void patchTask({ dueDate: next })}
+                      ariaLabel={`Due date for ${task.title}`}
+                      testIdPrefix="task-detail-due"
+                      status={dueDateStatus(task.dueDate, Boolean(task.completedOn))}
+                    />
                   </Row>
-                  {recurrenceSummary(task.recurrenceRule) && (
-                    <Row label="Repeats">
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <Repeat className="h-3.5 w-3.5" />
-                        {recurrenceSummary(task.recurrenceRule)}
-                      </span>
-                    </Row>
-                  )}
-                  {task.reminders && task.reminders.length > 0 && (
-                    <Row label="Reminders">
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        <Bell className="h-3.5 w-3.5" />
-                        {task.reminders
-                          .map((r) => REMINDER_LABELS[r] ?? r)
-                          .join(", ")}
-                      </span>
-                    </Row>
-                  )}
+                  <Row label="Repeats">
+                    <Popover open={recurrenceOpen} onOpenChange={setRecurrenceOpen}>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex items-center gap-1.5 text-left hover:text-foreground"
+                          data-testid="task-detail-repeats"
+                        >
+                          <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                          {task.recurrenceRule ? (
+                            <span>{formatRecurrenceSummary(task.recurrenceRule)}</span>
+                          ) : (
+                            <span className="text-muted-foreground">Does not repeat</span>
+                          )}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-auto p-0">
+                        <RecurrenceEditor
+                          value={task.recurrenceRule}
+                          dueDate={task.dueDate}
+                          onApply={(rule) => {
+                            void patchTask({ recurrenceRule: rule });
+                            setRecurrenceOpen(false);
+                          }}
+                          onRemove={() => {
+                            void patchTask({ recurrenceRule: null });
+                            setRecurrenceOpen(false);
+                          }}
+                          onCancel={() => setRecurrenceOpen(false)}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </Row>
                 </dl>
+
+                <RemindersEditor
+                  value={task.reminders}
+                  dueDate={task.dueDate}
+                  onChange={(next) => void patchTask({ reminders: next })}
+                />
 
                 {task.project && definitions.length > 0 && (
                   <CustomFieldValueList

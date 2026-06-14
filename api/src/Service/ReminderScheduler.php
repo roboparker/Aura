@@ -20,7 +20,7 @@ final class ReminderScheduler
     /**
      * True when the entry is a well-formed relative or absolute reminder.
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      */
     public function isValidShape(array $reminder): bool
     {
@@ -50,7 +50,7 @@ final class ReminderScheduler
     /**
      * True when the reminder needs a due date to anchor to (relative only).
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      */
     public function requiresDueDate(array $reminder): bool
     {
@@ -61,7 +61,7 @@ final class ReminderScheduler
      * A stable identifier for the reminder, independent of any single fire.
      * Used to dedup the list and as the base of the per-fire notification key.
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      */
     public function canonicalKey(array $reminder): string
     {
@@ -87,7 +87,7 @@ final class ReminderScheduler
      * <= now (we don't backfill missed days — one catch-up is enough), keyed
      * with the fire date so each day is a distinct notification.
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      *
      * @return list<array{key: string, at: \DateTimeImmutable}>
      */
@@ -121,7 +121,7 @@ final class ReminderScheduler
     /**
      * Human-readable description for emails / notification bodies.
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      */
     public function describe(array $reminder): string
     {
@@ -147,7 +147,7 @@ final class ReminderScheduler
      * The reminder's base fire time: due − offset for relative, the fixed
      * timestamp for absolute. Null when a relative reminder has no due date.
      *
-     * @param array<string, mixed> $reminder
+     * @param array<array-key, mixed> $reminder
      */
     private function anchorTime(array $reminder, ?\DateTimeImmutable $due): ?\DateTimeImmutable
     {
