@@ -3,15 +3,15 @@
 namespace App\Service;
 
 use App\Entity\Notification;
+use App\Entity\PushSubscription;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Push\PushPayload;
 use App\Push\PushSenderInterface;
-use App\Repository\NotificationRepository;
-use App\Repository\PushSubscriptionRepository;
 use App\Repository\TaskRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
-use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -41,10 +41,8 @@ final class TaskReminderDispatcher
 {
     public function __construct(
         private TaskRepository $tasks,
-        private NotificationRepository $notifications,
-        private PushSubscriptionRepository $pushSubscriptions,
+        private ManagerRegistry $doctrine,
         private PushSenderInterface $pushSender,
-        private EntityManagerInterface $em,
         private MailerInterface $mailer,
         private LoggerInterface $logger,
         private ReminderScheduler $scheduler,
@@ -58,74 +56,105 @@ final class TaskReminderDispatcher
     public function dispatch(): TaskReminderDispatchResult
     {
         $now = new \DateTimeImmutable();
+        $created = 0;
         $emailsSent = 0;
         $pushesSent = 0;
 
-        // Absolute reminders fire without a due date, so we no longer filter
-        // on dueDate here — only on "incomplete + has reminders".
-        $candidates = $this->tasks->createQueryBuilder('t')
+        // Absolute reminders fire without a due date, so we only filter on
+        // "incomplete + has reminders". Select IDs (not entities) so that a
+        // manager reset mid-run never leaves us iterating detached Task
+        // objects — each task is re-fetched fresh against the current manager.
+        /** @var list<mixed> $candidateIds */
+        $candidateIds = $this->tasks->createQueryBuilder('t')
+            ->select('t.id')
             ->where('t.completedOn IS NULL')
             ->andWhere('t.reminders IS NOT NULL')
             ->getQuery()
-            ->getResult();
+            ->getSingleColumnResult();
 
-        $created = 0;
-        /** @var Task $task */
-        foreach ($candidates as $task) {
-            $reminders = $task->getReminders() ?? [];
-            if ([] === $reminders) {
+        foreach ($candidateIds as $taskId) {
+            $em = $this->doctrine->getManager();
+            $task = $em->find(Task::class, $taskId);
+            if (!$task instanceof Task) {
                 continue;
             }
 
-            $recipients = $this->collectRecipients($task);
-            if ([] === $recipients) {
-                continue;
-            }
-
-            $dueDate = $task->getDueDate();
-            foreach ($reminders as $reminder) {
-                if (!is_array($reminder)) {
-                    continue;
-                }
-                foreach ($this->scheduler->dueFires($reminder, $dueDate, $now) as $fire) {
-                    $key = $fire['key'];
-                    $label = $this->scheduler->describe($reminder);
-
-                    foreach ($recipients as $recipient) {
-                        if ($this->notifications->taskReminderExists($recipient, $task, $key)) {
-                            continue;
-                        }
-
-                        $notification = new Notification();
-                        $notification->setRecipient($recipient);
-                        $notification->setTask($task);
-                        $notification->setReminderOffset($key);
-                        $notification->setType(Notification::TYPE_TASK_REMINDER);
-                        $notification->setTitle(sprintf('Reminder: %s', $task->getTitle()));
-                        $notification->setBody($this->buildBody($task, $label));
-                        $this->em->persist($notification);
-
-                        try {
-                            $this->em->flush();
-                            ++$created;
-                        } catch (UniqueConstraintViolationException) {
-                            // Concurrent dispatcher beat us to it. Recover the
-                            // EM, drop our pending entity, and move on.
-                            $this->em->clear();
-                            continue;
-                        }
-
-                        if ($this->sendReminderEmail($recipient, $task, $label)) {
-                            ++$emailsSent;
-                        }
-
-                        $pushesSent += $this->sendReminderPush($recipient, $task, $key, $label);
-                    }
-                }
+            try {
+                [$c, $e, $p] = $this->processTask($em, $task, $now);
+                $created += $c;
+                $emailsSent += $e;
+                $pushesSent += $p;
+            } catch (UniqueConstraintViolationException) {
+                // A concurrent dispatcher won the race on one of this task's
+                // rows. The failed flush closes the EntityManager (Doctrine
+                // ORM 3), so we reset the manager and move on — the other run
+                // owns the rest of this task's reminders, and any genuinely
+                // missed row is picked up on the next pass.
+                $this->doctrine->resetManager();
             }
         }
 
         return new TaskReminderDispatchResult($created, $emailsSent, $pushesSent);
+    }
+
+    /**
+     * Creates the due reminder notifications for a single task and fires their
+     * side-effects. Lets a {@see UniqueConstraintViolationException} (which
+     * closes the EM) propagate when a concurrent dispatcher already inserted
+     * one of the rows; the caller resets the manager and continues.
+     *
+     * @return array{int, int, int} [created, emailsSent, pushesSent]
+     */
+    private function processTask(ObjectManager $em, Task $task, \DateTimeImmutable $now): array
+    {
+        $reminders = $task->getReminders() ?? [];
+        if ([] === $reminders) {
+            return [0, 0, 0];
+        }
+        $recipients = $this->collectRecipients($task);
+        if ([] === $recipients) {
+            return [0, 0, 0];
+        }
+
+        $notifications = $this->doctrine->getRepository(Notification::class);
+        $created = 0;
+        $emailsSent = 0;
+        $pushesSent = 0;
+
+        $dueDate = $task->getDueDate();
+        foreach ($reminders as $reminder) {
+            if (!is_array($reminder)) {
+                continue;
+            }
+            foreach ($this->scheduler->dueFires($reminder, $dueDate, $now) as $fire) {
+                $key = $fire['key'];
+                $label = $this->scheduler->describe($reminder);
+
+                foreach ($recipients as $recipient) {
+                    if ($notifications->taskReminderExists($recipient, $task, $key)) {
+                        continue;
+                    }
+
+                    $notification = new Notification();
+                    $notification->setRecipient($recipient);
+                    $notification->setTask($task);
+                    $notification->setReminderOffset($key);
+                    $notification->setType(Notification::TYPE_TASK_REMINDER);
+                    $notification->setTitle(sprintf('Reminder: %s', $task->getTitle()));
+                    $notification->setBody($this->buildBody($task, $label));
+                    $em->persist($notification);
+                    $em->flush();
+                    ++$created;
+
+                    if ($this->sendReminderEmail($recipient, $task, $label)) {
+                        ++$emailsSent;
+                    }
+                    $pushesSent += $this->sendReminderPush($em, $recipient, $task, $key, $label);
+                }
+            }
+        }
+
+        return [$created, $emailsSent, $pushesSent];
     }
 
     /**
@@ -135,14 +164,14 @@ final class TaskReminderDispatcher
      *
      * Returns the count of pushes the transport accepted.
      */
-    private function sendReminderPush(User $recipient, Task $task, string $key, string $label): int
+    private function sendReminderPush(ObjectManager $em, User $recipient, Task $task, string $key, string $label): int
     {
         $prefs = $recipient->getPreferences();
         if (true !== ($prefs['pushNotificationsEnabled'] ?? false)) {
             return 0;
         }
 
-        $subscriptions = $this->pushSubscriptions->findActiveForUser($recipient);
+        $subscriptions = $this->doctrine->getRepository(PushSubscription::class)->findActiveForUser($recipient);
         if ([] === $subscriptions) {
             return 0;
         }
@@ -158,8 +187,8 @@ final class TaskReminderDispatcher
         foreach ($subscriptions as $subscription) {
             $result = $this->pushSender->send($subscription, $payload);
             if ($result->subscriptionExpired) {
-                $this->em->remove($subscription);
-                $this->em->flush();
+                $em->remove($subscription);
+                $em->flush();
                 continue;
             }
             if ($result->success) {
