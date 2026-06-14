@@ -9,3 +9,7 @@ api_platform:
         stateless: false
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
+        # Cap client-controlled page size so `?itemsPerPage=100000` can't
+        # force a full-table serialization (the Task collection enables
+        # pagination_client_items_per_page).
+        pagination_maximum_items_per_page: 100
