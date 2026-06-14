@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
+use App\Mcp\TaskRelationWarmer;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class SearchTasksTool implements McpToolInterface
@@ -18,6 +19,7 @@ final class SearchTasksTool implements McpToolInterface
         private EntityManagerInterface $em,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private TaskRelationWarmer $warmer,
     ) {
     }
 
@@ -70,7 +72,9 @@ final class SearchTasksTool implements McpToolInterface
             $qb->andWhere('t.project = :projectId')->setParameter('projectId', $projectId);
         }
 
+        /** @var list<Task> $tasks */
         $tasks = $qb->getQuery()->getResult();
+        $this->warmer->warm($tasks);
         return [
             'items' => array_map(fn (Task $task) => $this->serializer->task($task), $tasks),
             'query' => $query,
