@@ -5,24 +5,29 @@ namespace App\Validator;
 use Symfony\Component\Validator\Constraint;
 
 /**
- * Class-level constraint on Task. Validates the `reminders` field:
- *  - Each entry must be one of {@see self::ALLOWED_OFFSETS}.
- *  - Duplicates are rejected.
- *  - When non-empty, a `dueDate` must also be set (a reminder offset has
- *    nothing to anchor to without a due date).
+ * Class-level constraint on Task. Validates the (expanded) `reminders`
+ * field — a list of relative/absolute reminder objects:
+ *
+ *  - relative: {type:"relative", value:int>=0, unit:"minutes"|"hours"|"days", repeat:bool}
+ *  - absolute: {type:"absolute", at:ISO-8601, repeat:bool}
+ *
+ * Rules:
+ *  - Each entry must match one of the shapes above.
+ *  - Duplicates (same canonical key) are rejected.
+ *  - At most {@see self::MAX_REMINDERS} entries.
+ *  - A *relative* reminder needs a `dueDate` to anchor to; absolute
+ *    reminders stand on their own clock and don't.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final class ValidReminders extends Constraint
 {
-    /**
-     * Allowlist of reminder offset strings. Kept short and human-readable —
-     * the dispatcher and the PWA both reference this list.
-     */
-    public const ALLOWED_OFFSETS = ['15m', '1h', '1d'];
+    public const ALLOWED_UNITS = ['minutes', 'hours', 'days'];
+    public const MAX_REMINDERS = 10;
 
-    public string $messageRequiresDueDate = 'Reminders require a due date.';
-    public string $messageInvalidOffset = 'Reminder offsets must be one of: 15m, 1h, 1d.';
-    public string $messageDuplicate = 'Reminder offsets must not contain duplicates.';
+    public string $messageRequiresDueDate = 'Relative reminders require a due date.';
+    public string $messageInvalidShape = 'Each reminder must be a relative ({value, unit}) or absolute ({at}) entry.';
+    public string $messageDuplicate = 'Reminders must not contain duplicates.';
+    public string $messageTooMany = 'A task can have at most 10 reminders.';
 
     public function getTargets(): string
     {

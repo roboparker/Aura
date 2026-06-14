@@ -30,7 +30,7 @@ import {
   dueDateStatus,
   plainTextDescription,
   type RecurrenceRule,
-  type ReminderOffset,
+  type Reminder,
   type Tag,
   type Task,
 } from "@/components/tasks/taskHelpers";
@@ -54,7 +54,7 @@ interface TaskRowProps {
   onRecurrenceChange: (task: Task, nextRule: RecurrenceRule | null) => Promise<void>;
   onRemindersChange: (
     task: Task,
-    nextReminders: ReminderOffset[] | null,
+    nextReminders: Reminder[] | null,
   ) => Promise<void>;
   onAssigneesChange: (task: Task, nextIris: string[]) => Promise<void>;
   onAssigneeAvatarClick: (assignee: AssigneeOption) => void;

@@ -1,22 +1,37 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Lock } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Lock, PanelRight, Plus, Settings2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { displayName } from "@/lib/userDisplay";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
-import MarkdownView from "@/components/editor/MarkdownView";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
+import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
+import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
+import UserAvatar from "@/components/user/UserAvatar";
+import type { AssigneeOption } from "@/components/tasks/AssigneesCombobox";
+import type { TagOption } from "@/components/tasks/TagsCombobox";
+import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import {
+  dueDateStatus,
+  formatDueDate,
+  isoToLocalDate,
+  todayLocalMidnight,
+  type Reminder,
+  type RecurrenceRule,
+} from "@/components/tasks/taskHelpers";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 interface Member {
@@ -39,33 +54,29 @@ interface Project {
   description: string | null;
   createdOn: string;
   owner: Member;
-  // Members read-only from the API as a virtual getter; kept here so
-  // the page can render member chips without a follow-up fetch. Mutation
-  // happens via the space (#187) — see the "Manage in space" link
-  // surfaced below.
   members: Member[];
-  // Server returns the parent space embedded under `project:read`;
-  // PWA falls back to looking it up by IRI in the user's space list
-  // for the admin role check.
   space: string | SpaceRef;
 }
 
-interface Tag {
-  "@id": string;
-  id: string;
-  title: string;
-  color: string;
+interface CustomFieldValuePair {
+  definition: string;
+  value: unknown;
 }
 
-interface Task {
+interface ProjectTask {
   "@id": string;
   id: string;
   title: string;
   description: string | null;
   createdOn: string;
   completedOn: string | null;
+  dueDate: string | null;
   position: number;
-  tags: Tag[];
+  tags: TagOption[];
+  assignees: AssigneeOption[];
+  recurrenceRule: RecurrenceRule | null;
+  reminders: Reminder[] | null;
+  customFieldValues: CustomFieldValuePair[];
 }
 
 interface Collection<T> {
@@ -73,43 +84,94 @@ interface Collection<T> {
   "hydra:member"?: T[];
 }
 
+const membersOf = <T,>(c: Collection<T>): T[] =>
+  c.member ?? c["hydra:member"] ?? [];
+
 const projectSpaceIri = (project: Project): string =>
   typeof project.space === "string" ? project.space : project.space["@id"];
 
+// Due-date buckets for the grouped list, in render order.
+type Bucket = "overdue" | "week" | "later" | "none" | "done";
+const BUCKET_LABELS: Record<Bucket, string> = {
+  overdue: "Overdue",
+  week: "This week",
+  later: "Later",
+  none: "No due date",
+  done: "Completed",
+};
+const BUCKET_ORDER: Bucket[] = ["overdue", "week", "later", "none", "done"];
+
+const bucketFor = (task: ProjectTask): Bucket => {
+  if (task.completedOn) return "done";
+  const status = dueDateStatus(task.dueDate, false);
+  if (status === "overdue") return "overdue";
+  if (!task.dueDate) return "none";
+  const due = isoToLocalDate(task.dueDate);
+  if (!due) return "none";
+  const weekEnd = todayLocalMidnight();
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  return due.getTime() <= weekEnd.getTime() ? "week" : "later";
+};
+
 const ProjectDetail = () => {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const projectId = typeof id === "string" ? id : null;
+  const currentUserIri = user ? `/users/${user.id}` : null;
 
   const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
+  const [allTags, setAllTags] = useState<TagOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Task creation
+  // Quick add-task (collapsed behind "+ New task").
+  const [addOpen, setAddOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskEditorKey, setTaskEditorKey] = useState(0);
 
-  // Move-to-space (#182)
+  // Move / copy to space (#182).
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [moveTargetIri, setMoveTargetIri] = useState("");
   const [isMoving, setIsMoving] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
+  const [copyIncludeTasks, setCopyIncludeTasks] = useState(false);
   const [moveMessage, setMoveMessage] = useState<{
     text: string;
     kind: "success" | "error";
   } | null>(null);
 
-  // Copy-to-space (#182). Reuses the same target picker but POSTs to
-  // /copy instead of /move. On success we navigate to the new
-  // project's detail page so the user lands on the clone.
-  const [isCopying, setIsCopying] = useState(false);
-  // Opt-in deep-copy: when true, the POST body asks the server to
-  // also clone the project's tasks (#182 deep-copy slice).
-  const [copyIncludeTasks, setCopyIncludeTasks] = useState(false);
+  // Deep-linkable task drawer (?task={id}).
+  const activeTaskId =
+    typeof router.query.task === "string" ? router.query.task : null;
+  const openTaskDetail = useCallback(
+    (task: ProjectTask) => {
+      void router.push(
+        { pathname: router.pathname, query: { ...router.query, task: task.id } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
+  const closeTaskDetail = useCallback(
+    (open: boolean) => {
+      if (open) return;
+      const query = { ...router.query };
+      delete query.task;
+      void router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
+    },
+    [router],
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -122,10 +184,14 @@ const ProjectDetail = () => {
     setError(null);
     setIsLoading(true);
     try {
-      const projectRes = await fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`, {
-        credentials: "include",
+      const init = {
+        credentials: "include" as const,
         headers: { Accept: "application/ld+json" },
-      });
+      };
+      const projectRes = await fetch(
+        `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`,
+        init,
+      );
       if (projectRes.status === 404 || projectRes.status === 403) {
         setNotFound(true);
         return;
@@ -134,16 +200,27 @@ const ProjectDetail = () => {
       const projectData: Project = await projectRes.json();
       setProject(projectData);
 
-      const tasksRes = await fetch(
-        `${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectData["@id"])}`,
-        {
-          credentials: "include",
-          headers: { Accept: "application/ld+json" },
-        },
-      );
+      const projectIri = projectData["@id"];
+      const [tasksRes, defsRes, usersRes, tagsRes] = await Promise.all([
+        fetch(`${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectIri)}`, init),
+        fetch(
+          `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(projectIri)}`,
+          init,
+        ),
+        fetch(`${ENTRYPOINT}/me/assignable-users`, init),
+        fetch(`${ENTRYPOINT}/tags`, init),
+      ]);
       if (!tasksRes.ok) throw new Error("Failed to load tasks.");
-      const tasksData: Collection<Task> = await tasksRes.json();
-      setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
+      setTasks(membersOf<ProjectTask>(await tasksRes.json()));
+      if (defsRes.ok) {
+        setDefinitions(
+          membersOf<CustomFieldDefinition>(await defsRes.json()).sort(
+            (a, b) => a.position - b.position,
+          ),
+        );
+      }
+      if (usersRes.ok) setAssignableUsers(membersOf<AssigneeOption>(await usersRes.json()));
+      if (tagsRes.ok) setAllTags(membersOf<TagOption>(await tagsRes.json()));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load project.");
     } finally {
@@ -152,12 +229,18 @@ const ProjectDetail = () => {
   }, [projectId]);
 
   useEffect(() => {
-    if (isAuthenticated && projectId) {
-      load();
-    }
+    if (isAuthenticated && projectId) void load();
   }, [isAuthenticated, projectId, load]);
 
-  const toggleComplete = async (task: Task) => {
+  const resolveRef = useCallback(
+    (iri: string): string | null => {
+      const u = assignableUsers.find((a) => a["@id"] === iri);
+      return u ? displayName(u) : null;
+    },
+    [assignableUsers],
+  );
+
+  const toggleComplete = async (task: ProjectTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
     setError(null);
     try {
@@ -168,7 +251,7 @@ const ProjectDetail = () => {
         body: JSON.stringify({ completedOn }),
       });
       if (!res.ok) throw new Error("Failed to update task.");
-      const updated: Task = await res.json();
+      const updated: ProjectTask = await res.json();
       setTasks((prev) => prev.map((t) => (t["@id"] === task["@id"] ? updated : t)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task.");
@@ -178,7 +261,6 @@ const ProjectDetail = () => {
   const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!project || !newTaskTitle.trim()) return;
-
     setIsCreatingTask(true);
     setError(null);
     try {
@@ -198,11 +280,12 @@ const ProjectDetail = () => {
           data.description || data.detail || data["hydra:description"] || "Failed to create task.",
         );
       }
-      const created: Task = await res.json();
+      const created: ProjectTask = await res.json();
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
       setNewTaskDescription("");
       setTaskEditorKey((k) => k + 1);
+      setAddOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
     } finally {
@@ -254,14 +337,7 @@ const ProjectDetail = () => {
     setIsCopying(true);
     setMoveMessage(null);
     try {
-      // Empty body = clone into the source's own space; specifying a
-      // target uses the picker's current selection. The server accepts
-      // both shapes. `includeTasks` is the only opt-in deep-copy flag —
-      // discussions live at the space level and are never carried.
-      const body: {
-        space?: string;
-        includeTasks?: boolean;
-      } = {};
+      const body: { space?: string; includeTasks?: boolean } = {};
       if (moveTargetIri) body.space = moveTargetIri;
       if (copyIncludeTasks) body.includeTasks = true;
       const res = await fetch(
@@ -279,11 +355,7 @@ const ProjectDetail = () => {
           data.detail || data.error || data["hydra:description"] || "Failed to copy project.",
         );
       }
-      // Land the user on the freshly-cloned project so they can rename
-      // it or start filling it in.
-      if (data.id) {
-        await router.push(`/projects/${data.id}`);
-      }
+      if (data.id) await router.push(`/projects/${data.id}`);
     } catch (err) {
       setMoveMessage({
         text: err instanceof Error ? err.message : "Failed to copy project.",
@@ -293,6 +365,24 @@ const ProjectDetail = () => {
       setIsCopying(false);
     }
   };
+
+  const grouped = useMemo(() => {
+    const ordered = [...tasks].sort((a, b) => a.position - b.position);
+    const map = new Map<Bucket, ProjectTask[]>();
+    for (const task of ordered) {
+      const bucket = bucketFor(task);
+      const list = map.get(bucket) ?? [];
+      list.push(task);
+      map.set(bucket, list);
+    }
+    return BUCKET_ORDER.map((bucket) => ({
+      bucket,
+      tasks: map.get(bucket) ?? [],
+    })).filter((g) => g.tasks.length > 0);
+  }, [tasks]);
+
+  const openCount = tasks.filter((t) => !t.completedOn).length;
+  const totalCols = 6 + definitions.length;
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -320,19 +410,25 @@ const ProjectDetail = () => {
     );
   }
 
-  const openTasks = tasks.filter((t) => !t.completedOn);
-  const completedTasks = tasks.filter((t) => t.completedOn);
+  const space = project
+    ? spaces.find((s) => s["@id"] === projectSpaceIri(project))
+    : undefined;
+  const spaceId = project
+    ? typeof project.space === "string"
+      ? project.space.split("/").pop()
+      : project.space.id
+    : undefined;
 
   return (
     <>
       <Head>
         <title>{project ? `${project.title} - Madori` : "Project - Madori"}</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-12">
-        <div className="max-w-2xl mx-auto">
+      <div className="min-h-screen bg-muted px-4 py-8">
+        <div className="max-w-7xl mx-auto">
           <Link
             href="/projects"
-            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
+            className="mb-4 inline-block text-sm text-muted-foreground hover:text-foreground"
           >
             ← All projects
           </Link>
@@ -341,138 +437,149 @@ const ProjectDetail = () => {
             <p className="text-muted-foreground">Loading project...</p>
           ) : (
             <>
-              <Card className="mb-6">
-                <CardContent className="pt-6">
-                  <h1 className="text-2xl font-bold mb-2">{project.title}</h1>
-                  {project.description && (
-                    <MarkdownView source={project.description} className="mb-3" />
+              {/* Header */}
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-2xl font-bold">{project.title}</h1>
+                  {definitions.length > 0 && (
+                    <Badge variant="secondary" className="font-normal">
+                      {definitions.length} custom field
+                      {definitions.length === 1 ? "" : "s"}
+                    </Badge>
                   )}
+                  {space?.isPersonal && (
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSettingsOpen((v) => !v)}
+                    aria-pressed={settingsOpen}
+                    data-testid="project-settings-toggle"
+                  >
+                    <Settings2 className="mr-1 h-3.5 w-3.5" /> Settings
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    data-testid="project-custom-fields-link"
+                  >
+                    <Link href={`/projects/${project.id}/custom-fields`}>
+                      Custom fields
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => setAddOpen((v) => !v)}
+                    data-testid="project-new-task"
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> New task
+                  </Button>
+                </div>
+              </div>
 
-                  <div className="mt-3 space-y-2" data-testid="project-space-info">
-                    {(() => {
-                      const space = spaces.find(
-                        (s) => s["@id"] === projectSpaceIri(project),
-                      );
-                      const spaceLabel =
-                        typeof project.space === "string"
-                          ? null
-                          : project.space.name;
-                      const spaceId =
-                        typeof project.space === "string"
-                          ? project.space.split("/").pop()
-                          : project.space.id;
-                      const isPersonal = space?.isPersonal ?? false;
-                      return (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            Space
-                          </span>
-                          <Badge variant="secondary" className="gap-1">
-                            {isPersonal && (
-                              <Lock className="h-3 w-3" aria-hidden />
-                            )}
-                            {space?.name ?? spaceLabel ?? "Unknown space"}
-                          </Badge>
-                          {spaceId && (
-                            <Button asChild variant="link" size="sm" className="h-auto p-0">
-                              <Link href={`/spaces/${spaceId}`}>
-                                Manage members in space
-                              </Link>
-                            </Button>
-                          )}
-                        </div>
-                      );
-                    })()}
+              {error && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-                    {/* Move / Copy (#182). Showing every space the
-                        caller belongs to — server enforces the source
-                        + target membership rule. Move is disabled
-                        when there's nowhere else to go; Copy works
-                        with no target (clones into the current
-                        space). */}
+              {/* Collapsible project settings (space badge + move/copy + members) */}
+              {settingsOpen && (
+                <Card className="mb-4">
+                  <CardContent className="space-y-3 pt-6" data-testid="project-space-info">
+                    {project.description && (
+                      <p className="text-sm text-muted-foreground">{project.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Space</span>
+                      <Badge variant="secondary" className="gap-1">
+                        {space?.isPersonal && <Lock className="h-3 w-3" aria-hidden />}
+                        {space?.name ??
+                          (typeof project.space === "string" ? "Unknown space" : project.space.name)}
+                      </Badge>
+                      {spaceId && (
+                        <Button asChild variant="link" size="sm" className="h-auto p-0">
+                          <Link href={`/spaces/${spaceId}`}>Manage members in space</Link>
+                        </Button>
+                      )}
+                    </div>
+
                     <div
                       className="flex flex-wrap items-center gap-2"
                       data-testid="project-move-form"
                     >
-                        <Label
-                          htmlFor="project-move-target"
-                          className="text-xs text-muted-foreground"
+                      <Label
+                        htmlFor="project-move-target"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Move to
+                      </Label>
+                      <select
+                        id="project-move-target"
+                        value={moveTargetIri}
+                        onChange={(e) => setMoveTargetIri(e.target.value)}
+                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                        data-testid="project-move-select"
+                      >
+                        <option value="">Pick a space…</option>
+                        {spaces
+                          .filter((s) => s["@id"] !== projectSpaceIri(project))
+                          .map((s) => (
+                            <option key={s["@id"]} value={s["@id"]}>
+                              {s.name}
+                              {s.isPersonal ? " (Private)" : ""}
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleMove}
+                        disabled={!moveTargetIri || isMoving || isCopying}
+                        data-testid="project-move-submit"
+                      >
+                        {isMoving ? "Moving…" : "Move"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCopy}
+                        disabled={isMoving || isCopying}
+                        data-testid="project-copy-submit"
+                      >
+                        {isCopying ? "Copying…" : "Copy"}
+                      </Button>
+                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
+                        <input
+                          type="checkbox"
+                          checked={copyIncludeTasks}
+                          onChange={(e) => setCopyIncludeTasks(e.target.checked)}
+                          className="h-3.5 w-3.5"
+                          data-testid="project-copy-include-tasks"
+                        />
+                        include tasks
+                      </label>
+                      {moveMessage && (
+                        <span
+                          role="alert"
+                          className={cn(
+                            "text-xs",
+                            moveMessage.kind === "success"
+                              ? "text-muted-foreground"
+                              : "text-destructive",
+                          )}
                         >
-                          Move to
-                        </Label>
-                        <select
-                          id="project-move-target"
-                          value={moveTargetIri}
-                          onChange={(e) => setMoveTargetIri(e.target.value)}
-                          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                          data-testid="project-move-select"
-                        >
-                          <option value="">Pick a space…</option>
-                          {spaces
-                            .filter((s) => s["@id"] !== projectSpaceIri(project))
-                            .map((s) => (
-                              <option key={s["@id"]} value={s["@id"]}>
-                                {s.name}
-                                {s.isPersonal ? " (Private)" : ""}
-                              </option>
-                            ))}
-                        </select>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleMove}
-                          disabled={!moveTargetIri || isMoving || isCopying}
-                          data-testid="project-move-submit"
-                        >
-                          {isMoving ? "Moving…" : "Move"}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={handleCopy}
-                          disabled={isMoving || isCopying}
-                          data-testid="project-copy-submit"
-                          title={
-                            moveTargetIri
-                              ? "Copy this project into the selected space"
-                              : "Copy this project into its current space"
-                          }
-                        >
-                          {isCopying ? "Copying…" : "Copy"}
-                        </Button>
-                        {/* Deep-copy opt-in. Hidden until the user
-                            actually intends to copy — Move ignores it. */}
-                        <label
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
-                          data-testid="project-copy-include-tasks-label"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={copyIncludeTasks}
-                            onChange={(e) =>
-                              setCopyIncludeTasks(e.target.checked)
-                            }
-                            className="h-3.5 w-3.5"
-                            data-testid="project-copy-include-tasks"
-                          />
-                          include tasks
-                        </label>
-                        {moveMessage && (
-                          <span
-                            role="alert"
-                            className={cn(
-                              "text-xs",
-                              moveMessage.kind === "success"
-                                ? "text-muted-foreground"
-                                : "text-destructive",
-                            )}
-                          >
-                            {moveMessage.text}
-                          </span>
-                        )}
-                      </div>
+                          {moveMessage.text}
+                        </span>
+                      )}
+                    </div>
+
                     {project.members.length > 0 && (
                       <ul
                         className="flex flex-wrap items-center gap-1"
@@ -485,140 +592,288 @@ const ProjectDetail = () => {
                         ))}
                       </ul>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {error && (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="mb-6 flex flex-wrap justify-end gap-2">
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  data-testid="project-custom-fields-link"
-                >
-                  <Link href={`/projects/${project.id}/custom-fields`}>
-                    Custom fields
-                  </Link>
-                </Button>
-              </div>
-
-              <div className="space-y-6">
-              <Card>
-                <CardContent className="pt-6">
-                  <form
-                    onSubmit={handleCreateTask}
-                    className="space-y-4"
-                    data-testid="create-task-form"
-                  >
-                    <h2 className="text-lg font-semibold">Add a task</h2>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="task-title">Title</Label>
-                      <Input
-                        id="task-title"
-                        type="text"
-                        value={newTaskTitle}
-                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                        required
-                        maxLength={255}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="task-description">
-                        Description{" "}
-                        <span className="text-muted-foreground font-normal">(optional)</span>
-                      </Label>
-                      <MarkdownEditor
-                        key={taskEditorKey}
-                        id="task-description"
-                        ariaLabel="Task description"
-                        value={newTaskDescription}
-                        onChange={setNewTaskDescription}
-                      />
-                    </div>
-                    <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
-                      {isCreatingTask ? "Adding..." : "Add Task"}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              <h2 className="text-lg font-semibold mb-2">
-                Tasks{" "}
-                <span className="text-sm font-normal text-muted-foreground">
-                  ({openTasks.length} open
-                  {completedTasks.length > 0 ? `, ${completedTasks.length} done` : ""})
-                </span>
-              </h2>
-
-              {tasks.length === 0 ? (
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-muted-foreground">No tasks in this project yet.</p>
                   </CardContent>
                 </Card>
-              ) : (
-                <ul className="space-y-2" data-testid="project-task-list">
-                  {[...openTasks, ...completedTasks].map((task) => (
-                    <li key={task["@id"]} data-testid="project-task-item">
-                      <Card>
-                        <CardContent className="pt-4 pb-4 flex gap-3">
-                          <input
-                            type="checkbox"
-                            checked={!!task.completedOn}
-                            onChange={() => toggleComplete(task)}
-                            aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-                            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div
-                              className={cn(
-                                "font-medium",
-                                task.completedOn && "text-muted-foreground line-through",
-                              )}
-                            >
-                              {task.title}
-                            </div>
-                            {task.description && (
-                              <MarkdownView source={task.description} className="mt-1 text-sm" />
-                            )}
-                            {task.tags.length > 0 && (
-                              <div className="mt-2 flex flex-wrap gap-1">
-                                {task.tags.map((tag) => (
-                                  <span
-                                    key={tag["@id"]}
-                                    className="inline-block px-2 py-0.5 rounded text-xs text-white"
-                                    style={{ backgroundColor: tag.color }}
-                                  >
-                                    {tag.title}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
               )}
-              <CustomFieldFooterRow projectId={project.id} />
-              </div>
 
-              <div className="mt-6">
-                <ActivityPanel endpoint={`/projects/${project.id}/activity`} />
-              </div>
+              {/* Quick add-task */}
+              {addOpen && (
+                <Card className="mb-4">
+                  <CardContent className="pt-6">
+                    <form
+                      onSubmit={handleCreateTask}
+                      className="space-y-4"
+                      data-testid="create-task-form"
+                    >
+                      <div className="space-y-1.5">
+                        <Label htmlFor="task-title">Title</Label>
+                        <Input
+                          id="task-title"
+                          type="text"
+                          value={newTaskTitle}
+                          onChange={(e) => setNewTaskTitle(e.target.value)}
+                          required
+                          maxLength={255}
+                          autoFocus
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="task-description">
+                          Description{" "}
+                          <span className="text-muted-foreground font-normal">(optional)</span>
+                        </Label>
+                        <MarkdownEditor
+                          key={taskEditorKey}
+                          id="task-description"
+                          ariaLabel="Task description"
+                          value={newTaskDescription}
+                          onChange={setNewTaskDescription}
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
+                          {isCreatingTask ? "Adding..." : "Add task"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setAddOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Tabs defaultValue="tasks">
+                <TabsList variant="line">
+                  <TabsTrigger value="tasks">
+                    Tasks{" "}
+                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="tasks" className="mt-4">
+                  {tasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="pt-6">
+                        <p className="text-muted-foreground">
+                          No tasks in this project yet.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="overflow-x-auto rounded-lg border">
+                      <table className="w-full text-sm" data-testid="project-task-list">
+                        <thead>
+                          <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <th className="w-8 px-3 py-2" />
+                            <th className="w-10 px-1 py-2 text-left font-medium">#</th>
+                            <th className="px-2 py-2 text-left font-medium">Task</th>
+                            {definitions.map((def) => (
+                              <th
+                                key={def["@id"]}
+                                className="px-2 py-2 text-left font-medium whitespace-nowrap"
+                              >
+                                {def.name}
+                              </th>
+                            ))}
+                            <th className="px-2 py-2 text-left font-medium">Due</th>
+                            <th className="px-2 py-2 text-left font-medium">Assignees</th>
+                            <th className="w-10 px-2 py-2" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {grouped.map((group) => (
+                            <GroupRows
+                              key={group.bucket}
+                              label={BUCKET_LABELS[group.bucket]}
+                              count={group.tasks.length}
+                              colSpan={totalCols}
+                              tasks={group.tasks}
+                              definitions={definitions}
+                              resolveRef={resolveRef}
+                              onToggle={toggleComplete}
+                              onOpen={openTaskDetail}
+                            />
+                          ))}
+                        </tbody>
+                      </table>
+                      <CustomFieldFooterRow projectId={project.id} />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="activity" className="mt-4">
+                  <ActivityPanel endpoint={`/projects/${project.id}/activity`} />
+                </TabsContent>
+              </Tabs>
             </>
           )}
         </div>
       </div>
+
+      <TaskDetailDrawer
+        taskId={activeTaskId}
+        open={Boolean(activeTaskId)}
+        onOpenChange={closeTaskDetail}
+        currentUserIri={currentUserIri}
+        assignableUsers={assignableUsers}
+        allTags={allTags}
+        onTaskChanged={(updated) =>
+          setTasks((prev) =>
+            prev.map((t) =>
+              t["@id"] === updated["@id"]
+                ? {
+                    ...t,
+                    title: updated.title,
+                    completedOn: updated.completedOn,
+                    dueDate: updated.dueDate,
+                    tags: updated.tags,
+                    assignees: updated.assignees,
+                    recurrenceRule: updated.recurrenceRule,
+                    reminders: updated.reminders,
+                    customFieldValues: updated.customFieldValues,
+                  }
+                : t,
+            ),
+          )
+        }
+      />
     </>
   );
 };
+
+const GroupRows = ({
+  label,
+  count,
+  colSpan,
+  tasks,
+  definitions,
+  resolveRef,
+  onToggle,
+  onOpen,
+}: {
+  label: string;
+  count: number;
+  colSpan: number;
+  tasks: ProjectTask[];
+  definitions: CustomFieldDefinition[];
+  resolveRef: (iri: string) => string | null;
+  onToggle: (task: ProjectTask) => void;
+  onOpen: (task: ProjectTask) => void;
+}) => (
+  <>
+    <tr className="border-b bg-muted/40">
+      <td colSpan={colSpan} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label} <span className="text-muted-foreground/60">{count}</span>
+      </td>
+    </tr>
+    {tasks.map((task, i) => {
+      const valueByDef = new Map(
+        task.customFieldValues.map((v) => [v.definition, v.value]),
+      );
+      return (
+        <tr
+          key={task["@id"]}
+          className="border-b last:border-0 hover:bg-accent/40"
+          data-testid="project-task-item"
+        >
+          <td className="px-3 py-2 align-top">
+            <input
+              type="checkbox"
+              checked={!!task.completedOn}
+              onChange={() => onToggle(task)}
+              aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
+              className="mt-0.5 h-4 w-4 cursor-pointer"
+            />
+          </td>
+          <td className="px-1 py-2 align-top text-xs text-muted-foreground">
+            T{i + 1}
+          </td>
+          <td className="px-2 py-2 align-top">
+            <button
+              type="button"
+              onClick={() => onOpen(task)}
+              className={cn(
+                "text-left font-medium hover:text-primary",
+                task.completedOn && "text-muted-foreground line-through",
+              )}
+            >
+              {task.title}
+            </button>
+            {task.tags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {task.tags.map((tag) => (
+                  <span
+                    key={tag["@id"]}
+                    className="rounded px-1.5 py-0.5 text-xs font-medium"
+                    style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
+                  >
+                    {tag.title}
+                  </span>
+                ))}
+              </div>
+            )}
+          </td>
+          {definitions.map((def) => (
+            <td key={def["@id"]} className="px-2 py-2 align-top">
+              <CustomFieldValueCell
+                definition={def}
+                value={valueByDef.get(def["@id"])}
+                resolveRef={resolveRef}
+              />
+            </td>
+          ))}
+          <td className="px-2 py-2 align-top whitespace-nowrap">
+            {task.dueDate ? (
+              <span
+                className={cn(
+                  "text-sm",
+                  dueDateStatus(task.dueDate, !!task.completedOn) === "overdue" &&
+                    "text-destructive",
+                )}
+              >
+                {formatDueDate(task.dueDate)}
+              </span>
+            ) : (
+              <span className="text-muted-foreground/50">—</span>
+            )}
+          </td>
+          <td className="px-2 py-2 align-top">
+            {task.assignees.length > 0 ? (
+              <div className="flex -space-x-1.5">
+                {task.assignees.slice(0, 4).map((a) => (
+                  <UserAvatar
+                    key={a["@id"]}
+                    user={a}
+                    size="sm"
+                    className="h-6 w-6 ring-2 ring-background"
+                  />
+                ))}
+              </div>
+            ) : (
+              <span className="text-muted-foreground/50">—</span>
+            )}
+          </td>
+          <td className="px-2 py-2 align-top">
+            <button
+              type="button"
+              onClick={() => onOpen(task)}
+              aria-label={`Open details for "${task.title}"`}
+              className="text-muted-foreground hover:text-foreground"
+              data-testid="project-task-open-detail"
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
+          </td>
+        </tr>
+      );
+    })}
+  </>
+);
 
 export default ProjectDetail;

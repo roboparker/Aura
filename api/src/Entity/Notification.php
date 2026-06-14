@@ -133,11 +133,14 @@ class Notification
     private ?Task $task = null;
 
     /**
-     * Reminder offset string (e.g. "15m", "1h", "1d") this row was created
-     * for. Used together with (recipient, task) as a uniqueness key so the
-     * dispatcher can be re-run safely without producing duplicate rows.
+     * Per-fire reminder key this row was created for — produced by
+     * {@see \App\Service\ReminderScheduler::dueFires()} (e.g.
+     * "rel:15:minutes", "abs:2026-06-01T09:00:00+00:00", or a "repeat daily"
+     * variant suffixed with the fire date). Used together with
+     * (recipient, task) as a uniqueness key so the dispatcher can be re-run
+     * safely without producing duplicate rows.
      */
-    #[ORM\Column(length: 16, nullable: true)]
+    #[ORM\Column(length: 80, nullable: true)]
     private ?string $reminderOffset = null;
 
     /**

@@ -7,6 +7,7 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Repository\TaskRepository;
+use App\Service\RecurrenceCalculator;
 use App\Service\TaskActivityNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -37,6 +38,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
         private TaskRepository $tasks,
         private Security $security,
         private TaskActivityNotifier $activity,
+        private RecurrenceCalculator $recurrence,
     ) {
     }
 
@@ -95,20 +97,41 @@ final class TaskUpdateProcessor implements ProcessorInterface
     private function createNextOccurrence(Task $completed): void
     {
         // Caller only invokes us after asserting both fields are set —
-        // re-narrow so phpstan can see the non-null shape on the
-        // advanceDueDate call below.
+        // re-narrow so phpstan sees the non-null shape below.
         $dueDate = $completed->getDueDate();
         $rule = $completed->getRecurrenceRule();
         if (null === $dueDate || null === $rule) {
             return;
         }
+
+        // A count-based end treats `ends.count` as the number of occurrences
+        // remaining in the series including the one just completed. When only
+        // one remains, this WAS the last — spawn nothing. Otherwise the clone
+        // carries the count decremented by one.
+        $nextRule = $rule;
+        $ends = $rule['ends'] ?? null;
+        if (is_array($ends) && ($ends['type'] ?? null) === 'count') {
+            $remaining = is_int($ends['count'] ?? null) ? $ends['count'] : 1;
+            if ($remaining <= 1) {
+                return;
+            }
+            $nextRule['ends'] = ['type' => 'count', 'count' => $remaining - 1];
+        }
+
+        $nextDue = $this->recurrence->nextDueDate($dueDate, $rule);
+        if (null === $nextDue) {
+            // Series ended (e.g. past the `until` bound).
+            return;
+        }
+
         $next = new Task();
         $next->setOwner($completed->getOwner());
         $next->setProject($completed->getProject());
         $next->setTitle($completed->getTitle());
         $next->setDescription($completed->getDescription());
-        $next->setRecurrenceRule($rule);
-        $next->setDueDate($this->advanceDueDate($dueDate, $rule));
+        $next->setRecurrenceRule($nextRule);
+        $next->setDueDate($nextDue);
+        $next->setReminders($completed->getReminders());
 
         foreach ($completed->getTags() as $tag) {
             $next->addTag($tag);
@@ -125,27 +148,5 @@ final class TaskUpdateProcessor implements ProcessorInterface
 
         $this->em->persist($next);
         $this->em->flush();
-    }
-
-    /**
-     * Compute the next dueDate from the previous one + recurrence rule.
-     * Advances off the original `dueDate` (not "now") so missing a deadline
-     * doesn't shift the schedule forward.
-     *
-     * @param array{frequency: string, interval: int} $rule
-     */
-    private function advanceDueDate(\DateTimeImmutable $current, array $rule): \DateTimeImmutable
-    {
-        $interval = max(1, $rule['interval']);
-        // \DateTimeImmutable::modify is calendar-aware: "+1 month" off Jan 31
-        // becomes Mar 3 (skipping Feb), which is the standard PHP behaviour
-        // and matches what users intuitively expect for monthly recurrence.
-        return match ($rule['frequency']) {
-            'daily' => $current->modify(sprintf('+%d days', $interval)),
-            'weekly' => $current->modify(sprintf('+%d weeks', $interval)),
-            'monthly' => $current->modify(sprintf('+%d months', $interval)),
-            'yearly' => $current->modify(sprintf('+%d years', $interval)),
-            default => $current,
-        };
     }
 }

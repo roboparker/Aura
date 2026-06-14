@@ -3,9 +3,9 @@
 <p>Hi {{ recipient.givenName ?: recipient.email }},</p>
 
 <p>
-    This is a reminder that
+    This is a reminder for
     <strong>&ldquo;{{ task.title }}&rdquo;</strong>
-    is due in {{ offsetLabel }}{% if task.dueDate %} (<time datetime="{{ task.dueDate|date('c') }}">{{ task.dueDate|date('M j, Y g:i a') }}</time>){% endif %}.
+    — {{ offsetLabel }}{% if task.dueDate %} (due <time datetime="{{ task.dueDate|date('c') }}">{{ task.dueDate|date('M j, Y g:i a') }}</time>){% endif %}.
 </p>
 
 {% if task.recurrenceRule %}
