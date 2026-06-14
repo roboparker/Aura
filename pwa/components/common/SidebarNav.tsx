@@ -1,15 +1,21 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { apiGetCollection } from "@/lib/apiClient";
+import { CONTENT_SECTIONS } from "@/lib/contentSections";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import SpaceSwitcher from "./SpaceSwitcher";
 
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
-// see UserMenu / Navbar. The sidebar carries the space switcher and the
-// admin section.
+// see UserMenu / Navbar. The sidebar carries the space switcher, the
+// active space's content sections (projects / pages / discussions),
+// and the admin section.
 
 // The shared section is now a list of accessible spaces (rendered
 // from ActiveSpaceContext at render time, since it's per-user state).
@@ -32,22 +38,201 @@ const ADMIN_EXTERNAL_LINKS =
     ? []
     : [{ href: "/.well-known/mercure/ui/", label: "Mercure" }];
 
+// The active space's content surfaces (Projects / Pages / Discussions)
+// are rendered as their own sidebar sections from the shared
+// CONTENT_SECTIONS map (icon + color shared with the aggregator page
+// headers). Each heading links to its top-level aggregator (scoped to
+// the active space, with the inline create composer); the items below
+// are the active space's rows; an "add" link sits at the foot of each
+// section. Headings + add link show even when the space has none, so
+// the structure is always discoverable.
+
+// Cap how many rows a section lists so a large space can't push the
+// admin section (and the section below it) far off-screen. The heading
+// links to the full aggregator for the rest.
+const MAX_SECTION_ITEMS = 8;
+
+interface ResourceRow {
+  "@id": string;
+  id: string;
+  title: string;
+}
+
+/**
+ * Fetch the active space's rows for one resource (`projects` / `pages`
+ * / `discussions`), scoped by `?space=<iri>` — the same filter the
+ * aggregators and SpaceContentTabs use.
+ *
+ * Keyed under the resource's react-query prefix (e.g. `["projects", …]`)
+ * so the aggregators' `invalidateQueries({ queryKey: ["projects"] })`
+ * on create/edit/delete refreshes this list too — a project added on
+ * `/projects` shows up here without a manual reload.
+ */
+function useSpaceResources(
+  spaceIri: string | null,
+  resource: (typeof CONTENT_SECTIONS)[number]["resource"],
+): ResourceRow[] {
+  const query = useQuery({
+    queryKey: [resource, spaceIri, "nav"],
+    enabled: !!spaceIri,
+    queryFn: () => {
+      if (!spaceIri) return Promise.resolve<ResourceRow[]>([]);
+      return apiGetCollection<ResourceRow>(
+        `/${resource}?space=${encodeURIComponent(spaceIri)}&itemsPerPage=50`,
+        { errorMessage: `Failed to load ${resource}.` },
+      );
+    },
+  });
+
+  // A failed fetch leaves the section as just its heading + add link
+  // rather than breaking the nav.
+  return query.data ?? [];
+}
+
 interface SidebarNavProps {
   /**
    * Wrap each interactive item — used by the mobile Sheet variant to
    * auto-close on selection. The persistent sidebar passes through.
    */
   itemWrapper?: (children: ReactNode) => ReactNode;
+  /**
+   * Render the active-space switcher at the top. The navbar shows the
+   * switcher on its left at `md` and up, so only the mobile Sheet
+   * variant (where there's no room for it in the top bar) sets this.
+   */
+  includeSpaceSwitcher?: boolean;
 }
+
+interface ContentSectionProps {
+  section: (typeof CONTENT_SECTIONS)[number];
+  spaceIri: string;
+  wrap: (children: ReactNode) => ReactNode;
+}
+
+/**
+ * One sidebar section: a heading (links to the aggregator) with a
+ * collapse toggle, the active space's rows, and an "add" link. The
+ * heading + toggle always render; the rows and "add" link collapse
+ * behind the chevron, with the open/closed choice persisted per
+ * resource in localStorage.
+ */
+const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
+  const router = useRouter();
+  const items = useSpaceResources(spaceIri, section.resource);
+  const aggregatorHref = `/${section.resource}`;
+  const shown = items.slice(0, MAX_SECTION_ITEMS);
+  const currentPath = router.asPath.split("?")[0];
+  const Icon = section.icon;
+
+  // Persist the collapsed state per resource. Start expanded on the
+  // server / first paint, then hydrate the stored choice after mount so
+  // there's no SSR mismatch.
+  const storageKey = `madori.navCollapsed.${section.resource}`;
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, [storageKey]);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <div className="flex items-center px-3 pb-1">
+        {wrap(
+          <Link
+            href={aggregatorHref}
+            className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+          >
+            <Icon className={cn("size-3.5 shrink-0", section.iconClass)} />
+            <span className="truncate">{section.label}</span>
+          </Link>,
+        )}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          aria-label={`${collapsed ? "Expand" : "Collapse"} ${section.label}`}
+          className="ml-auto rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition-transform",
+              collapsed && "-rotate-90",
+            )}
+          />
+        </button>
+      </div>
+
+      {!collapsed && (
+        <>
+          {shown.map((item) => {
+            const href = `/${section.resource}/${item.id}`;
+            return (
+              <span key={item["@id"]}>
+                {wrap(
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      "w-full min-w-0 justify-start font-normal",
+                      currentPath === href && "bg-accent text-accent-foreground",
+                    )}
+                  >
+                    <Link href={href}>
+                      {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, so the row
+                          text lines up under the heading label. */}
+                      <span className="truncate pl-5">{item.title}</span>
+                    </Link>
+                  </Button>,
+                )}
+              </span>
+            );
+          })}
+
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start font-normal text-muted-foreground"
+              >
+                <Link href={aggregatorHref}>
+                  <Plus className="size-4" />
+                  New {section.singular}
+                </Link>
+              </Button>,
+            )}
+          </span>
+        </>
+      )}
+    </div>
+  );
+};
 
 /**
  * Shared navigation contents used by both the persistent left-side
  * `<Sidebar>` (`md:` and up) and the mobile-only Sheet variant in the
- * navbar. Single source of truth so the space switcher and admin
- * section stay in sync across both surfaces.
+ * navbar. Single source of truth so the space switcher, content
+ * sections, and admin section stay in sync across both surfaces.
  */
-const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
+const SidebarNav = ({
+  itemWrapper,
+  includeSpaceSwitcher = false,
+}: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
@@ -56,16 +241,31 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-2 pt-4 pb-2">
-        <SpaceSwitcher />
-      </div>
+      {includeSpaceSwitcher && (
+        <div className="px-2 pt-4 pb-2">
+          <SpaceSwitcher />
+        </div>
+      )}
 
-      <nav className="flex flex-col gap-0.5 px-2 pb-4 flex-1 overflow-y-auto">
-        {isAdmin && (
-          <>
-            <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Admin
-            </p>
+      <nav className="flex flex-col gap-0.5 px-2 pt-2 pb-4 flex-1 overflow-y-auto">
+        {activeSpace &&
+          CONTENT_SECTIONS.map((section) => (
+            <ContentSection
+              key={section.resource}
+              section={section}
+              spaceIri={activeSpace["@id"]}
+              wrap={wrap}
+            />
+          ))}
+      </nav>
+
+      {/* Admin tooling is pinned to the foot of the sidebar, below the
+          (scrollable) space content, separated by a divider. */}
+      {isAdmin && (
+        <div className="flex flex-col gap-0.5 border-t px-2 py-3">
+          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Admin
+          </p>
             <span>
               {wrap(
                 <Button
@@ -127,9 +327,8 @@ const SidebarNav = ({ itemWrapper }: SidebarNavProps) => {
                 </a>
               </Button>
             ))}
-          </>
-        )}
-      </nav>
+        </div>
+      )}
     </div>
   );
 };
