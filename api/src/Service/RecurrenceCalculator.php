@@ -160,8 +160,12 @@ final class RecurrenceCalculator
 
     /**
      * Monthly recurrence in one of two modes:
-     *  - "day": same day-of-month as the anchor, stepping `interval` months
-     *    (PHP's calendar-aware modify handles short months).
+     *  - "day": same day-of-month as the anchor, stepping `interval` months.
+     *    Each occurrence is computed from the anchor's month (not the previous
+     *    occurrence) and the anchor day is clamped to the target month's
+     *    length, so "the 31st" yields Feb 28/29 without permanently drifting —
+     *    PHP's `+1 month` overflows short months (Jan 31 + 1mo => Mar 3), which
+     *    would otherwise compound off a mutating cursor.
      *  - "weekday": the Nth weekday of the month (bySetPos + byDay[0]), e.g.
      *    "2nd Thursday"; -1 means the last such weekday.
      *
@@ -174,10 +178,21 @@ final class RecurrenceCalculator
         $mode = ($rule['monthlyMode'] ?? 'day') === 'weekday' ? 'weekday' : 'day';
 
         if ('day' === $mode) {
-            $cursor = $after;
-            for ($i = 0; $i < 600; ++$i) {
-                $cursor = $cursor->modify(sprintf('+%d months', $interval));
-                yield $cursor;
+            $anchorDay = (int) $after->format('j');
+            $hour = (int) $after->format('H');
+            $minute = (int) $after->format('i');
+            $second = (int) $after->format('s');
+            // Anchor on the first of the anchor's month so stepping months
+            // never overflows; clamp the anchor day into each target month.
+            $monthCursor = $after->modify('first day of this month')->setTime(0, 0);
+            for ($i = 1; $i <= 600; ++$i) {
+                $month = $monthCursor->modify(sprintf('+%d months', $i * $interval));
+                $day = min($anchorDay, (int) $month->format('t'));
+                yield $month->setDate(
+                    (int) $month->format('Y'),
+                    (int) $month->format('n'),
+                    $day,
+                )->setTime($hour, $minute, $second);
             }
             return;
         }

@@ -98,7 +98,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         $queryBuilder
             ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
             ->andWhere(sprintf(
-                '%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s)',
+                '(%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s))',
                 $rootAlias,
                 $directSubquery,
                 $groupSubquery,
