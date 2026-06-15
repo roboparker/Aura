@@ -6,7 +6,12 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Comment;
+use App\Entity\CustomFieldDefinition;
+use App\Entity\Discussion;
+use App\Entity\Page;
 use App\Entity\Project;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,10 +40,19 @@ class McpTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
+        // Delete child-to-parent so DQL bulk deletes don't trip FKs.
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceGroupMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -110,6 +124,12 @@ class McpTest extends ApiTestCase
             'add_task_comment', 'list_task_comments',
             'upload_file', 'list_files', 'download_file',
             'get_custom_fields',
+            'list_spaces',
+            'create_page', 'get_page', 'update_page', 'delete_page', 'list_pages',
+            'list_tags', 'create_tag',
+            'create_discussion', 'get_discussion', 'list_discussions',
+            'add_page_comment', 'list_page_comments',
+            'add_discussion_comment', 'list_discussion_comments',
             ] as $expected
         ) {
             $this->assertContains($expected, $names, sprintf('Missing tool "%s"', $expected));
@@ -236,6 +256,322 @@ class McpTest extends ApiTestCase
         $author = $structured['author'];
         $this->assertIsArray($author);
         $this->assertSame('alice@example.com', $author['email']);
+    }
+
+    public function testListSpacesReturnsMembershipsWithRole(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $space = $this->makeSpace($alice, 'Alice Space');
+        $this->makeSpace($bob, 'Bob Space');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_spaces',
+            'arguments' => [],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $names = array_column($items, 'name');
+        $this->assertSame(['Alice Space'], $names);
+        $first = $items[0];
+        $this->assertIsArray($first);
+        $this->assertSame('admin', $first['role']);
+        $this->assertSame((string) $space->getId(), $first['id']);
+    }
+
+    public function testCreateAndGetPageInSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'create_page',
+            'arguments' => [
+                'title' => 'Onboarding',
+                'body' => '# Welcome',
+                'spaceId' => (string) $space->getId(),
+            ],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('Onboarding', $structured['title']);
+        $this->assertSame((string) $space->getId(), $structured['spaceId']);
+        $pageId = $structured['id'];
+        $this->assertIsString($pageId);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_page',
+            'arguments' => ['pageId' => $pageId],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('# Welcome', $structured['body']);
+    }
+
+    public function testCreatePageDefaultsToPersonalSpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        // Provision Alice's personal space the way the app does on signup
+        // — persisting a project triggers ProjectSpaceDefaultListener.
+        $this->makeProject($alice, [$alice], 'Seed');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'create_page',
+            'arguments' => ['title' => 'Personal note'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('Personal note', $structured['title']);
+        $this->assertIsString($structured['spaceId']);
+    }
+
+    public function testListPagesHonoursSpaceMembership(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $aliceSpace = $this->makeSpace($alice, 'Alice Space');
+        $bobSpace = $this->makeSpace($bob, 'Bob Space');
+        $this->makePage($alice, $aliceSpace, 'Mine');
+        $this->makePage($bob, $bobSpace, 'Hidden');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_pages',
+            'arguments' => [],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['Mine'], array_column($items, 'title'));
+    }
+
+    public function testUpdateAndDeletePage(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $page = $this->makePage($alice, $space, 'Draft');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'update_page',
+            'arguments' => ['pageId' => (string) $page->getId(), 'title' => 'Final'],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('Final', $structured['title']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'delete_page',
+            'arguments' => ['pageId' => (string) $page->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertTrue($structured['deleted']);
+        $this->assertNull($this->entityManager->getRepository(Page::class)->find($page->getId()));
+    }
+
+    public function testPageEditByNonAuthorNonAdminIsForbidden(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $space = $this->makeSpace($alice);
+        // Bob is a plain member of Alice's space.
+        $this->ensureSpaceMembership($space, $bob, Space::ROLE_MEMBER);
+        $page = $this->makePage($alice, $space, 'Alice doc');
+        $plain = $this->mintToken($bob, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'update_page',
+            'arguments' => ['pageId' => (string) $page->getId(), 'title' => 'Hijacked'],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
+    public function testCreateAndListTags(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'create_tag',
+            'arguments' => ['title' => 'urgent', 'color' => '#ef4444'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('urgent', $structured['title']);
+        $this->assertSame('#ef4444', $structured['color']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_tags',
+            'arguments' => [],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['urgent'], array_column($items, 'title'));
+    }
+
+    public function testUpdateTaskSetsCustomFieldValue(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->makeProject($alice, [$alice], 'Fielded');
+        $field = $this->makeCustomFieldDefinition($project, 'Notes', 'text');
+        $task = $this->makeTaskInProject($alice, $project, 'With fields');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'update_task',
+            'arguments' => [
+                'taskId' => (string) $task->getId(),
+                'customFieldValues' => [
+                    ['definitionId' => (string) $field->getId(), 'value' => 'hello world'],
+                ],
+            ],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $values = $structured['customFieldValues'] ?? null;
+        $this->assertIsArray($values);
+        $this->assertCount(1, $values);
+        $this->assertIsArray($values[0]);
+        $this->assertSame('hello world', $values[0]['value']);
+    }
+
+    public function testCreateGetAndListDiscussion(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'create_discussion',
+            'arguments' => [
+                'title' => 'Roadmap',
+                'body' => 'What next?',
+                'category' => 'ideas',
+                'spaceId' => (string) $space->getId(),
+            ],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('Roadmap', $structured['title']);
+        $this->assertSame('ideas', $structured['category']);
+        $discussionId = $structured['id'];
+        $this->assertIsString($discussionId);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_discussion',
+            'arguments' => ['discussionId' => $discussionId],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('What next?', $structured['body']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_discussions',
+            'arguments' => ['spaceId' => (string) $space->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['Roadmap'], array_column($items, 'title'));
+    }
+
+    public function testAddAndListPageComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $page = $this->makePage($alice, $space, 'Spec');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_page_comment',
+            'arguments' => ['pageId' => (string) $page->getId(), 'body' => 'First note'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('First note', $structured['body']);
+        $this->assertSame('page', $structured['commentableType']);
+        $this->assertSame((string) $page->getId(), $structured['pageId']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_page_comments',
+            'arguments' => ['pageId' => (string) $page->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['First note'], array_column($items, 'body'));
+    }
+
+    public function testAddAndListDiscussionComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $discussion = $this->makeDiscussion($alice, $space, 'Topic');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_discussion_comment',
+            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Good point'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('discussion', $structured['commentableType']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_discussion_comments',
+            'arguments' => ['discussionId' => (string) $discussion->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['Good point'], array_column($items, 'body'));
+    }
+
+    public function testLockedDiscussionRejectsNewComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $discussion = $this->makeDiscussion($alice, $space, 'Closed');
+        $discussion->setIsLocked(true);
+        $this->entityManager->flush();
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_discussion_comment',
+            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Sneaky'],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
     }
 
     public function testInvalidUuidProducesValidationError(): void
@@ -412,6 +748,29 @@ class McpTest extends ApiTestCase
         return $task;
     }
 
+    private function makePage(User $author, Space $space, string $title): Page
+    {
+        $page = new Page();
+        $page->setCreatedBy($author);
+        $page->setSpace($space);
+        $page->setTitle($title);
+        $this->entityManager->persist($page);
+        $this->entityManager->flush();
+        return $page;
+    }
+
+    private function makeDiscussion(User $author, Space $space, string $title): Discussion
+    {
+        $discussion = new Discussion();
+        $discussion->setAuthor($author);
+        $discussion->setSpace($space);
+        $discussion->setTitle($title);
+        $discussion->setBody('Body of ' . $title);
+        $this->entityManager->persist($discussion);
+        $this->entityManager->flush();
+        return $discussion;
+    }
+
     private function makeTaskInProject(User $owner, Project $project, string $title): Task
     {
         $task = new Task();
@@ -437,6 +796,35 @@ class McpTest extends ApiTestCase
         $this->entityManager->persist($project);
         $this->entityManager->flush();
         return $project;
+    }
+
+    /**
+     * A shared space with `$admin` as its admin. `createUser()` doesn't
+     * provision the signup-time personal space, so page/discussion tools
+     * that need a real space get one here.
+     */
+    private function makeSpace(User $admin, string $name = 'Team Space'): Space
+    {
+        $space = new Space();
+        $space->setName($name);
+        $space->setCreatedBy($admin);
+        $space->addUserMembership(
+            (new SpaceMembership())->setUser($admin)->setRole(Space::ROLE_ADMIN),
+        );
+        $this->entityManager->persist($space);
+        $this->entityManager->flush();
+        return $space;
+    }
+
+    private function makeCustomFieldDefinition(Project $project, string $name, string $type): CustomFieldDefinition
+    {
+        $field = new CustomFieldDefinition();
+        $field->setProject($project);
+        $field->setName($name);
+        $field->setType($type);
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+        return $field;
     }
 
     private function createUser(string $email): User
