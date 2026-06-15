@@ -2,6 +2,8 @@
 
 namespace App\Mcp\Tool;
 
+use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -57,6 +59,19 @@ final class UpdateTaskTool implements McpToolInterface
                     'type' => 'array',
                     'items' => ['type' => 'string'],
                     'description' => 'Replaces the existing tag set.',
+                ],
+                'customFieldValues' => [
+                    'type' => 'array',
+                    'description' => 'Replaces the whole set of custom field values on the task. Each entry sets one field defined on the task\'s project (see get_custom_fields). Omit a definition to leave it unset; pass an empty array to clear all values.',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'definitionId' => ['type' => 'string', 'description' => 'UUID of a CustomFieldDefinition on the task\'s project.'],
+                            'value' => ['description' => 'The value, shaped to the field\'s kind/subtype (string, number, bool, ISO date, {amount,currency} for money, an IRI for references, or an array when the field is multi).'],
+                        ],
+                        'required' => ['definitionId', 'value'],
+                        'additionalProperties' => false,
+                    ],
                 ],
             ],
             'required' => ['taskId'],
@@ -127,10 +142,48 @@ final class UpdateTaskTool implements McpToolInterface
                 $task->addTag($tag);
             }
         }
+        if (array_key_exists('customFieldValues', $arguments)) {
+            $this->applyCustomFieldValues($task, $arguments['customFieldValues']);
+        }
 
         $this->input->assertValid($task);
         $this->em->flush();
 
         return $this->serializer->task($task);
+    }
+
+    /**
+     * Replace the task's whole custom-field-value set. Existing rows are
+     * dropped (orphanRemoval reaps them) and rebuilt from the payload;
+     * the deferrable `(task_id, definition_id)` unique constraint lets
+     * the delete-then-insert collapse in one flush. Per-value shape,
+     * project-scope, and required-ness are policed by
+     * {@see \App\Validator\ValidCustomFieldValues} via assertValid().
+     */
+    private function applyCustomFieldValues(Task $task, mixed $raw): void
+    {
+        if (!is_array($raw)) {
+            throw McpException::invalidInput('customFieldValues must be an array.');
+        }
+        foreach ($task->getCustomFieldValues()->toArray() as $existing) {
+            $task->removeCustomFieldValue($existing);
+        }
+        foreach ($raw as $entry) {
+            if (!is_array($entry)) {
+                throw McpException::invalidInput('Each customFieldValues entry must be an object.');
+            }
+            $definitionId = $this->input->requireUuid(
+                'customFieldValues[].definitionId',
+                $entry['definitionId'] ?? null,
+            );
+            $definition = $this->em->getRepository(CustomFieldDefinition::class)->find($definitionId);
+            if (null === $definition) {
+                throw McpException::notFound(sprintf('Custom field %s', $definitionId));
+            }
+            $value = new CustomFieldValue();
+            $value->setDefinition($definition);
+            $value->setValue($entry['value'] ?? null);
+            $task->addCustomFieldValue($value);
+        }
     }
 }

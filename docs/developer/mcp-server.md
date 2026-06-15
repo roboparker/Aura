@@ -63,14 +63,20 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | ----------- | ------------------------------------------------------------------------------ |
 | Task        | `create_task`, `get_task`, `update_task`, `delete_task`, `list_tasks`, `search_tasks` |
 | Project     | `create_project`, `get_project`, `update_project`, `delete_project`, `list_projects` |
+| Space       | `list_spaces`                                                                   |
+| Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
+| Discussion  | `create_discussion`, `get_discussion`, `list_discussions`                      |
 | Assignment  | `assign_task`, `unassign_task`, `get_my_tasks`                                 |
 | TaskComment | `add_task_comment`, `list_task_comments`                                       |
+| Tag         | `list_tags`, `create_tag`                                                       |
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
 
-> **Custom field values** — `get_custom_fields` returns a project's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through the REST Task `customFieldValues` array; a dedicated `set_custom_field` MCP tool is not yet exposed.
+Create tools that target a space (`create_project`, `create_page`, `create_discussion`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
+
+> **Custom field values** — `get_custom_fields` returns a project's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
 
 ## Errors
 
