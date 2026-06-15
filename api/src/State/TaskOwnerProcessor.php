@@ -5,12 +5,10 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Task;
-use App\Entity\User;
 use App\Repository\TaskRepository;
+use App\Security\AuthenticatedUserResolver;
 use App\Service\TaskActivityNotifier;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
  * Sets the owner of a new Task to the currently authenticated user and
@@ -28,7 +26,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private Security $security,
+        private AuthenticatedUserResolver $auth,
         private TaskRepository $tasks,
         private TaskActivityNotifier $activity,
     ) {
@@ -39,10 +37,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Task
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
-            throw new UnauthorizedHttpException('Bearer', 'You must be authenticated to create a task.');
-        }
+        $user = $this->auth->requireUser('create a task');
 
         $data->setOwner($user);
 

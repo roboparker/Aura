@@ -3,9 +3,8 @@
 namespace App\Service;
 
 use App\Entity\User;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * Sends the "you're on the waitlist" confirmation email at signup time while
@@ -21,18 +20,13 @@ use Symfony\Component\Mailer\MailerInterface;
 final class WaitlistJoinedMailer
 {
     public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
+        private readonly MailDispatcher $mail,
     ) {
     }
 
     public function sendJoinedConfirmation(User $user): void
     {
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
-
         $email = (new TemplatedEmail())
-            ->from($from)
             ->to($user->getEmail())
             ->subject("You're on the Madori waitlist")
             ->htmlTemplate('emails/waitlist_joined.html.twig')
@@ -41,6 +35,6 @@ final class WaitlistJoinedMailer
                 'recipient' => $user,
             ]);
 
-        $this->mailer->send($email);
+        $this->mail->send($email);
     }
 }

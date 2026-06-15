@@ -2,6 +2,8 @@
 
 namespace App\Mcp;
 
+use App\Entity\Discussion;
+use App\Entity\Page;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -49,5 +51,36 @@ final class McpAuthorization
     public function isProjectMember(Project $project, User $user): bool
     {
         return $project->isAccessibleBy($user);
+    }
+
+    /**
+     * Pages read like the rest of their space: any space member can view
+     * (#183/#185). Mirrors the Page `Get` security expression.
+     */
+    public function canReadPage(Page $page, User $user): bool
+    {
+        return true === $page->getSpace()?->hasMember($user);
+    }
+
+    /**
+     * Page edit/delete: the author OR a space admin. Mirrors the Page
+     * `Patch`/`Delete` expressions. UUID comparison so the check holds
+     * after an EntityManager::clear().
+     */
+    public function canEditPage(Page $page, User $user): bool
+    {
+        if (true === $page->getCreatedBy()?->getId()?->equals($user->getId())) {
+            return true;
+        }
+        return true === $page->getSpace()?->isAdmin($user);
+    }
+
+    /**
+     * Discussions read like the rest of their space: any space member
+     * can browse (#91/#185). Mirrors the Discussion `Get` expression.
+     */
+    public function canReadDiscussion(Discussion $discussion, User $user): bool
+    {
+        return true === $discussion->getSpace()?->hasMember($user);
     }
 }

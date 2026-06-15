@@ -6,6 +6,7 @@ use App\Entity\Project;
 use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpInputHelper;
+use App\Mcp\McpSpaceResolver;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class CreateProjectTool implements McpToolInterface
@@ -14,6 +15,7 @@ final class CreateProjectTool implements McpToolInterface
         private EntityManagerInterface $em,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private McpSpaceResolver $spaces,
     ) {
     }
 
@@ -24,7 +26,7 @@ final class CreateProjectTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Create a new shared project. The authenticated user becomes the owner and the only initial member; add more members via the project settings UI or future tools.';
+        return 'Create a new project. The authenticated user becomes the owner. Pass a spaceId (from list_spaces) to create it in a shared space; omit it to use your personal space. Members come from the space, not the project.';
     }
 
     public function getInputSchema(): array
@@ -34,6 +36,7 @@ final class CreateProjectTool implements McpToolInterface
             'properties' => [
                 'title' => ['type' => 'string', 'description' => 'Project title (required).'],
                 'description' => ['type' => 'string', 'description' => 'Optional Markdown description.'],
+                'spaceId' => ['type' => 'string', 'description' => 'UUID of a space the user belongs to. Omit for the personal space.'],
             ],
             'required' => ['title'],
             'additionalProperties' => false,
@@ -44,13 +47,16 @@ final class CreateProjectTool implements McpToolInterface
     {
         $title = $this->input->requireString($arguments, 'title');
         $description = $this->input->optionalString($arguments, 'description');
+        // An explicit space must be one the caller belongs to; omitted
+        // leaves space null so ProjectSpaceDefaultListener defaults it to
+        // the caller's personal space (where they're admin) at persist.
+        $space = $this->spaces->resolveMemberSpaceOrNull($arguments['spaceId'] ?? null, $user);
 
         $project = new Project();
         $project->setOwner($user);
-        // Space defaults to the caller's personal space via
-        // ProjectSpaceDefaultListener at PrePersist (#185), where they
-        // already hold the admin role. No project-local member set
-        // exists anymore.
+        if (null !== $space) {
+            $project->setSpace($space);
+        }
         $project->setTitle($title);
         if (null !== $description) {
             $project->setDescription($description);

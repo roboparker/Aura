@@ -27,6 +27,12 @@
         <include>
             <directory suffix=".php">src</directory>
         </include>
+        <exclude>
+            <!-- Dev/test data seeders, not production logic — they run during
+                 E2E fixture loading, not PHPUnit, so they only ever skew the
+                 coverage denominator. -->
+            <directory suffix=".php">src/DataFixtures</directory>
+        </exclude>
     </coverage>
 
     <listeners>

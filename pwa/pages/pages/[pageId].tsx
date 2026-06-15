@@ -8,6 +8,8 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { displayName } from "@/lib/userDisplay";
+import { formatRelative } from "@/lib/relativeTime";
+import { apiErrorMessage, readCollection } from "@/lib/apiClient";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
@@ -48,36 +50,6 @@ interface ChildPage {
   id: string;
   title: string;
 }
-
-interface Collection<T> {
-  member?: T[];
-  "hydra:member"?: T[];
-}
-
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-const formatRelative = (iso: string): string => {
-  const ts = new Date(iso).getTime();
-  if (Number.isNaN(ts)) return "";
-  const diffSec = Math.round((ts - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return RELATIVE.format(diffSec, "second");
-  if (abs < 3600) return RELATIVE.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RELATIVE.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2592000) return RELATIVE.format(Math.round(diffSec / 86400), "day");
-  if (abs < 31536000)
-    return RELATIVE.format(Math.round(diffSec / 2592000), "month");
-  return RELATIVE.format(Math.round(diffSec / 31536000), "year");
-};
-
-const errorMessage = async (res: Response): Promise<string> => {
-  const data = await res.json().catch(() => ({}));
-  return (
-    data.detail ||
-    data.description ||
-    data["hydra:description"] ||
-    "Request failed."
-  );
-};
 
 const PageDetailView = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -155,12 +127,10 @@ const PageDetailView = () => {
         ),
       ]);
       if (childrenRes.ok) {
-        const collection: Collection<ChildPage> = await childrenRes.json();
-        setChildren(collection.member ?? collection["hydra:member"] ?? []);
+        setChildren(readCollection<ChildPage>(await childrenRes.json()));
       }
       if (commentsRes.ok) {
-        const collection: Collection<PageCommentRow> = await commentsRes.json();
-        setComments(collection.member ?? collection["hydra:member"] ?? []);
+        setComments(readCollection<PageCommentRow>(await commentsRes.json()));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
@@ -211,7 +181,7 @@ const PageDetailView = () => {
         body: JSON.stringify({ title: editTitle.trim(), body: editBody }),
       });
       if (!res.ok) {
-        throw new Error(await errorMessage(res));
+        throw new Error(await apiErrorMessage(res, "Request failed."));
       }
       setEditing(false);
       await load();
@@ -238,7 +208,7 @@ const PageDetailView = () => {
         credentials: "include",
       });
       if (!res.ok) {
-        throw new Error(await errorMessage(res));
+        throw new Error(await apiErrorMessage(res, "Request failed."));
       }
       await router.push("/pages");
     } catch (err) {
@@ -256,7 +226,7 @@ const PageDetailView = () => {
       headers: { "Content-Type": "application/ld+json" },
       body: JSON.stringify({ page: page["@id"], body }),
     });
-    if (!res.ok) throw new Error(await errorMessage(res));
+    if (!res.ok) throw new Error(await apiErrorMessage(res, "Request failed."));
     const created: PageCommentRow = await res.json();
     // Optimistic insert; the Mercure echo of this POST may also
     // arrive and tries to add the same IRI — dedupe defensively.
@@ -277,7 +247,7 @@ const PageDetailView = () => {
       headers: { "Content-Type": "application/merge-patch+json" },
       body: JSON.stringify({ body }),
     });
-    if (!res.ok) throw new Error(await errorMessage(res));
+    if (!res.ok) throw new Error(await apiErrorMessage(res, "Request failed."));
     const updated: PageCommentRow = await res.json();
     setComments((prev) =>
       prev.map((c) => (c["@id"] === updated["@id"] ? updated : c)),
@@ -292,7 +262,7 @@ const PageDetailView = () => {
       credentials: "include",
     });
     if (!res.ok) {
-      throw new Error(await errorMessage(res));
+      throw new Error(await apiErrorMessage(res, "Request failed."));
     }
     setComments((prev) => prev.filter((c) => c["@id"] !== comment["@id"]));
   };

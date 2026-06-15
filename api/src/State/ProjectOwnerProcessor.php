@@ -5,11 +5,9 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Project;
-use App\Entity\User;
 use App\Repository\SpaceRepository;
-use Symfony\Bundle\SecurityBundle\Security;
+use App\Security\AuthenticatedUserResolver;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 /**
  * Stamps the creator as owner of a new Project and adds them to the member
@@ -26,7 +24,7 @@ final class ProjectOwnerProcessor implements ProcessorInterface
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
         private ProcessorInterface $persistProcessor,
-        private Security $security,
+        private AuthenticatedUserResolver $auth,
         private SpaceRepository $spaceRepository,
     ) {
     }
@@ -36,10 +34,7 @@ final class ProjectOwnerProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Project
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof User) {
-            throw new UnauthorizedHttpException('Bearer', 'You must be authenticated to create a project.');
-        }
+        $user = $this->auth->requireUser('create a project');
 
         $data->setOwner($user);
 

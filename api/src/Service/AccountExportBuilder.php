@@ -4,9 +4,8 @@ namespace App\Service;
 
 use App\Entity\AccountExport;
 use App\Entity\MediaObject;
-use App\Entity\User;
+use App\Service\Export\ExportArchiveWriter;
 use Doctrine\ORM\EntityManagerInterface;
-use League\Flysystem\FilesystemOperator;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -36,8 +35,7 @@ final class AccountExportBuilder
     public function __construct(
         private EntityManagerInterface $em,
         private UserDataExporter $exporter,
-        #[Autowire(service: 'media.storage')]
-        private FilesystemOperator $mediaStorage,
+        private ExportArchiveWriter $archive,
         #[Autowire('%app.account_export_dir%')]
         private string $exportDir,
     ) {
@@ -74,13 +72,13 @@ final class AccountExportBuilder
 
         $account = $this->exporter->export($user);
         $account['exportedAt'] = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
-        $account['attachments'] = array_values(array_map(static fn (MediaObject $m): array => [
+        $account['attachments'] = array_values(array_map(fn (MediaObject $m): array => [
             'id' => (string) $m->getId(),
             'kind' => $m->getKind(),
             'originalName' => $m->getOriginalName(),
             'mimeType' => $m->getMimeType(),
             'byteSize' => $m->getByteSize(),
-            'file' => self::attachmentFileName($m),
+            'file' => $this->archive->attachmentFileName($m),
         ], $media));
 
         $zip = new \ZipArchive();
@@ -89,17 +87,17 @@ final class AccountExportBuilder
         }
 
         try {
-            $this->addJson($zip, 'account.json', $account);
+            $this->archive->addJson($zip, 'account.json', $account);
 
             foreach ($media as $mediaObject) {
-                $this->addAttachment($zip, $mediaObject, $partsDir);
+                $this->archive->addAttachment($zip, $mediaObject, $partsDir);
             }
         } catch (\Throwable $e) {
             $zip->close();
             if (is_file($tmp)) {
                 unlink($tmp);
             }
-            $this->removeDir($partsDir);
+            $this->archive->removeDir($partsDir);
             throw $e;
         }
 
@@ -107,7 +105,7 @@ final class AccountExportBuilder
         // the staging directory must survive until here, then it's safe to
         // remove regardless of success.
         $closed = $zip->close();
-        $this->removeDir($partsDir);
+        $this->archive->removeDir($partsDir);
         if (!$closed) {
             if (is_file($tmp)) {
                 unlink($tmp);
@@ -119,88 +117,5 @@ final class AccountExportBuilder
         }
 
         return $file;
-    }
-
-    /**
-     * Stable in-archive filename for an attachment: media id prefix keeps
-     * names collision-free, the sanitized original name keeps them human.
-     */
-    public static function attachmentFileName(MediaObject $media): string
-    {
-        $name = basename($media->getOriginalName());
-        $sanitized = preg_replace('/[^\w.\- ]+/u', '_', $name);
-        $safe = (null !== $sanitized && '' !== trim($sanitized)) ? trim($sanitized) : 'file';
-
-        return sprintf('attachments/%s-%s', (string) $media->getId(), $safe);
-    }
-
-    /**
-     * @param array<int|string, mixed> $data
-     */
-    private function addJson(\ZipArchive $zip, string $name, array $data): void
-    {
-        $json = json_encode(
-            $data,
-            JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-        );
-        if (!$zip->addFromString($name, $json)) {
-            throw new \RuntimeException(sprintf('Could not add "%s" to the export archive.', $name));
-        }
-    }
-
-    private function addAttachment(\ZipArchive $zip, MediaObject $media, string $partsDir): void
-    {
-        $path = $media->getVariantPath('original') ?? array_values($media->getVariants())[0] ?? null;
-        if (null === $path || !$this->mediaStorage->fileExists($path)) {
-            // A missing file shouldn't sink the whole export — the JSON
-            // manifest still records that the attachment existed.
-            return;
-        }
-
-        // Stream flysystem → a staged temp file, then hand the path to
-        // ZipArchive::addFile() so the bytes are read from disk at close()
-        // rather than buffered in memory. The media id is unique, so it's a
-        // safe temp filename.
-        $tempPath = $partsDir . '/' . (string) $media->getId();
-        $dest = fopen($tempPath, 'wb');
-        if (false === $dest) {
-            throw new \RuntimeException(sprintf('Could not stage attachment "%s" for export.', (string) $media->getId()));
-        }
-
-        $source = $this->mediaStorage->readStream($path);
-        $copied = stream_copy_to_stream($source, $dest);
-        if (\is_resource($source)) {
-            fclose($source);
-        }
-        fclose($dest);
-        if (false === $copied) {
-            // Couldn't read the bytes — skip rather than abort the export.
-            unlink($tempPath);
-            return;
-        }
-
-        if (!$zip->addFile($tempPath, self::attachmentFileName($media))) {
-            throw new \RuntimeException(sprintf('Could not add attachment "%s" to the export archive.', (string) $media->getId()));
-        }
-    }
-
-    /**
-     * Removes a staging directory and its (flat) contents. Best-effort — a
-     * leftover that survives a hard kill is reaped by AccountExportPruner.
-     */
-    private function removeDir(string $dir): void
-    {
-        if (!is_dir($dir)) {
-            return;
-        }
-        $entries = glob($dir . '/*');
-        if (false !== $entries) {
-            foreach ($entries as $entry) {
-                if (is_file($entry)) {
-                    unlink($entry);
-                }
-            }
-        }
-        rmdir($dir);
     }
 }

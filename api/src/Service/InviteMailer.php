@@ -3,8 +3,7 @@
 namespace App\Service;
 
 use App\Entity\UserInvite;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Component\Mime\Email;
 
 /**
@@ -21,28 +20,18 @@ use Symfony\Component\Mime\Email;
 final class InviteMailer
 {
     public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-        #[Autowire('%env(default::MAILER_FROM)%')]
-        private ?string $mailerFrom = null,
+        private readonly MailDispatcher $mail,
     ) {
     }
 
     public function sendSignupLink(UserInvite $invite, string $plainToken, int $ttlDays): void
     {
-        $signupUrl = sprintf(
-            '%s/signup?invite=%s',
-            rtrim($this->frontendUrl, '/'),
-            $plainToken,
-        );
-        $from = (null !== $this->mailerFrom && '' !== $this->mailerFrom) ? $this->mailerFrom : 'no-reply@madori.test';
+        $signupUrl = $this->mail->frontendLink('/signup?invite=' . $plainToken);
 
         $targets = $this->collectTargetLabels($invite);
         $contextLine = $this->formatContextLine($targets);
 
         $message = (new Email())
-            ->from($from)
             ->to($invite->getEmail())
             ->subject('You\'ve been invited to join Madori')
             ->text(sprintf(
@@ -58,7 +47,7 @@ final class InviteMailer
                 $ttlDays,
             ));
 
-        $this->mailer->send($message);
+        $this->mail->send($message);
     }
 
     /**
