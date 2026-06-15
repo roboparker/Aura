@@ -25,5 +25,6 @@
 
 - [ ] My code follows the project's conventions
 - [ ] I have added tests that prove my fix or feature works
-- [ ] New and existing tests pass locally
+- [ ] New and existing tests pass locally (PHPUnit / `pnpm test:coverage`)
+- [ ] New pure-logic helpers under `pwa/lib` are added to the coverage allowlist in `pwa/vitest.config.ts`
 - [ ] I have updated documentation if needed

@@ -37,6 +37,37 @@ Use lowercase `kebab-case` for branch names.
 - **PHP**: Follow [Symfony coding standards](https://symfony.com/doc/current/contributing/code/standards.html)
 - **TypeScript/React**: Follow the existing patterns in the codebase
 
+### Testing
+
+Every PR must keep CI green, which includes the test suites:
+
+- **API** — PHPUnit (`bin/phpunit`). New endpoints, services, and behaviour
+  changes need tests under `api/tests/`. A **minimum line-coverage floor** is
+  enforced on PRs: the *Tests* CI job runs the suite with coverage
+  (`XDEBUG_MODE=coverage … --coverage-clover`) and then
+  [`api/bin/coverage-check.php`](../api/bin/coverage-check.php) fails the build
+  if `api/src` line coverage drops below the floor (currently 84%; measured
+  ~85%). Dev/test seeders under `src/DataFixtures` are excluded from coverage
+  (see `api/phpunit.xml.dist`). To check locally:
+
+  ```bash
+  docker compose exec -e XDEBUG_MODE=coverage php php -d memory_limit=-1 \
+    bin/phpunit --coverage-clover var/coverage.xml
+  docker compose exec php php bin/coverage-check.php var/coverage.xml 84
+  ```
+- **PWA** — Vitest over the framework-free logic in `pwa/lib`
+  (`pnpm test`). A **minimum-coverage floor** is enforced on PRs via
+  `pnpm test:coverage`: the modules listed in `coverage.include` in
+  [`pwa/vitest.config.ts`](../pwa/vitest.config.ts) must stay above the
+  configured thresholds (lines/statements ≥ 85%, functions ≥ 90%,
+  branches ≥ 75%). When you add a new pure-logic helper under `pwa/lib`,
+  add it (and its `*.test.ts`) to that allowlist so the gate keeps it
+  covered. Component/integration coverage lives in the Playwright **e2e**
+  suite rather than the unit layer.
+
+If your change is genuinely untestable in these layers (pure infra/config),
+say so in the PR description.
+
 See `docs/developer/branching-and-releases.md` for the full branching and release strategy.
 
 ## License
