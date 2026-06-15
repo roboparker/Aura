@@ -7,6 +7,7 @@ use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
+use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Project;
 use App\Entity\Space;
@@ -127,6 +128,8 @@ class McpTest extends ApiTestCase
             'create_page', 'get_page', 'update_page', 'delete_page', 'list_pages',
             'list_tags', 'create_tag',
             'create_discussion', 'get_discussion', 'list_discussions',
+            'add_page_comment', 'list_page_comments',
+            'add_discussion_comment', 'list_discussion_comments',
             ] as $expected
         ) {
             $this->assertContains($expected, $names, sprintf('Missing tool "%s"', $expected));
@@ -496,6 +499,81 @@ class McpTest extends ApiTestCase
         $this->assertSame(['Roadmap'], array_column($items, 'title'));
     }
 
+    public function testAddAndListPageComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $page = $this->makePage($alice, $space, 'Spec');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_page_comment',
+            'arguments' => ['pageId' => (string) $page->getId(), 'body' => 'First note'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('First note', $structured['body']);
+        $this->assertSame('page', $structured['commentableType']);
+        $this->assertSame((string) $page->getId(), $structured['pageId']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_page_comments',
+            'arguments' => ['pageId' => (string) $page->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['First note'], array_column($items, 'body'));
+    }
+
+    public function testAddAndListDiscussionComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $discussion = $this->makeDiscussion($alice, $space, 'Topic');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_discussion_comment',
+            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Good point'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('discussion', $structured['commentableType']);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_discussion_comments',
+            'arguments' => ['discussionId' => (string) $discussion->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+        $this->assertSame(['Good point'], array_column($items, 'body'));
+    }
+
+    public function testLockedDiscussionRejectsNewComment(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $discussion = $this->makeDiscussion($alice, $space, 'Closed');
+        $discussion->setIsLocked(true);
+        $this->entityManager->flush();
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'add_discussion_comment',
+            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Sneaky'],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
     public function testInvalidUuidProducesValidationError(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -679,6 +757,18 @@ class McpTest extends ApiTestCase
         $this->entityManager->persist($page);
         $this->entityManager->flush();
         return $page;
+    }
+
+    private function makeDiscussion(User $author, Space $space, string $title): Discussion
+    {
+        $discussion = new Discussion();
+        $discussion->setAuthor($author);
+        $discussion->setSpace($space);
+        $discussion->setTitle($title);
+        $discussion->setBody('Body of ' . $title);
+        $this->entityManager->persist($discussion);
+        $this->entityManager->flush();
+        return $discussion;
     }
 
     private function makeTaskInProject(User $owner, Project $project, string $title): Task

@@ -29,9 +29,13 @@ final class McpToolPolicy
         'delete_task' => ['category' => 'tasks', 'write' => true],
         'assign_task' => ['category' => 'tasks', 'write' => true],
         'unassign_task' => ['category' => 'tasks', 'write' => true],
-        // comments (task comments)
+        // comments (task / page / discussion comments share one category)
         'list_task_comments' => ['category' => 'comments', 'write' => false],
         'add_task_comment' => ['category' => 'comments', 'write' => true],
+        'list_page_comments' => ['category' => 'comments', 'write' => false],
+        'add_page_comment' => ['category' => 'comments', 'write' => true],
+        'list_discussion_comments' => ['category' => 'comments', 'write' => false],
+        'add_discussion_comment' => ['category' => 'comments', 'write' => true],
         // files (attachments)
         'list_files' => ['category' => 'files', 'write' => false],
         'download_file' => ['category' => 'files', 'write' => false],

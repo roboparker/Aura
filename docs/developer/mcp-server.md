@@ -67,7 +67,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
 | Discussion  | `create_discussion`, `get_discussion`, `list_discussions`                      |
 | Assignment  | `assign_task`, `unassign_task`, `get_my_tasks`                                 |
-| TaskComment | `add_task_comment`, `list_task_comments`                                       |
+| Comment     | `add_task_comment`, `list_task_comments`, `add_page_comment`, `list_page_comments`, `add_discussion_comment`, `list_discussion_comments` |
 | Tag         | `list_tags`, `create_tag`                                                       |
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
