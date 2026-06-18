@@ -37,8 +37,21 @@ if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
 		fi
 	fi
 
-	setfacl -R -m u:www-data:rwX -m u:"$(whoami)":rwX var
-	setfacl -dR -m u:www-data:rwX -m u:"$(whoami)":rwX var
+	# www-data must own writes under var/. Walk var/ but prune var/media: the
+	# worker mounts it read-only for the backup pass, and setfacl on a
+	# read-only mount fails — under `set -e` that crash-loops the entrypoint.
+	# The web container keeps media writable and gets its ACLs in the guarded
+	# pass below.
+	find var -path var/media -prune -o -print0 \
+		| xargs -0 setfacl -m u:www-data:rwX -m u:"$(whoami)":rwX
+	find var -path var/media -prune -o -type d -print0 \
+		| xargs -0 setfacl -d -m u:www-data:rwX -m u:"$(whoami)":rwX
+
+	# Apply the same ACLs to var/media only when it is writable, so the web
+	# container's read-write upload mount is covered while the worker's
+	# read-only mount is skipped (failures ignored as a belt-and-braces guard).
+	setfacl -R -m u:www-data:rwX -m u:"$(whoami)":rwX var/media 2>/dev/null || true
+	setfacl -dR -m u:www-data:rwX -m u:"$(whoami)":rwX var/media 2>/dev/null || true
 
 	echo 'PHP app ready!'
 fi
