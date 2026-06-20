@@ -248,6 +248,14 @@ const CustomFieldSheet = ({
     setSubtype(next);
     if (kind === "select") {
       setConfig((prev) => ({ ...prev, multi: next === "multi" }));
+    } else if (kind === "numeric" && next === "money") {
+      // Money requires a currency; seed the default so the picker's shown
+      // value is actually stored and submit works without touching it.
+      setConfig((prev) => ({
+        ...prev,
+        multi: false,
+        currency: prev.currency ?? "USD",
+      }));
     } else if (descriptor.noMultiSubtypes?.includes(next)) {
       setConfig((prev) => ({ ...prev, multi: false }));
     }
