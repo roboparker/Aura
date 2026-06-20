@@ -18,6 +18,12 @@ import {
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -303,20 +309,22 @@ const MoneyValue = ({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">
-        {currencySymbol(currency)}
-      </span>
-      <Input
-        type="number"
-        step={digits === 0 ? 1 : 1 / factor}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(error)}
-        className="tabular-nums"
-        data-testid="custom-field-value-money"
-      />
+      <InputGroup className="flex-1">
+        <InputGroupAddon>
+          <InputGroupText>{currencySymbol(currency)}</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          type="number"
+          step={digits === 0 ? 1 : 1 / factor}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(error)}
+          className="tabular-nums"
+          data-testid="custom-field-value-money"
+        />
+      </InputGroup>
       {!compact && (
         <Badge variant="outline" className="shrink-0 font-mono text-xs">
           {currency}
