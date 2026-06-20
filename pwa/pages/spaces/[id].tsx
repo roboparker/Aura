@@ -646,7 +646,7 @@ const SpaceDetail = () => {
                                     user={toAvatarUser(m.user)}
                                     size="sm"
                                   />
-                                  <span className="text-sm font-medium truncate flex-1">
+                                  <span className="min-w-0 text-sm font-medium truncate flex-1">
                                     {displayName(m.user)}
                                     {isSelf && (
                                       <span className="ml-1 text-xs text-muted-foreground">

@@ -76,7 +76,7 @@ const SpaceSwitcher = () => {
             isPersonal={activeSpace.isPersonal}
             size="sm"
           />
-          <span className="truncate flex-1 text-left font-medium">
+          <span className="min-w-0 truncate flex-1 text-left font-medium">
             {activeSpace.name}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
@@ -114,7 +114,7 @@ const SpaceSwitcher = () => {
                 isPersonal={space.isPersonal}
                 size="sm"
               />
-              <span className="truncate flex-1">{space.name}</span>
+              <span className="min-w-0 truncate flex-1">{space.name}</span>
             </DropdownMenuItem>
           );
         })}
