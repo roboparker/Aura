@@ -186,7 +186,7 @@ const SearchOverlay = () => {
               onClick={() => runQuery(trimmed)}
             >
               <SearchIcon className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 truncate">
+              <span className="min-w-0 flex-1 truncate">
                 Search for <span className="font-medium text-foreground">{trimmed}</span>
               </span>
               <CornerDownLeft className="h-3.5 w-3.5 text-muted-foreground" />
@@ -252,7 +252,7 @@ const SearchOverlay = () => {
                     onClick={() => runQuery(r.q)}
                   >
                     <SearchIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="flex-1 truncate font-mono text-xs">{r.q}</span>
+                    <span className="min-w-0 flex-1 truncate font-mono text-xs">{r.q}</span>
                     {typeof r.count === "number" && (
                       <span className="text-[11px] text-muted-foreground">{r.count} results</span>
                     )}
