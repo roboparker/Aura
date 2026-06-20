@@ -1,12 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferencePersist } from "@/lib/usePreferencePersist";
+import { useSettingsSection } from "@/lib/useSettingsSection";
 import { DEFAULT_NOTIFICATION_MATRIX } from "@/lib/notificationPrefs";
 import SettingsShell from "@/components/settings/SettingsShell";
 import SaveIndicator from "@/components/settings/SaveIndicator";
+import SectionSaveBar from "@/components/settings/SectionSaveBar";
 import NotificationMatrix from "@/components/settings/NotificationMatrix";
 import EmailDigestControl from "@/components/settings/EmailDigestControl";
 import QuietHoursControl from "@/components/settings/QuietHoursControl";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -14,7 +15,6 @@ import { Switch } from "@/components/ui/switch";
 
 const NotificationsPage = () => {
   const { user } = useAuth();
-  const { persist, saveStatus, saveError } = usePreferencePersist();
   const prefs = user?.preferences;
   const disabled = !user;
 
@@ -31,28 +31,46 @@ const NotificationsPage = () => {
     end: "07:00",
   };
 
+  // Delivery matrix — its own buffered save.
+  const delivery = useSettingsSection(matrix, (next) => ({
+    notificationMatrix: next,
+  }));
+
+  // Email digest + quiet hours share one card and save together.
+  const emailQuiet = useSettingsSection({ digest, quietHours }, (next) => ({
+    emailDigest: next.digest,
+    // notificationFrequency is the canonical cadence the backend reads; keep
+    // it in sync with the digest mode.
+    notificationFrequency: next.digest.mode,
+    quietHours: next.quietHours,
+  }));
+
+  // The push toggle is a single browser-permission affordance — kept immediate.
+  const push = usePreferencePersist();
+
   return (
     <SettingsShell
       active="notifications"
       title="Notifications"
       description="Pick which Madori events reach you, and where."
-      actions={<SaveIndicator status={saveStatus} />}
     >
-      {saveError && (
-        <Alert variant="destructive" data-testid="settings-error">
-          <AlertDescription>{saveError}</AlertDescription>
-        </Alert>
-      )}
-
       <Card data-testid="settings-notifications">
         <CardHeader>
           <CardTitle>Delivery</CardTitle>
         </CardHeader>
         <CardContent>
           <NotificationMatrix
-            value={matrix}
+            value={delivery.draft}
             disabled={disabled}
-            onChange={(next) => void persist({ notificationMatrix: next })}
+            onChange={delivery.setDraft}
+          />
+          <SectionSaveBar
+            dirty={delivery.dirty}
+            status={delivery.saveStatus}
+            error={delivery.saveError}
+            onSave={() => void delivery.save()}
+            onDiscard={delivery.discard}
+            testId="settings-delivery-save"
           />
         </CardContent>
       </Card>
@@ -63,20 +81,28 @@ const NotificationsPage = () => {
         </CardHeader>
         <CardContent className="space-y-6">
           <EmailDigestControl
-            value={digest}
+            value={emailQuiet.draft.digest}
             disabled={disabled}
             onChange={(next) =>
-              // notificationFrequency is the canonical cadence the backend
-              // reads; keep it in sync with the digest mode.
-              void persist({ emailDigest: next, notificationFrequency: next.mode })
+              emailQuiet.setDraft({ ...emailQuiet.draft, digest: next })
             }
           />
           <Separator />
           <QuietHoursControl
-            value={quietHours}
+            value={emailQuiet.draft.quietHours}
             timezone={prefs?.timezone ?? "UTC"}
             disabled={disabled}
-            onChange={(next) => void persist({ quietHours: next })}
+            onChange={(next) =>
+              emailQuiet.setDraft({ ...emailQuiet.draft, quietHours: next })
+            }
+          />
+          <SectionSaveBar
+            dirty={emailQuiet.dirty}
+            status={emailQuiet.saveStatus}
+            error={emailQuiet.saveError}
+            onSave={() => void emailQuiet.save()}
+            onDiscard={emailQuiet.discard}
+            testId="settings-email-save"
           />
         </CardContent>
       </Card>
@@ -95,15 +121,18 @@ const NotificationsPage = () => {
                 Send browser push when an in-app event fires.
               </p>
             </div>
-            <Switch
-              id="push-toggle"
-              checked={prefs?.pushNotificationsEnabled ?? false}
-              disabled={disabled}
-              onCheckedChange={(on) =>
-                void persist({ pushNotificationsEnabled: on })
-              }
-              data-testid="settings-push-toggle"
-            />
+            <div className="flex shrink-0 items-center gap-2 pt-0.5">
+              <SaveIndicator status={push.saveStatus} />
+              <Switch
+                id="push-toggle"
+                checked={prefs?.pushNotificationsEnabled ?? false}
+                disabled={disabled}
+                onCheckedChange={(on) =>
+                  void push.persist({ pushNotificationsEnabled: on })
+                }
+                data-testid="settings-push-toggle"
+              />
+            </div>
           </div>
           <p className="text-xs text-muted-foreground">
             Browser permission:{" "}

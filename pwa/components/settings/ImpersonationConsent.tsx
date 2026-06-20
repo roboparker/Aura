@@ -5,10 +5,10 @@ import {
   type ImpersonationCategory,
   type ImpersonationLevel,
 } from "@/contexts/AuthContext";
-import { usePreferencePersist } from "@/lib/usePreferencePersist";
+import { useSettingsSection } from "@/lib/useSettingsSection";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import SaveIndicator from "@/components/settings/SaveIndicator";
+import SectionSaveBar from "@/components/settings/SectionSaveBar";
 import ImpersonationItemExceptions from "@/components/settings/ImpersonationItemExceptions";
 import PermissionTree, {
   type PermissionLevel,
@@ -60,12 +60,21 @@ const DEFAULT_ACCESS: Record<ImpersonationCategory, ImpersonationLevel> = {
  */
 const ImpersonationConsent = () => {
   const { user } = useAuth();
-  const { persist, saveStatus, saveError } = usePreferencePersist();
 
   const enabled = user?.preferences?.canBeImpersonated ?? false;
   const access = useMemo(
     () => ({ ...DEFAULT_ACCESS, ...(user?.preferences?.impersonationAccess ?? {}) }),
     [user?.preferences?.impersonationAccess],
+  );
+
+  // Master toggle + the access matrix buffer together behind one Save. The
+  // per-item overrides below keep their own immediate save.
+  const consent = useSettingsSection(
+    { canBeImpersonated: enabled, impersonationAccess: access },
+    (next) => ({
+      canBeImpersonated: next.canBeImpersonated,
+      impersonationAccess: next.impersonationAccess,
+    }),
   );
 
   return (
@@ -86,28 +95,27 @@ const ImpersonationConsent = () => {
             leave it off and no one can impersonate your account.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2 pt-0.5">
-          <SaveIndicator status={saveStatus} />
-          <Switch
-            id="impersonation-consent"
-            checked={enabled}
-            onCheckedChange={(checked) =>
-              void persist({ canBeImpersonated: checked })
-            }
-            aria-label="Allow admin impersonation"
-          />
-        </div>
+        <Switch
+          id="impersonation-consent"
+          className="mt-0.5 shrink-0"
+          checked={consent.draft.canBeImpersonated}
+          onCheckedChange={(checked) =>
+            consent.setDraft({ ...consent.draft, canBeImpersonated: checked })
+          }
+          aria-label="Allow admin impersonation"
+        />
       </div>
 
-      {enabled ? (
+      {consent.draft.canBeImpersonated ? (
         <div className="rounded-md border p-3">
           <PermissionTree
             levels={LEVELS}
             nodes={NODES}
-            values={access as Record<string, string>}
+            values={consent.draft.impersonationAccess as Record<string, string>}
             masterLabel="What admins can access"
             onChange={(next) =>
-              void persist({
+              consent.setDraft({
+                ...consent.draft,
                 impersonationAccess: next as Record<
                   ImpersonationCategory,
                   ImpersonationLevel
@@ -127,9 +135,14 @@ const ImpersonationConsent = () => {
         </div>
       ) : null}
 
-      {saveStatus === "error" && saveError ? (
-        <p className="text-sm text-destructive">{saveError}</p>
-      ) : null}
+      <SectionSaveBar
+        dirty={consent.dirty}
+        status={consent.saveStatus}
+        error={consent.saveError}
+        onSave={() => void consent.save()}
+        onDiscard={consent.discard}
+        testId="settings-impersonation-save"
+      />
     </div>
   );
 };
