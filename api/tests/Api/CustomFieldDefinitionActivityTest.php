@@ -81,6 +81,49 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
         $this->assertSame('CustomFieldDefinition', $first['objectClass'] ?? null);
     }
 
+    public function testActivityRetainsDeletedFieldWithRemoveEvent(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $created = $client->request('POST', '/custom_field_definitions', [
+            'json' => [
+                'project' => '/projects/' . $project->getId(),
+                'name' => 'Severity',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $iri = $created['@id'] ?? null;
+        self::assertIsString($iri);
+
+        // Delete the field — its audit rows outlive the entity.
+        $client->request('DELETE', $iri);
+        $this->assertResponseStatusCodeSame(204);
+
+        // The change log still surfaces the field's create history plus a
+        // remove event, rather than dropping it entirely.
+        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $actions = [];
+        foreach ($items as $item) {
+            $this->assertIsArray($item);
+            $actions[] = $item['action'] ?? null;
+        }
+        $this->assertContains('create', $actions, 'deleted field create history is retained');
+        $this->assertContains('remove', $actions, 'deletion is recorded as a remove event');
+    }
+
     public function testStrangerGets404(): void
     {
         $alice = $this->createUser('alice@example.com');
