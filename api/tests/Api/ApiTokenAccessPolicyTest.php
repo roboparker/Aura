@@ -98,6 +98,62 @@ class ApiTokenAccessPolicyTest extends ApiTestCase
         $this->assertJsonContains(['totalItems' => 1]);
     }
 
+    public function testProfileNoneBlocksAccountRead(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bearer = $this->mintToken($alice, ['categories' => ['profile' => 'none'], 'items' => []]);
+
+        $client = static::createClient();
+        $client->request('GET', '/api/me', ['headers' => $this->authHeaders($bearer)]);
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testProfileViewAllowsAccountReadButWritesStayBlocked(): void
+    {
+        // Mint both tokens before createClient() reboots the kernel (which
+        // would detach $alice from the EntityManager mid-test).
+        $alice = $this->createUser('alice@example.com');
+        $view = $this->mintToken($alice, ['categories' => ['profile' => 'view'], 'items' => []]);
+        $edit = $this->mintToken($alice, ['categories' => ['profile' => 'edit'], 'items' => []]);
+
+        $client = static::createClient();
+        $client->request('GET', '/api/me', ['headers' => $this->authHeaders($view)]);
+        $this->assertResponseIsSuccessful();
+
+        // Even at 'edit', preference writes are account-sensitive and stay blocked.
+        $client->request('PATCH', '/me/preferences', [
+            'json' => ['timezone' => 'UTC'],
+            'headers' => $this->authHeaders($edit),
+        ]);
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testSecurityCategoryGatesAccountSurface(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $none = $this->mintToken($alice, ['categories' => ['security' => 'none'], 'items' => []]);
+        $view = $this->mintToken($alice, ['categories' => ['security' => 'view'], 'items' => []]);
+
+        $client = static::createClient();
+        $client->request('GET', '/me/sessions', ['headers' => $this->authHeaders($none)]);
+        $this->assertResponseStatusCodeSame(403);
+
+        $client->request('GET', '/me/sessions', ['headers' => $this->authHeaders($view)]);
+        $this->assertResponseIsSuccessful();
+    }
+
+    public function testTokenOmittingAccountCategoryKeepsPriorReadBehavior(): void
+    {
+        // Backward-compat + impersonation safety: a policy that doesn't model
+        // profile/security leaves account reads allowed as before.
+        $alice = $this->createUser('alice@example.com');
+        $bearer = $this->mintToken($alice, ['categories' => ['tasks' => 'view'], 'items' => []]);
+
+        $client = static::createClient();
+        $client->request('GET', '/api/me', ['headers' => $this->authHeaders($bearer)]);
+        $this->assertResponseIsSuccessful();
+    }
+
     /**
      * @return array<string, string>
      */

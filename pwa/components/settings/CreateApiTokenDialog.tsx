@@ -35,17 +35,26 @@ const NODES: PermissionNode[] = [
   {
     key: "content",
     label: "Content",
-    description: "tasks, projects, pages, discussions, comments",
+    description: "tasks, projects, pages, discussions, comments, files",
     children: [
       { key: "tasks", label: "Tasks" },
       { key: "projects", label: "Projects" },
       { key: "pages", label: "Pages" },
       { key: "discussions", label: "Discussions" },
       { key: "comments", label: "Comments" },
+      { key: "files", label: "Files" },
     ],
   },
-  { key: "notifications", label: "Notifications" },
-  { key: "files", label: "Files" },
+  {
+    key: "settings",
+    label: "Settings",
+    description: "notifications, profile, security",
+    children: [
+      { key: "notifications", label: "Notifications" },
+      { key: "profile", label: "Profile" },
+      { key: "security", label: "Security" },
+    ],
+  },
 ];
 
 const ALL_CATEGORIES = [
@@ -56,6 +65,8 @@ const ALL_CATEGORIES = [
   "comments",
   "notifications",
   "files",
+  "profile",
+  "security",
 ];
 
 // When a token is restricted, start everything at read-only — a useful,
@@ -145,7 +156,7 @@ const CreateApiTokenDialog = ({
             </DialogHeader>
             <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">
               <code
-                className="flex-1 truncate font-mono text-sm"
+                className="min-w-0 flex-1 truncate font-mono text-sm"
                 data-testid="api-token-plaintext"
               >
                 {created.plainToken}
