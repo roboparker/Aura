@@ -100,6 +100,12 @@ const CustomFieldsManager = ({
   const [filled, setFilled] = useState<Record<string, number>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
+  // Bumped on every open so the drawer remounts fresh each time. Reusing one
+  // Radix Dialog instance and toggling `open` back on while its close (exit)
+  // animation is still pending leaves Radix's Presence state machine stuck and
+  // the drawer never reopens — reproducible by saving a field then immediately
+  // clicking Edit. A fresh mount per open sidesteps the stale Presence.
+  const [openSeq, setOpenSeq] = useState(0);
   const [changeLogOpen, setChangeLogOpen] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
 
@@ -155,10 +161,12 @@ const CustomFieldsManager = ({
 
   const openCreate = () => {
     setEditing(null);
+    setOpenSeq((n) => n + 1);
     setSheetOpen(true);
   };
   const openEdit = (def: CustomFieldDefinition) => {
     setEditing(def);
+    setOpenSeq((n) => n + 1);
     setSheetOpen(true);
   };
 
@@ -413,6 +421,7 @@ const CustomFieldsManager = ({
       )}
 
       <CustomFieldSheet
+        key={openSeq}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         projectIri={projectIri}

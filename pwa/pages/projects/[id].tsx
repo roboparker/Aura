@@ -12,7 +12,9 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
+import CustomFieldValueFields from "@/components/tasks/CustomFieldValueFields";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
+import { violationsFromBody, type ViolationMap } from "@/lib/violations";
 import UserAvatar from "@/components/user/UserAvatar";
 import type { AssigneeOption } from "@/components/tasks/AssigneesCombobox";
 import type { TagOption } from "@/components/tasks/TagsCombobox";
@@ -90,6 +92,12 @@ const membersOf = <T,>(c: Collection<T>): T[] =>
 const projectSpaceIri = (project: Project): string =>
   typeof project.space === "string" ? project.space : project.space["@id"];
 
+const isEmptyFieldValue = (value: unknown): boolean =>
+  value === null ||
+  value === undefined ||
+  value === "" ||
+  (Array.isArray(value) && value.length === 0);
+
 // Due-date buckets for the grouped list, in render order.
 type Bucket = "overdue" | "week" | "later" | "none" | "done";
 const BUCKET_LABELS: Record<Bucket, string> = {
@@ -134,6 +142,12 @@ const ProjectDetail = () => {
   const [addOpen, setAddOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskDescription, setNewTaskDescription] = useState("");
+  // Custom-field values for the new task, keyed by definition IRI, plus any
+  // per-field validation messages re-mapped from a 422.
+  const [newTaskFieldValues, setNewTaskFieldValues] = useState<
+    Record<string, unknown>
+  >({});
+  const [newTaskFieldErrors, setNewTaskFieldErrors] = useState<ViolationMap>({});
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskEditorKey, setTaskEditorKey] = useState(0);
 
@@ -263,6 +277,20 @@ const ProjectDetail = () => {
     if (!project || !newTaskTitle.trim()) return;
     setIsCreatingTask(true);
     setError(null);
+    setNewTaskFieldErrors({});
+
+    // Build the value array in definition order, dropping empties, and keep an
+    // index→definition map so `customFieldValues[i]` violations land on the
+    // right field row (mirrors CustomFieldValueList's persist path).
+    const customFieldValues: { definition: string; value: unknown }[] = [];
+    const indexToDef: string[] = [];
+    for (const def of definitions) {
+      const value = newTaskFieldValues[def["@id"]];
+      if (isEmptyFieldValue(value)) continue;
+      indexToDef.push(def["@id"]);
+      customFieldValues.push({ definition: def["@id"], value });
+    }
+
     try {
       const res = await fetch(`${ENTRYPOINT}/tasks`, {
         method: "POST",
@@ -272,18 +300,40 @@ const ProjectDetail = () => {
           title: newTaskTitle.trim(),
           description: newTaskDescription.trim() || null,
           project: project["@id"],
+          ...(customFieldValues.length > 0 ? { customFieldValues } : {}),
         }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description || data.detail || data["hydra:description"] || "Failed to create task.",
-        );
+        // Re-key customFieldValues[i] violations onto their definition IRI so
+        // each field shows its own error; surface anything else as the banner.
+        const fieldErrors: ViolationMap = {};
+        let otherError: string | null = null;
+        for (const [path, message] of Object.entries(violationsFromBody(data))) {
+          const match = path.match(/^customFieldValues\[(\d+)\]/);
+          const defIri = match ? indexToDef[Number(match[1])] : undefined;
+          if (defIri) fieldErrors[defIri] = message;
+          else otherError = message;
+        }
+        setNewTaskFieldErrors(fieldErrors);
+        const hasFieldErrors = Object.keys(fieldErrors).length > 0;
+        if (otherError || !hasFieldErrors) {
+          setError(
+            otherError ||
+              data.description ||
+              data.detail ||
+              data["hydra:description"] ||
+              "Failed to create task.",
+          );
+        }
+        return;
       }
       const created: ProjectTask = await res.json();
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
       setNewTaskDescription("");
+      setNewTaskFieldValues({});
+      setNewTaskFieldErrors({});
       setTaskEditorKey((k) => k + 1);
       setAddOpen(false);
     } catch (err) {
@@ -630,6 +680,26 @@ const ProjectDetail = () => {
                           onChange={setNewTaskDescription}
                         />
                       </div>
+                      {project && definitions.length > 0 && (
+                        <div className="space-y-3" data-testid="new-task-custom-fields">
+                          <Label>Custom fields</Label>
+                          <CustomFieldValueFields
+                            definitions={definitions}
+                            values={newTaskFieldValues}
+                            onChange={(defIri, next) =>
+                              setNewTaskFieldValues((prev) => ({
+                                ...prev,
+                                [defIri]: next,
+                              }))
+                            }
+                            violations={newTaskFieldErrors}
+                            projectIri={project["@id"]}
+                            spaceIri={projectSpaceIri(project)}
+                            users={assignableUsers}
+                            disabled={isCreatingTask}
+                          />
+                        </div>
+                      )}
                       <div className="flex gap-2">
                         <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
                           {isCreatingTask ? "Adding..." : "Add task"}
@@ -637,7 +707,11 @@ const ProjectDetail = () => {
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={() => setAddOpen(false)}
+                          onClick={() => {
+                            setAddOpen(false);
+                            setNewTaskFieldValues({});
+                            setNewTaskFieldErrors({});
+                          }}
                         >
                           Cancel
                         </Button>

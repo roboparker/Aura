@@ -201,7 +201,7 @@ const AssigneesCombobox = ({
             {(u: AssigneeOption) => (
               <ComboboxItem key={u["@id"]} value={u}>
                 <UserAvatar user={u} size="sm" className="h-5 w-5" />
-                <span className="flex-1 truncate">{displayName(u)}</span>
+                <span className="min-w-0 flex-1 truncate">{displayName(u)}</span>
                 <span className="text-xs text-muted-foreground truncate">
                   {u.email}
                 </span>

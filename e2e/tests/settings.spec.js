@@ -112,7 +112,8 @@ test.describe("Settings", () => {
     await expect(mentionsEmail).toHaveAttribute("aria-checked", "true");
     await mentionsEmail.click();
     await expect(mentionsEmail).toHaveAttribute("aria-checked", "false");
-    // Wait for the autosave to land before reloading.
+    // Explicit per-section save: commit the change, then wait for it to land.
+    await page.getByTestId("settings-delivery-save").click();
     await expect(page.getByTestId("settings-save-saved")).toBeVisible();
 
     await page.reload();
@@ -130,6 +131,9 @@ test.describe("Settings", () => {
     await tz.click();
     await tz.fill("London");
     await page.getByRole("option", { name: /London/ }).first().click();
+    // Explicit per-section save before reloading.
+    await page.getByTestId("settings-workspace-save").click();
+    await expect(page.getByTestId("settings-save-saved")).toBeVisible();
 
     await page.reload();
     await expect(page.getByTestId("settings-timezone-input")).toHaveValue(

@@ -514,7 +514,7 @@ const SelectValue = ({
             {(o: SelectOption) => (
               <ComboboxItem key={o.key} value={o}>
                 <OptionDot option={o} />
-                <span className="flex-1 truncate">{o.label}</span>
+                <span className="min-w-0 flex-1 truncate">{o.label}</span>
               </ComboboxItem>
             )}
           </ComboboxList>
@@ -544,7 +544,7 @@ const SelectValue = ({
           {(o: SelectOption) => (
             <ComboboxItem key={o.key} value={o}>
               <OptionDot option={o} />
-              <span className="flex-1 truncate">{o.label}</span>
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
             </ComboboxItem>
           )}
         </ComboboxList>
@@ -616,7 +616,7 @@ const ReferenceValue = (props: ValueEditorProps) => {
             {(o: RefOption) => (
               <ComboboxItem key={o.iri} value={o}>
                 {o.user && <UserAvatar user={o.user} size="sm" className="h-5 w-5" />}
-                <span className="flex-1 truncate">{o.label}</span>
+                <span className="min-w-0 flex-1 truncate">{o.label}</span>
               </ComboboxItem>
             )}
           </ComboboxList>
@@ -649,7 +649,7 @@ const ReferenceValue = (props: ValueEditorProps) => {
           {(o: RefOption) => (
             <ComboboxItem key={o.iri} value={o}>
               {o.user && <UserAvatar user={o.user} size="sm" className="h-5 w-5" />}
-              <span className="flex-1 truncate">{o.label}</span>
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
             </ComboboxItem>
           )}
         </ComboboxList>

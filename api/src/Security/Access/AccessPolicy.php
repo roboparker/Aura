@@ -34,6 +34,11 @@ final class AccessPolicy
         'comments',
         'notifications',
         'files',
+        // Account surfaces (token actors only — not impersonation, which uses
+        // User::IMPERSONATION_CATEGORIES). 'profile' gates /api/me + /me/preferences;
+        // 'security' gates /me/2fa, /me/sessions, account lifecycle, change-password.
+        'profile',
+        'security',
     ];
 
     public const ITEM_TYPES = ['project', 'page', 'task', 'discussion'];
@@ -60,6 +65,18 @@ final class AccessPolicy
     public static function categoryForItemType(string $type): ?string
     {
         return self::ITEM_TYPE_CATEGORY[$type] ?? null;
+    }
+
+    /**
+     * Whether this policy explicitly carries a level for the category, as
+     * opposed to it merely defaulting to 'none'. Lets the enforcement listener
+     * distinguish a token that models a category (enforce it) from an actor
+     * whose model omits it entirely — e.g. impersonation, which never carries
+     * 'profile'/'security' — so omitted categories keep their prior behavior.
+     */
+    public function definesCategory(string $category): bool
+    {
+        return array_key_exists($category, $this->categories);
     }
 
     /** The level for a whole category. */
