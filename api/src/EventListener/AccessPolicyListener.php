@@ -27,7 +27,14 @@ use Symfony\Component\Uid\Uuid;
  *    viewable; writes (create) require the category to be 'edit'.
  *  - Any other content category (`/comments`, `/notifications`, `/media-objects`):
  *    governed wholesale by the category level.
- *  - Non-content endpoints (app shell, `/api/me`, `/spaces`, `/groups`, auth):
+ *  - Account surfaces (`profile`: /api/me + /me/preferences; `security`: /me/2fa,
+ *    /me/sessions, /me/deactivate|delete|export, /auth/change-password +
+ *    email-change): the category gates READ visibility (none = blocked). Every
+ *    write here is account-sensitive and stays blocked regardless of level (and
+ *    is independently step-up-gated). Only enforced when the actor's policy
+ *    actually defines the category — impersonation never does, so impersonated
+ *    reads of these surfaces keep working.
+ *  - Other non-content endpoints (app shell, `/spaces`, `/groups`, auth):
  *    reads allowed so the UI loads + a session can be ended; ALL writes
  *    blocked, so nothing outside granted content can be mutated (including the
  *    actor's own preferences / token settings).
@@ -75,6 +82,37 @@ final class AccessPolicyListener
     {
     }
 
+    /**
+     * Classify an account-management path into its gating category, or null if
+     * the path isn't an account surface. Keyed on the first two segments since
+     * profile + security both live under the shared `/me`, `/api/me`, `/auth`
+     * prefixes that first-segment routing can't separate.
+     */
+    private function accountCategory(string $first, ?string $second): ?string
+    {
+        if ('api' === $first && 'me' === $second) {
+            return 'profile';
+        }
+
+        if ('me' === $first) {
+            return match ($second) {
+                'preferences' => 'profile',
+                '2fa', 'sessions', 'deactivate', 'delete', 'export' => 'security',
+                default => null,
+            };
+        }
+
+        if ('auth' === $first) {
+            return match ($second) {
+                'change-password' => 'security',
+                'request-email-change', 'confirm-email-change', 'revert-email-change' => 'profile',
+                default => null,
+            };
+        }
+
+        return null;
+    }
+
     public function __invoke(RequestEvent $event): void
     {
         if (!$event->isMainRequest()) {
@@ -98,6 +136,24 @@ final class AccessPolicyListener
 
         $segments = explode('/', ltrim($request->getPathInfo(), '/'));
         $first = $segments[0];
+
+        // Account surfaces (profile / security). Enforced only when the actor's
+        // policy actually models the category — impersonation omits these, so
+        // its reads of /me fall through to the read-allowed default below.
+        $accountCategory = $this->accountCategory($first, $segments[1] ?? null);
+        if (null !== $accountCategory && $policy->definesCategory($accountCategory)) {
+            if (!$isRead) {
+                // Every account write is sensitive (also step-up-gated): blocked
+                // at any level. Future non-sensitive writes would relax here.
+                throw $this->denied($accountCategory);
+            }
+            if (AccessPolicy::NONE === $policy->categoryLevel($accountCategory)) {
+                throw $this->denied($accountCategory);
+            }
+
+            return;
+        }
+
         $category = self::PREFIX_TO_CATEGORY[$first] ?? null;
 
         if (null === $category) {
