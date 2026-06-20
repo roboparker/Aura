@@ -681,8 +681,7 @@ const ProjectDetail = () => {
                         />
                       </div>
                       {project && definitions.length > 0 && (
-                        <div className="space-y-3" data-testid="new-task-custom-fields">
-                          <Label>Custom fields</Label>
+                        <div data-testid="new-task-custom-fields">
                           <CustomFieldValueFields
                             definitions={definitions}
                             values={newTaskFieldValues}
@@ -697,6 +696,7 @@ const ProjectDetail = () => {
                             spaceIri={projectSpaceIri(project)}
                             users={assignableUsers}
                             disabled={isCreatingTask}
+                            compact
                           />
                         </div>
                       )}

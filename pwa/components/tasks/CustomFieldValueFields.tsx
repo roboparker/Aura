@@ -16,6 +16,9 @@ interface CustomFieldValueFieldsProps {
   spaceIri?: string | null;
   users?: AvatarUser[];
   disabled?: boolean;
+  /** Compact mode (e.g. the new-task form): drop the per-field subtype badge
+   *  and editor adornments, for a tighter inline form. */
+  compact?: boolean;
 }
 
 /**
@@ -33,6 +36,7 @@ const CustomFieldValueFields = ({
   spaceIri,
   users,
   disabled,
+  compact,
 }: CustomFieldValueFieldsProps) => (
   <div className="space-y-4">
     {definitions.map((def) => (
@@ -46,9 +50,11 @@ const CustomFieldValueFields = ({
               </span>
             )}
           </label>
-          <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
-            {subtypeLabelFor(def.kind, def.subtype)}
-          </Badge>
+          {!compact && (
+            <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
+              {subtypeLabelFor(def.kind, def.subtype)}
+            </Badge>
+          )}
         </div>
         <CustomFieldValueEditor
           definition={def}
@@ -59,6 +65,7 @@ const CustomFieldValueFields = ({
           projectIri={projectIri}
           spaceIri={spaceIri}
           users={users}
+          compact={compact}
         />
       </div>
     ))}

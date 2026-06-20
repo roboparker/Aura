@@ -69,6 +69,9 @@ export interface ValueEditorProps {
   spaceIri?: string | null;
   /** Space members for reference.user (avoids a fetch). */
   users?: AvatarUser[];
+  /** Compact mode (e.g. the new-task form): drop redundant adornments like
+   *  the money currency badge. */
+  compact?: boolean;
 }
 
 const isMulti = (definition: CustomFieldDefinition): boolean =>
@@ -270,6 +273,7 @@ const MoneyValue = ({
   onChange,
   disabled,
   error,
+  compact,
 }: ValueEditorProps) => {
   const currency = definition.config.currency ?? "USD";
   const digits = currencyFractionDigits(currency);
@@ -313,9 +317,11 @@ const MoneyValue = ({
         className="tabular-nums"
         data-testid="custom-field-value-money"
       />
-      <Badge variant="outline" className="shrink-0 font-mono text-xs">
-        {currency}
-      </Badge>
+      {!compact && (
+        <Badge variant="outline" className="shrink-0 font-mono text-xs">
+          {currency}
+        </Badge>
+      )}
     </div>
   );
 };
