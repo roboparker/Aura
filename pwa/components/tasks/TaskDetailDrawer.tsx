@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Repeat, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +120,9 @@ const TaskDetailDrawer = ({
   const [error, setError] = useState<string | null>(null);
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  // Local draft for the WYSIWYG description, debounce-saved on edit.
+  const [descDraft, setDescDraft] = useState("");
+  const descDirtyRef = useRef(false);
 
   // Load the task whenever the drawer opens on a new id.
   useEffect(() => {
@@ -263,6 +267,23 @@ const TaskDetailDrawer = ({
     onTaskDeleted?.(iri);
   }, [task, onOpenChange, onTaskDeleted]);
 
+  // Re-seed the description draft when a different task loads.
+  const descTaskIri = task?.["@id"] ?? null;
+  useEffect(() => {
+    descDirtyRef.current = false;
+    setDescDraft(task?.description ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [descTaskIri]);
+
+  // Debounce-save the description after edits.
+  useEffect(() => {
+    if (!descDirtyRef.current) return;
+    const handle = setTimeout(() => {
+      void patchTask({ description: descDraft.trim() === "" ? null : descDraft });
+    }, 800);
+    return () => clearTimeout(handle);
+  }, [descDraft, patchTask]);
+
   const saveCustomFields = useCallback(
     async (next: CustomFieldValuePair[]): Promise<ViolationMap> => {
       const res = await patchTask({ customFieldValues: next });
@@ -380,7 +401,7 @@ const TaskDetailDrawer = ({
         )}
 
         {task && (
-          <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">
             <div className="border-b px-5 pt-4 pb-3">
               {/* Top-left mark-done toggle + delete (close button is absolute top-right). */}
               <div className="mb-3 flex items-center gap-2">
@@ -430,142 +451,137 @@ const TaskDetailDrawer = ({
                   data-testid="task-detail-title"
                 />
               </div>
-              {task.tags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
-                  {task.tags.map((tag) => (
-                    <span
-                      key={tag["@id"]}
-                      className="rounded px-1.5 py-0.5 text-xs font-medium"
-                      style={{
-                        backgroundColor: `${tag.color}22`,
-                        color: tag.color,
-                      }}
-                    >
-                      {tag.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <TabsList variant="line" className="mt-3">
-                <TabsTrigger value="details" data-testid="task-tab-details">
-                  Details
-                </TabsTrigger>
-                <TabsTrigger value="activity" data-testid="task-tab-activity">
-                  Activity
-                </TabsTrigger>
-                <TabsTrigger value="comments" data-testid="task-tab-comments">
-                  Comments {comments.length > 0 ? `(${comments.length})` : ""}
-                </TabsTrigger>
-              </TabsList>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-              <TabsContent value="details" className="space-y-5">
-                <dl className="space-y-3 text-sm">
-                  <Row label="Assignees">
-                    <AssigneesCombobox
-                      value={task.assignees}
-                      options={assignableUsers}
-                      onChange={(iris) => void patchTask({ assignees: iris })}
-                      subjectLabel={task.title}
-                    />
-                  </Row>
-                  <Row label="Tags">
-                    <TagsCombobox
-                      value={task.tags}
-                      options={allTags}
-                      onChange={(iris) => void patchTask({ tags: iris })}
-                      subjectLabel={task.title}
-                    />
-                  </Row>
-                  <Row label="Due">
-                    <DueDateCell
-                      value={task.dueDate}
-                      onChange={(next) => void patchTask({ dueDate: next })}
-                      ariaLabel={`Due date for ${task.title}`}
-                      testIdPrefix="task-detail-due"
-                      status={dueDateStatus(task.dueDate, Boolean(task.completedOn))}
-                    />
-                  </Row>
-                  <Row label="Repeats">
-                    <Popover open={recurrenceOpen} onOpenChange={setRecurrenceOpen}>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="flex items-center gap-1.5 text-left hover:text-foreground"
-                          data-testid="task-detail-repeats"
-                        >
-                          <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
-                          {task.recurrenceRule ? (
-                            <span>{formatRecurrenceSummary(task.recurrenceRule)}</span>
-                          ) : (
-                            <span className="text-muted-foreground">Does not repeat</span>
-                          )}
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="start" className="w-auto p-0">
-                        <RecurrenceEditor
-                          value={task.recurrenceRule}
-                          dueDate={task.dueDate}
-                          onApply={(rule) => {
-                            void patchTask({ recurrenceRule: rule });
-                            setRecurrenceOpen(false);
-                          }}
-                          onRemove={() => {
-                            void patchTask({ recurrenceRule: null });
-                            setRecurrenceOpen(false);
-                          }}
-                          onCancel={() => setRecurrenceOpen(false)}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </Row>
-                </dl>
-
-                <RemindersEditor
-                  value={task.reminders}
-                  dueDate={task.dueDate}
-                  onChange={(next) => void patchTask({ reminders: next })}
-                />
-
-                {task.project && definitions.length > 0 && (
-                  <CustomFieldValueList
-                    definitions={definitions}
-                    values={task.customFieldValues}
-                    onSave={saveCustomFields}
-                    projectIri={task.project}
-                    spaceIri={spaceIri}
-                    users={assignableUsers}
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+              <dl className="space-y-3 text-sm">
+                <Row label="Tags">
+                  <TagsCombobox
+                    value={task.tags}
+                    options={allTags}
+                    onChange={(iris) => void patchTask({ tags: iris })}
+                    subjectLabel={task.title}
                   />
-                )}
+                </Row>
+                <Row label="Due">
+                  <DueDateCell
+                    value={task.dueDate}
+                    onChange={(next) => void patchTask({ dueDate: next })}
+                    ariaLabel={`Due date for ${task.title}`}
+                    testIdPrefix="task-detail-due"
+                    status={dueDateStatus(task.dueDate, Boolean(task.completedOn))}
+                  />
+                </Row>
+                <Row label="Repeats">
+                  <Popover open={recurrenceOpen} onOpenChange={setRecurrenceOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 text-left hover:text-foreground"
+                        data-testid="task-detail-repeats"
+                      >
+                        <Repeat className="h-3.5 w-3.5 text-muted-foreground" />
+                        {task.recurrenceRule ? (
+                          <span>{formatRecurrenceSummary(task.recurrenceRule)}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Does not repeat</span>
+                        )}
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-auto p-0">
+                      <RecurrenceEditor
+                        value={task.recurrenceRule}
+                        dueDate={task.dueDate}
+                        onApply={(rule) => {
+                          void patchTask({ recurrenceRule: rule });
+                          setRecurrenceOpen(false);
+                        }}
+                        onRemove={() => {
+                          void patchTask({ recurrenceRule: null });
+                          setRecurrenceOpen(false);
+                        }}
+                        onCancel={() => setRecurrenceOpen(false)}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </Row>
+                <Row label="Assignees">
+                  <AssigneesCombobox
+                    value={task.assignees}
+                    options={assignableUsers}
+                    onChange={(iris) => void patchTask({ assignees: iris })}
+                    subjectLabel={task.title}
+                  />
+                </Row>
+              </dl>
 
-                <AttachmentsPanel
-                  taskTitle={task.title}
-                  attachments={task.attachments}
-                  canDeleteAll={canModerate}
-                  onAttach={handleAttach}
-                  onDetach={handleDetach}
+              <RemindersEditor
+                value={task.reminders}
+                dueDate={task.dueDate}
+                onChange={(next) => void patchTask({ reminders: next })}
+              />
+
+              {task.project && definitions.length > 0 && (
+                <CustomFieldValueList
+                  definitions={definitions}
+                  values={task.customFieldValues}
+                  onSave={saveCustomFields}
+                  projectIri={task.project}
+                  spaceIri={spaceIri}
+                  users={assignableUsers}
                 />
-              </TabsContent>
+              )}
 
-              <TabsContent value="activity">
-                <ActivityPanel endpoint={`/tasks/${task.id}/activity`} />
-              </TabsContent>
-
-              <TabsContent value="comments">
-                <CommentsPanel
-                  parentLabel={task.title}
-                  comments={comments}
-                  isLoading={commentsLoading}
-                  currentUserIri={currentUserIri}
-                  canModerate={canModerate}
-                  onCreate={handleCreateComment}
-                  onEdit={handleEditComment}
-                  onDelete={handleDeleteComment}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Description
+                </p>
+                <MarkdownEditor
+                  key={`desc-${task["@id"]}`}
+                  value={task.description ?? ""}
+                  onChange={(v) => {
+                    descDirtyRef.current = true;
+                    setDescDraft(v);
+                  }}
+                  ariaLabel="Task description"
                 />
-              </TabsContent>
+              </div>
+
+              <AttachmentsPanel
+                taskTitle={task.title}
+                attachments={task.attachments}
+                canDeleteAll={canModerate}
+                onAttach={handleAttach}
+                onDetach={handleDetach}
+              />
+
+              <Tabs defaultValue="comments" className="border-t pt-4">
+                <TabsList variant="line">
+                  <TabsTrigger value="comments" data-testid="task-tab-comments">
+                    Comments {comments.length > 0 ? `(${comments.length})` : ""}
+                  </TabsTrigger>
+                  <TabsTrigger value="activity" data-testid="task-tab-activity">
+                    Activity
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="comments" className="mt-4">
+                  <CommentsPanel
+                    parentLabel={task.title}
+                    comments={comments}
+                    isLoading={commentsLoading}
+                    currentUserIri={currentUserIri}
+                    canModerate={canModerate}
+                    onCreate={handleCreateComment}
+                    onEdit={handleEditComment}
+                    onDelete={handleDeleteComment}
+                  />
+                </TabsContent>
+                <TabsContent value="activity" className="mt-4">
+                  <ActivityPanel endpoint={`/tasks/${task.id}/activity`} />
+                </TabsContent>
+              </Tabs>
             </div>
-          </Tabs>
+          </div>
         )}
       </SheetContent>
       </Sheet>
