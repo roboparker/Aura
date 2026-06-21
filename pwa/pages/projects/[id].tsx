@@ -142,6 +142,8 @@ const ProjectDetail = () => {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+  // Bumped whenever the task set changes so the aggregate footer re-fetches.
+  const [footerKey, setFooterKey] = useState(0);
 
   // Move / copy to space (#182).
   const [moveTargetIri, setMoveTargetIri] = useState("");
@@ -236,6 +238,12 @@ const ProjectDetail = () => {
   useEffect(() => {
     if (isAuthenticated && projectId) void load();
   }, [isAuthenticated, projectId, load]);
+
+  // Any change to the task set (inline edit, toggle, create, drawer) re-fetches
+  // the aggregate footer so its sums/averages stay live without a reload.
+  useEffect(() => {
+    setFooterKey((k) => k + 1);
+  }, [tasks]);
 
   // Re-sync the task-column definitions after the Settings-tab manager mutates
   // them, so a created/edited/reordered/deleted field reflects without reload.
@@ -682,7 +690,7 @@ const ProjectDetail = () => {
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="overflow-x-auto rounded-lg border">
+                    <div className="overflow-x-auto rounded-t-lg border">
                       <table className="w-full text-sm" data-testid="project-task-list">
                         <thead>
                           <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
@@ -768,7 +776,10 @@ const ProjectDetail = () => {
                           ))}
                         </tbody>
                       </table>
-                      <CustomFieldFooterRow projectId={project.id} />
+                      <CustomFieldFooterRow
+                        projectId={project.id}
+                        refreshKey={footerKey}
+                      />
                     </div>
                   )}
                 </TabsContent>
