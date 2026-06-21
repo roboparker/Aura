@@ -3,6 +3,8 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\CustomField\CustomFieldKind;
+use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\User;
@@ -93,6 +95,41 @@ class SpaceActivityTest extends ApiTestCase
         $actors = $body['actors'] ?? null;
         $this->assertIsArray($actors);
         $this->assertArrayHasKey('/users/' . $owner->getId(), $actors);
+    }
+
+    public function testCustomFieldActivityRollsUpToSpaceFeed(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $project = $this->seedProject($owner, [$owner], 'Launch checklist');
+        $space = $project->getSpace();
+        self::assertNotNull($space);
+
+        // A custom-field definition lives under the project; its activity should
+        // roll up to the space feed the same way tasks do (the hierarchy).
+        $field = new CustomFieldDefinition();
+        $field->setProject($project)
+            ->setName('Priority')
+            ->setKind(CustomFieldKind::TEXT->value)
+            ->setSubtype('text')
+            ->setConfig(['multi' => false])
+            ->setPosition(0);
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($owner);
+        $client->request('GET', '/spaces/' . $space->getId() . '/activity');
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $classes = array_column($items, 'objectClass');
+        $this->assertContains(
+            'CustomFieldDefinition',
+            $classes,
+            'Custom-field activity should roll up to the space feed.',
+        );
     }
 
     public function testStrangerCannotReadSpaceActivity(): void
