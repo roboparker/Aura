@@ -120,7 +120,9 @@ class SpaceActivityTest extends ApiTestCase
         $client->loginUser($owner);
         $client->request('GET', '/spaces/' . $space->getId() . '/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $items = $body['items'] ?? null;
         $this->assertIsArray($items);

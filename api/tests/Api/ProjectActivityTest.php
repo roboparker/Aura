@@ -61,7 +61,9 @@ class ProjectActivityTest extends ApiTestCase
         // remove event, rather than dropping it with the row.
         $client->request('GET', '/projects/' . $project->getId() . '/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $items = $body['items'] ?? null;
         $this->assertIsArray($items);
@@ -98,7 +100,9 @@ class ProjectActivityTest extends ApiTestCase
 
         $client->request('GET', '/projects/' . $project->getId() . '/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $items = $body['items'] ?? null;
         $this->assertIsArray($items);

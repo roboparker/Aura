@@ -111,7 +111,9 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
         // remove event, rather than dropping it entirely.
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
         $this->assertResponseIsSuccessful();
-        $body = $client->getResponse()->toArray();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
 
         $items = $body['items'] ?? null;
         $this->assertIsArray($items);

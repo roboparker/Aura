@@ -156,7 +156,7 @@ class CustomFieldFooterController extends AbstractController
             $qb->andWhere('t.section IS NULL');
         } elseif (is_string($section) && '' !== $section) {
             $sectionId = str_contains($section, '/')
-                ? (string) substr((string) strrchr($section, '/'), 1)
+                ? substr((string) strrchr($section, '/'), 1)
                 : $section;
             if (Uuid::isValid($sectionId)) {
                 $qb->andWhere('t.section = :section')
