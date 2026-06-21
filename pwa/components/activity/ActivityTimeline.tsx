@@ -4,16 +4,16 @@ import { displayName } from "@/lib/userDisplay";
 
 /**
  * Responsive "history point graph" for activity streams. Renders a vertical
- * rail of point markers with one event card per entry.
+ * rail of point markers with one event card each.
  *
  *  - When the container is wide enough (`@2xl`, ~42rem) the rail sits in the
  *    middle and cards alternate to either side.
  *  - When it's narrow the rail moves to the left and every card stacks on the
  *    right — so it works inside the task drawer as well as a full-width tab.
  *
- * It's a presentational component: the caller resolves each event's actor and
- * change summary and passes them in. Layout responds to its own width via CSS
- * container queries, so the same component adapts wherever it's mounted.
+ * The rail line and dots are positioned at exactly 50% of the (full-width) row,
+ * so the centre never drifts regardless of card widths. It's presentational:
+ * the caller resolves each event's actor and change summary.
  */
 export type TimelineActor = AvatarUser & { "@id"?: string };
 
@@ -88,7 +88,7 @@ const dotClass = (action: string): string => {
 const ActivityTimeline = ({ events, className }: ActivityTimelineProps) => {
   return (
     <ol
-      className={cn("@container relative space-y-0", className)}
+      className={cn("@container relative w-full", className)}
       data-testid="activity-timeline"
     >
       {events.map((event, index) => {
@@ -97,41 +97,36 @@ const ActivityTimeline = ({ events, className }: ActivityTimelineProps) => {
         return (
           <li
             key={event.id}
-            className={cn(
-              "grid items-start gap-x-3 pb-6",
-              // Narrow: [rail | card]. Wide: [card | rail | card].
-              "grid-cols-[1.5rem_minmax(0,1fr)]",
-              "@2xl:grid-cols-[minmax(0,1fr)_1.5rem_minmax(0,1fr)]",
-            )}
+            className="relative pb-6"
             data-testid="activity-timeline-item"
           >
-            {/* Rail: continuous connecting line + the point marker. */}
-            <div
+            {/* Connecting line: at the left when narrow, dead-centre when wide. */}
+            <span
               aria-hidden
-              className="relative col-start-1 flex h-full justify-center @2xl:col-start-2"
-            >
-              <span className="absolute top-1 bottom-[-1.5rem] w-px bg-border" />
-              <span
-                className={cn(
-                  "relative z-10 mt-1 h-3 w-3 shrink-0 rounded-full ring-4 ring-background",
-                  dotClass(event.action),
-                )}
-              />
-            </div>
+              className="absolute inset-y-0 left-[0.5625rem] w-px -translate-x-1/2 bg-border @2xl:left-1/2"
+            />
+            {/* Point marker, sharing the line's x so they always align. */}
+            <span
+              aria-hidden
+              className={cn(
+                "absolute top-1.5 left-[0.5625rem] z-10 h-3 w-3 -translate-x-1/2 rounded-full ring-4 ring-background @2xl:left-1/2",
+                dotClass(event.action),
+              )}
+            />
 
-            {/* Card: always the right column when narrow; alternates when wide. */}
+            {/* Card: right of the line when narrow; alternating halves when wide. */}
             <div
               className={cn(
-                "col-start-2 min-w-0",
+                "pl-6 @2xl:pl-0",
                 onLeft
-                  ? "@2xl:col-start-1 @2xl:row-start-1 @2xl:text-right"
-                  : "@2xl:col-start-3 @2xl:row-start-1",
+                  ? "@2xl:pr-[calc(50%+1rem)] @2xl:text-right"
+                  : "@2xl:pl-[calc(50%+1rem)]",
               )}
             >
               <div
                 className={cn(
-                  "inline-flex max-w-full items-start gap-2 rounded-lg border bg-card px-3 py-2 text-sm",
-                  onLeft && "@2xl:flex-row-reverse @2xl:text-left",
+                  "inline-flex max-w-full items-start gap-2 rounded-lg border bg-card px-3 py-2 text-left text-sm",
+                  onLeft && "@2xl:flex-row-reverse",
                 )}
               >
                 {event.actor ? (
@@ -143,7 +138,7 @@ const ActivityTimeline = ({ events, className }: ActivityTimelineProps) => {
                   />
                 )}
                 <div className="min-w-0">
-                  <p className="leading-snug">
+                  <p className="leading-snug break-words">
                     <span className="font-medium">{name}</span>{" "}
                     <span className="text-muted-foreground">
                       {verbFor(event.action)} this {objectLabel(event.objectClass)}
