@@ -26,6 +26,11 @@ jobs:
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       -
+        # Stage repo-root docs into pwa/.content/docs so the prod PWA build
+        # (context ./pwa) can render the /guides routes. See sync-docs.mjs.
+        name: Stage docs for the PWA build
+        run: node pwa/scripts/sync-docs.mjs
+      -
         name: Build dev stack (app-php, app-pwa)
         uses: docker/bake-action@v6
         with:
