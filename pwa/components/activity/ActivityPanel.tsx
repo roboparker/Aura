@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
-import { displayName } from "@/lib/userDisplay";
+import { type AvatarUser } from "@/components/user/UserAvatar";
+import ActivityTimeline, {
+  type TimelineEvent,
+} from "@/components/activity/ActivityTimeline";
 import { ENTRYPOINT } from "@/config/entrypoint";
 
 /**
@@ -48,35 +50,6 @@ export interface ActivityPanelProps {
    *  Built by the parent so this component stays trigger-agnostic. */
   endpoint: string;
 }
-
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-
-const formatRelative = (iso: string): string => {
-  const ts = new Date(iso).getTime();
-  if (Number.isNaN(ts)) return "";
-  const diffSec = Math.round((ts - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return RELATIVE.format(diffSec, "second");
-  if (abs < 3600) return RELATIVE.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RELATIVE.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2592000) return RELATIVE.format(Math.round(diffSec / 86400), "day");
-  if (abs < 31536000)
-    return RELATIVE.format(Math.round(diffSec / 2592000), "month");
-  return RELATIVE.format(Math.round(diffSec / 31536000), "year");
-};
-
-const verbFor = (action: string): string => {
-  switch (action) {
-    case "create":
-      return "created";
-    case "update":
-      return "updated";
-    case "remove":
-      return "deleted";
-    default:
-      return action;
-  }
-};
 
 const renderChanges = (data: Record<string, unknown>): string | null => {
   const keys = Object.keys(data);
@@ -151,42 +124,18 @@ const ActivityPanel = ({ endpoint }: ActivityPanelProps) => {
             No activity yet.
           </p>
         ) : (
-          <ul className="space-y-3" data-testid="activity-list">
-            {items.map((row) => {
-              const actor = row.actor ? actors[row.actor] : null;
-              const changes = renderChanges(row.data);
-              return (
-                <li
-                  key={row.id}
-                  className="flex gap-3 items-start text-sm"
-                  data-testid="activity-item"
-                >
-                  {actor ? (
-                    <UserAvatar user={actor} size="sm" />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="h-8 w-8 shrink-0 rounded-full bg-muted"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p>
-                      <span className="font-medium">
-                        {actor ? displayName(actor) : "Someone"}
-                      </span>{" "}
-                      <span className="text-muted-foreground">
-                        {verbFor(row.action)} this {row.objectClass.toLowerCase()}
-                        {changes && row.action !== "remove" ? ` — ${changes}` : ""}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatRelative(row.loggedAt)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <ActivityTimeline
+            events={items.map(
+              (row): TimelineEvent => ({
+                id: row.id,
+                action: row.action,
+                loggedAt: row.loggedAt,
+                objectClass: row.objectClass,
+                actor: row.actor ? (actors[row.actor] ?? null) : null,
+                changes: renderChanges(row.data),
+              }),
+            )}
+          />
         )}
         {hasMore && (
           <div className="mt-3">
