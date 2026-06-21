@@ -239,6 +239,8 @@ Developer docs:
 - `docs/developer/two-factor-auth.md` - 2FA implementation reference (entity model, endpoints, recovery flow, threat model)
 - `docs/developer/password-reset.md` - Forgot/reset implementation, token model, email-enumeration mitigations, rate limiting
 - `docs/developer/data-export.md` - Space + account (GDPR) data exports: shared async-build/token/prune machinery, access bars, retention
+- `docs/developer/web-push.md` - Web Push (#100): PushSubscription, WebPushSender, the service worker + enable flow, VAPID key setup
+- `docs/developer/task-organization.md` - Task sections, the Kanban board view, and task relationships (entities, endpoints, validation, UI)
 
 User docs:
 - `docs/user/two-factor-auth.md` - End-user guide for enabling, using, and recovering 2FA
