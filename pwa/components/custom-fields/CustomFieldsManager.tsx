@@ -334,8 +334,8 @@ const CustomFieldsManager = ({
               <>
                 You&apos;re editing as a{" "}
                 <span className="font-medium text-foreground">space admin</span>.
-                Members in {spaceName ?? "this space"} can use these fields on
-                tasks but can&apos;t change definitions.
+                Members in {spaceName ?? "this space"}{" "}
+                can use these fields on tasks but can&apos;t change definitions.
               </>
             ) : (
               <>
