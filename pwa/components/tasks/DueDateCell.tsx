@@ -196,6 +196,9 @@ const DueDateCell = ({
           selected={selected}
           onSelect={handleSelect}
           autoFocus
+          // Extra top padding so the month nav arrows clear the quick-pick
+          // buttons above (the arrows sit at the calendar's top edge).
+          className="pt-6"
         />
         {onRecurrenceChange && value && (
           <RecurrencePicker
