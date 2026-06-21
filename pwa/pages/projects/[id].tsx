@@ -1,23 +1,14 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lock, PanelRight, Plus, Settings2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
-import CustomFieldValueFields from "@/components/tasks/CustomFieldValueFields";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
@@ -25,7 +16,6 @@ import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
-import { violationsFromBody, type ViolationMap } from "@/lib/violations";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
 import {
   dueDateStatus,
@@ -148,15 +138,8 @@ const ProjectDetail = () => {
   // Quick add-task (collapsed behind "+ New task").
   const [addOpen, setAddOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDescription, setNewTaskDescription] = useState("");
-  // Custom-field values for the new task, keyed by definition IRI, plus any
-  // per-field validation messages re-mapped from a 422.
-  const [newTaskFieldValues, setNewTaskFieldValues] = useState<
-    Record<string, unknown>
-  >({});
-  const [newTaskFieldErrors, setNewTaskFieldErrors] = useState<ViolationMap>({});
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [taskEditorKey, setTaskEditorKey] = useState(0);
+  const newTaskInputRef = useRef<HTMLInputElement | null>(null);
 
   // Move / copy to space (#182).
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -314,75 +297,47 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!project || !newTaskTitle.trim()) return;
+  // Inline quick-add: create with just the title; everything else is edited in
+  // the row afterwards. Keeps the add row open + refocused for rapid entry.
+  const createTask = async () => {
+    const title = newTaskTitle.trim();
+    if (!project || !title) return;
     setIsCreatingTask(true);
     setError(null);
-    setNewTaskFieldErrors({});
-
-    // Build the value array in definition order, dropping empties, and keep an
-    // index→definition map so `customFieldValues[i]` violations land on the
-    // right field row (mirrors CustomFieldValueList's persist path).
-    const customFieldValues: { definition: string; value: unknown }[] = [];
-    const indexToDef: string[] = [];
-    for (const def of definitions) {
-      const value = newTaskFieldValues[def["@id"]];
-      if (isEmptyFieldValue(value)) continue;
-      indexToDef.push(def["@id"]);
-      customFieldValues.push({ definition: def["@id"], value });
-    }
-
     try {
       const res = await fetch(`${ENTRYPOINT}/tasks`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          title: newTaskTitle.trim(),
-          description: newTaskDescription.trim() || null,
-          project: project["@id"],
-          ...(customFieldValues.length > 0 ? { customFieldValues } : {}),
-        }),
+        body: JSON.stringify({ title, project: project["@id"] }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        // Re-key customFieldValues[i] violations onto their definition IRI so
-        // each field shows its own error; surface anything else as the banner.
-        const fieldErrors: ViolationMap = {};
-        let otherError: string | null = null;
-        for (const [path, message] of Object.entries(violationsFromBody(data))) {
-          const match = path.match(/^customFieldValues\[(\d+)\]/);
-          const defIri = match ? indexToDef[Number(match[1])] : undefined;
-          if (defIri) fieldErrors[defIri] = message;
-          else otherError = message;
-        }
-        setNewTaskFieldErrors(fieldErrors);
-        const hasFieldErrors = Object.keys(fieldErrors).length > 0;
-        if (otherError || !hasFieldErrors) {
-          setError(
-            otherError ||
-              data.description ||
-              data.detail ||
-              data["hydra:description"] ||
-              "Failed to create task.",
-          );
-        }
-        return;
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to create task.",
+        );
       }
       const created: ProjectTask = await res.json();
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
-      setNewTaskDescription("");
-      setNewTaskFieldValues({});
-      setNewTaskFieldErrors({});
-      setTaskEditorKey((k) => k + 1);
-      setAddOpen(false);
+      requestAnimationFrame(() => newTaskInputRef.current?.focus());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
     } finally {
       setIsCreatingTask(false);
     }
+  };
+
+  const openAddRow = () => {
+    setAddOpen(true);
+    requestAnimationFrame(() => newTaskInputRef.current?.focus());
+  };
+  const closeAddRow = () => {
+    setAddOpen(false);
+    setNewTaskTitle("");
   };
 
   const handleMove = async () => {
@@ -565,7 +520,7 @@ const ProjectDetail = () => {
                   </Button>
                   <Button
                     size="sm"
-                    onClick={() => setAddOpen((v) => !v)}
+                    onClick={openAddRow}
                     data-testid="project-new-task"
                   >
                     <Plus className="mr-1 h-3.5 w-3.5" /> New task
@@ -688,81 +643,6 @@ const ProjectDetail = () => {
                 </Card>
               )}
 
-              {/* Quick add-task */}
-              {addOpen && (
-                <Card className="mb-4">
-                  <CardContent className="pt-6">
-                    <form
-                      onSubmit={handleCreateTask}
-                      className="space-y-4"
-                      data-testid="create-task-form"
-                    >
-                      <div className="space-y-1.5">
-                        <Label htmlFor="task-title">Title</Label>
-                        <Input
-                          id="task-title"
-                          type="text"
-                          value={newTaskTitle}
-                          onChange={(e) => setNewTaskTitle(e.target.value)}
-                          required
-                          maxLength={255}
-                          autoFocus
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="task-description">
-                          Description{" "}
-                          <span className="text-muted-foreground font-normal">(optional)</span>
-                        </Label>
-                        <MarkdownEditor
-                          key={taskEditorKey}
-                          id="task-description"
-                          ariaLabel="Task description"
-                          value={newTaskDescription}
-                          onChange={setNewTaskDescription}
-                        />
-                      </div>
-                      {project && definitions.length > 0 && (
-                        <div data-testid="new-task-custom-fields">
-                          <CustomFieldValueFields
-                            definitions={definitions}
-                            values={newTaskFieldValues}
-                            onChange={(defIri, next) =>
-                              setNewTaskFieldValues((prev) => ({
-                                ...prev,
-                                [defIri]: next,
-                              }))
-                            }
-                            violations={newTaskFieldErrors}
-                            projectIri={project["@id"]}
-                            spaceIri={projectSpaceIri(project)}
-                            users={assignableUsers}
-                            disabled={isCreatingTask}
-                            compact
-                          />
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
-                          {isCreatingTask ? "Adding..." : "Add task"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setAddOpen(false);
-                            setNewTaskFieldValues({});
-                            setNewTaskFieldErrors({});
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
-
               <Tabs defaultValue="tasks">
                 <TabsList variant="line">
                   <TabsTrigger value="tasks">
@@ -773,7 +653,7 @@ const ProjectDetail = () => {
                 </TabsList>
 
                 <TabsContent value="tasks" className="mt-4">
-                  {tasks.length === 0 ? (
+                  {tasks.length === 0 && !addOpen ? (
                     <Card>
                       <CardContent className="pt-6">
                         <p className="text-muted-foreground">
@@ -803,6 +683,50 @@ const ProjectDetail = () => {
                           </tr>
                         </thead>
                         <tbody>
+                          {addOpen && (
+                            <tr
+                              className="border-b bg-muted/20"
+                              data-testid="project-new-task-row"
+                            >
+                              <td className="px-3 py-2 align-middle">
+                                <Plus
+                                  className="h-4 w-4 text-muted-foreground"
+                                  aria-hidden
+                                />
+                              </td>
+                              <td className="px-1 py-2" />
+                              <td className="px-2 py-2">
+                                <Input
+                                  ref={newTaskInputRef}
+                                  value={newTaskTitle}
+                                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void createTask();
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      closeAddRow();
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (!newTaskTitle.trim()) closeAddRow();
+                                  }}
+                                  placeholder="Task title, then Enter…"
+                                  maxLength={255}
+                                  disabled={isCreatingTask}
+                                  className="h-8"
+                                  data-testid="project-new-task-title"
+                                />
+                              </td>
+                              <td
+                                colSpan={definitions.length + 3}
+                                className="px-2 py-2 text-xs text-muted-foreground"
+                              >
+                                Enter to add · Esc to cancel
+                              </td>
+                            </tr>
+                          )}
                           {grouped.map((group) => (
                             <GroupRows
                               key={group.bucket}
