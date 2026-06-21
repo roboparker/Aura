@@ -447,7 +447,7 @@ const TaskDetailDrawer = ({
                     const v = e.target.value.trim();
                     if (v && v !== task.title) void patchTask({ title: v });
                   }}
-                  className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
+                  className="h-auto py-2 text-lg font-semibold"
                   data-testid="task-detail-title"
                 />
               </div>
