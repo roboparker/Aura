@@ -4,7 +4,6 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -331,6 +330,7 @@ const TaskDetailDrawer = ({
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="right"
+        dim
         className="flex w-full flex-col gap-0 p-0 sm:max-w-xl"
         data-testid="task-detail-drawer"
         onInteractOutside={(e) => {
@@ -360,7 +360,7 @@ const TaskDetailDrawer = ({
 
         {task && (
           <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b px-5 pt-5 pb-3">
+            <div className="border-b px-5 pt-12 pb-3">
               <div className="flex items-start gap-2">
                 <Checkbox
                   checked={Boolean(task.completedOn)}
@@ -420,20 +420,6 @@ const TaskDetailDrawer = ({
 
             <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               <TabsContent value="details" className="space-y-5">
-                <Textarea
-                  defaultValue={task.description ?? ""}
-                  key={`desc-${task["@id"]}`}
-                  placeholder="Add a description…"
-                  rows={3}
-                  onBlur={(e) => {
-                    const v = e.target.value;
-                    if (v !== (task.description ?? "")) {
-                      void patchTask({ description: v === "" ? null : v });
-                    }
-                  }}
-                  data-testid="task-detail-description"
-                />
-
                 <dl className="space-y-3 text-sm">
                   <Row label="Assignees">
                     <AssigneesCombobox

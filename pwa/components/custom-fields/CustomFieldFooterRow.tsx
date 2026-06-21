@@ -16,6 +16,8 @@ import type { FooterResponse, FooterRow } from "./types";
 interface Props {
   projectId: string;
   filters?: string;
+  /** Bump to force a re-fetch (e.g. after a task value is edited inline). */
+  refreshKey?: number;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -60,7 +62,7 @@ const formatNumber = (v: number): string => {
     : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
-const CustomFieldFooterRow = ({ projectId, filters }: Props) => {
+const CustomFieldFooterRow = ({ projectId, filters, refreshKey }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,12 +88,15 @@ const CustomFieldFooterRow = ({ projectId, filters }: Props) => {
     return () => {
       aborted = true;
     };
-  }, [projectId, filters]);
+  }, [projectId, filters, refreshKey]);
 
   if (error || rows.length === 0) return null;
 
   return (
-    <Card className="mt-2" data-testid="custom-field-footer-row">
+    <Card
+      className="rounded-t-none border-t-0"
+      data-testid="custom-field-footer-row"
+    >
       <CardContent className="py-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         {rows.map((row) => (
           <div

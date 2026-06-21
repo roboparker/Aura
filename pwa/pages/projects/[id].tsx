@@ -1,27 +1,25 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Lock, PanelRight, Plus, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Lock, PanelRight, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import { displayName } from "@/lib/userDisplay";
-import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
-import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
-import CustomFieldValueFields from "@/components/tasks/CustomFieldValueFields";
+import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
+import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
+import DueDateCell from "@/components/tasks/DueDateCell";
+import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
+import AssigneesCombobox, {
+  type AssigneeOption,
+} from "@/components/tasks/AssigneesCombobox";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
-import { violationsFromBody, type ViolationMap } from "@/lib/violations";
-import UserAvatar from "@/components/user/UserAvatar";
-import type { AssigneeOption } from "@/components/tasks/AssigneesCombobox";
-import type { TagOption } from "@/components/tasks/TagsCombobox";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
 import {
   dueDateStatus,
-  formatDueDate,
   isoToLocalDate,
   todayLocalMidnight,
   type Reminder,
@@ -31,6 +29,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -141,18 +140,12 @@ const ProjectDetail = () => {
   // Quick add-task (collapsed behind "+ New task").
   const [addOpen, setAddOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskDescription, setNewTaskDescription] = useState("");
-  // Custom-field values for the new task, keyed by definition IRI, plus any
-  // per-field validation messages re-mapped from a 422.
-  const [newTaskFieldValues, setNewTaskFieldValues] = useState<
-    Record<string, unknown>
-  >({});
-  const [newTaskFieldErrors, setNewTaskFieldErrors] = useState<ViolationMap>({});
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [taskEditorKey, setTaskEditorKey] = useState(0);
+  const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+  // Bumped whenever the task set changes so the aggregate footer re-fetches.
+  const [footerKey, setFooterKey] = useState(0);
 
   // Move / copy to space (#182).
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [moveTargetIri, setMoveTargetIri] = useState("");
   const [isMoving, setIsMoving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
@@ -246,12 +239,74 @@ const ProjectDetail = () => {
     if (isAuthenticated && projectId) void load();
   }, [isAuthenticated, projectId, load]);
 
-  const resolveRef = useCallback(
-    (iri: string): string | null => {
-      const u = assignableUsers.find((a) => a["@id"] === iri);
-      return u ? displayName(u) : null;
+  // Any change to the task set (inline edit, toggle, create, drawer) re-fetches
+  // the aggregate footer so its sums/averages stay live without a reload.
+  useEffect(() => {
+    setFooterKey((k) => k + 1);
+  }, [tasks]);
+
+  // Re-sync the task-column definitions after the Settings-tab manager mutates
+  // them, so a created/edited/reordered/deleted field reflects without reload.
+  const reloadDefinitions = useCallback(async () => {
+    if (!project) return;
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(project["@id"])}`,
+        { credentials: "include" },
+      );
+      if (res.ok) {
+        setDefinitions(
+          membersOf<CustomFieldDefinition>(await res.json()).sort(
+            (a, b) => a.position - b.position,
+          ),
+        );
+      }
+    } catch {
+      /* keep the current columns on a transient failure */
+    }
+  }, [project]);
+
+  // Generic single-task PATCH used by every inline row editor.
+  const patchTask = useCallback(
+    async (task: ProjectTask, body: Record<string, unknown>) => {
+      setError(null);
+      try {
+        const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/merge-patch+json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("Failed to update task.");
+        const updated: ProjectTask = await res.json();
+        setTasks((prev) =>
+          prev.map((t) => (t["@id"] === task["@id"] ? updated : t)),
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update task.");
+      }
     },
-    [assignableUsers],
+    [],
+  );
+
+  // Replace one definition's value and PATCH the whole array (dropping empties,
+  // in definition order) like the drawer's CustomFieldValueList does.
+  const handleCustomFieldChange = useCallback(
+    (task: ProjectTask, defIri: string, value: unknown) => {
+      const next = definitions
+        .map((def) => {
+          const existing = task.customFieldValues.find(
+            (v) => v.definition === def["@id"],
+          );
+          return {
+            definition: def["@id"],
+            value: def["@id"] === defIri ? value : existing?.value,
+          };
+        })
+        .filter((p) => !isEmptyFieldValue(p.value));
+      void patchTask(task, { customFieldValues: next });
+    },
+    [definitions, patchTask],
   );
 
   const toggleComplete = async (task: ProjectTask) => {
@@ -272,75 +327,47 @@ const ProjectDetail = () => {
     }
   };
 
-  const handleCreateTask = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!project || !newTaskTitle.trim()) return;
+  // Inline quick-add: create with just the title; everything else is edited in
+  // the row afterwards. Keeps the add row open + refocused for rapid entry.
+  const createTask = async () => {
+    const title = newTaskTitle.trim();
+    if (!project || !title) return;
     setIsCreatingTask(true);
     setError(null);
-    setNewTaskFieldErrors({});
-
-    // Build the value array in definition order, dropping empties, and keep an
-    // index→definition map so `customFieldValues[i]` violations land on the
-    // right field row (mirrors CustomFieldValueList's persist path).
-    const customFieldValues: { definition: string; value: unknown }[] = [];
-    const indexToDef: string[] = [];
-    for (const def of definitions) {
-      const value = newTaskFieldValues[def["@id"]];
-      if (isEmptyFieldValue(value)) continue;
-      indexToDef.push(def["@id"]);
-      customFieldValues.push({ definition: def["@id"], value });
-    }
-
     try {
       const res = await fetch(`${ENTRYPOINT}/tasks`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          title: newTaskTitle.trim(),
-          description: newTaskDescription.trim() || null,
-          project: project["@id"],
-          ...(customFieldValues.length > 0 ? { customFieldValues } : {}),
-        }),
+        body: JSON.stringify({ title, project: project["@id"] }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        // Re-key customFieldValues[i] violations onto their definition IRI so
-        // each field shows its own error; surface anything else as the banner.
-        const fieldErrors: ViolationMap = {};
-        let otherError: string | null = null;
-        for (const [path, message] of Object.entries(violationsFromBody(data))) {
-          const match = path.match(/^customFieldValues\[(\d+)\]/);
-          const defIri = match ? indexToDef[Number(match[1])] : undefined;
-          if (defIri) fieldErrors[defIri] = message;
-          else otherError = message;
-        }
-        setNewTaskFieldErrors(fieldErrors);
-        const hasFieldErrors = Object.keys(fieldErrors).length > 0;
-        if (otherError || !hasFieldErrors) {
-          setError(
-            otherError ||
-              data.description ||
-              data.detail ||
-              data["hydra:description"] ||
-              "Failed to create task.",
-          );
-        }
-        return;
+        throw new Error(
+          data.description ||
+            data.detail ||
+            data["hydra:description"] ||
+            "Failed to create task.",
+        );
       }
       const created: ProjectTask = await res.json();
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
-      setNewTaskDescription("");
-      setNewTaskFieldValues({});
-      setNewTaskFieldErrors({});
-      setTaskEditorKey((k) => k + 1);
-      setAddOpen(false);
+      requestAnimationFrame(() => newTaskInputRef.current?.focus());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
     } finally {
       setIsCreatingTask(false);
     }
+  };
+
+  const openAddRow = () => {
+    setAddOpen(true);
+    requestAnimationFrame(() => newTaskInputRef.current?.focus());
+  };
+  const closeAddRow = () => {
+    setAddOpen(false);
+    setNewTaskTitle("");
   };
 
   const handleMove = async () => {
@@ -432,7 +459,7 @@ const ProjectDetail = () => {
   }, [tasks]);
 
   const openCount = tasks.filter((t) => !t.completedOn).length;
-  const totalCols = 6 + definitions.length;
+  const totalCols = 7 + definitions.length;
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -468,6 +495,13 @@ const ProjectDetail = () => {
       ? project.space.split("/").pop()
       : project.space.id
     : undefined;
+  const isSpaceAdmin = Boolean(
+    space &&
+      user &&
+      space.userMemberships.some(
+        (m) => m.user.id === user.id && m.role === "admin",
+      ),
+  );
 
   return (
     <>
@@ -503,27 +537,8 @@ const ProjectDetail = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    variant="ghost"
                     size="sm"
-                    onClick={() => setSettingsOpen((v) => !v)}
-                    aria-pressed={settingsOpen}
-                    data-testid="project-settings-toggle"
-                  >
-                    <Settings2 className="mr-1 h-3.5 w-3.5" /> Settings
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    data-testid="project-custom-fields-link"
-                  >
-                    <Link href={`/projects/${project.id}/custom-fields`}>
-                      Custom fields
-                    </Link>
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => setAddOpen((v) => !v)}
+                    onClick={openAddRow}
                     data-testid="project-new-task"
                   >
                     <Plus className="mr-1 h-3.5 w-3.5" /> New task
@@ -537,9 +552,20 @@ const ProjectDetail = () => {
                 </Alert>
               )}
 
-              {/* Collapsible project settings (space badge + move/copy + members) */}
-              {settingsOpen && (
-                <Card className="mb-4">
+              <Tabs defaultValue="tasks">
+                <TabsList variant="line">
+                  <TabsTrigger value="tasks">
+                    Tasks{" "}
+                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsTrigger value="settings" data-testid="project-settings-tab">
+                    Settings
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="settings" className="mt-4 space-y-6">
+                  <Card>
                   <CardContent className="space-y-3 pt-6" data-testid="project-space-info">
                     {project.description && (
                       <p className="text-sm text-muted-foreground">{project.description}</p>
@@ -644,94 +670,18 @@ const ProjectDetail = () => {
                     )}
                   </CardContent>
                 </Card>
-              )}
 
-              {/* Quick add-task */}
-              {addOpen && (
-                <Card className="mb-4">
-                  <CardContent className="pt-6">
-                    <form
-                      onSubmit={handleCreateTask}
-                      className="space-y-4"
-                      data-testid="create-task-form"
-                    >
-                      <div className="space-y-1.5">
-                        <Label htmlFor="task-title">Title</Label>
-                        <Input
-                          id="task-title"
-                          type="text"
-                          value={newTaskTitle}
-                          onChange={(e) => setNewTaskTitle(e.target.value)}
-                          required
-                          maxLength={255}
-                          autoFocus
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="task-description">
-                          Description{" "}
-                          <span className="text-muted-foreground font-normal">(optional)</span>
-                        </Label>
-                        <MarkdownEditor
-                          key={taskEditorKey}
-                          id="task-description"
-                          ariaLabel="Task description"
-                          value={newTaskDescription}
-                          onChange={setNewTaskDescription}
-                        />
-                      </div>
-                      {project && definitions.length > 0 && (
-                        <div data-testid="new-task-custom-fields">
-                          <CustomFieldValueFields
-                            definitions={definitions}
-                            values={newTaskFieldValues}
-                            onChange={(defIri, next) =>
-                              setNewTaskFieldValues((prev) => ({
-                                ...prev,
-                                [defIri]: next,
-                              }))
-                            }
-                            violations={newTaskFieldErrors}
-                            projectIri={project["@id"]}
-                            spaceIri={projectSpaceIri(project)}
-                            users={assignableUsers}
-                            disabled={isCreatingTask}
-                            compact
-                          />
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <Button type="submit" disabled={isCreatingTask || !newTaskTitle.trim()}>
-                          {isCreatingTask ? "Adding..." : "Add task"}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setAddOpen(false);
-                            setNewTaskFieldValues({});
-                            setNewTaskFieldErrors({});
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  </CardContent>
-                </Card>
-              )}
-
-              <Tabs defaultValue="tasks">
-                <TabsList variant="line">
-                  <TabsTrigger value="tasks">
-                    Tasks{" "}
-                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
+                  <CustomFieldsManager
+                    projectIri={project["@id"]}
+                    projectTitle={project.title}
+                    spaceName={space?.name}
+                    isSpaceAdmin={isSpaceAdmin}
+                    onDefinitionsChanged={() => void reloadDefinitions()}
+                  />
+                </TabsContent>
 
                 <TabsContent value="tasks" className="mt-4">
-                  {tasks.length === 0 ? (
+                  {tasks.length === 0 && !addOpen ? (
                     <Card>
                       <CardContent className="pt-6">
                         <p className="text-muted-foreground">
@@ -740,13 +690,14 @@ const ProjectDetail = () => {
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="overflow-x-auto rounded-lg border">
+                    <div className="overflow-x-auto rounded-t-lg border">
                       <table className="w-full text-sm" data-testid="project-task-list">
                         <thead>
                           <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <th className="w-8 px-3 py-2" />
                             <th className="w-10 px-1 py-2 text-left font-medium">#</th>
                             <th className="px-2 py-2 text-left font-medium">Task</th>
+                            <th className="px-2 py-2 text-left font-medium">Tags</th>
                             {definitions.map((def) => (
                               <th
                                 key={def["@id"]}
@@ -761,6 +712,50 @@ const ProjectDetail = () => {
                           </tr>
                         </thead>
                         <tbody>
+                          {addOpen && (
+                            <tr
+                              className="border-b bg-muted/20"
+                              data-testid="project-new-task-row"
+                            >
+                              <td className="px-3 py-2 align-middle">
+                                <Plus
+                                  className="h-4 w-4 text-muted-foreground"
+                                  aria-hidden
+                                />
+                              </td>
+                              <td className="px-1 py-2" />
+                              <td className="px-2 py-2">
+                                <Input
+                                  ref={newTaskInputRef}
+                                  value={newTaskTitle}
+                                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void createTask();
+                                    } else if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      closeAddRow();
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    if (!newTaskTitle.trim()) closeAddRow();
+                                  }}
+                                  placeholder="Task title, then Enter…"
+                                  maxLength={255}
+                                  disabled={isCreatingTask}
+                                  className="h-8"
+                                  data-testid="project-new-task-title"
+                                />
+                              </td>
+                              <td
+                                colSpan={definitions.length + 4}
+                                className="px-2 py-2 text-xs text-muted-foreground"
+                              >
+                                Enter to add · Esc to cancel
+                              </td>
+                            </tr>
+                          )}
                           {grouped.map((group) => (
                             <GroupRows
                               key={group.bucket}
@@ -769,14 +764,22 @@ const ProjectDetail = () => {
                               colSpan={totalCols}
                               tasks={group.tasks}
                               definitions={definitions}
-                              resolveRef={resolveRef}
+                              allTags={allTags}
+                              assignableUsers={assignableUsers}
+                              projectIri={project["@id"]}
+                              spaceIri={projectSpaceIri(project)}
                               onToggle={toggleComplete}
                               onOpen={openTaskDetail}
+                              patchTask={patchTask}
+                              onCustomFieldChange={handleCustomFieldChange}
                             />
                           ))}
                         </tbody>
                       </table>
-                      <CustomFieldFooterRow projectId={project.id} />
+                      <CustomFieldFooterRow
+                        projectId={project.id}
+                        refreshKey={footerKey}
+                      />
                     </div>
                   )}
                 </TabsContent>
@@ -821,133 +824,228 @@ const ProjectDetail = () => {
   );
 };
 
+interface GroupRowsProps {
+  label: string;
+  count: number;
+  colSpan: number;
+  tasks: ProjectTask[];
+  definitions: CustomFieldDefinition[];
+  allTags: TagOption[];
+  assignableUsers: AssigneeOption[];
+  projectIri: string;
+  spaceIri: string;
+  onToggle: (task: ProjectTask) => void;
+  onOpen: (task: ProjectTask) => void;
+  patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
+  onCustomFieldChange: (task: ProjectTask, defIri: string, value: unknown) => void;
+}
+
 const GroupRows = ({
   label,
   count,
   colSpan,
   tasks,
   definitions,
-  resolveRef,
+  allTags,
+  assignableUsers,
+  projectIri,
+  spaceIri,
   onToggle,
   onOpen,
-}: {
-  label: string;
-  count: number;
-  colSpan: number;
-  tasks: ProjectTask[];
-  definitions: CustomFieldDefinition[];
-  resolveRef: (iri: string) => string | null;
-  onToggle: (task: ProjectTask) => void;
-  onOpen: (task: ProjectTask) => void;
-}) => (
+  patchTask,
+  onCustomFieldChange,
+}: GroupRowsProps) => (
   <>
     <tr className="border-b bg-muted/40">
       <td colSpan={colSpan} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label} <span className="text-muted-foreground/60">{count}</span>
       </td>
     </tr>
-    {tasks.map((task, i) => {
-      const valueByDef = new Map(
-        task.customFieldValues.map((v) => [v.definition, v.value]),
-      );
-      return (
-        <tr
-          key={task["@id"]}
-          className="border-b last:border-0 hover:bg-accent/40"
-          data-testid="project-task-item"
-        >
-          <td className="px-3 py-2 align-top">
-            <input
-              type="checkbox"
-              checked={!!task.completedOn}
-              onChange={() => onToggle(task)}
-              aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-              className="mt-0.5 h-4 w-4 cursor-pointer"
-            />
-          </td>
-          <td className="px-1 py-2 align-top text-xs text-muted-foreground">
-            T{i + 1}
-          </td>
-          <td className="px-2 py-2 align-top">
-            <button
-              type="button"
-              onClick={() => onOpen(task)}
-              className={cn(
-                "text-left font-medium hover:text-primary",
-                task.completedOn && "text-muted-foreground line-through",
-              )}
-            >
-              {task.title}
-            </button>
-            {task.tags.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1">
-                {task.tags.map((tag) => (
-                  <span
-                    key={tag["@id"]}
-                    className="rounded px-1.5 py-0.5 text-xs font-medium"
-                    style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
-                  >
-                    {tag.title}
-                  </span>
-                ))}
-              </div>
-            )}
-          </td>
-          {definitions.map((def) => (
-            <td key={def["@id"]} className="px-2 py-2 align-top">
-              <CustomFieldValueCell
-                definition={def}
-                value={valueByDef.get(def["@id"])}
-                resolveRef={resolveRef}
-              />
-            </td>
-          ))}
-          <td className="px-2 py-2 align-top whitespace-nowrap">
-            {task.dueDate ? (
-              <span
-                className={cn(
-                  "text-sm",
-                  dueDateStatus(task.dueDate, !!task.completedOn) === "overdue" &&
-                    "text-destructive",
-                )}
-              >
-                {formatDueDate(task.dueDate)}
-              </span>
-            ) : (
-              <span className="text-muted-foreground/50">—</span>
-            )}
-          </td>
-          <td className="px-2 py-2 align-top">
-            {task.assignees.length > 0 ? (
-              <div className="flex -space-x-1.5">
-                {task.assignees.slice(0, 4).map((a) => (
-                  <UserAvatar
-                    key={a["@id"]}
-                    user={a}
-                    size="sm"
-                    className="h-6 w-6 ring-2 ring-background"
-                  />
-                ))}
-              </div>
-            ) : (
-              <span className="text-muted-foreground/50">—</span>
-            )}
-          </td>
-          <td className="px-2 py-2 align-top">
-            <button
-              type="button"
-              onClick={() => onOpen(task)}
-              aria-label={`Open details for "${task.title}"`}
-              className="text-muted-foreground hover:text-foreground"
-              data-testid="project-task-open-detail"
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-          </td>
-        </tr>
-      );
-    })}
+    {tasks.map((task, i) => (
+      <ProjectTaskRow
+        key={task["@id"]}
+        task={task}
+        index={i}
+        definitions={definitions}
+        allTags={allTags}
+        assignableUsers={assignableUsers}
+        projectIri={projectIri}
+        spaceIri={spaceIri}
+        onToggle={onToggle}
+        onOpen={onOpen}
+        patchTask={patchTask}
+        onCustomFieldChange={onCustomFieldChange}
+      />
+    ))}
   </>
 );
+
+const ProjectTaskRow = ({
+  task,
+  index,
+  definitions,
+  allTags,
+  assignableUsers,
+  projectIri,
+  spaceIri,
+  onToggle,
+  onOpen,
+  patchTask,
+  onCustomFieldChange,
+}: Omit<GroupRowsProps, "label" | "count" | "colSpan" | "tasks"> & {
+  task: ProjectTask;
+  index: number;
+}) => {
+  return (
+    <tr
+      className="border-b last:border-0 hover:bg-accent/40"
+      data-testid="project-task-item"
+    >
+      <td className="px-3 py-2 align-middle">
+        <Checkbox
+          checked={!!task.completedOn}
+          onCheckedChange={() => onToggle(task)}
+          aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
+          className="size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
+        />
+      </td>
+      <td className="px-1 py-2 align-middle text-xs text-muted-foreground">
+        T{index + 1}
+      </td>
+      <td className="min-w-[12rem] px-2 py-2 align-middle">
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          className={cn(
+            "w-full cursor-pointer text-left font-medium hover:text-primary",
+            task.completedOn && "text-muted-foreground line-through",
+          )}
+          data-testid="project-task-title"
+        >
+          {task.title}
+        </button>
+      </td>
+      <td className="px-2 py-2 align-middle">
+        <TagsCombobox
+          value={task.tags}
+          options={allTags}
+          onChange={(iris) => void patchTask(task, { tags: iris })}
+          subjectLabel={task.title}
+        />
+      </td>
+      {definitions.map((def) => (
+        <td key={def["@id"]} className="px-2 py-2 align-middle">
+          <ProjectCustomFieldCell
+            task={task}
+            definition={def}
+            projectIri={projectIri}
+            spaceIri={spaceIri}
+            users={assignableUsers}
+            onCustomFieldChange={onCustomFieldChange}
+          />
+        </td>
+      ))}
+      <td className="px-2 py-2 align-middle">
+        <DueDateCell
+          value={task.dueDate}
+          onChange={(next) => void patchTask(task, { dueDate: next })}
+          ariaLabel={`Due date for "${task.title}"`}
+          testIdPrefix="project-task-due-date"
+          recurrenceValue={task.recurrenceRule}
+          onRecurrenceChange={(next) =>
+            void patchTask(task, { recurrenceRule: next })
+          }
+          remindersValue={task.reminders}
+          onRemindersChange={(next) => void patchTask(task, { reminders: next })}
+          status={dueDateStatus(task.dueDate, !!task.completedOn)}
+        />
+      </td>
+      <td className="px-2 py-2 align-middle">
+        <AssigneesCombobox
+          value={task.assignees}
+          options={assignableUsers}
+          onChange={(iris) => void patchTask(task, { assignees: iris })}
+          subjectLabel={task.title}
+        />
+      </td>
+      <td className="px-2 py-2 align-middle">
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          aria-label={`Open details for "${task.title}"`}
+          className="text-muted-foreground hover:text-foreground"
+          data-testid="project-task-open-detail"
+        >
+          <PanelRight className="h-4 w-4" />
+        </button>
+      </td>
+    </tr>
+  );
+};
+
+const ProjectCustomFieldCell = ({
+  task,
+  definition,
+  projectIri,
+  spaceIri,
+  users,
+  onCustomFieldChange,
+}: {
+  task: ProjectTask;
+  definition: CustomFieldDefinition;
+  projectIri: string;
+  spaceIri: string;
+  users: AssigneeOption[];
+  onCustomFieldChange: (
+    task: ProjectTask,
+    defIri: string,
+    value: unknown,
+  ) => void;
+}) => {
+  const serverValue =
+    task.customFieldValues.find((v) => v.definition === definition["@id"])
+      ?.value ?? null;
+  const serverKey = JSON.stringify(serverValue);
+  const [value, setValue] = useState<unknown>(() => JSON.parse(serverKey));
+  const dirty = useRef(false);
+
+  // Keep the latest commit target in a ref so the debounce effect can depend
+  // only on `value` (task/definition change identity on every render).
+  const commitRef = useRef<(v: unknown) => void>(() => {});
+  useEffect(() => {
+    commitRef.current = (v: unknown) =>
+      onCustomFieldChange(task, definition["@id"], v);
+  });
+
+  // Re-sync from the server copy when it changes and there's no pending edit.
+  useEffect(() => {
+    if (!dirty.current) setValue(JSON.parse(serverKey));
+  }, [serverKey]);
+
+  // Debounced commit so typing into text/number fields doesn't PATCH per key.
+  useEffect(() => {
+    if (!dirty.current) return;
+    const handle = setTimeout(() => {
+      dirty.current = false;
+      commitRef.current(value);
+    }, 600);
+    return () => clearTimeout(handle);
+  }, [value]);
+
+  return (
+    <CustomFieldValueEditor
+      definition={definition}
+      value={value}
+      onChange={(next) => {
+        dirty.current = true;
+        setValue(next);
+      }}
+      projectIri={projectIri}
+      spaceIri={spaceIri}
+      users={users}
+      compact
+    />
+  );
+};
 
 export default ProjectDetail;
