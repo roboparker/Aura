@@ -864,22 +864,6 @@ const ProjectTaskRow = ({
   task: ProjectTask;
   index: number;
 }) => {
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState(task.title);
-  useEffect(() => {
-    if (!editingTitle) setTitleDraft(task.title);
-  }, [task.title, editingTitle]);
-
-  const saveTitle = () => {
-    const next = titleDraft.trim();
-    setEditingTitle(false);
-    if (!next || next === task.title) {
-      setTitleDraft(task.title);
-      return;
-    }
-    void patchTask(task, { title: next });
-  };
-
   return (
     <tr
       className="border-b last:border-0 hover:bg-accent/40"
@@ -898,40 +882,17 @@ const ProjectTaskRow = ({
         T{index + 1}
       </td>
       <td className="min-w-[12rem] px-2 py-2 align-top">
-        {editingTitle ? (
-          <Input
-            autoFocus
-            value={titleDraft}
-            onChange={(e) => setTitleDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                saveTitle();
-              } else if (e.key === "Escape") {
-                e.preventDefault();
-                setEditingTitle(false);
-                setTitleDraft(task.title);
-              }
-            }}
-            onBlur={saveTitle}
-            maxLength={255}
-            aria-label={`Edit title for "${task.title}"`}
-            className="h-8"
-            data-testid="project-task-title-input"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditingTitle(true)}
-            className={cn(
-              "w-full cursor-text text-left font-medium hover:text-primary",
-              task.completedOn && "text-muted-foreground line-through",
-            )}
-            data-testid="project-task-title"
-          >
-            {task.title}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => onOpen(task)}
+          className={cn(
+            "w-full cursor-pointer text-left font-medium hover:text-primary",
+            task.completedOn && "text-muted-foreground line-through",
+          )}
+          data-testid="project-task-title"
+        >
+          {task.title}
+        </button>
         <div className="mt-1">
           <TagsCombobox
             value={task.tags}
