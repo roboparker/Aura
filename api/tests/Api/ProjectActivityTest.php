@@ -3,6 +3,8 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\CustomField\CustomFieldKind;
+use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -72,6 +74,42 @@ class ProjectActivityTest extends ApiTestCase
         }
         $this->assertContains('create', $taskActions, 'deleted task create history is retained');
         $this->assertContains('remove', $taskActions, 'deletion is recorded as a remove event on the board');
+    }
+
+    public function testCustomFieldActivityAppearsInBoardActivity(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+
+        // A custom-field definition's lifecycle is Gedmo-logged with the
+        // versioned project, so it should surface on the board's activity feed.
+        $field = new CustomFieldDefinition();
+        $field->setProject($project)
+            ->setName('Priority')
+            ->setKind(CustomFieldKind::TEXT->value)
+            ->setSubtype('text')
+            ->setConfig(['multi' => false])
+            ->setPosition(0);
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('GET', '/projects/' . $project->getId() . '/activity');
+        $this->assertResponseIsSuccessful();
+        $body = $client->getResponse()->toArray();
+
+        $items = $body['items'] ?? null;
+        $this->assertIsArray($items);
+        $cfdActions = [];
+        foreach ($items as $item) {
+            $this->assertIsArray($item);
+            if (($item['objectClass'] ?? null) === 'CustomFieldDefinition') {
+                $cfdActions[] = $item['action'] ?? null;
+            }
+        }
+        $this->assertContains('create', $cfdActions, 'custom-field activity is folded into the board feed');
     }
 
     private function createProject(User $owner, string $title): Project
