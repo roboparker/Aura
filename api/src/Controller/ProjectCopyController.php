@@ -126,7 +126,8 @@ class ProjectCopyController extends AbstractController
                 ->setConfig($sourceDefinition->getConfig())
                 ->setFooter($sourceDefinition->getFooter())
                 ->setPosition($sourceDefinition->getPosition())
-                ->setNullable($sourceDefinition->isNullable());
+                ->setNullable($sourceDefinition->isNullable())
+                ->setVisibility($sourceDefinition->getVisibility());
             $this->em->persist($clone);
         }
 

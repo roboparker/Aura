@@ -333,6 +333,17 @@ const ProjectDetail = () => {
     [definitions, patchTask],
   );
 
+  // Definitions surfaced per view. The drawer always shows every field; the
+  // list and board honour each field's `visibility` setting (default "both").
+  const listDefinitions = useMemo(
+    () => definitions.filter((d) => (d.visibility ?? "both") !== "board"),
+    [definitions],
+  );
+  const boardDefinitions = useMemo(
+    () => definitions.filter((d) => (d.visibility ?? "both") !== "list"),
+    [definitions],
+  );
+
   const toggleComplete = async (task: ProjectTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
     setError(null);
@@ -965,6 +976,7 @@ const ProjectDetail = () => {
 
                   {view === "board" ? (
                     <TaskBoard
+                      definitions={boardDefinitions}
                       columns={sectionGroups.map((group) => ({
                         key: group.key,
                         sectionIri: group.section ? group.section["@id"] : null,
@@ -998,6 +1010,7 @@ const ProjectDetail = () => {
                     refreshKey={footerKey}
                     heading="Grand total"
                     className="mb-6 rounded-lg"
+                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
                   />
 
                   <div className="space-y-6" data-testid="project-task-list">
@@ -1015,7 +1028,7 @@ const ProjectDetail = () => {
                               : DEFAULT_SECTION_LABEL
                           }
                           tasks={group.tasks}
-                          definitions={definitions}
+                          definitions={listDefinitions}
                           projectId={project.id}
                           projectIri={project["@id"]}
                           spaceIri={projectSpaceIri(project)}
@@ -1052,6 +1065,7 @@ const ProjectDetail = () => {
                     refreshKey={footerKey}
                     heading="Grand total"
                     className="mt-6 rounded-lg"
+                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
                   />
                   </>
                   )}
@@ -1308,6 +1322,7 @@ const SectionBlock = ({
           projectId={projectId}
           filters={footerFilter}
           refreshKey={footerKey}
+          visibleDefinitions={definitions.map((d) => d["@id"])}
         />
       </div>
     </div>
