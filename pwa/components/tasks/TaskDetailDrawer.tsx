@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Repeat } from "lucide-react";
+import { CheckCircle2, Repeat } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Popover,
@@ -360,19 +360,33 @@ const TaskDetailDrawer = ({
 
         {task && (
           <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b px-5 pt-12 pb-3">
-              <div className="flex items-start gap-2">
-                <Checkbox
-                  checked={Boolean(task.completedOn)}
-                  onCheckedChange={(checked) =>
+            <div className="border-b px-5 pt-4 pb-3">
+              {/* Top-left mark-done toggle (the close button is absolute top-right). */}
+              <div className="mb-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
                     void patchTask({
-                      completedOn: checked ? new Date().toISOString() : null,
+                      completedOn: task.completedOn
+                        ? null
+                        : new Date().toISOString(),
                     })
                   }
-                  className="mt-1.5"
-                  aria-label="Mark complete"
+                  aria-pressed={Boolean(task.completedOn)}
+                  className={
+                    task.completedOn
+                      ? "border-emerald-600/40 bg-emerald-600/10 text-emerald-700 hover:bg-emerald-600/15 hover:text-emerald-700 dark:text-emerald-400"
+                      : ""
+                  }
                   data-testid="task-detail-complete"
-                />
+                >
+                  <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                  {task.completedOn ? "Completed" : "Mark done"}
+                </Button>
+              </div>
+              <div className="flex items-start gap-2">
                 <Input
                   defaultValue={task.title}
                   key={task["@id"] + task.title}
@@ -383,11 +397,6 @@ const TaskDetailDrawer = ({
                   className="border-0 px-0 text-lg font-semibold shadow-none focus-visible:ring-0"
                   data-testid="task-detail-title"
                 />
-                {task.completedOn && (
-                  <span className="mt-1.5 shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                    Done
-                  </span>
-                )}
               </div>
               {task.tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5 pl-6">
