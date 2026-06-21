@@ -901,18 +901,18 @@ const ProjectTaskRow = ({
       className="border-b last:border-0 hover:bg-accent/40"
       data-testid="project-task-item"
     >
-      <td className="px-3 py-2 align-top">
+      <td className="px-3 py-2 align-middle">
         <Checkbox
           checked={!!task.completedOn}
           onCheckedChange={() => onToggle(task)}
           aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-          className="mt-1 size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
+          className="size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
         />
       </td>
-      <td className="px-1 py-2 align-top text-xs text-muted-foreground">
+      <td className="px-1 py-2 align-middle text-xs text-muted-foreground">
         T{index + 1}
       </td>
-      <td className="min-w-[12rem] px-2 py-2 align-top">
+      <td className="min-w-[12rem] px-2 py-2 align-middle">
         <button
           type="button"
           onClick={() => onOpen(task)}
@@ -925,7 +925,7 @@ const ProjectTaskRow = ({
           {task.title}
         </button>
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className="px-2 py-2 align-middle">
         <TagsCombobox
           value={task.tags}
           options={allTags}
@@ -934,7 +934,7 @@ const ProjectTaskRow = ({
         />
       </td>
       {definitions.map((def) => (
-        <td key={def["@id"]} className="px-2 py-2 align-top">
+        <td key={def["@id"]} className="px-2 py-2 align-middle">
           <ProjectCustomFieldCell
             task={task}
             definition={def}
@@ -945,7 +945,7 @@ const ProjectTaskRow = ({
           />
         </td>
       ))}
-      <td className="px-2 py-2 align-top">
+      <td className="px-2 py-2 align-middle">
         <DueDateCell
           value={task.dueDate}
           onChange={(next) => void patchTask(task, { dueDate: next })}
@@ -960,7 +960,7 @@ const ProjectTaskRow = ({
           status={dueDateStatus(task.dueDate, !!task.completedOn)}
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className="px-2 py-2 align-middle">
         <AssigneesCombobox
           value={task.assignees}
           options={assignableUsers}
@@ -968,7 +968,7 @@ const ProjectTaskRow = ({
           subjectLabel={task.title}
         />
       </td>
-      <td className="px-2 py-2 align-top">
+      <td className="px-2 py-2 align-middle">
         <button
           type="button"
           onClick={() => onOpen(task)}
