@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import Router from "next/router";
 import { ENTRYPOINT } from "../config/entrypoint";
 import { trackEvent } from "../lib/analytics";
 import { fetchWithTimeout } from "../lib/fetchWithTimeout";
+import { signinHrefForCurrent } from "../lib/authRedirect";
+import {
+  armSessionExpiry,
+  installSessionExpiryInterceptor,
+  setSessionExpiredHandler,
+} from "../lib/sessionExpiry";
 
 export type NotificationFrequency = "realtime" | "hourly" | "daily";
 
@@ -273,6 +280,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     fetchMe();
   }, [fetchMe]);
+
+  // Install the global 401 detector once and register the handler that
+  // turns an expired session into a clean logout + redirect. Any API call
+  // that 401s while a session is armed (see below) lands here — we drop
+  // the local user and bounce to the sign-in screen flagged `expired=1`,
+  // preserving where they were via `?next=` so login returns them there.
+  useEffect(() => {
+    installSessionExpiryInterceptor();
+    setSessionExpiredHandler(() => {
+      setUser(null);
+      const target = signinHrefForCurrent(Router.asPath);
+      const href = target.includes("?") ? `${target}&expired=1` : `${target}?expired=1`;
+      Router.replace(href).catch(() => {});
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
+
+  // Arm the detector only while we actually hold a session, so a 401 on
+  // the pre-login `/api/me` probe (a normal unauthenticated response)
+  // never reads as an expiry. Disarming also re-primes the one-shot guard,
+  // so a fresh sign-in can trigger the redirect again later.
+  useEffect(() => {
+    armSessionExpiry(user !== null);
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setError(null);

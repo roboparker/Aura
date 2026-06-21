@@ -32,6 +32,8 @@ interface Props {
   registered?: boolean;
   /** True when the user just reset their password. */
   reset?: boolean;
+  /** True when the user was bounced here by an expired session. */
+  expired?: boolean;
   /**
    * Called when `/auth/login` responds `requiresTwoFactor`. The parent
    * (AuthCard) swaps the form body + footer copy in lockstep — keeping the
@@ -42,13 +44,22 @@ interface Props {
   onTwoFactorRequired: (email: string) => void;
 }
 
-const SignInForm = ({ next, registered, reset, onTwoFactorRequired }: Props) => {
+const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: Props) => {
   const { login } = useAuth();
   const router = useRouter();
   const [ssoNotice, setSsoNotice] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
+      {expired && (
+        <Alert data-testid="session-expired">
+          <AlertTitle>Your session expired</AlertTitle>
+          <AlertDescription>
+            For your security you were signed out. Please sign in again to continue.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {registered && (
         <Alert>
           <AlertDescription>
