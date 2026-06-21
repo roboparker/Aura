@@ -137,6 +137,10 @@ const ProjectDetail = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Which detail tab is active — controlled so the header's "New task" button
+  // can show on the Tasks tab only.
+  const [activeTab, setActiveTab] = useState("tasks");
+
   // Quick add-task (collapsed behind "+ New task").
   const [addOpen, setAddOpen] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -535,15 +539,17 @@ const ProjectDetail = () => {
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={openAddRow}
-                    data-testid="project-new-task"
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" /> New task
-                  </Button>
-                </div>
+                {activeTab === "tasks" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={openAddRow}
+                      data-testid="project-new-task"
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" /> New task
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -552,7 +558,7 @@ const ProjectDetail = () => {
                 </Alert>
               )}
 
-              <Tabs defaultValue="tasks">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList variant="line">
                   <TabsTrigger value="tasks">
                     Tasks{" "}
