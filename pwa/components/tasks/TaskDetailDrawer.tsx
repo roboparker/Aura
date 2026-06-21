@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Repeat } from "lucide-react";
+import { CheckCircle2, Repeat, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,6 +88,8 @@ export interface TaskDetailDrawerProps {
   allTags: TagOption[];
   /** Bubble the updated task up so the list row can re-render in place. */
   onTaskChanged?: (task: DrawerTask) => void;
+  /** Called with the deleted task's IRI so the list can drop the row. */
+  onTaskDeleted?: (taskIri: string) => void;
 }
 
 /**
@@ -104,6 +107,7 @@ const TaskDetailDrawer = ({
   assignableUsers,
   allTags,
   onTaskChanged,
+  onTaskDeleted,
 }: TaskDetailDrawerProps) => {
   const [task, setTask] = useState<DrawerTask | null>(null);
   const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
@@ -114,6 +118,7 @@ const TaskDetailDrawer = ({
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [recurrenceOpen, setRecurrenceOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Load the task whenever the drawer opens on a new id.
   useEffect(() => {
@@ -243,6 +248,21 @@ const TaskDetailDrawer = ({
     [task, applyTask],
   );
 
+  // Delete the task. Throws on failure so the ConfirmDialog keeps its modal
+  // open and surfaces the error; on success it closes the drawer and tells the
+  // list to drop the row.
+  const deleteTask = useCallback(async () => {
+    if (!task) return;
+    const iri = task["@id"];
+    const res = await fetch(`${ENTRYPOINT}${iri}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to delete task.");
+    onOpenChange(false);
+    onTaskDeleted?.(iri);
+  }, [task, onOpenChange, onTaskDeleted]);
+
   const saveCustomFields = useCallback(
     async (next: CustomFieldValuePair[]): Promise<ViolationMap> => {
       const res = await patchTask({ customFieldValues: next });
@@ -327,7 +347,8 @@ const TaskDetailDrawer = ({
     currentUserIri !== null && task?.owner["@id"] === currentUserIri;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="right"
         dim
@@ -361,8 +382,8 @@ const TaskDetailDrawer = ({
         {task && (
           <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
             <div className="border-b px-5 pt-4 pb-3">
-              {/* Top-left mark-done toggle (the close button is absolute top-right). */}
-              <div className="mb-3">
+              {/* Top-left mark-done toggle + delete (close button is absolute top-right). */}
+              <div className="mb-3 flex items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -384,6 +405,17 @@ const TaskDetailDrawer = ({
                 >
                   <CheckCircle2 className="mr-1.5 h-4 w-4" />
                   {task.completedOn ? "Completed" : "Mark done"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  aria-label="Delete task"
+                  data-testid="task-detail-delete"
+                >
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
               <div className="flex items-start gap-2">
@@ -536,7 +568,18 @@ const TaskDetailDrawer = ({
           </Tabs>
         )}
       </SheetContent>
-    </Sheet>
+      </Sheet>
+      {task && (
+        <ConfirmDialog
+          open={confirmDeleteOpen}
+          onOpenChange={setConfirmDeleteOpen}
+          title="Delete task?"
+          description={`"${task.title}" and its comments will be permanently deleted. This can't be undone.`}
+          confirmLabel="Delete"
+          onConfirm={deleteTask}
+        />
+      )}
+    </>
   );
 };
 
