@@ -83,6 +83,17 @@ const EnablePushPrompt = ({ className }: { className?: string }) => {
         </span>
       )}
       {error && <span className="text-destructive">{error}</span>}
+      {/* Dismiss is browser-session only — we deliberately do NOT flip the
+          account preference off here: the user may be on a shared/public
+          computer but still want push on their own devices. */}
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="text-muted-foreground underline underline-offset-2 hover:no-underline"
+        data-testid="enable-push-dismiss"
+      >
+        Not now
+      </button>
     </p>
   );
 };
