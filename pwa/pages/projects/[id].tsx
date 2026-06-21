@@ -1,8 +1,8 @@
 import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, PanelRight, Plus, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ChevronDown, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -20,8 +20,6 @@ import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
 import {
   dueDateStatus,
-  isoToLocalDate,
-  todayLocalMidnight,
   type Reminder,
   type RecurrenceRule,
 } from "@/components/tasks/taskHelpers";
@@ -30,6 +28,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +83,15 @@ interface ProjectTask {
   recurrenceRule: RecurrenceRule | null;
   reminders: Reminder[] | null;
   customFieldValues: CustomFieldValuePair[];
+  /** Board section IRI, or null = the default "In progress" group. */
+  section: string | null;
+}
+
+interface TaskSection {
+  "@id": string;
+  id: string;
+  title: string;
+  position: number;
 }
 
 interface Collection<T> {
@@ -98,28 +111,9 @@ const isEmptyFieldValue = (value: unknown): boolean =>
   value === "" ||
   (Array.isArray(value) && value.length === 0);
 
-// Due-date buckets for the grouped list, in render order.
-type Bucket = "overdue" | "week" | "later" | "none" | "done";
-const BUCKET_LABELS: Record<Bucket, string> = {
-  overdue: "Overdue",
-  week: "This week",
-  later: "Later",
-  none: "No due date",
-  done: "Completed",
-};
-const BUCKET_ORDER: Bucket[] = ["overdue", "week", "later", "none", "done"];
-
-const bucketFor = (task: ProjectTask): Bucket => {
-  if (task.completedOn) return "done";
-  const status = dueDateStatus(task.dueDate, false);
-  if (status === "overdue") return "overdue";
-  if (!task.dueDate) return "none";
-  const due = isoToLocalDate(task.dueDate);
-  if (!due) return "none";
-  const weekEnd = todayLocalMidnight();
-  weekEnd.setDate(weekEnd.getDate() + 7);
-  return due.getTime() <= weekEnd.getTime() ? "week" : "later";
-};
+// The implicit group for tasks with no section (Task.section === null).
+const DEFAULT_SECTION_KEY = "__default__";
+const DEFAULT_SECTION_LABEL = "In progress";
 
 const ProjectDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -132,6 +126,7 @@ const ProjectDetail = () => {
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
+  const [sections, setSections] = useState<TaskSection[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
   const [allTags, setAllTags] = useState<TagOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -148,8 +143,12 @@ const ProjectDetail = () => {
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
-  // Quick add-task (collapsed behind "+ New task").
-  const [addOpen, setAddOpen] = useState(false);
+  // Quick add-task. `addSection` is which group the inline add row is open in:
+  // undefined = closed, null = the default "In progress" group, a string = that
+  // section's IRI. So new tasks land in the section the user added them under.
+  const [addSection, setAddSection] = useState<string | null | undefined>(
+    undefined,
+  );
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const newTaskInputRef = useRef<HTMLInputElement | null>(null);
@@ -219,10 +218,14 @@ const ProjectDetail = () => {
       setProject(projectData);
 
       const projectIri = projectData["@id"];
-      const [tasksRes, defsRes, usersRes, tagsRes] = await Promise.all([
+      const [tasksRes, defsRes, sectionsRes, usersRes, tagsRes] = await Promise.all([
         fetch(`${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectIri)}`, init),
         fetch(
           `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(projectIri)}`,
+          init,
+        ),
+        fetch(
+          `${ENTRYPOINT}/task_sections?project=${encodeURIComponent(projectIri)}`,
           init,
         ),
         fetch(`${ENTRYPOINT}/me/assignable-users`, init),
@@ -233,6 +236,13 @@ const ProjectDetail = () => {
       if (defsRes.ok) {
         setDefinitions(
           membersOf<CustomFieldDefinition>(await defsRes.json()).sort(
+            (a, b) => a.position - b.position,
+          ),
+        );
+      }
+      if (sectionsRes.ok) {
+        setSections(
+          membersOf<TaskSection>(await sectionsRes.json()).sort(
             (a, b) => a.position - b.position,
           ),
         );
@@ -350,7 +360,12 @@ const ProjectDetail = () => {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({ title, project: project["@id"] }),
+        body: JSON.stringify({
+          title,
+          project: project["@id"],
+          // `addSection` is the IRI of the group being added to; null = default.
+          ...(typeof addSection === "string" ? { section: addSection } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -372,13 +387,76 @@ const ProjectDetail = () => {
     }
   };
 
-  const openAddRow = () => {
-    setAddOpen(true);
+  const openAddRow = (section: string | null = null) => {
+    setAddSection(section);
     requestAnimationFrame(() => newTaskInputRef.current?.focus());
   };
   const closeAddRow = () => {
-    setAddOpen(false);
+    setAddSection(undefined);
     setNewTaskTitle("");
+  };
+
+  const createSection = async () => {
+    if (!project) return;
+    try {
+      const res = await fetch(`${ENTRYPOINT}/task_sections`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/ld+json" },
+        body: JSON.stringify({
+          project: project["@id"],
+          title: "New section",
+          position: sections.length,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to add section.");
+      const created: TaskSection = await res.json();
+      setSections((prev) => [...prev, created]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add section.");
+    }
+  };
+
+  const renameSection = async (section: TaskSection, title: string) => {
+    const trimmed = title.trim();
+    if (trimmed === "" || trimmed === section.title) return;
+    setSections((prev) =>
+      prev.map((s) =>
+        s["@id"] === section["@id"] ? { ...s, title: trimmed } : s,
+      ),
+    );
+    try {
+      const res = await fetch(`${ENTRYPOINT}${section["@id"]}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ title: trimmed }),
+      });
+      if (!res.ok) throw new Error("Failed to rename section.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to rename section.");
+    }
+  };
+
+  const deleteSection = async (section: TaskSection) => {
+    try {
+      const res = await fetch(`${ENTRYPOINT}${section["@id"]}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error("Failed to delete section.");
+      }
+      setSections((prev) => prev.filter((s) => s["@id"] !== section["@id"]));
+      // Its tasks fall back to the default group (server SET NULL).
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.section === section["@id"] ? { ...t, section: null } : t,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete section.");
+    }
   };
 
   const handleMove = async () => {
@@ -466,23 +544,40 @@ const ProjectDetail = () => {
     await router.push("/projects");
   };
 
-  const grouped = useMemo(() => {
+  // Group tasks by board section. The default "In progress" group (null
+  // section) always leads; user sections follow in position order. Empty
+  // sections still render so tasks can be added/moved into them.
+  const sectionGroups = useMemo(() => {
     const ordered = [...tasks].sort((a, b) => a.position - b.position);
-    const map = new Map<Bucket, ProjectTask[]>();
+    const bySection = new Map<string, ProjectTask[]>();
     for (const task of ordered) {
-      const bucket = bucketFor(task);
-      const list = map.get(bucket) ?? [];
+      const key = task.section ?? DEFAULT_SECTION_KEY;
+      const list = bySection.get(key) ?? [];
       list.push(task);
-      map.set(bucket, list);
+      bySection.set(key, list);
     }
-    return BUCKET_ORDER.map((bucket) => ({
-      bucket,
-      tasks: map.get(bucket) ?? [],
-    })).filter((g) => g.tasks.length > 0);
-  }, [tasks]);
+    const groups: {
+      key: string;
+      section: TaskSection | null;
+      tasks: ProjectTask[];
+    }[] = [
+      {
+        key: DEFAULT_SECTION_KEY,
+        section: null,
+        tasks: bySection.get(DEFAULT_SECTION_KEY) ?? [],
+      },
+    ];
+    for (const section of [...sections].sort((a, b) => a.position - b.position)) {
+      groups.push({
+        key: section["@id"],
+        section,
+        tasks: bySection.get(section["@id"]) ?? [],
+      });
+    }
+    return groups;
+  }, [tasks, sections]);
 
   const openCount = tasks.filter((t) => !t.completedOn).length;
-  const totalCols = 7 + definitions.length;
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -559,14 +654,38 @@ const ProjectDetail = () => {
                   )}
                 </div>
                 {activeTab === "tasks" && (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center">
                     <Button
                       size="sm"
-                      onClick={openAddRow}
+                      className="rounded-r-none"
+                      onClick={() => openAddRow(null)}
                       data-testid="project-new-task"
                     >
                       <Plus className="mr-1 h-3.5 w-3.5" /> New task
                     </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="rounded-l-none border-l border-primary-foreground/25 px-1.5"
+                          aria-label="More add options"
+                          data-testid="project-add-menu"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openAddRow(null)}>
+                          <Plus className="mr-2 h-4 w-4" /> New task
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => void createSection()}
+                          data-testid="project-add-section"
+                        >
+                          <Rows3 className="mr-2 h-4 w-4" /> Add section
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 )}
               </div>
@@ -810,107 +929,67 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="tasks" className="mt-4">
-                  {tasks.length === 0 && !addOpen ? (
-                    <Card>
-                      <CardContent className="pt-6">
-                        <p className="text-muted-foreground">
-                          No tasks in this project yet.
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="overflow-x-auto rounded-t-lg border">
-                      <table className="w-full text-sm" data-testid="project-task-list">
-                        <thead>
-                          <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                            <th className="w-8 px-3 py-2" />
-                            <th className="w-10 px-1 py-2 text-left font-medium">#</th>
-                            <th className="px-2 py-2 text-left font-medium">Task</th>
-                            <th className="px-2 py-2 text-left font-medium">Tags</th>
-                            {definitions.map((def) => (
-                              <th
-                                key={def["@id"]}
-                                className="px-2 py-2 text-left font-medium whitespace-nowrap"
-                              >
-                                {def.name}
-                              </th>
-                            ))}
-                            <th className="px-2 py-2 text-left font-medium">Due</th>
-                            <th className="px-2 py-2 text-left font-medium">Assignees</th>
-                            <th className="w-10 px-2 py-2" />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {addOpen && (
-                            <tr
-                              className="border-b bg-muted/20"
-                              data-testid="project-new-task-row"
-                            >
-                              <td className="px-3 py-2 align-middle">
-                                <Plus
-                                  className="h-4 w-4 text-muted-foreground"
-                                  aria-hidden
-                                />
-                              </td>
-                              <td className="px-1 py-2" />
-                              <td className="px-2 py-2">
-                                <Input
-                                  ref={newTaskInputRef}
-                                  value={newTaskTitle}
-                                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      void createTask();
-                                    } else if (e.key === "Escape") {
-                                      e.preventDefault();
-                                      closeAddRow();
-                                    }
-                                  }}
-                                  onBlur={() => {
-                                    if (!newTaskTitle.trim()) closeAddRow();
-                                  }}
-                                  placeholder="Task title, then Enter…"
-                                  maxLength={255}
-                                  disabled={isCreatingTask}
-                                  className="h-8"
-                                  data-testid="project-new-task-title"
-                                />
-                              </td>
-                              <td
-                                colSpan={definitions.length + 4}
-                                className="px-2 py-2 text-xs text-muted-foreground"
-                              >
-                                Enter to add · Esc to cancel
-                              </td>
-                            </tr>
-                          )}
-                          {grouped.map((group) => (
-                            <GroupRows
-                              key={group.bucket}
-                              label={BUCKET_LABELS[group.bucket]}
-                              count={group.tasks.length}
-                              colSpan={totalCols}
-                              tasks={group.tasks}
-                              definitions={definitions}
-                              allTags={allTags}
-                              assignableUsers={assignableUsers}
-                              projectIri={project["@id"]}
-                              spaceIri={projectSpaceIri(project)}
-                              onToggle={toggleComplete}
-                              onOpen={openTaskDetail}
-                              patchTask={patchTask}
-                              onCustomFieldChange={handleCustomFieldChange}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                      <CustomFieldFooterRow
-                        projectId={project.id}
-                        refreshKey={footerKey}
-                      />
-                    </div>
-                  )}
+                  {/* Grand totals across the whole board — top. */}
+                  <CustomFieldFooterRow
+                    projectId={project.id}
+                    refreshKey={footerKey}
+                    heading="Grand total"
+                    className="mb-6 rounded-lg"
+                  />
+
+                  <div className="space-y-6" data-testid="project-task-list">
+                    {sectionGroups.map((group) => {
+                      const sectionIri = group.section
+                        ? group.section["@id"]
+                        : null;
+                      return (
+                        <SectionBlock
+                          key={group.key}
+                          section={group.section}
+                          title={
+                            group.section
+                              ? group.section.title
+                              : DEFAULT_SECTION_LABEL
+                          }
+                          tasks={group.tasks}
+                          definitions={definitions}
+                          projectId={project.id}
+                          projectIri={project["@id"]}
+                          spaceIri={projectSpaceIri(project)}
+                          allTags={allTags}
+                          assignableUsers={assignableUsers}
+                          footerFilter={
+                            sectionIri
+                              ? `section=${encodeURIComponent(sectionIri)}`
+                              : "section=none"
+                          }
+                          footerKey={footerKey}
+                          addOpen={addSection === sectionIri}
+                          newTaskTitle={newTaskTitle}
+                          newTaskInputRef={newTaskInputRef}
+                          isCreatingTask={isCreatingTask}
+                          onNewTaskTitle={setNewTaskTitle}
+                          onCreateTask={createTask}
+                          onAddRow={() => openAddRow(sectionIri)}
+                          onCloseAddRow={closeAddRow}
+                          onToggle={toggleComplete}
+                          onOpen={openTaskDetail}
+                          patchTask={patchTask}
+                          onCustomFieldChange={handleCustomFieldChange}
+                          onRename={renameSection}
+                          onDelete={deleteSection}
+                        />
+                      );
+                    })}
+                  </div>
+
+                  {/* Grand totals across the whole board — bottom. */}
+                  <CustomFieldFooterRow
+                    projectId={project.id}
+                    refreshKey={footerKey}
+                    heading="Grand total"
+                    className="mt-6 rounded-lg"
+                  />
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4">
@@ -956,11 +1035,223 @@ const ProjectDetail = () => {
   );
 };
 
-interface GroupRowsProps {
-  label: string;
-  count: number;
-  colSpan: number;
+interface SectionBlockProps {
+  section: TaskSection | null;
+  title: string;
   tasks: ProjectTask[];
+  definitions: CustomFieldDefinition[];
+  projectId: string;
+  projectIri: string;
+  spaceIri: string;
+  allTags: TagOption[];
+  assignableUsers: AssigneeOption[];
+  footerFilter: string;
+  footerKey: number;
+  addOpen: boolean;
+  newTaskTitle: string;
+  newTaskInputRef: RefObject<HTMLInputElement | null>;
+  isCreatingTask: boolean;
+  onNewTaskTitle: (value: string) => void;
+  onCreateTask: () => void | Promise<void>;
+  onAddRow: () => void;
+  onCloseAddRow: () => void;
+  onToggle: (task: ProjectTask) => void;
+  onOpen: (task: ProjectTask) => void;
+  patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
+  onCustomFieldChange: (task: ProjectTask, defIri: string, value: unknown) => void;
+  onRename: (section: TaskSection, title: string) => void | Promise<void>;
+  onDelete: (section: TaskSection) => void | Promise<void>;
+}
+
+/** One board section: editable title + its own task table + a footer. */
+const SectionBlock = ({
+  section,
+  title,
+  tasks,
+  definitions,
+  projectId,
+  projectIri,
+  spaceIri,
+  allTags,
+  assignableUsers,
+  footerFilter,
+  footerKey,
+  addOpen,
+  newTaskTitle,
+  newTaskInputRef,
+  isCreatingTask,
+  onNewTaskTitle,
+  onCreateTask,
+  onAddRow,
+  onCloseAddRow,
+  onToggle,
+  onOpen,
+  patchTask,
+  onCustomFieldChange,
+  onRename,
+  onDelete,
+}: SectionBlockProps) => {
+  const addColSpan = definitions.length + 4;
+  const fullColSpan = definitions.length + 7;
+  return (
+    <div data-testid="project-section">
+      <div className="mb-1.5 flex items-center gap-2">
+        {section ? (
+          <input
+            defaultValue={title}
+            onBlur={(e) => void onRename(section, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            className="rounded border border-transparent bg-transparent px-1 py-0.5 text-sm font-semibold hover:border-input focus:border-input focus:outline-none"
+            aria-label="Section title"
+            data-testid="section-title-input"
+          />
+        ) : (
+          <span className="px-1 text-sm font-semibold">{title}</span>
+        )}
+        <span className="text-xs text-muted-foreground">{tasks.length}</span>
+        <button
+          type="button"
+          onClick={onAddRow}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          data-testid="section-add-task"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add task
+        </button>
+        {section && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Section actions"
+                data-testid="section-menu"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => void onDelete(section)}
+                className="text-destructive"
+                data-testid="section-delete"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete section
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+
+      <div className="overflow-x-auto rounded-t-lg border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="w-8 px-3 py-2" />
+              <th className="w-10 px-1 py-2 text-left font-medium">#</th>
+              <th className="px-2 py-2 text-left font-medium">Task</th>
+              <th className="px-2 py-2 text-left font-medium">Tags</th>
+              {definitions.map((def) => (
+                <th
+                  key={def["@id"]}
+                  className="px-2 py-2 text-left font-medium whitespace-nowrap"
+                >
+                  {def.name}
+                </th>
+              ))}
+              <th className="px-2 py-2 text-left font-medium">Due</th>
+              <th className="px-2 py-2 text-left font-medium">Assignees</th>
+              <th className="w-10 px-2 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task, i) => (
+              <ProjectTaskRow
+                key={task["@id"]}
+                task={task}
+                index={i}
+                definitions={definitions}
+                allTags={allTags}
+                assignableUsers={assignableUsers}
+                projectIri={projectIri}
+                spaceIri={spaceIri}
+                onToggle={onToggle}
+                onOpen={onOpen}
+                patchTask={patchTask}
+                onCustomFieldChange={onCustomFieldChange}
+              />
+            ))}
+            {addOpen && (
+              <tr className="border-b bg-muted/20" data-testid="project-new-task-row">
+                <td className="px-3 py-2 align-middle">
+                  <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
+                </td>
+                <td className="px-1 py-2" />
+                <td className="px-2 py-2">
+                  <Input
+                    ref={newTaskInputRef}
+                    value={newTaskTitle}
+                    onChange={(e) => onNewTaskTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void onCreateTask();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        onCloseAddRow();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!newTaskTitle.trim()) onCloseAddRow();
+                    }}
+                    placeholder="Task title, then Enter…"
+                    maxLength={255}
+                    disabled={isCreatingTask}
+                    className="h-8"
+                    data-testid="project-new-task-title"
+                  />
+                </td>
+                <td
+                  colSpan={addColSpan}
+                  className="px-2 py-2 text-xs text-muted-foreground"
+                >
+                  Enter to add · Esc to cancel
+                </td>
+              </tr>
+            )}
+            {tasks.length === 0 && !addOpen && (
+              <tr>
+                <td
+                  colSpan={fullColSpan}
+                  className="px-3 py-3 text-sm text-muted-foreground"
+                >
+                  No tasks here yet.{" "}
+                  <button
+                    type="button"
+                    onClick={onAddRow}
+                    className="text-foreground underline underline-offset-2 hover:no-underline"
+                  >
+                    Add one
+                  </button>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        <CustomFieldFooterRow
+          projectId={projectId}
+          filters={footerFilter}
+          refreshKey={footerKey}
+        />
+      </div>
+    </div>
+  );
+};
+
+interface ProjectTaskRowProps {
+  task: ProjectTask;
+  index: number;
   definitions: CustomFieldDefinition[];
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
@@ -971,46 +1262,6 @@ interface GroupRowsProps {
   patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
   onCustomFieldChange: (task: ProjectTask, defIri: string, value: unknown) => void;
 }
-
-const GroupRows = ({
-  label,
-  count,
-  colSpan,
-  tasks,
-  definitions,
-  allTags,
-  assignableUsers,
-  projectIri,
-  spaceIri,
-  onToggle,
-  onOpen,
-  patchTask,
-  onCustomFieldChange,
-}: GroupRowsProps) => (
-  <>
-    <tr className="border-b bg-muted/40">
-      <td colSpan={colSpan} className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label} <span className="text-muted-foreground/60">{count}</span>
-      </td>
-    </tr>
-    {tasks.map((task, i) => (
-      <ProjectTaskRow
-        key={task["@id"]}
-        task={task}
-        index={i}
-        definitions={definitions}
-        allTags={allTags}
-        assignableUsers={assignableUsers}
-        projectIri={projectIri}
-        spaceIri={spaceIri}
-        onToggle={onToggle}
-        onOpen={onOpen}
-        patchTask={patchTask}
-        onCustomFieldChange={onCustomFieldChange}
-      />
-    ))}
-  </>
-);
 
 const ProjectTaskRow = ({
   task,
@@ -1024,10 +1275,7 @@ const ProjectTaskRow = ({
   onOpen,
   patchTask,
   onCustomFieldChange,
-}: Omit<GroupRowsProps, "label" | "count" | "colSpan" | "tasks"> & {
-  task: ProjectTask;
-  index: number;
-}) => {
+}: ProjectTaskRowProps) => {
   return (
     <tr
       className="border-b last:border-0 hover:bg-accent/40"

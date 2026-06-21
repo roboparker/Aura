@@ -148,6 +148,22 @@ class CustomFieldFooterController extends AbstractController
                 ->setParameter('ftsQuery', trim($search));
         }
 
+        // Scope to a board section so the list view can footer each section
+        // independently. `none` = the default (unsectioned) group; an IRI or
+        // bare UUID = that section; omitting it aggregates the whole board.
+        $section = $request->query->get('section');
+        if ('none' === $section) {
+            $qb->andWhere('t.section IS NULL');
+        } elseif (is_string($section) && '' !== $section) {
+            $sectionId = str_contains($section, '/')
+                ? (string) substr((string) strrchr($section, '/'), 1)
+                : $section;
+            if (Uuid::isValid($sectionId)) {
+                $qb->andWhere('t.section = :section')
+                    ->setParameter('section', $sectionId);
+            }
+        }
+
         /** @var list<array{id: Uuid|string}> $rows */
         $rows = $qb->getQuery()->getArrayResult();
         $ids = [];
