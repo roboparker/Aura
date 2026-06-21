@@ -21,7 +21,7 @@ const Basic = () => {
 const EmailChipInputPage = () => (
   <ComponentDoc
     name="EmailChipInput"
-    description="Controlled multi-email chip input backed by an external `value` array, so the caller owns state and can submit the list directly. Enter, comma, or Tab chips the draft; Backspace on an empty input removes the last chip; pasting a comma/whitespace-separated list splits into chips. Invalid emails keep focus and flash a red ring without blocking the form. Each chip shows a deterministic colored letter tile (no `/users` lookup). Used on the create-space and create-group flows."
+    description="Controlled multi-email chip input backed by an external `value` array, so the caller owns state and can submit the list directly. Enter, comma, or Tab chips the draft; Backspace on an empty input removes the last chip; pasting a comma/whitespace-separated list splits into chips. Invalid emails keep focus and flash a red ring without blocking the form. Each chip shows a deterministic colored letter tile (no `/users` lookup). An optional `maxItems` caps the list (further chips are silently ignored). Used on the create-space and create-group flows."
     importPath={`import EmailChipInput from "@/components/common/EmailChipInput";`}
     examples={[
       {

@@ -328,13 +328,14 @@ The schedule is **stateful** (last-run timestamps live in the app cache) so the 
 
 ## Web Push (VAPID)
 
-Web Push delivery (#100) signs requests to the browser's push service with a VAPID key pair. The reminder dispatcher (`app:tasks:reminders:dispatch`) sends a Web Push to every registered device of a recipient who has `pushNotificationsEnabled=true`; subscriptions the push service rejects with 404/410 are pruned inline so dead endpoints don't accumulate. The PWA service worker that turns these payloads into desktop notifications is the remaining piece of #100 and lands in a follow-up.
+Web Push delivery (#100) signs requests to the browser's push service with a VAPID key pair. The reminder dispatcher (`app:tasks:reminders:dispatch`) sends a Web Push to every registered device of a recipient who has `pushNotificationsEnabled=true`; subscriptions the push service rejects with 404/410 are pruned inline so dead endpoints don't accumulate. The PWA service worker (`pwa/public/sw.js`, registered from `_app.tsx`) renders these payloads as desktop notifications and focuses/opens the target URL on click; `pwa/lib/push.ts` `enablePush()` drives the browser opt-in (`PushManager.subscribe()` → `POST /me/push-subscriptions`). Generate a keypair with `npx web-push generate-vapid-keys` (or `Minishlink\WebPush\VAPID::createVapidKeys()`); the public key must match between the API and the PWA.
 
 | Env var | Purpose |
 | --- | --- |
-| `VAPID_PUBLIC_KEY` | Base64-url-encoded P-256 public key. Shipped to the PWA so `PushManager.subscribe()` can apply it. |
-| `VAPID_PRIVATE_KEY` | Base64-url-encoded P-256 private key. **Server-only** — never exposed to clients. |
+| `VAPID_PUBLIC_KEY` | Base64-url-encoded P-256 public key (API side). **Must equal `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.** |
+| `VAPID_PRIVATE_KEY` | Base64-url-encoded P-256 private key. **Server-only** — keep it in the untracked server `.env`, never in the repo. |
 | `VAPID_SUBJECT` | `mailto:` or `https://` contact for push services to reach you about issues. |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | The same public key, read by the PWA so `PushManager.subscribe()` can apply it. **Not secret** — baked into the PWA at build time; committed in `pwa/.env.production`. |
 
 Leaving any of the three slots empty disables push send: the dispatcher logs a warning, the in-app notification + email paths still run, and existing subscription rows are left untouched. This keeps a fresh checkout green without forcing every contributor to generate a key pair.
 
