@@ -79,6 +79,12 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-php:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/app-php:buildcache,mode=max
 
+      # Stage the repo-root docs into pwa/.content/docs so the /guides routes
+      # build with content. The pwa build context is `pwa/`, which can't reach
+      # `docs/`; sync-docs (re-included via pwa/.dockerignore) pre-stages it.
+      - name: Stage docs for the PWA build
+        run: node pwa/scripts/sync-docs.mjs
+
       - name: Build & push pwa image
         uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
         with:
