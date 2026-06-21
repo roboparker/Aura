@@ -18,7 +18,9 @@ function Calendar({
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
-      className={cn("p-3", className)}
+      // `relative` so the absolutely-positioned nav arrows anchor to the
+      // calendar itself, not an ancestor popover (where they'd overlap content).
+      className={cn("relative p-3", className)}
       classNames={{
         months: "flex flex-col sm:flex-row gap-2",
         month: "flex flex-col gap-4",

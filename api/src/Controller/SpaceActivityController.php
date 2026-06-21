@@ -5,9 +5,9 @@ namespace App\Controller;
 use App\Entity\Page;
 use App\Entity\Project;
 use App\Entity\Space;
-use App\Entity\Task;
 use App\Entity\User;
 use App\Service\ActivityFeedQuery;
+use App\Service\ProjectActivityScope;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,6 +34,7 @@ class SpaceActivityController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ActivityFeedQuery $activityFeed,
+        private ProjectActivityScope $scope,
     ) {
     }
 
@@ -52,25 +53,29 @@ class SpaceActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        // Resolve the id sets that scope the feed to this space. Tasks
-        // are reached through their project (a space has no direct task
-        // collection), mirroring ProjectActivityController.
+        // Roll the per-project activity groups (project + tasks + custom-field
+        // definitions, including deleted children) up across every project in
+        // the space, then add the space's pages. Reusing ProjectActivityScope
+        // keeps the hierarchy consistent: a space sees everything its projects
+        // see, one level down — the same way space membership cascades.
         $projects = $this->em->getRepository(Project::class)->findBy(['space' => $space]);
         $pages = $this->em->getRepository(Page::class)->findBy(['space' => $space]);
-        $projectIds = array_values(array_map(static fn (Project $p): string => (string) $p->getId(), $projects));
-        $pageIds = array_values(array_map(static fn (Page $p): string => (string) $p->getId(), $pages));
-        $taskIds = [];
+
+        /** @var array<class-string, list<string>> $groups */
+        $groups = [Page::class => array_values(array_map(
+            static fn (Page $p): string => (string) $p->getId(),
+            $pages,
+        ))];
         foreach ($projects as $project) {
-            foreach ($project->getTasks() as $task) {
-                $taskIds[] = (string) $task->getId();
+            foreach ($this->scope->groupsForProject($project) as $class => $ids) {
+                $groups[$class] = array_values(array_unique([
+                    ...($groups[$class] ?? []),
+                    ...$ids,
+                ]));
             }
         }
 
-        return new JsonResponse($this->activityFeed->forObjectGroups([
-            Project::class => $projectIds,
-            Page::class => $pageIds,
-            Task::class => $taskIds,
-        ], $request));
+        return new JsonResponse($this->activityFeed->forObjectGroups($groups, $request));
     }
 
     private function canRead(Space $space, User $user): bool

@@ -47,14 +47,29 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  dim = false,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  /**
+   * Dim the rest of the screen behind the sheet. Use for NON-modal sheets,
+   * where Radix renders no overlay — a click-to-close, fade-in backdrop that
+   * still lets the sheet's own portaled popovers (higher z-index) stay
+   * clickable. Don't set on modal sheets; they already have the Radix overlay.
+   */
+  dim?: boolean
 }) {
   return (
     <SheetPortal>
       <SheetOverlay />
+      {dim && (
+        <SheetPrimitive.Close
+          aria-label="Close"
+          data-slot="sheet-dim"
+          className="fixed inset-0 z-50 cursor-default bg-black/50 animate-in fade-in-0 duration-300"
+        />
+      )}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(

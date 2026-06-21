@@ -3,9 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Project;
-use App\Entity\Task;
 use App\Entity\User;
 use App\Service\ActivityFeedQuery;
+use App\Service\ProjectActivityScope;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -16,19 +16,21 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Reads the audit history for a project AND every task that belongs to
- * it. Access mirrors the Project GET security expression — any project
- * member can read; non-members get a 404.
+ * Reads the audit history for a project AND every task and custom-field
+ * definition that belongs to it. Access mirrors the Project GET security
+ * expression — any project member can read; non-members get a 404.
  *
- * The history feed combines `Project` rows with `Task` rows (filtered
- * by the project's task IDs) and orders both by `loggedAt` so the PWA
- * sees a single chronological stream.
+ * The history feed combines `Project` rows with `Task` and
+ * `CustomFieldDefinition` rows (filtered by the project's ids, including
+ * deleted ones) and orders them all by `loggedAt` so the PWA sees a single
+ * chronological stream.
  */
 class ProjectActivityController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
         private ActivityFeedQuery $activityFeed,
+        private ProjectActivityScope $scope,
     ) {
     }
 
@@ -51,15 +53,13 @@ class ProjectActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $taskIds = array_values(array_map(
-            static fn (Task $t): string => (string) $t->getId(),
-            $project->getTasks()->toArray(),
-        ));
-
-        return new JsonResponse($this->activityFeed->forObjectGroups([
-            Project::class => [(string) $project->getId()],
-            Task::class => $taskIds,
-        ], $request));
+        // The project's audit history rolls up its tasks and custom-field
+        // definitions — including deleted children, recovered via the versioned
+        // `project` on their log rows. The same grouping feeds the space-level
+        // feed one level up, so the hierarchy stays consistent.
+        return new JsonResponse(
+            $this->activityFeed->forObjectGroups($this->scope->groupsForProject($project), $request),
+        );
     }
 
     private function canRead(Project $project, User $user): bool

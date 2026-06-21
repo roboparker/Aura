@@ -6,6 +6,7 @@ use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use App\Filter\OverdueFilter;
 use App\Filter\TaskSearchFilter;
@@ -112,8 +113,24 @@ class Task
      */
     #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    // Versioned so the audit log records which project a task belonged to —
+    // the board's activity feed keys on this to keep a deleted task's history
+    // (ending in its remove event) even after the row is gone.
+    #[Gedmo\Versioned]
     #[Groups(['task:read', 'task:write'])]
     private ?Project $project = null;
+
+    /**
+     * Board section the task is grouped under. Null = the implicit default
+     * "In progress" group, so existing tasks need no backfill. When the parent
+     * section is deleted the FK is set to null, dropping the task back into the
+     * default group.
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: TaskSection::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['task:read', 'task:write'])]
+    private ?TaskSection $section = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -290,6 +307,17 @@ class Task
     public function setProject(?Project $project): static
     {
         $this->project = $project;
+        return $this;
+    }
+
+    public function getSection(): ?TaskSection
+    {
+        return $this->section;
+    }
+
+    public function setSection(?TaskSection $section): static
+    {
+        $this->section = $section;
         return $this;
     }
 

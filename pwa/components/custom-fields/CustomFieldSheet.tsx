@@ -37,6 +37,7 @@ import {
   kindLabelFor,
   subtypeLabelFor,
 } from "./kind-editors";
+import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
 import { fieldHandle } from "./handle";
 import type {
   CustomFieldConfig,
@@ -89,6 +90,42 @@ const errorMessage = async (res: Response): Promise<string> => {
   );
 };
 
+/**
+ * A representative sample value for the live preview, in each subtype's wire
+ * format (matching value-editors.tsx). `reference.*` has no sample IRI, so it
+ * previews empty.
+ */
+const sampleValueFor = (
+  kind: CustomFieldKind,
+  subtype: CustomFieldSubtype,
+  config: CustomFieldConfig,
+): unknown => {
+  const multi = Boolean(config.multi) || subtype === "multi";
+  switch (kind) {
+    case "boolean":
+      return true;
+    case "numeric":
+      if (subtype === "money") {
+        return { amount: 123450, currency: config.currency ?? "USD" };
+      }
+      return subtype === "int" ? 42 : 42.5;
+    case "text":
+      if (subtype === "url") return "https://example.com";
+      return multi ? ["Sample"] : "Sample text";
+    case "date":
+      if (subtype === "time") return "09:00";
+      if (subtype === "datetime") return "2026-06-20T09:00";
+      return "2026-06-20";
+    case "select": {
+      const first = config.options?.[0]?.key;
+      if (first === undefined) return multi ? [] : null;
+      return multi ? [first] : first;
+    }
+    default:
+      return null; // reference — no sample IRI available
+  }
+};
+
 const CustomFieldSheet = ({
   open,
   onOpenChange,
@@ -117,6 +154,30 @@ const CustomFieldSheet = ({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [optionStats, setOptionStats] = useState<Record<string, number>>({});
+
+  // Live preview: build a definition from the current form state and render
+  // the real task value editor seeded with a representative sample, so the
+  // author sees exactly how the field behaves on a task.
+  const previewDefinition = useMemo<CustomFieldDefinition>(
+    () => ({
+      "@id": "preview",
+      id: "preview",
+      name: name || "Field",
+      kind,
+      subtype,
+      config,
+      footer,
+      nullable,
+      position: 0,
+    }),
+    [name, kind, subtype, config, footer, nullable],
+  );
+  const [previewValue, setPreviewValue] = useState<unknown>(() =>
+    sampleValueFor(kind, subtype, config),
+  );
+  useEffect(() => {
+    setPreviewValue(sampleValueFor(kind, subtype, config));
+  }, [kind, subtype, config]);
 
   // Re-seed the form whenever the sheet opens (new vs edit, or a
   // different field).
@@ -187,6 +248,14 @@ const CustomFieldSheet = ({
     setSubtype(next);
     if (kind === "select") {
       setConfig((prev) => ({ ...prev, multi: next === "multi" }));
+    } else if (kind === "numeric" && next === "money") {
+      // Money requires a currency; seed the default so the picker's shown
+      // value is actually stored and submit works without touching it.
+      setConfig((prev) => ({
+        ...prev,
+        multi: false,
+        currency: prev.currency ?? "USD",
+      }));
     } else if (descriptor.noMultiSubtypes?.includes(next)) {
       setConfig((prev) => ({ ...prev, multi: false }));
     }
@@ -347,7 +416,7 @@ const CustomFieldSheet = ({
           onSubmit={handleSubmit}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+          <div className="flex flex-1 flex-col space-y-4 overflow-y-auto px-5 py-4">
             <div className="space-y-1.5">
               <Label htmlFor="cf-name">Name</Label>
               <Input
@@ -397,19 +466,6 @@ const CustomFieldSheet = ({
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span
-                className={cn("h-1.5 w-1.5 rounded-full", KIND_BADGE[kind].dot)}
-              />
-              <span className="text-muted-foreground">
-                {kindLabelFor(kind).toLowerCase()} ·{" "}
-                {subtypeLabelFor(kind, subtype).toLowerCase()}
-              </span>
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                nullable = {String(nullable)}
-              </span>
             </div>
 
             {kind !== "boolean" && (
@@ -553,6 +609,41 @@ const CustomFieldSheet = ({
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+
+            {/* Preview pinned to the bottom, set off from the form above. */}
+            <div className="mt-auto space-y-3 border-t pt-8">
+              <div className="space-y-2">
+                <div>
+                  <h3 className="text-base font-semibold text-foreground">
+                    Preview
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    How this field appears when filling in a task.
+                  </p>
+                </div>
+                <div className="rounded-md border bg-muted/20 p-3" data-testid="custom-field-preview">
+                  <CustomFieldValueEditor
+                    definition={previewDefinition}
+                    value={previewValue}
+                    onChange={setPreviewValue}
+                    projectIri={projectIri}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span
+                  className={cn("h-1.5 w-1.5 rounded-full", KIND_BADGE[kind].dot)}
+                />
+                <span className="text-muted-foreground">
+                  {kindLabelFor(kind).toLowerCase()} ·{" "}
+                  {subtypeLabelFor(kind, subtype).toLowerCase()}
+                </span>
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  nullable = {String(nullable)}
+                </span>
+              </div>
+            </div>
           </div>
 
           <SheetFooter className="flex-row items-center justify-between border-t px-5 py-3">

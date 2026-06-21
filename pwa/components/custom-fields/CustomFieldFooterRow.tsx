@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { FooterResponse, FooterRow } from "./types";
 
 /**
@@ -16,6 +17,12 @@ import type { FooterResponse, FooterRow } from "./types";
 interface Props {
   projectId: string;
   filters?: string;
+  /** Bump to force a re-fetch (e.g. after a task value is edited inline). */
+  refreshKey?: number;
+  /** Optional leading label (e.g. "Grand total") — also switches to a
+   *  standalone rounded card instead of the table-attached style. */
+  heading?: string;
+  className?: string;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -60,7 +67,13 @@ const formatNumber = (v: number): string => {
     : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
-const CustomFieldFooterRow = ({ projectId, filters }: Props) => {
+const CustomFieldFooterRow = ({
+  projectId,
+  filters,
+  refreshKey,
+  heading,
+  className,
+}: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -86,13 +99,24 @@ const CustomFieldFooterRow = ({ projectId, filters }: Props) => {
     return () => {
       aborted = true;
     };
-  }, [projectId, filters]);
+  }, [projectId, filters, refreshKey]);
 
   if (error || rows.length === 0) return null;
 
   return (
-    <Card className="mt-2" data-testid="custom-field-footer-row">
-      <CardContent className="py-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+    <Card
+      className={cn(
+        heading ? "rounded-lg" : "rounded-t-none border-t-0",
+        className,
+      )}
+      data-testid="custom-field-footer-row"
+    >
+      <CardContent className="py-2 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+        {heading && (
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {heading}
+          </span>
+        )}
         {rows.map((row) => (
           <div
             key={row.definition}

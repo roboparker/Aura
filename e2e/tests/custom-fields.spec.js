@@ -14,10 +14,11 @@ const openCustomFields = async (page, projectTitle) => {
   await page.getByTestId("new-project-button").click();
   await page.fill("#title", projectTitle);
   await page.click('button[type="submit"]');
-  // Creating navigates straight to the new project's detail page.
+  // Creating navigates straight to the new project's detail page. Custom
+  // fields live under the Settings tab's "Custom fields" section now.
   await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-  await page.click('[data-testid="project-custom-fields-link"]');
-  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+\/custom-fields$/);
+  await page.getByTestId("project-settings-tab").click();
+  await page.getByTestId("project-settings-fields").click();
 };
 
 test.describe("Custom field definitions (kind-aware, #227)", () => {

@@ -668,8 +668,10 @@ class TaskTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
     }
 
-    public function testRelativeRemindersWithoutDueDateAreRejected(): void
+    public function testRelativeRemindersWithoutDueDateAreStoredDormant(): void
     {
+        // A relative reminder may be configured before a due date exists; it is
+        // stored and stays dormant (never fires) until a due date anchors it.
         $alice = $this->createUser('alice@example.com');
 
         $client = static::createClient();
@@ -684,7 +686,12 @@ class TaskTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
 
-        $this->assertResponseStatusCodeSame(422);
+        $this->assertResponseStatusCodeSame(201);
+        $task = $this->reloadTaskByTitle('Orphan reminder');
+        $this->assertSame(
+            [['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]],
+            $task->getReminders(),
+        );
     }
 
     public function testInvalidReminderShapeIsRejected(): void

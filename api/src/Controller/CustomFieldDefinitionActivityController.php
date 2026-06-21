@@ -20,13 +20,15 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Project-level change log for the custom-fields schema:
  * `GET /projects/{id}/custom_field_definitions/activity`. Merges the
- * Gedmo audit history of every custom field definition currently in the
- * project, newest-first, reusing {@see ActivityFeedQuery} so the shape
- * matches the task/project feeds (rows + actor map).
+ * Gedmo audit history of every custom field definition in the project,
+ * newest-first, reusing {@see ActivityFeedQuery} so the shape matches the
+ * task/project feeds (rows + actor map).
  *
- * History for fields that have since been deleted falls out of scope —
- * we can only key on the project's current definition ids. Access mirrors
- * the project surface: any space member; 404 otherwise.
+ * Fields that have since been deleted stay in the log: their rows outlive
+ * the entity (the audit table has no FK to it), and we recover their object
+ * ids from the versioned `project` stamped on each create/update entry — so a
+ * deleted field's history, ending in its `remove` event, remains visible.
+ * Access mirrors the project surface: any space member; 404 otherwise.
  */
 class CustomFieldDefinitionActivityController extends AbstractController
 {
@@ -57,13 +59,45 @@ class CustomFieldDefinitionActivityController extends AbstractController
 
         $definitions = $this->em->getRepository(CustomFieldDefinition::class)
             ->findBy(['project' => $project]);
-        $objectIds = array_values(
-            array_map(static fn (CustomFieldDefinition $d): string => (string) $d->getId(), $definitions),
+        $currentIds = array_map(
+            static fn (CustomFieldDefinition $d): string => (string) $d->getId(),
+            $definitions,
         );
+
+        // Union current ids with the ids of fields that were deleted from this
+        // project (recovered from the audit log via the versioned `project`).
+        $objectIds = array_values(array_unique(
+            [...$currentIds, ...$this->deletedDefinitionIds($project)],
+        ));
 
         return new JsonResponse(
             $this->activityFeed->forClass(CustomFieldDefinition::class, $objectIds, $request),
         );
+    }
+
+    /**
+     * Object ids of custom field definitions that once belonged to this project
+     * but no longer exist — read from the audit log's versioned `project`.
+     *
+     * @return list<string>
+     */
+    private function deletedDefinitionIds(Project $project): array
+    {
+        // Gedmo stores the versioned association nested as {"id": "<uuid>"}.
+        $rows = $this->em->getConnection()->executeQuery(
+            "SELECT DISTINCT object_id FROM ext_log_entries
+             WHERE object_class = :class AND data->'project'->>'id' = :project",
+            [
+                'class' => CustomFieldDefinition::class,
+                'project' => (string) $project->getId(),
+            ],
+        )->fetchFirstColumn();
+
+        // object_id is a VARCHAR column, so values are strings; filter defensively.
+        return array_values(array_filter(
+            $rows,
+            static fn (mixed $id): bool => is_string($id),
+        ));
     }
 
     private function canRead(Project $project, User $user): bool

@@ -28,6 +28,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "checkbox", name: "Checkbox", category: "Form", description: "Boolean input with controlled and indeterminate states." },
   { slug: "combobox", name: "Combobox", category: "Form", description: "Searchable select with multi-value chips." },
   { slug: "command", name: "Command", category: "Overlay", description: "Command palette built on cmdk." },
+  { slug: "confirm-dialog", name: "ConfirmDialog", category: "Overlay", description: "Shared confirmation modal (replaces window.confirm) with async confirm, spinner, and inline error." },
   { slug: "dialog", name: "Dialog", category: "Overlay", description: "Modal dialog with title, body, and actions." },
   { slug: "dropdown-menu", name: "Dropdown Menu", category: "Overlay", description: "Anchored menu with items, separators, and submenus." },
   { slug: "formik-field", name: "FormikField", category: "Form", description: "Formik-aware label + input + error wrapper." },

@@ -18,6 +18,12 @@ import {
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
 import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -69,6 +75,9 @@ export interface ValueEditorProps {
   spaceIri?: string | null;
   /** Space members for reference.user (avoids a fetch). */
   users?: AvatarUser[];
+  /** Compact mode (e.g. the new-task form): drop redundant adornments like
+   *  the money currency badge. */
+  compact?: boolean;
 }
 
 const isMulti = (definition: CustomFieldDefinition): boolean =>
@@ -270,6 +279,7 @@ const MoneyValue = ({
   onChange,
   disabled,
   error,
+  compact,
 }: ValueEditorProps) => {
   const currency = definition.config.currency ?? "USD";
   const digits = currencyFractionDigits(currency);
@@ -299,23 +309,27 @@ const MoneyValue = ({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-sm text-muted-foreground">
-        {currencySymbol(currency)}
-      </span>
-      <Input
-        type="number"
-        step={digits === 0 ? 1 : 1 / factor}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={(e) => commit(e.target.value)}
-        disabled={disabled}
-        aria-invalid={Boolean(error)}
-        className="tabular-nums"
-        data-testid="custom-field-value-money"
-      />
-      <Badge variant="outline" className="shrink-0 font-mono text-xs">
-        {currency}
-      </Badge>
+      <InputGroup className="flex-1">
+        <InputGroupAddon>
+          <InputGroupText>{currencySymbol(currency)}</InputGroupText>
+        </InputGroupAddon>
+        <InputGroupInput
+          type="number"
+          step={digits === 0 ? 1 : 1 / factor}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={(e) => commit(e.target.value)}
+          disabled={disabled}
+          aria-invalid={Boolean(error)}
+          className="tabular-nums"
+          data-testid="custom-field-value-money"
+        />
+      </InputGroup>
+      {!compact && (
+        <Badge variant="outline" className="shrink-0 font-mono text-xs">
+          {currency}
+        </Badge>
+      )}
     </div>
   );
 };

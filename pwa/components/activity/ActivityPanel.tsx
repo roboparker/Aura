@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
-import { displayName } from "@/lib/userDisplay";
+import { type AvatarUser } from "@/components/user/UserAvatar";
+import ActivityTimeline, {
+  type TimelineEvent,
+} from "@/components/activity/ActivityTimeline";
 import { ENTRYPOINT } from "@/config/entrypoint";
 
 /**
@@ -49,51 +51,60 @@ export interface ActivityPanelProps {
   endpoint: string;
 }
 
-const RELATIVE = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+// "completedOn" → "completed on", "dueDate" → "due date", "maxLength" → "max length".
+const humanizeKey = (key: string): string =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .toLowerCase();
 
-const formatRelative = (iso: string): string => {
-  const ts = new Date(iso).getTime();
-  if (Number.isNaN(ts)) return "";
-  const diffSec = Math.round((ts - Date.now()) / 1000);
-  const abs = Math.abs(diffSec);
-  if (abs < 60) return RELATIVE.format(diffSec, "second");
-  if (abs < 3600) return RELATIVE.format(Math.round(diffSec / 60), "minute");
-  if (abs < 86400) return RELATIVE.format(Math.round(diffSec / 3600), "hour");
-  if (abs < 2592000) return RELATIVE.format(Math.round(diffSec / 86400), "day");
-  if (abs < 31536000)
-    return RELATIVE.format(Math.round(diffSec / 2592000), "month");
-  return RELATIVE.format(Math.round(diffSec / 31536000), "year");
-};
+// Gedmo serialises a versioned association as a bare `{ id }` — a UUID with
+// nothing human to show, so we drop those keys from the summary.
+const isReference = (value: unknown): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  "id" in value &&
+  Object.keys(value).length === 1;
 
-const verbFor = (action: string): string => {
-  switch (action) {
-    case "create":
-      return "created";
-    case "update":
-      return "updated";
-    case "remove":
-      return "deleted";
-    default:
-      return action;
-  }
-};
+// PHP `DateTime` serialises as `{ date, timezone_type, timezone }`.
+const isPhpDate = (value: unknown): value is { date: string } =>
+  typeof value === "object" &&
+  value !== null &&
+  "date" in value &&
+  typeof (value as { date: unknown }).date === "string";
 
-const renderChanges = (data: Record<string, unknown>): string | null => {
-  const keys = Object.keys(data);
-  if (keys.length === 0) return null;
-  // For v1 we just list "field: value" — historic values are not in
-  // the payload because Gedmo only stores the new state. Surfacing
-  // before-state would mean walking adjacent versions, which is a v2
-  // concern.
-  return keys.map((k) => `${k}: ${formatValue(data[k])}`).join(", ");
+const DATE_FMT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+const formatPhpDate = (raw: string): string => {
+  // "2026-06-21 00:32:03.354000" (UTC) → a real Date; trim micro→milliseconds.
+  const normalized = raw.replace(" ", "T").replace(/(\.\d{3})\d*/, "$1");
+  const iso = /([+-]\d{2}:?\d{2}|Z)$/.test(normalized)
+    ? normalized
+    : `${normalized}Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? raw : DATE_FMT.format(date);
 };
 
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "yes" : "no";
   if (typeof value === "string") return value === "" ? "—" : value;
-  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number") return String(value);
+  if (isPhpDate(value)) return formatPhpDate(value.date);
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+};
+
+const renderChanges = (data: Record<string, unknown>): string | null => {
+  // List "field: value" for the new state (Gedmo only stores the new value,
+  // not the before — surfacing the diff would mean walking adjacent versions).
+  const parts = Object.entries(data)
+    .filter(([, value]) => !isReference(value))
+    .map(([key, value]) => `${humanizeKey(key)}: ${formatValue(value)}`);
+  return parts.length === 0 ? null : parts.join(", ");
 };
 
 const ActivityPanel = ({ endpoint }: ActivityPanelProps) => {
@@ -151,42 +162,18 @@ const ActivityPanel = ({ endpoint }: ActivityPanelProps) => {
             No activity yet.
           </p>
         ) : (
-          <ul className="space-y-3" data-testid="activity-list">
-            {items.map((row) => {
-              const actor = row.actor ? actors[row.actor] : null;
-              const changes = renderChanges(row.data);
-              return (
-                <li
-                  key={row.id}
-                  className="flex gap-3 items-start text-sm"
-                  data-testid="activity-item"
-                >
-                  {actor ? (
-                    <UserAvatar user={actor} size="sm" />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="h-8 w-8 shrink-0 rounded-full bg-muted"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p>
-                      <span className="font-medium">
-                        {actor ? displayName(actor) : "Someone"}
-                      </span>{" "}
-                      <span className="text-muted-foreground">
-                        {verbFor(row.action)} this {row.objectClass.toLowerCase()}
-                        {changes && row.action !== "remove" ? ` — ${changes}` : ""}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatRelative(row.loggedAt)}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <ActivityTimeline
+            events={items.map(
+              (row): TimelineEvent => ({
+                id: row.id,
+                action: row.action,
+                loggedAt: row.loggedAt,
+                objectClass: row.objectClass,
+                actor: row.actor ? (actors[row.actor] ?? null) : null,
+                changes: renderChanges(row.data),
+              }),
+            )}
+          />
         )}
         {hasMore && (
           <div className="mt-3">
