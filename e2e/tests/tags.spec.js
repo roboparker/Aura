@@ -77,7 +77,7 @@ test.describe("Tags", () => {
 
     // The tags combobox input is always present; click into it so Base UI
     // opens the options popover.
-    const tagInput = item.locator('[data-slot="combobox-chip-input"]');
+    const tagInput = item.locator('[data-testid="task-tags"] [data-slot="combobox-chip-input"]');
     await tagInput.click();
     await page.getByRole("option", { name: `Blue-${suffix}` }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(`Blue-${suffix}`);
@@ -122,7 +122,7 @@ test.describe("Tags", () => {
     await createTaskInline(page, taskTitle);
     const item = page.locator('[data-testid="task-item"]', { hasText: taskTitle });
     // Click into the always-present chip-input to open the Base UI Combobox popover.
-    await item.locator('[data-slot="combobox-chip-input"]').click();
+    await item.locator('[data-testid="task-tags"] [data-slot="combobox-chip-input"]').click();
     await page.getByRole("option", { name: tagTitle }).click();
     await expect(item.locator('[data-testid="task-tag"]')).toContainText(tagTitle);
     // Dismiss the popover.
