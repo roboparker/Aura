@@ -3,6 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\Project;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -111,7 +112,7 @@ class TaskRelationshipTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    private function createTask(object $client, Project $project, string $title): string
+    private function createTask(Client $client, Project $project, string $title): string
     {
         $task = $client->request('POST', '/tasks', [
             'json' => ['title' => $title, 'project' => '/projects/' . $project->getId()],

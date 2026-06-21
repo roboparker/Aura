@@ -38,7 +38,7 @@ class TaskRelationshipRepository extends ServiceEntityRepository
      */
     public function findBetween(Task $a, Task $b, string $type): ?TaskRelationship
     {
-        return $this->createQueryBuilder('r')
+        $result = $this->createQueryBuilder('r')
             ->where('r.type = :type')
             ->andWhere(
                 '(r.source = :a AND r.target = :b) OR (r.source = :b AND r.target = :a)',
@@ -49,5 +49,7 @@ class TaskRelationshipRepository extends ServiceEntityRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+
+        return $result instanceof TaskRelationship ? $result : null;
     }
 }
