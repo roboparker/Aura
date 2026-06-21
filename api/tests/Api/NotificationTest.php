@@ -347,9 +347,11 @@ class NotificationTest extends ApiTestCase
     public function testDispatcherSkipsPushWhenPreferenceDisabled(): void
     {
         $alice = $this->createUser('alice@example.com');
-        // Default for `pushNotificationsEnabled` is false; subscriptions
-        // can exist on the user from a previous opt-in but the dispatcher
-        // must respect the current preference.
+        // Push is on by default, so disable it explicitly: a subscription can
+        // linger from a previous opt-in but the dispatcher must respect the
+        // current preference.
+        $alice->setPreferences(['pushNotificationsEnabled' => false]);
+        $this->entityManager->flush();
         $this->seedPushSubscription($alice, 'https://fcm.example/alice');
         $this->seedDueTask($alice, 'Standup');
 

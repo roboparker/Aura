@@ -26,13 +26,16 @@ const EnablePushPrompt = ({ className }: { className?: string }) => {
   const supported = isPushSupported();
   const permission = pushPermission();
   const hasVapid = Boolean(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY);
-  const alreadyOn =
-    permission === "granted" &&
-    (user?.preferences?.pushNotificationsEnabled ?? false);
+  // Push is enabled by default, so only warn when the user still wants it (pref
+  // true) but the browser hasn't granted it. If they turned it off in settings,
+  // respect that and stay quiet.
+  const wantsPush = user?.preferences?.pushNotificationsEnabled ?? true;
+  const granted = permission === "granted";
 
-  if (!mounted || !supported || alreadyOn || dismissed) return null;
+  if (!mounted || !supported || !wantsPush || granted || dismissed) return null;
 
-  const canEnable = hasVapid && permission !== "denied";
+  const blocked = permission === "denied";
+  const canEnable = hasVapid && !blocked;
 
   const handleEnable = async () => {
     setBusy(true);
@@ -73,6 +76,11 @@ const EnablePushPrompt = ({ className }: { className?: string }) => {
         >
           {busy ? "Enabling…" : "Turn on"}
         </button>
+      )}
+      {blocked && (
+        <span className="text-muted-foreground">
+          (allow them in your browser settings)
+        </span>
       )}
       {error && <span className="text-destructive">{error}</span>}
     </p>
