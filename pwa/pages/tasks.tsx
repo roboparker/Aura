@@ -1269,6 +1269,9 @@ const Tasks = () => {
             ),
           )
         }
+        onTaskDeleted={(iri) =>
+          setTasks((current) => current.filter((t) => t["@id"] !== iri))
+        }
       />
     </>
   );

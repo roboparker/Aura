@@ -10,11 +10,11 @@ import {
   X,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   ATTACHMENT_SUPPORTED_MIMES,
   uploadAttachmentFile,
 } from "@/lib/attachments";
-import { cn } from "@/lib/utils";
 
 export interface Attachment {
   "@id": string;
@@ -72,7 +72,6 @@ const AttachmentsPanel = ({
 }: AttachmentsPanelProps) => {
   const [error, setError] = useState<string | null>(null);
   const [busyCount, setBusyCount] = useState(0);
-  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Index into `imageAttachments` (computed below) of the image currently
@@ -308,48 +307,24 @@ const AttachmentsPanel = ({
         </div>
       )}
 
-      <div
-        onDragEnter={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragOver={(e) => e.preventDefault()}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragOver(false);
-          if (e.dataTransfer.files) void handleFiles(e.dataTransfer.files);
-        }}
-        className={cn(
-          "rounded-md border border-dashed text-sm text-center px-3 py-4 transition-colors",
-          dragOver
-            ? "border-primary bg-primary/5 text-foreground"
-            : "border-input text-muted-foreground",
-        )}
-        data-testid="attachment-dropzone"
-      >
-        <Upload className="h-4 w-4 mx-auto mb-1" aria-hidden="true" />
-        <p>
-          Drop files to attach to{" "}
-          <span className="font-medium text-foreground">"{taskTitle}"</span>, or{" "}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-cyan-700 hover:underline"
-            data-testid="attachment-pick"
-          >
-            choose from your computer
-          </button>
-          .
-        </p>
-        <p className="text-xs mt-1">
+      <div className="space-y-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={busyCount > 0}
+          aria-label={`Attach files to "${taskTitle}"`}
+          data-testid="attachment-pick"
+        >
+          <Upload className="mr-1.5 h-4 w-4" aria-hidden="true" />
+          {busyCount > 0
+            ? `Uploading ${busyCount} file${busyCount === 1 ? "" : "s"}…`
+            : "Attach files"}
+        </Button>
+        <p className="text-xs text-muted-foreground">
           Up to 10 MB. Images, PDFs, text, CSV, JSON, ZIP.
         </p>
-        {busyCount > 0 && (
-          <p className="text-xs mt-2" data-testid="attachment-uploading">
-            Uploading {busyCount} file{busyCount === 1 ? "" : "s"}…
-          </p>
-        )}
       </div>
 
       <input

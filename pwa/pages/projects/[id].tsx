@@ -819,6 +819,9 @@ const ProjectDetail = () => {
             ),
           )
         }
+        onTaskDeleted={(iri) =>
+          setTasks((prev) => prev.filter((t) => t["@id"] !== iri))
+        }
       />
     </>
   );

@@ -40,10 +40,10 @@ test.describe("Task detail drawer", () => {
       page.locator('[data-testid="task-detail-drawer"]'),
     ).toBeVisible();
 
-    // The three tabs are present.
-    await expect(page.locator('[data-testid="task-tab-details"]')).toBeVisible();
-    await expect(page.locator('[data-testid="task-tab-activity"]')).toBeVisible();
+    // Details show directly (no Details tab); Comments / Activity tabs are at
+    // the bottom of the panel.
     await expect(page.locator('[data-testid="task-tab-comments"]')).toBeVisible();
+    await expect(page.locator('[data-testid="task-tab-activity"]')).toBeVisible();
 
     // Closing the drawer (Escape) removes the deep-link param.
     await page.keyboard.press("Escape");

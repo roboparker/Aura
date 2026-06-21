@@ -42,9 +42,7 @@ const toLocalInput = (iso: string): string => {
 const RemindersEditor = ({ value, dueDate, onChange }: RemindersEditorProps) => {
   const reminders = value ?? [];
   const [adding, setAdding] = useState(false);
-  const [mode, setMode] = useState<"relative" | "absolute">(
-    dueDate ? "relative" : "absolute",
-  );
+  const [mode, setMode] = useState<"relative" | "absolute">("relative");
   const [relValue, setRelValue] = useState(15);
   const [relUnit, setRelUnit] = useState<ReminderUnit>("minutes");
   const [absAt, setAbsAt] = useState("");
@@ -52,7 +50,7 @@ const RemindersEditor = ({ value, dueDate, onChange }: RemindersEditorProps) => 
 
   const resetForm = () => {
     setAdding(false);
-    setMode(dueDate ? "relative" : "absolute");
+    setMode("relative");
     setRelValue(15);
     setRelUnit("minutes");
     setAbsAt("");
@@ -154,10 +152,9 @@ const RemindersEditor = ({ value, dueDate, onChange }: RemindersEditorProps) => 
             <button
               type="button"
               onClick={() => setMode("relative")}
-              disabled={!dueDate}
               aria-pressed={mode === "relative"}
               className={cn(
-                "rounded px-2 py-1 text-xs font-medium transition disabled:opacity-40",
+                "rounded px-2 py-1 text-xs font-medium transition",
                 mode === "relative"
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -209,7 +206,13 @@ const RemindersEditor = ({ value, dueDate, onChange }: RemindersEditorProps) => 
               </select>
               <span className="text-sm text-muted-foreground">before due</span>
             </div>
-          ) : (
+          ) : null}
+          {mode === "relative" && !dueDate && (
+            <p className="text-xs text-muted-foreground" data-testid="reminder-rel-dormant">
+              Fires once this task has a due date.
+            </p>
+          )}
+          {mode === "absolute" && (
             <input
               type="datetime-local"
               value={absAt === "" ? "" : toLocalInput(absAt)}
