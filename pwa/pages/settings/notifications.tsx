@@ -1,6 +1,7 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import { useSettingsSection } from "@/lib/useSettingsSection";
+import { enablePush } from "@/lib/push";
 import { DEFAULT_NOTIFICATION_MATRIX } from "@/lib/notificationPrefs";
 import SettingsShell from "@/components/settings/SettingsShell";
 import SaveIndicator from "@/components/settings/SaveIndicator";
@@ -127,9 +128,18 @@ const NotificationsPage = () => {
                 id="push-toggle"
                 checked={prefs?.pushNotificationsEnabled ?? false}
                 disabled={disabled}
-                onCheckedChange={(on) =>
-                  void push.persist({ pushNotificationsEnabled: on })
-                }
+                onCheckedChange={(on) => {
+                  if (!on) {
+                    void push.persist({ pushNotificationsEnabled: false });
+                    return;
+                  }
+                  // Turning on subscribes the browser first; only flip the
+                  // preference once a subscription is registered.
+                  void enablePush().then((result) => {
+                    if (result.ok)
+                      void push.persist({ pushNotificationsEnabled: true });
+                  });
+                }}
                 data-testid="settings-push-toggle"
               />
             </div>

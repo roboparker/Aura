@@ -300,7 +300,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         'timezone' => 'UTC',
         // Legacy master switches — kept as hard overrides over the matrix.
         'emailNotificationsEnabled' => true,
-        'pushNotificationsEnabled' => false,
+        'pushNotificationsEnabled' => true,
         'notificationFrequency' => 'realtime',
         // Per-event delivery matrix: row → {inApp, email}.
         'notificationMatrix' => [

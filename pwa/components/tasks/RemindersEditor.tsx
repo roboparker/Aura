@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import EnablePushPrompt from "@/components/notifications/EnablePushPrompt";
 import {
   describeReminder,
   reminderKey,
@@ -257,6 +258,8 @@ const RemindersEditor = ({ value, dueDate, onChange }: RemindersEditorProps) => 
           <Plus className="h-3.5 w-3.5" /> Add reminder
         </button>
       )}
+
+      {reminders.length > 0 && <EnablePushPrompt />}
     </div>
   );
 };
