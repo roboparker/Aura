@@ -515,12 +515,6 @@ const TaskDetailDrawer = ({
                 </Row>
               </dl>
 
-              <RemindersEditor
-                value={task.reminders}
-                dueDate={task.dueDate}
-                onChange={(next) => void patchTask({ reminders: next })}
-              />
-
               {task.project && definitions.length > 0 && (
                 <CustomFieldValueList
                   definitions={definitions}
@@ -553,6 +547,12 @@ const TaskDetailDrawer = ({
                 canDeleteAll={canModerate}
                 onAttach={handleAttach}
                 onDetach={handleDetach}
+              />
+
+              <RemindersEditor
+                value={task.reminders}
+                dueDate={task.dueDate}
+                onChange={(next) => void patchTask({ reminders: next })}
               />
 
               <Tabs defaultValue="comments" className="mt-auto border-t pt-4">
