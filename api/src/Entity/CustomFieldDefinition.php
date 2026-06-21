@@ -109,6 +109,10 @@ class CustomFieldDefinition
     #[ORM\ManyToOne(targetEntity: Project::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Project is required.')]
+    // Versioned so the audit log records which project the field belonged to —
+    // the change-log endpoint keys on this to recover the history of fields
+    // that have since been deleted (their log rows outlive the row itself).
+    #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private ?Project $project = null;
 

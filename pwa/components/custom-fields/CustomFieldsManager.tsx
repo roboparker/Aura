@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CircleCheck, Copy, GripVertical, History, Plus, Settings } from "lucide-react";
+import { CircleCheck, Copy, GripVertical, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 import CustomFieldSheet from "./CustomFieldSheet";
 import CustomFieldChangeLog from "./CustomFieldChangeLog";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { fieldHandle } from "./handle";
 import { KIND_BADGE, kindLabelFor, subtypeLabelFor } from "./kind-editors";
 import type {
@@ -100,6 +101,9 @@ const CustomFieldsManager = ({
   const [filled, setFilled] = useState<Record<string, number>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CustomFieldDefinition | null>(
+    null,
+  );
   // Bumped on every open so the drawer remounts fresh each time. Reusing one
   // Radix Dialog instance and toggling `open` back on while its close (exit)
   // animation is still pending leaves Radix's Presence state machine stuck and
@@ -183,6 +187,17 @@ const CustomFieldsManager = ({
 
   const handleDeleted = (def: CustomFieldDefinition) => {
     setDefs((prev) => prev.filter((d) => d["@id"] !== def["@id"]));
+  };
+
+  // Deletion is confirmed through the shared ConfirmDialog; the action throws
+  // on failure so the modal surfaces the error and stays open.
+  const confirmDelete = async (def: CustomFieldDefinition) => {
+    const res = await fetch(`${ENTRYPOINT}${def["@id"]}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error(await errorMessage(res));
+    handleDeleted(def);
   };
 
   // Client-side duplicate — there's no copy endpoint, so we POST a fresh
@@ -371,7 +386,7 @@ const CustomFieldsManager = ({
                 <TableHead>Footer</TableHead>
                 <TableHead className="text-right">Filled</TableHead>
                 {isSpaceAdmin && (
-                  <TableHead className="w-20 text-right">Actions</TableHead>
+                  <TableHead className="w-28 text-right">Actions</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -395,6 +410,7 @@ const CustomFieldsManager = ({
                       draggable={isSpaceAdmin && defs.length > 1}
                       onEdit={() => openEdit(def)}
                       onDuplicate={() => void handleDuplicate(def)}
+                      onDelete={() => setDeleteTarget(def)}
                     />
                   ))}
                 </SortableContext>
@@ -439,6 +455,26 @@ const CustomFieldsManager = ({
         onOpenChange={setChangeLogOpen}
         projectId={projectId}
       />
+
+      {deleteTarget && (
+        <ConfirmDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setDeleteTarget(null);
+          }}
+          title="Delete custom field"
+          description={
+            <>
+              Delete custom field &ldquo;
+              <span className="font-medium">{deleteTarget.name}</span>&rdquo;?
+              Existing values on tasks will also be removed.
+            </>
+          }
+          confirmLabel="Delete"
+          destructive
+          onConfirm={() => confirmDelete(deleteTarget)}
+        />
+      )}
     </div>
   );
 };
@@ -451,6 +487,7 @@ const FieldRow = ({
   draggable,
   onEdit,
   onDuplicate,
+  onDelete,
 }: {
   def: CustomFieldDefinition;
   total: number;
@@ -459,6 +496,7 @@ const FieldRow = ({
   draggable: boolean;
   onEdit: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: def["@id"], disabled: !draggable });
@@ -540,22 +578,33 @@ const FieldRow = ({
               size="icon"
               variant="ghost"
               className="h-8 w-8"
-              onClick={onEdit}
-              aria-label={`Edit ${def.name}`}
-              data-testid="custom-field-edit"
+              onClick={onDuplicate}
+              aria-label={`Duplicate ${def.name}`}
+              data-testid="custom-field-duplicate"
             >
-              <Settings className="h-3.5 w-3.5" />
+              <Copy className="h-3.5 w-3.5" />
             </Button>
             <Button
               type="button"
               size="icon"
               variant="ghost"
               className="h-8 w-8"
-              onClick={onDuplicate}
-              aria-label={`Duplicate ${def.name}`}
-              data-testid="custom-field-duplicate"
+              onClick={onEdit}
+              aria-label={`Edit ${def.name}`}
+              data-testid="custom-field-edit"
             >
-              <Copy className="h-3.5 w-3.5" />
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              onClick={onDelete}
+              aria-label={`Delete ${def.name}`}
+              data-testid="custom-field-delete"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
         </TableCell>

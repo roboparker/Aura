@@ -37,7 +37,6 @@ import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { cn } from "@/lib/utils";
 import {
   CURRENCIES,
-  currencyFractionDigits,
   findCurrency,
   type CurrencyInfo,
 } from "@/lib/currencies";
@@ -90,7 +89,7 @@ export const KIND_DESCRIPTORS: Record<CustomFieldKind, KindDescriptor> = {
     label: "Numeric",
     subtypes: [
       { value: "int", label: "Integer" },
-      { value: "float", label: "Number" },
+      { value: "float", label: "Decimal" },
       { value: "money", label: "Money" },
     ],
     supportsMulti: true,
@@ -489,8 +488,6 @@ const PatternCheck = ({
 const MoneyEditor = ({ config, update }: SubEditorProps) => {
   const code = config.currency ?? "USD";
   const selected = findCurrency(code) ?? null;
-  const digits = currencyFractionDigits(code);
-  const preview = formatMoneyPreview(1234.5, code, digits);
 
   return (
     <div className="space-y-3">
@@ -521,43 +518,12 @@ const MoneyEditor = ({ config, update }: SubEditorProps) => {
         </Combobox>
       </div>
 
-      <div className="flex items-center justify-between rounded-md border border-input bg-muted/40 px-3 py-2">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Decimal places
-          </p>
-          <p className="text-sm font-medium">{digits}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
-            Preview
-          </p>
-          <p className="text-lg font-semibold tabular-nums">{preview}</p>
-        </div>
-      </div>
       <p className="text-xs text-muted-foreground">
         Precision follows the currency (ISO-4217); amounts are stored in
         minor units.
       </p>
     </div>
   );
-};
-
-const formatMoneyPreview = (
-  major: number,
-  code: string,
-  digits: number,
-): string => {
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: code,
-      minimumFractionDigits: digits,
-      maximumFractionDigits: digits,
-    }).format(major);
-  } catch {
-    return major.toFixed(digits);
-  }
 };
 
 /* ------------------------------------------------------------------ */
