@@ -22,7 +22,6 @@ const AUTHED_PATHS = [
   "/tasks",
   "/projects",
   `/projects/${PLACEHOLDER_UUID}`,
-  `/projects/${PLACEHOLDER_UUID}/custom-fields`,
   "/discussions",
   `/discussions/${PLACEHOLDER_UUID}`,
   "/pages",
