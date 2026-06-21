@@ -330,6 +330,7 @@ const TaskDetailDrawer = ({
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="right"
+        dim
         className="flex w-full flex-col gap-0 p-0 sm:max-w-xl"
         data-testid="task-detail-drawer"
         onInteractOutside={(e) => {
@@ -359,7 +360,7 @@ const TaskDetailDrawer = ({
 
         {task && (
           <Tabs defaultValue="details" className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b px-5 pt-5 pb-3">
+            <div className="border-b px-5 pt-12 pb-3">
               <div className="flex items-start gap-2">
                 <Checkbox
                   checked={Boolean(task.completedOn)}
