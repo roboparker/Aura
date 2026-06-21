@@ -304,15 +304,6 @@ const CustomFieldsManager = ({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setChangeLogOpen(true)}
-            data-testid="custom-fields-changelog"
-          >
-            <History className="mr-1 h-3.5 w-3.5" /> Change log
-          </Button>
           {isSpaceAdmin && (
             <Button
               type="button"
@@ -334,8 +325,8 @@ const CustomFieldsManager = ({
               <>
                 You&apos;re editing as a{" "}
                 <span className="font-medium text-foreground">space admin</span>.
-                Members in {spaceName ?? "this space"} can use these fields on
-                tasks but can&apos;t change definitions.
+                Members in {spaceName ?? "this space"}{" "}
+                can use these fields on tasks but can&apos;t change definitions.
               </>
             ) : (
               <>
@@ -383,6 +374,20 @@ const CustomFieldsManager = ({
         </div>
       ) : (
         <div className="rounded-lg border">
+          <div className="flex items-center justify-end border-b px-2 py-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setChangeLogOpen(true)}
+              aria-label="Custom fields change log"
+              title="Change log"
+              data-testid="custom-fields-changelog"
+            >
+              <History className="h-4 w-4" />
+            </Button>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>

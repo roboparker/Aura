@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, PanelRight, Plus } from "lucide-react";
+import { Lock, PanelRight, Plus, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -29,6 +29,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -136,6 +137,16 @@ const ProjectDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Which detail tab is active — controlled so the header's "New task" button
+  // can show on the Tasks tab only.
+  const [activeTab, setActiveTab] = useState("tasks");
+  // Settings sub-section (left menu like the user settings page).
+  const [settingsSection, setSettingsSection] = useState<
+    "privacy" | "fields" | "danger"
+  >("privacy");
+  const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
+    useState(false);
 
   // Quick add-task (collapsed behind "+ New task").
   const [addOpen, setAddOpen] = useState(false);
@@ -443,6 +454,18 @@ const ProjectDetail = () => {
     }
   };
 
+  const handleDeleteProject = async () => {
+    if (!project) return;
+    const res = await fetch(
+      `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}`,
+      { method: "DELETE", credentials: "include" },
+    );
+    if (!res.ok && res.status !== 204) {
+      throw new Error("Failed to delete project.");
+    }
+    await router.push("/projects");
+  };
+
   const grouped = useMemo(() => {
     const ordered = [...tasks].sort((a, b) => a.position - b.position);
     const map = new Map<Bucket, ProjectTask[]>();
@@ -535,15 +558,17 @@ const ProjectDetail = () => {
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                   )}
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={openAddRow}
-                    data-testid="project-new-task"
-                  >
-                    <Plus className="mr-1 h-3.5 w-3.5" /> New task
-                  </Button>
-                </div>
+                {activeTab === "tasks" && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={openAddRow}
+                      data-testid="project-new-task"
+                    >
+                      <Plus className="mr-1 h-3.5 w-3.5" /> New task
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {error && (
@@ -552,7 +577,7 @@ const ProjectDetail = () => {
                 </Alert>
               )}
 
-              <Tabs defaultValue="tasks">
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList variant="line">
                   <TabsTrigger value="tasks">
                     Tasks{" "}
@@ -564,119 +589,223 @@ const ProjectDetail = () => {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="settings" className="mt-4 space-y-6">
-                  <Card>
-                  <CardContent className="space-y-3 pt-6" data-testid="project-space-info">
-                    {project.description && (
-                      <p className="text-sm text-muted-foreground">{project.description}</p>
-                    )}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Space</span>
-                      <Badge variant="secondary" className="gap-1">
-                        {space?.isPersonal && <Lock className="h-3 w-3" aria-hidden />}
-                        {space?.name ??
-                          (typeof project.space === "string" ? "Unknown space" : project.space.name)}
-                      </Badge>
-                      {spaceId && (
-                        <Button asChild variant="link" size="sm" className="h-auto p-0">
-                          <Link href={`/spaces/${spaceId}`}>Manage members in space</Link>
-                        </Button>
-                      )}
-                    </div>
-
-                    <div
-                      className="flex flex-wrap items-center gap-2"
-                      data-testid="project-move-form"
+                <TabsContent value="settings" className="mt-4">
+                  <div className="flex flex-col gap-6 sm:flex-row">
+                    {/* Left menu, mirroring the user settings nav. */}
+                    <nav
+                      className="flex shrink-0 gap-1 overflow-x-auto sm:w-44 sm:flex-col"
+                      aria-label="Project settings sections"
+                      data-testid="project-settings-nav"
                     >
-                      <Label
-                        htmlFor="project-move-target"
-                        className="text-xs text-muted-foreground"
-                      >
-                        Move to
-                      </Label>
-                      <select
-                        id="project-move-target"
-                        value={moveTargetIri}
-                        onChange={(e) => setMoveTargetIri(e.target.value)}
-                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                        data-testid="project-move-select"
-                      >
-                        <option value="">Pick a space…</option>
-                        {spaces
-                          .filter((s) => s["@id"] !== projectSpaceIri(project))
-                          .map((s) => (
-                            <option key={s["@id"]} value={s["@id"]}>
-                              {s.name}
-                              {s.isPersonal ? " (Private)" : ""}
-                            </option>
-                          ))}
-                      </select>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleMove}
-                        disabled={!moveTargetIri || isMoving || isCopying}
-                        data-testid="project-move-submit"
-                      >
-                        {isMoving ? "Moving…" : "Move"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCopy}
-                        disabled={isMoving || isCopying}
-                        data-testid="project-copy-submit"
-                      >
-                        {isCopying ? "Copying…" : "Copy"}
-                      </Button>
-                      <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
-                        <input
-                          type="checkbox"
-                          checked={copyIncludeTasks}
-                          onChange={(e) => setCopyIncludeTasks(e.target.checked)}
-                          className="h-3.5 w-3.5"
-                          data-testid="project-copy-include-tasks"
-                        />
-                        include tasks
-                      </label>
-                      {moveMessage && (
-                        <span
-                          role="alert"
+                      {(
+                        [
+                          { key: "privacy", label: "Privacy", Icon: Shield },
+                          { key: "fields", label: "Custom fields", Icon: Table2 },
+                          { key: "danger", label: "Danger zone", Icon: TriangleAlert },
+                        ] as const
+                      ).map(({ key, label, Icon }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSettingsSection(key)}
+                          aria-current={settingsSection === key ? "page" : undefined}
                           className={cn(
-                            "text-xs",
-                            moveMessage.kind === "success"
-                              ? "text-muted-foreground"
-                              : "text-destructive",
+                            "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm whitespace-nowrap transition-colors",
+                            settingsSection === key
+                              ? "bg-muted font-medium text-foreground"
+                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                            key === "danger" &&
+                              settingsSection !== key &&
+                              "text-destructive/80 hover:text-destructive",
                           )}
+                          data-testid={`project-settings-${key}`}
                         >
-                          {moveMessage.text}
-                        </span>
+                          <Icon className="h-4 w-4 shrink-0" /> {label}
+                        </button>
+                      ))}
+                    </nav>
+
+                    <div className="min-w-0 flex-1 space-y-6">
+                      {settingsSection === "privacy" && (
+                        <Card>
+                          <CardContent
+                            className="space-y-3 pt-6"
+                            data-testid="project-space-info"
+                          >
+                            {project.description && (
+                              <p className="text-sm text-muted-foreground">
+                                {project.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-muted-foreground">Space</span>
+                              <Badge variant="secondary" className="gap-1">
+                                {space?.isPersonal && (
+                                  <Lock className="h-3 w-3" aria-hidden />
+                                )}
+                                {space?.name ??
+                                  (typeof project.space === "string"
+                                    ? "Unknown space"
+                                    : project.space.name)}
+                              </Badge>
+                              {spaceId && (
+                                <Button
+                                  asChild
+                                  variant="link"
+                                  size="sm"
+                                  className="h-auto p-0"
+                                >
+                                  <Link href={`/spaces/${spaceId}`}>
+                                    Manage members in space
+                                  </Link>
+                                </Button>
+                              )}
+                            </div>
+
+                            {project.members.length > 0 && (
+                              <ul
+                                className="flex flex-wrap items-center gap-1"
+                                data-testid="member-list"
+                              >
+                                {project.members.map((member) => (
+                                  <li key={member["@id"]} data-testid="member-pill">
+                                    <Badge variant="outline">{member.email}</Badge>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+
+                      {settingsSection === "fields" && (
+                        <CustomFieldsManager
+                          projectIri={project["@id"]}
+                          projectTitle={project.title}
+                          spaceName={space?.name}
+                          isSpaceAdmin={isSpaceAdmin}
+                          onDefinitionsChanged={() => void reloadDefinitions()}
+                        />
+                      )}
+
+                      {settingsSection === "danger" && (
+                        <div className="space-y-6">
+                          <Card>
+                            <CardContent className="space-y-3 pt-6">
+                              <div>
+                                <h3 className="text-sm font-medium">Move or copy</h3>
+                                <p className="text-xs text-muted-foreground">
+                                  Relocate this project to another space, or duplicate it.
+                                </p>
+                              </div>
+                              <div
+                                className="flex flex-wrap items-center gap-2"
+                                data-testid="project-move-form"
+                              >
+                                <Label
+                                  htmlFor="project-move-target"
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  Move to
+                                </Label>
+                                <select
+                                  id="project-move-target"
+                                  value={moveTargetIri}
+                                  onChange={(e) => setMoveTargetIri(e.target.value)}
+                                  className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                                  data-testid="project-move-select"
+                                >
+                                  <option value="">Pick a space…</option>
+                                  {spaces
+                                    .filter((s) => s["@id"] !== projectSpaceIri(project))
+                                    .map((s) => (
+                                      <option key={s["@id"]} value={s["@id"]}>
+                                        {s.name}
+                                        {s.isPersonal ? " (Private)" : ""}
+                                      </option>
+                                    ))}
+                                </select>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleMove}
+                                  disabled={!moveTargetIri || isMoving || isCopying}
+                                  data-testid="project-move-submit"
+                                >
+                                  {isMoving ? "Moving…" : "Move"}
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={handleCopy}
+                                  disabled={isMoving || isCopying}
+                                  data-testid="project-copy-submit"
+                                >
+                                  {isCopying ? "Copying…" : "Copy"}
+                                </Button>
+                                <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={copyIncludeTasks}
+                                    onChange={(e) => setCopyIncludeTasks(e.target.checked)}
+                                    className="h-3.5 w-3.5"
+                                    data-testid="project-copy-include-tasks"
+                                  />
+                                  include tasks
+                                </label>
+                                {moveMessage && (
+                                  <span
+                                    role="alert"
+                                    className={cn(
+                                      "text-xs",
+                                      moveMessage.kind === "success"
+                                        ? "text-muted-foreground"
+                                        : "text-destructive",
+                                    )}
+                                  >
+                                    {moveMessage.text}
+                                  </span>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+
+                          <Card className="border-destructive/40">
+                            <CardContent className="space-y-3 pt-6">
+                              <div>
+                                <h3 className="text-sm font-medium text-destructive">
+                                  Delete this project
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                  Permanently delete this project and all of its tasks.
+                                  This can&apos;t be undone.
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setConfirmDeleteProjectOpen(true)}
+                                data-testid="project-delete"
+                              >
+                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete project
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        </div>
                       )}
                     </div>
+                  </div>
 
-                    {project.members.length > 0 && (
-                      <ul
-                        className="flex flex-wrap items-center gap-1"
-                        data-testid="member-list"
-                      >
-                        {project.members.map((member) => (
-                          <li key={member["@id"]} data-testid="member-pill">
-                            <Badge variant="outline">{member.email}</Badge>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
-
-                  <CustomFieldsManager
-                    projectIri={project["@id"]}
-                    projectTitle={project.title}
-                    spaceName={space?.name}
-                    isSpaceAdmin={isSpaceAdmin}
-                    onDefinitionsChanged={() => void reloadDefinitions()}
+                  <ConfirmDialog
+                    open={confirmDeleteProjectOpen}
+                    onOpenChange={setConfirmDeleteProjectOpen}
+                    title="Delete this project?"
+                    description={`"${project.title}" and all of its tasks will be permanently deleted. This can't be undone.`}
+                    confirmLabel="Delete project"
+                    onConfirm={handleDeleteProject}
                   />
                 </TabsContent>
 
