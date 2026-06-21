@@ -8,6 +8,7 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import ActivityPanel from "@/components/activity/ActivityPanel";
+import TaskBoard from "@/components/projects/TaskBoard";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
@@ -136,6 +137,8 @@ const ProjectDetail = () => {
   // Which detail tab is active — controlled so the header's "New task" button
   // can show on the Tasks tab only.
   const [activeTab, setActiveTab] = useState("tasks");
+  // Tasks tab view mode: the list (grouped tables) or the Kanban board.
+  const [view, setView] = useState<"list" | "board">("list");
   // Settings sub-section (left menu like the user settings page).
   const [settingsSection, setSettingsSection] = useState<
     "privacy" | "fields" | "danger"
@@ -457,6 +460,17 @@ const ProjectDetail = () => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete section.");
     }
+  };
+
+  // Move a task to another section (or the default group when null) — used by
+  // the board's drag-between-columns.
+  const moveTaskToSection = (taskIri: string, sectionIri: string | null) => {
+    const task = tasks.find((t) => t["@id"] === taskIri);
+    if (!task || task.section === sectionIri) return;
+    setTasks((prev) =>
+      prev.map((t) => (t["@id"] === taskIri ? { ...t, section: sectionIri } : t)),
+    );
+    void patchTask(task, { section: sectionIri });
   };
 
   const handleMove = async () => {
@@ -929,6 +943,55 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="tasks" className="mt-4">
+                  {/* List / Board view toggle. */}
+                  <div className="mb-4 inline-flex rounded-md border p-0.5">
+                    {(["list", "board"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setView(mode)}
+                        className={cn(
+                          "rounded px-3 py-1 text-sm capitalize transition-colors",
+                          view === mode
+                            ? "bg-muted font-medium text-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        data-testid={`view-${mode}`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+
+                  {view === "board" ? (
+                    <TaskBoard
+                      columns={sectionGroups.map((group) => ({
+                        key: group.key,
+                        sectionIri: group.section ? group.section["@id"] : null,
+                        title: group.section
+                          ? group.section.title
+                          : DEFAULT_SECTION_LABEL,
+                        tasks: group.tasks,
+                      }))}
+                      onOpen={(taskIri) => {
+                        const task = tasks.find((t) => t["@id"] === taskIri);
+                        if (task) openTaskDetail(task);
+                      }}
+                      onMove={moveTaskToSection}
+                      onAddTask={(sectionIri) => {
+                        setView("list");
+                        openAddRow(sectionIri);
+                      }}
+                      onAddSection={() => void createSection()}
+                      onDeleteSection={(sectionIri) => {
+                        const section = sections.find(
+                          (s) => s["@id"] === sectionIri,
+                        );
+                        if (section) void deleteSection(section);
+                      }}
+                    />
+                  ) : (
+                  <>
                   {/* Grand totals across the whole board — top. */}
                   <CustomFieldFooterRow
                     projectId={project.id}
@@ -990,6 +1053,8 @@ const ProjectDetail = () => {
                     heading="Grand total"
                     className="mt-6 rounded-lg"
                   />
+                  </>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4">

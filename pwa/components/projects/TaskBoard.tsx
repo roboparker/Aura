@@ -1,0 +1,263 @@
+import { useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+
+/**
+ * Kanban board view for a project: one column per board section, with task
+ * cards that open the detail drawer on click and drag between sections. The
+ * default "In progress" group (sectionIri === null) is the first column.
+ *
+ * Drag uses @dnd-kit with a pointer activation distance so a plain click still
+ * opens the drawer; dropping a card on a column moves the task to that section.
+ */
+export interface BoardTask {
+  "@id": string;
+  id: string;
+  title: string;
+  completedOn: string | null;
+  dueDate: string | null;
+  section: string | null;
+  tags: { "@id": string; title: string }[];
+  assignees: AvatarUser[];
+}
+
+export interface BoardColumn {
+  key: string;
+  sectionIri: string | null;
+  title: string;
+  tasks: BoardTask[];
+}
+
+interface TaskBoardProps {
+  columns: BoardColumn[];
+  onOpen: (taskIri: string) => void;
+  onMove: (taskIri: string, sectionIri: string | null) => void;
+  onAddTask: (sectionIri: string | null) => void;
+  onAddSection: () => void;
+  onDeleteSection: (sectionIri: string) => void;
+}
+
+const COL_PREFIX = "col:";
+
+const dueLabel = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+};
+
+const CardBody = ({ task }: { task: BoardTask }) => (
+  <div className="space-y-1.5">
+    <p
+      className={cn(
+        "text-sm leading-snug",
+        task.completedOn && "text-muted-foreground line-through",
+      )}
+    >
+      {task.title}
+    </p>
+    {(task.tags.length > 0 || task.dueDate || task.assignees.length > 0) && (
+      <div className="flex flex-wrap items-center gap-1">
+        {task.dueDate && (
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+            {dueLabel(task.dueDate)}
+          </Badge>
+        )}
+        {task.tags.map((tag) => (
+          <Badge
+            key={tag["@id"]}
+            variant="outline"
+            className="px-1.5 py-0 text-[10px] font-normal"
+          >
+            {tag.title}
+          </Badge>
+        ))}
+        {task.assignees.length > 0 && (
+          <span className="ml-auto flex -space-x-1.5">
+            {task.assignees.slice(0, 3).map((a, i) => (
+              <UserAvatar key={i} user={a} size="sm" className="ring-2 ring-card" />
+            ))}
+          </span>
+        )}
+      </div>
+    )}
+  </div>
+);
+
+const TaskCard = ({
+  task,
+  onOpen,
+}: {
+  task: BoardTask;
+  onOpen: (taskIri: string) => void;
+}) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task["@id"],
+  });
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      {...attributes}
+      {...listeners}
+      onClick={() => onOpen(task["@id"])}
+      className={cn(
+        "w-full cursor-grab rounded-lg border bg-card p-2.5 text-left shadow-sm transition hover:border-foreground/20 active:cursor-grabbing",
+        isDragging && "opacity-40",
+      )}
+      data-testid="board-card"
+    >
+      <CardBody task={task} />
+    </button>
+  );
+};
+
+const BoardColumnView = ({
+  column,
+  onOpen,
+  onAddTask,
+  onDeleteSection,
+}: {
+  column: BoardColumn;
+  onOpen: (taskIri: string) => void;
+  onAddTask: (sectionIri: string | null) => void;
+  onDeleteSection: (sectionIri: string) => void;
+}) => {
+  const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${column.key}` });
+  return (
+    <div className="flex w-72 shrink-0 flex-col" data-testid="board-column">
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <span className="text-sm font-semibold">{column.title}</span>
+        <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
+        {column.sectionIri && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Section actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => onDeleteSection(column.sectionIri as string)}
+                className="text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete section
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+      <div
+        ref={setNodeRef}
+        className={cn(
+          "flex min-h-24 flex-1 flex-col gap-2 rounded-lg border border-dashed border-transparent bg-muted/30 p-2 transition",
+          isOver && "border-foreground/30 bg-muted/60",
+        )}
+      >
+        {column.tasks.map((task) => (
+          <TaskCard key={task["@id"]} task={task} onOpen={onOpen} />
+        ))}
+        <button
+          type="button"
+          onClick={() => onAddTask(column.sectionIri)}
+          className="flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+          data-testid="board-add-task"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add task
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const TaskBoard = ({
+  columns,
+  onOpen,
+  onMove,
+  onAddTask,
+  onAddSection,
+  onDeleteSection,
+}: TaskBoardProps) => {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const draggingTask = draggingId
+    ? columns.flatMap((c) => c.tasks).find((t) => t["@id"] === draggingId)
+    : null;
+
+  const handleStart = (event: DragStartEvent) =>
+    setDraggingId(String(event.active.id));
+
+  const handleEnd = (event: DragEndEvent) => {
+    setDraggingId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const overId = String(over.id);
+    if (!overId.startsWith(COL_PREFIX)) return;
+    const colKey = overId.slice(COL_PREFIX.length);
+    const target = columns.find((c) => c.key === colKey);
+    if (!target) return;
+    const taskIri = String(active.id);
+    const task = columns.flatMap((c) => c.tasks).find((t) => t["@id"] === taskIri);
+    if (task && task.section !== target.sectionIri) {
+      onMove(taskIri, target.sectionIri);
+    }
+  };
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
+      <div className="flex gap-4 overflow-x-auto pb-2" data-testid="task-board">
+        {columns.map((column) => (
+          <BoardColumnView
+            key={column.key}
+            column={column}
+            onOpen={onOpen}
+            onAddTask={onAddTask}
+            onDeleteSection={onDeleteSection}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={onAddSection}
+          className="flex h-9 w-72 shrink-0 items-center gap-1 rounded-lg border border-dashed px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+          data-testid="board-add-section"
+        >
+          <Plus className="h-4 w-4" /> Add section
+        </button>
+      </div>
+      <DragOverlay>
+        {draggingTask ? (
+          <div className="w-72 rounded-lg border bg-card p-2.5 shadow-lg">
+            <CardBody task={draggingTask} />
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+};
+
+export default TaskBoard;
