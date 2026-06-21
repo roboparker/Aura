@@ -50,7 +50,7 @@ const Basic = () => {
 const PermissionTreePage = () => (
   <ComponentDoc
     name="PermissionTree"
-    description="Reusable nested permission editor. The data model is a flat `{ leafKey: levelValue }` map; the UX is three deep — a master None/Custom/All row, per-group None/Custom/All rows that expand to their leaves, and per-leaf level controls. None sets the subtree to the first (least-privileged) level, All to the last, and Custom reveals the leaves for a mixed selection. Feature-agnostic: pass your own `levels` (ordered least → most privileged) and `nodes`. First used for admin-impersonation consent; intended to back API-key scopes and other per-feature grants."
+    description="Reusable nested permission editor. The data model is a flat `{ leafKey: levelValue }` map; the UX is three deep — a master None/Custom/All row, per-group None/Custom/All rows that expand to their leaves, and per-leaf level controls. None sets the subtree to the first (least-privileged) level, All to the last, and Custom reveals the leaves for a mixed selection. Feature-agnostic: pass your own `levels` (ordered least → most privileged) and `nodes`, and an optional `masterLabel` to retitle the master row (defaults to `All categories`). First used for admin-impersonation consent; intended to back API-key scopes and other per-feature grants."
     importPath={`import PermissionTree from "@/components/common/PermissionTree";`}
     examples={[
       {
