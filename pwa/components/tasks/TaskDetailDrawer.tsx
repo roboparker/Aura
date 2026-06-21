@@ -453,7 +453,7 @@ const TaskDetailDrawer = ({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4">
+            <div className="flex min-h-0 flex-1 flex-col space-y-5 overflow-y-auto px-5 py-4">
               <dl className="space-y-3 text-sm">
                 <Row label="Tags">
                   <TagsCombobox
@@ -555,7 +555,7 @@ const TaskDetailDrawer = ({
                 onDetach={handleDetach}
               />
 
-              <Tabs defaultValue="comments" className="border-t pt-4">
+              <Tabs defaultValue="comments" className="mt-auto border-t pt-4">
                 <TabsList variant="line">
                   <TabsTrigger value="comments" data-testid="task-tab-comments">
                     Comments {comments.length > 0 ? `(${comments.length})` : ""}
