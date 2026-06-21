@@ -237,6 +237,27 @@ const ProjectDetail = () => {
     if (isAuthenticated && projectId) void load();
   }, [isAuthenticated, projectId, load]);
 
+  // Re-sync the task-column definitions after the Settings-tab manager mutates
+  // them, so a created/edited/reordered/deleted field reflects without reload.
+  const reloadDefinitions = useCallback(async () => {
+    if (!project) return;
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(project["@id"])}`,
+        { credentials: "include" },
+      );
+      if (res.ok) {
+        setDefinitions(
+          membersOf<CustomFieldDefinition>(await res.json()).sort(
+            (a, b) => a.position - b.position,
+          ),
+        );
+      }
+    } catch {
+      /* keep the current columns on a transient failure */
+    }
+  }, [project]);
+
   // Generic single-task PATCH used by every inline row editor.
   const patchTask = useCallback(
     async (task: ProjectTask, body: Record<string, unknown>) => {
@@ -647,6 +668,7 @@ const ProjectDetail = () => {
                     projectTitle={project.title}
                     spaceName={space?.name}
                     isSpaceAdmin={isSpaceAdmin}
+                    onDefinitionsChanged={() => void reloadDefinitions()}
                   />
                 </TabsContent>
 

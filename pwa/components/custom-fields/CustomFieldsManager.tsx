@@ -57,6 +57,9 @@ interface Props {
   /** Active space name, surfaced in the admin notice + reference scope note. */
   spaceName?: string;
   isSpaceAdmin: boolean;
+  /** Fired after any definition mutation (create/edit/delete/reorder) so a
+   *  host that also renders the definitions (e.g. task columns) can re-sync. */
+  onDefinitionsChanged?: () => void;
 }
 
 const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
@@ -92,6 +95,7 @@ const CustomFieldsManager = ({
   projectTitle,
   spaceName,
   isSpaceAdmin,
+  onDefinitionsChanged,
 }: Props) => {
   const projectId = projectIdFromIri(projectIri);
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
@@ -183,10 +187,12 @@ const CustomFieldsManager = ({
       return sortByPosition(next);
     });
     void loadStats();
+    onDefinitionsChanged?.();
   };
 
   const handleDeleted = (def: CustomFieldDefinition) => {
     setDefs((prev) => prev.filter((d) => d["@id"] !== def["@id"]));
+    onDefinitionsChanged?.();
   };
 
   // Deletion is confirmed through the shared ConfirmDialog; the action throws
@@ -247,6 +253,7 @@ const CustomFieldsManager = ({
           },
         );
         if (!res.ok) throw new Error(await errorMessage(res));
+        onDefinitionsChanged?.();
       } catch (err) {
         setLoadError(
           err instanceof Error ? err.message : "Failed to save order.",
@@ -254,7 +261,7 @@ const CustomFieldsManager = ({
         void load(); // re-sync to the server's truth
       }
     },
-    [projectId, load],
+    [projectId, load, onDefinitionsChanged],
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
