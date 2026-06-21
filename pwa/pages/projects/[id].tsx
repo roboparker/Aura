@@ -2,13 +2,14 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, PanelRight, Plus, Settings2 } from "lucide-react";
+import { Lock, PanelRight, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
+import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
@@ -143,7 +144,6 @@ const ProjectDetail = () => {
   const newTaskInputRef = useRef<HTMLInputElement | null>(null);
 
   // Move / copy to space (#182).
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [moveTargetIri, setMoveTargetIri] = useState("");
   const [isMoving, setIsMoving] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
@@ -466,6 +466,13 @@ const ProjectDetail = () => {
       ? project.space.split("/").pop()
       : project.space.id
     : undefined;
+  const isSpaceAdmin = Boolean(
+    space &&
+      user &&
+      space.userMemberships.some(
+        (m) => m.user.id === user.id && m.role === "admin",
+      ),
+  );
 
   return (
     <>
@@ -501,25 +508,6 @@ const ProjectDetail = () => {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setSettingsOpen((v) => !v)}
-                    aria-pressed={settingsOpen}
-                    data-testid="project-settings-toggle"
-                  >
-                    <Settings2 className="mr-1 h-3.5 w-3.5" /> Settings
-                  </Button>
-                  <Button
-                    asChild
-                    variant="outline"
-                    size="sm"
-                    data-testid="project-custom-fields-link"
-                  >
-                    <Link href={`/projects/${project.id}/custom-fields`}>
-                      Custom fields
-                    </Link>
-                  </Button>
-                  <Button
                     size="sm"
                     onClick={openAddRow}
                     data-testid="project-new-task"
@@ -535,9 +523,20 @@ const ProjectDetail = () => {
                 </Alert>
               )}
 
-              {/* Collapsible project settings (space badge + move/copy + members) */}
-              {settingsOpen && (
-                <Card className="mb-4">
+              <Tabs defaultValue="tasks">
+                <TabsList variant="line">
+                  <TabsTrigger value="tasks">
+                    Tasks{" "}
+                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsTrigger value="settings" data-testid="project-settings-tab">
+                    Settings
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="settings" className="mt-4 space-y-6">
+                  <Card>
                   <CardContent className="space-y-3 pt-6" data-testid="project-space-info">
                     {project.description && (
                       <p className="text-sm text-muted-foreground">{project.description}</p>
@@ -642,16 +641,14 @@ const ProjectDetail = () => {
                     )}
                   </CardContent>
                 </Card>
-              )}
 
-              <Tabs defaultValue="tasks">
-                <TabsList variant="line">
-                  <TabsTrigger value="tasks">
-                    Tasks{" "}
-                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
+                  <CustomFieldsManager
+                    projectIri={project["@id"]}
+                    projectTitle={project.title}
+                    spaceName={space?.name}
+                    isSpaceAdmin={isSpaceAdmin}
+                  />
+                </TabsContent>
 
                 <TabsContent value="tasks" className="mt-4">
                   {tasks.length === 0 && !addOpen ? (
