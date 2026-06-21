@@ -28,6 +28,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -429,7 +430,7 @@ const ProjectDetail = () => {
   }, [tasks]);
 
   const openCount = tasks.filter((t) => !t.completedOn).length;
-  const totalCols = 6 + definitions.length;
+  const totalCols = 7 + definitions.length;
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -669,6 +670,7 @@ const ProjectDetail = () => {
                             <th className="w-8 px-3 py-2" />
                             <th className="w-10 px-1 py-2 text-left font-medium">#</th>
                             <th className="px-2 py-2 text-left font-medium">Task</th>
+                            <th className="px-2 py-2 text-left font-medium">Tags</th>
                             {definitions.map((def) => (
                               <th
                                 key={def["@id"]}
@@ -720,7 +722,7 @@ const ProjectDetail = () => {
                                 />
                               </td>
                               <td
-                                colSpan={definitions.length + 3}
+                                colSpan={definitions.length + 4}
                                 className="px-2 py-2 text-xs text-muted-foreground"
                               >
                                 Enter to add · Esc to cancel
@@ -870,12 +872,11 @@ const ProjectTaskRow = ({
       data-testid="project-task-item"
     >
       <td className="px-3 py-2 align-top">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={!!task.completedOn}
-          onChange={() => onToggle(task)}
+          onCheckedChange={() => onToggle(task)}
           aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
-          className="mt-2 h-4 w-4 cursor-pointer"
+          className="mt-1 size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
         />
       </td>
       <td className="px-1 py-2 align-top text-xs text-muted-foreground">
@@ -893,14 +894,14 @@ const ProjectTaskRow = ({
         >
           {task.title}
         </button>
-        <div className="mt-1">
-          <TagsCombobox
-            value={task.tags}
-            options={allTags}
-            onChange={(iris) => void patchTask(task, { tags: iris })}
-            subjectLabel={task.title}
-          />
-        </div>
+      </td>
+      <td className="px-2 py-2 align-top">
+        <TagsCombobox
+          value={task.tags}
+          options={allTags}
+          onChange={(iris) => void patchTask(task, { tags: iris })}
+          subjectLabel={task.title}
+        />
       </td>
       {definitions.map((def) => (
         <td key={def["@id"]} className="px-2 py-2 align-top">
