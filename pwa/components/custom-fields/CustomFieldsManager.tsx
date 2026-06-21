@@ -34,6 +34,7 @@ import { fieldHandle } from "./handle";
 import { KIND_BADGE, kindLabelFor, subtypeLabelFor } from "./kind-editors";
 import type {
   CustomFieldDefinition,
+  CustomFieldVisibility,
   FieldStatsResponse,
 } from "./types";
 
@@ -63,6 +64,12 @@ interface Props {
 }
 
 const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
+
+const VISIBILITY_LABELS: Record<CustomFieldVisibility, string> = {
+  list: "List",
+  board: "Board",
+  both: "Both",
+};
 
 /** `Spring Collection Launch` → `spring-collection-launch` (header badge). */
 const slugify = (value: string): string =>
@@ -224,6 +231,7 @@ const CustomFieldsManager = ({
             config: def.config,
             nullable: def.nullable,
             footer: def.footer,
+            visibility: def.visibility,
             project: projectIri,
             position: nextPosition,
           }),
@@ -395,6 +403,7 @@ const CustomFieldsManager = ({
                 <TableHead>Name</TableHead>
                 <TableHead>Kind</TableHead>
                 <TableHead>Required</TableHead>
+                <TableHead>Visibility</TableHead>
                 <TableHead>Footer</TableHead>
                 <TableHead className="text-right">Filled</TableHead>
                 {isSpaceAdmin && (
@@ -568,6 +577,11 @@ const FieldRow = ({
             Required
           </span>
         )}
+      </TableCell>
+      <TableCell>
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-input bg-muted/40 px-2.5 py-0.5 text-xs text-muted-foreground">
+          {VISIBILITY_LABELS[def.visibility ?? "both"]}
+        </span>
       </TableCell>
       <TableCell>
         {def.footer ? (

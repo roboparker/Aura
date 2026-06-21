@@ -98,6 +98,17 @@ class CustomFieldDefinition
 
     public const MAX_NAME_LENGTH = 80;
 
+    public const VISIBILITY_LIST = 'list';
+    public const VISIBILITY_BOARD = 'board';
+    public const VISIBILITY_BOTH = 'both';
+
+    /** @var list<string> */
+    public const VISIBILITIES = [
+        self::VISIBILITY_LIST,
+        self::VISIBILITY_BOARD,
+        self::VISIBILITY_BOTH,
+    ];
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -193,6 +204,20 @@ class CustomFieldDefinition
     #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
     private int $position = 0;
+
+    /**
+     * Where the field is shown to readers: in the project task list
+     * (`list`), the Kanban board cards (`board`), or both (default).
+     * The task detail drawer always shows every field regardless.
+     */
+    #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_BOTH])]
+    #[Assert\Choice(
+        choices: self::VISIBILITIES,
+        message: 'Visibility must be one of: {{ choices }}.',
+    )]
+    #[Gedmo\Versioned]
+    #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
+    private string $visibility = self::VISIBILITY_BOTH;
 
     /**
      * Legacy `required` column — kept as a denormalised mirror of
@@ -357,6 +382,17 @@ class CustomFieldDefinition
     public function setPosition(int $position): static
     {
         $this->position = $position;
+        return $this;
+    }
+
+    public function getVisibility(): string
+    {
+        return $this->visibility;
+    }
+
+    public function setVisibility(string $visibility): static
+    {
+        $this->visibility = $visibility;
         return $this;
     }
 

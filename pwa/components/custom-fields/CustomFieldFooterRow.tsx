@@ -23,6 +23,9 @@ interface Props {
    *  standalone rounded card instead of the table-attached style. */
   heading?: string;
   className?: string;
+  /** When set, only footers for these definition IRIs are shown — keeps the
+   *  list footer in step with the list's `visibility`-filtered columns. */
+  visibleDefinitions?: string[];
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -73,6 +76,7 @@ const CustomFieldFooterRow = ({
   refreshKey,
   heading,
   className,
+  visibleDefinitions,
 }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +105,11 @@ const CustomFieldFooterRow = ({
     };
   }, [projectId, filters, refreshKey]);
 
-  if (error || rows.length === 0) return null;
+  const visibleRows = visibleDefinitions
+    ? rows.filter((row) => visibleDefinitions.includes(row.definition))
+    : rows;
+
+  if (error || visibleRows.length === 0) return null;
 
   return (
     <Card
@@ -117,7 +125,7 @@ const CustomFieldFooterRow = ({
             {heading}
           </span>
         )}
-        {rows.map((row) => (
+        {visibleRows.map((row) => (
           <div
             key={row.definition}
             className="flex items-baseline gap-2"
