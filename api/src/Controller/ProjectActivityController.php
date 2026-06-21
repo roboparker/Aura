@@ -51,14 +51,36 @@ class ProjectActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $taskIds = array_values(array_map(
+        $taskIds = array_map(
             static fn (Task $t): string => (string) $t->getId(),
             $project->getTasks()->toArray(),
-        ));
+        );
+
+        // Tasks deleted from this project keep their audit rows (the log table
+        // has no FK to the task). Recover their object ids from the versioned
+        // `project` recorded on each create/update entry so the board's history
+        // still shows a deleted task's lifecycle, ending in its remove event.
+        // Gedmo serialises the versioned association as `{"id": "<uuid>"}`, so
+        // reach into the nested id rather than comparing the whole object.
+        $sql = <<<'SQL'
+            SELECT DISTINCT object_id
+            FROM ext_log_entries
+            WHERE object_class = :class AND data->'project'->>'id' = :pid
+            SQL;
+        $rows = $this->em->getConnection()
+            ->executeQuery($sql, [
+                'class' => Task::class,
+                'pid' => (string) $project->getId(),
+            ])
+            ->fetchFirstColumn();
+        // object_id is a VARCHAR column, so values are strings; filter defensively.
+        $deleted = array_filter($rows, static fn (mixed $oid): bool => is_string($oid));
+
+        $allTaskIds = array_values(array_unique([...$taskIds, ...$deleted]));
 
         return new JsonResponse($this->activityFeed->forObjectGroups([
             Project::class => [(string) $project->getId()],
-            Task::class => $taskIds,
+            Task::class => $allTaskIds,
         ], $request));
     }
 

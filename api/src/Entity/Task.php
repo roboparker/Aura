@@ -112,6 +112,10 @@ class Task
      */
     #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    // Versioned so the audit log records which project a task belonged to —
+    // the board's activity feed keys on this to keep a deleted task's history
+    // (ending in its remove event) even after the row is gone.
+    #[Gedmo\Versioned]
     #[Groups(['task:read', 'task:write'])]
     private ?Project $project = null;
 
