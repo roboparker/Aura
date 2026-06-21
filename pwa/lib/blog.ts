@@ -1,34 +1,23 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import type { BlogPost, BlogPostSummary } from "./blogTypes";
 
 /**
- * File-based blog. Posts are markdown files committed under
+ * File-based blog loader. Posts are markdown files committed under
  * `pwa/content/blog/*.md` with YAML-ish frontmatter, so the content lives
  * in version control (history, diffs, PR review) and ships as static HTML.
  *
- * Server-only — imported solely from `getStaticProps` / `getStaticPaths`
- * (and the build-time sitemap script). The prod image doesn't copy the
- * `content/` tree, so nothing here may run at request time; the pages it
- * feeds are statically generated at build.
+ * Server-only — this module imports `node:fs` and so MUST only be referenced
+ * from `getStaticProps` / `getStaticPaths` (which Next strips from the client
+ * bundle) and the build-time sitemap script. Client-safe types + helpers live
+ * in `./blogTypes`. The prod image doesn't copy the `content/` tree, so
+ * nothing here may run at request time; the pages it feeds are statically
+ * generated at build.
  */
 
 const BLOG_ROOT = resolve(process.cwd(), "content", "blog");
 
-export interface BlogPost {
-  slug: string;
-  title: string;
-  description: string | null;
-  /** Path to a committed social-share image, e.g. `/blog/foo.png`. */
-  ogImage: string | null;
-  /** ISO date (or `YYYY-MM-DD`) from frontmatter. */
-  date: string | null;
-  author: string | null;
-  draft: boolean;
-  body: string;
-}
-
-/** Listing/summary view — everything but the (potentially large) body. */
-export type BlogPostSummary = Omit<BlogPost, "body">;
+export type { BlogPost, BlogPostSummary } from "./blogTypes";
 
 /**
  * Minimal frontmatter parser. Handles a leading `---` fenced block of
@@ -161,17 +150,4 @@ export function siteUrl(): string {
     /\/$/,
     "",
   );
-}
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-/** Deterministic UTC date formatting ("June 21, 2026"). */
-export function formatBlogDate(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 }

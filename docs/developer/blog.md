@@ -42,10 +42,15 @@ Everything is resolved at **build time** — the production image only ships
 `public/` + `.next`, never the `content/` tree, so nothing reads markdown at
 request time.
 
-- `pwa/lib/blog.ts` — server-only loader (`getAllPosts`, `getPostSummaries`,
-  `getPostBySlug`) that reads `pwa/content/blog/*.md`, parses frontmatter
-  (a small dependency-free parser), and exposes `siteUrl()` +
-  `formatBlogDate()`. Imported only from `getStaticProps`/`getStaticPaths`.
+- `pwa/lib/blog.ts` — **server-only** loader (`getAllPosts`,
+  `getPostSummaries`, `getPostBySlug`, `siteUrl`) that reads
+  `pwa/content/blog/*.md` and parses frontmatter (a small dependency-free
+  parser). It imports `node:fs`, so it must be referenced **only** from
+  `getStaticProps`/`getStaticPaths` (which Next strips from the client
+  bundle) — using it in a component would pull `fs` into the browser build
+  and fail under Turbopack.
+- `pwa/lib/blogTypes.ts` — client-safe types + `formatBlogDate()`, free of
+  any `node:` imports so the page components can use them directly.
 - `pwa/pages/blog/index.tsx` — SSG listing (`getStaticProps`).
 - `pwa/pages/blog/[slug].tsx` — SSG detail (`getStaticPaths` + `getStaticProps`,
   `fallback: false`) with the full SEO `<head>`: description, canonical,

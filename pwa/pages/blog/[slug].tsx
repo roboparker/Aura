@@ -5,13 +5,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  formatBlogDate,
-  getAllPosts,
-  getPostBySlug,
-  siteUrl,
-  type BlogPost,
-} from "@/lib/blog";
+import { formatBlogDate, type BlogPost } from "@/lib/blogTypes";
+import { getAllPosts, getPostBySlug, siteUrl } from "@/lib/blog";
 
 interface Props {
   post: BlogPost;

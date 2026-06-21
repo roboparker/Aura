@@ -1,12 +1,8 @@
 import type { GetStaticProps, NextPage } from "next";
 import Head from "next/head";
 import Link from "next/link";
-import {
-  formatBlogDate,
-  getPostSummaries,
-  siteUrl,
-  type BlogPostSummary,
-} from "@/lib/blog";
+import { formatBlogDate, type BlogPostSummary } from "@/lib/blogTypes";
+import { getPostSummaries, siteUrl } from "@/lib/blog";
 
 interface Props {
   posts: BlogPostSummary[];
