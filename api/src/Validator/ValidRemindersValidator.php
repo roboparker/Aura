@@ -40,8 +40,10 @@ final class ValidRemindersValidator extends ConstraintValidator
             return;
         }
 
+        // A relative reminder anchors to the due date, but we allow storing one
+        // before a due date exists: it stays dormant (ReminderScheduler skips it
+        // when there's no anchor) and starts firing once a due date is set.
         $keys = [];
-        $needsDueDate = false;
         foreach ($reminders as $reminder) {
             if (!is_array($reminder) || !$this->scheduler->isValidShape($reminder)) {
                 $this->violate($constraint->messageInvalidShape);
@@ -53,13 +55,6 @@ final class ValidRemindersValidator extends ConstraintValidator
                 return;
             }
             $keys[$key] = true;
-            if ($this->scheduler->requiresDueDate($reminder)) {
-                $needsDueDate = true;
-            }
-        }
-
-        if ($needsDueDate && null === $value->getDueDate()) {
-            $this->violate($constraint->messageRequiresDueDate);
         }
     }
 
