@@ -21,6 +21,7 @@ import AttachmentsPanel from "@/components/tasks/AttachmentsPanel";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import RecurrenceEditor from "@/components/tasks/RecurrenceEditor";
 import RemindersEditor from "@/components/tasks/RemindersEditor";
+import TaskRelationshipsPanel from "@/components/tasks/TaskRelationshipsPanel";
 import CommentsPanel from "@/components/common/CommentsPanel";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldValueList, {
@@ -525,6 +526,8 @@ const TaskDetailDrawer = ({
                   users={assignableUsers}
                 />
               )}
+
+              <TaskRelationshipsPanel taskIri={task["@id"]} />
 
               <div className="space-y-1.5">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
