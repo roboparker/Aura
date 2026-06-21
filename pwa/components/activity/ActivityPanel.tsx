@@ -51,22 +51,60 @@ export interface ActivityPanelProps {
   endpoint: string;
 }
 
-const renderChanges = (data: Record<string, unknown>): string | null => {
-  const keys = Object.keys(data);
-  if (keys.length === 0) return null;
-  // For v1 we just list "field: value" — historic values are not in
-  // the payload because Gedmo only stores the new state. Surfacing
-  // before-state would mean walking adjacent versions, which is a v2
-  // concern.
-  return keys.map((k) => `${k}: ${formatValue(data[k])}`).join(", ");
+// "completedOn" → "completed on", "dueDate" → "due date", "maxLength" → "max length".
+const humanizeKey = (key: string): string =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .toLowerCase();
+
+// Gedmo serialises a versioned association as a bare `{ id }` — a UUID with
+// nothing human to show, so we drop those keys from the summary.
+const isReference = (value: unknown): boolean =>
+  typeof value === "object" &&
+  value !== null &&
+  "id" in value &&
+  Object.keys(value).length === 1;
+
+// PHP `DateTime` serialises as `{ date, timezone_type, timezone }`.
+const isPhpDate = (value: unknown): value is { date: string } =>
+  typeof value === "object" &&
+  value !== null &&
+  "date" in value &&
+  typeof (value as { date: unknown }).date === "string";
+
+const DATE_FMT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});
+
+const formatPhpDate = (raw: string): string => {
+  // "2026-06-21 00:32:03.354000" (UTC) → a real Date; trim micro→milliseconds.
+  const normalized = raw.replace(" ", "T").replace(/(\.\d{3})\d*/, "$1");
+  const iso = /([+-]\d{2}:?\d{2}|Z)$/.test(normalized)
+    ? normalized
+    : `${normalized}Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? raw : DATE_FMT.format(date);
 };
 
 const formatValue = (value: unknown): string => {
   if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "yes" : "no";
   if (typeof value === "string") return value === "" ? "—" : value;
-  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "number") return String(value);
+  if (isPhpDate(value)) return formatPhpDate(value.date);
   if (typeof value === "object") return JSON.stringify(value);
   return String(value);
+};
+
+const renderChanges = (data: Record<string, unknown>): string | null => {
+  // List "field: value" for the new state (Gedmo only stores the new value,
+  // not the before — surfacing the diff would mean walking adjacent versions).
+  const parts = Object.entries(data)
+    .filter(([, value]) => !isReference(value))
+    .map(([key, value]) => `${humanizeKey(key)}: ${formatValue(value)}`);
+  return parts.length === 0 ? null : parts.join(", ");
 };
 
 const ActivityPanel = ({ endpoint }: ActivityPanelProps) => {
