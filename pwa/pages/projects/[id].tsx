@@ -1389,13 +1389,16 @@ const SectionBlock = ({
             )}
           </tbody>
         </table>
-        </div>
+        {/* Per-section aggregates: a flush, column-aligned footer inside the
+            same scroll container so it lines up with the columns above. */}
         <CustomFieldFooterRow
           projectId={projectId}
           filters={footerFilter}
           refreshKey={footerKey}
-          visibleDefinitions={definitions.map((d) => d["@id"])}
+          columns={definitions}
+          flush
         />
+        </div>
       </div>
     </div>
   );

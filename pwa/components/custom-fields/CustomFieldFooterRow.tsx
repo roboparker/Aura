@@ -34,6 +34,9 @@ interface Props {
   columns?: CustomFieldDefinition[];
   /** Stronger styling for the grand-total bars. */
   prominent?: boolean;
+  /** Render as a bare table (no card wrapper) to sit inside a section table's
+   *  scroll container as a flush, column-aligned footer. */
+  flush?: boolean;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -87,6 +90,7 @@ const CustomFieldFooterRow = ({
   visibleDefinitions,
   columns,
   prominent,
+  flush,
 }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -121,10 +125,62 @@ const CustomFieldFooterRow = ({
 
   if (error || visibleRows.length === 0) return null;
 
-  // Column-aligned bar: a table-fixed table sharing the section tables'
-  // columns, so each total lands under its custom-field column.
+  // Column-aligned aggregate bar: a table-fixed table sharing the section
+  // tables' columns, so each aggregate lands under its custom-field column.
+  // Each cell stacks the aggregate type over its value (no field name — the
+  // column header conveys that). Used for both per-section and grand totals.
   if (columns) {
     const valueByDef = new Map(rows.map((row) => [row.definition, row]));
+    const cells = (
+      <>
+        <td className="px-3 py-2" />
+        <td className="px-1 py-2" />
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+        {columns.map((def) => {
+          const row = valueByDef.get(def["@id"]);
+          return (
+            <td
+              key={def["@id"]}
+              className="px-2 py-2 align-top"
+              data-testid="custom-field-footer-cell"
+            >
+              {row && (
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {row.label ?? row.kind}
+                  </span>
+                  <span className="truncate tabular-nums font-semibold">
+                    {formatValue(row)}
+                  </span>
+                </div>
+              )}
+            </td>
+          );
+        })}
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+      </>
+    );
+
+    // Flush: a bare table that lives inside a section table's scroll container,
+    // lining up with that table's columns and scrolling with it.
+    if (flush) {
+      return (
+        <table
+          className="w-full table-fixed border-t text-sm"
+          data-testid="custom-field-footer-row"
+        >
+          <TaskTableColumns definitions={columns} />
+          <tbody>
+            <tr>{cells}</tr>
+          </tbody>
+        </table>
+      );
+    }
+
+    // Standalone grand-total bar.
     return (
       <div
         className={cn(
@@ -138,27 +194,7 @@ const CustomFieldFooterRow = ({
           <table className="w-full table-fixed text-sm">
             <TaskTableColumns definitions={columns} />
             <tbody>
-              <tr className={cn(prominent && "font-semibold")}>
-                <td className="px-3 py-2.5" />
-                <td className="px-1 py-2.5" />
-                <td className="px-2 py-2.5" />
-                <td className="px-2 py-2.5" />
-                {columns.map((def) => {
-                  const row = valueByDef.get(def["@id"]);
-                  return (
-                    <td
-                      key={def["@id"]}
-                      className="truncate px-2 py-2.5 tabular-nums"
-                      data-testid="custom-field-footer-cell"
-                    >
-                      {row ? formatValue(row) : ""}
-                    </td>
-                  );
-                })}
-                <td className="px-2 py-2.5" />
-                <td className="px-2 py-2.5" />
-                <td className="px-2 py-2.5" />
-              </tr>
+              <tr>{cells}</tr>
             </tbody>
           </table>
         </div>
