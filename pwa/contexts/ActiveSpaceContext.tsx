@@ -6,6 +6,7 @@ import {
   useEffect,
   useState,
 } from "react";
+import { useRouter } from "next/router";
 import { ENTRYPOINT } from "../config/entrypoint";
 import { useAuth } from "./AuthContext";
 
@@ -119,6 +120,12 @@ const storageKeyFor = (userId: string) => `${STORAGE_PREFIX}.${userId}`;
 // rather than restoring whatever was last selected on this browser.
 const RESET_FLAG_KEY = "madori.activeSpaceReset";
 
+// sessionStorage flag holding the space id a fresh sign-in is trying to land
+// in (the #406 "Start page" space choice). If that space turns out to be
+// inaccessible by the time the space list loads, the resolver sends the user
+// to the all-spaces page instead of silently dropping them into Private.
+const LANDING_PENDING_KEY = "madori.activeSpaceLandingPending";
+
 /**
  * Called by the sign-in flow on a successful login so the post-login
  * landing starts in the user's Private space instead of restoring the
@@ -144,14 +151,16 @@ export function markActiveSpaceReset() {
  * `user` lags a just-completed login by a render, so we can't go through
  * the context setter here) and clears any pending reset flag so the
  * landing resolution in {@link ActiveSpaceProvider} restores this choice.
- * If the chosen space later becomes inaccessible the resolver falls back
- * to the personal space, same as any stale stored selection.
+ * If the chosen space turns out to be inaccessible (deleted, left), the
+ * resolver redirects to the all-spaces page rather than silently landing
+ * in the personal space (the `LANDING_PENDING_KEY` flag drives that).
  */
 export function markActiveSpaceLanding(userId: string, spaceId: string) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(storageKeyFor(userId), spaceId);
     window.sessionStorage.removeItem(RESET_FLAG_KEY);
+    window.sessionStorage.setItem(LANDING_PENDING_KEY, spaceId);
   } catch {
     // Storage-disabled browsers: fall back to whatever the resolver
     // settles on (the personal space) — acceptable, not worth surfacing.
@@ -176,6 +185,7 @@ export function markActiveSpaceLanding(userId: string, spaceId: string) {
  */
 export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
 
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
@@ -243,6 +253,22 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
     // user.id is the dependency — switching accounts in the same tab
     // (impersonation, sign-out + sign-in) gives a fresh list.
   }, [authLoading, isAuthenticated, user?.id, fetchSpaces]);
+
+  // A fresh sign-in asked to land in a specific "Start page" space. Once the
+  // space list has loaded, if that space is no longer accessible, send the
+  // user to the all-spaces page instead of silently resolving to Private.
+  // One-shot: the flag is cleared as soon as it's evaluated.
+  useEffect(() => {
+    if (isLoading || authLoading || !isAuthenticated) return;
+    if (typeof window === "undefined") return;
+    const pending = window.sessionStorage.getItem(LANDING_PENDING_KEY);
+    if (pending === null) return;
+    window.sessionStorage.removeItem(LANDING_PENDING_KEY);
+    // Skip on a load error (the all-spaces page would fail the same way).
+    if (error === null && !spaces.some((s) => s.id === pending)) {
+      void router.replace("/spaces");
+    }
+  }, [isLoading, authLoading, isAuthenticated, error, spaces, router]);
 
   const personalSpace = spaces.find((s) => s.isPersonal) ?? null;
 

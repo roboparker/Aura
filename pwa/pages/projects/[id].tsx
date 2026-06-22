@@ -179,24 +179,32 @@ const ProjectDetail = () => {
     typeof router.query.task === "string" ? router.query.task : null;
   const openTaskDetail = useCallback(
     (task: ProjectTask) => {
+      if (!projectId) return;
+      // Interpolate `id` explicitly — relying on router.query alone throws in
+      // Next 16 if the dynamic param is momentarily absent during a shallow
+      // route transition.
       void router.push(
-        { pathname: router.pathname, query: { ...router.query, task: task.id } },
+        {
+          pathname: "/projects/[id]",
+          query: { ...router.query, id: projectId, task: task.id },
+        },
         undefined,
         { shallow: true },
       );
     },
-    [router],
+    [router, projectId],
   );
   const closeTaskDetail = useCallback(
     (open: boolean) => {
-      if (open) return;
+      if (open || !projectId) return;
       const query = { ...router.query };
       delete query.task;
-      void router.push({ pathname: router.pathname, query }, undefined, {
+      query.id = projectId;
+      void router.push({ pathname: "/projects/[id]", query }, undefined, {
         shallow: true,
       });
     },
-    [router],
+    [router, projectId],
   );
 
   useEffect(() => {
