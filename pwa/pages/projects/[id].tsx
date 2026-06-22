@@ -1247,7 +1247,8 @@ const SectionBlock = ({
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-t-lg border">
+      <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
@@ -1376,6 +1377,7 @@ const SectionBlock = ({
             )}
           </tbody>
         </table>
+        </div>
         <CustomFieldFooterRow
           projectId={projectId}
           filters={footerFilter}

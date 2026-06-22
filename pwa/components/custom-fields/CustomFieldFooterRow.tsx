@@ -114,7 +114,10 @@ const CustomFieldFooterRow = ({
   return (
     <Card
       className={cn(
-        heading ? "rounded-lg" : "rounded-t-none border-t-0",
+        // Per-section footer (no heading) sits flush inside the section
+        // table's rounded, clipped wrapper — just a top divider, no border or
+        // rounding of its own. Standalone (heading) footers keep their card.
+        heading ? "rounded-lg" : "rounded-none border-0 border-t",
         className,
       )}
       data-testid="custom-field-footer-row"
