@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Discussion;
+use App\Entity\Feedback;
 use App\Entity\Page;
 use App\Entity\Task;
 use App\Entity\User;
@@ -66,8 +67,18 @@ class CommentsMercureTokenController extends AbstractController
         return $this->mint($id, $request, $user, Discussion::class, '/discussions/');
     }
 
+    #[Route(
+        '/feedback/{id}/comments/mercure-token',
+        name: 'feedback_comments_mercure_token',
+        methods: ['GET'],
+    )]
+    public function feedback(string $id, Request $request, #[CurrentUser] ?User $user): Response
+    {
+        return $this->mint($id, $request, $user, Feedback::class, '/feedback/');
+    }
+
     /**
-     * @param class-string<Task|Page|Discussion> $entityClass
+     * @param class-string<Task|Page|Discussion|Feedback> $entityClass
      */
     private function mint(
         string $id,
@@ -99,13 +110,18 @@ class CommentsMercureTokenController extends AbstractController
         return new JsonResponse(['topic' => $topic]);
     }
 
-    private function canRead(Task|Page|Discussion $parent, User $user): bool
+    private function canRead(Task|Page|Discussion|Feedback $parent, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
         if ($parent instanceof Task) {
             return $parent->isAccessibleBy($user);
+        }
+        // Feedback is an instance-level board: every authenticated user
+        // can read every ticket (the caller is already authenticated here).
+        if ($parent instanceof Feedback) {
+            return true;
         }
         $space = $parent->getSpace();
         return null !== $space && $space->hasMember($user);

@@ -97,6 +97,10 @@ final class CommentMercurePublisher
         if (null !== $discussion && null !== $discussion->getId()) {
             return '/discussions/' . $discussion->getId();
         }
+        $feedback = $comment->getFeedback();
+        if (null !== $feedback && null !== $feedback->getId()) {
+            return '/feedback/' . $feedback->getId();
+        }
         return null;
     }
 

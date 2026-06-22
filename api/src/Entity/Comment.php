@@ -77,13 +77,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['comment:write']],
     order: ['createdAt' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['task' => 'exact', 'page' => 'exact', 'discussion' => 'exact', 'commentableType' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['task' => 'exact', 'page' => 'exact', 'discussion' => 'exact', 'feedback' => 'exact', 'commentableType' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: CommentRepository::class)]
 #[ORM\Table(name: 'comment')]
 #[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_comment_task_created')]
 #[ORM\Index(columns: ['page_id', 'created_at'], name: 'idx_comment_page_created')]
 #[ORM\Index(columns: ['discussion_id', 'created_at'], name: 'idx_comment_discussion_created')]
+#[ORM\Index(columns: ['feedback_id', 'created_at'], name: 'idx_comment_feedback_created')]
 #[ORM\Index(columns: ['search_vector'], name: 'idx_comment_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
 class Comment
@@ -93,8 +94,14 @@ class Comment
     public const TYPE_TASK = 'task';
     public const TYPE_PAGE = 'page';
     public const TYPE_DISCUSSION = 'discussion';
+    public const TYPE_FEEDBACK = 'feedback';
 
-    public const ALLOWED_TYPES = [self::TYPE_TASK, self::TYPE_PAGE, self::TYPE_DISCUSSION];
+    public const ALLOWED_TYPES = [
+        self::TYPE_TASK,
+        self::TYPE_PAGE,
+        self::TYPE_DISCUSSION,
+        self::TYPE_FEEDBACK,
+    ];
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -111,7 +118,7 @@ class Comment
      * the FK trio.
      */
     #[ORM\Column(name: 'commentable_type', length: 16)]
-    #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Parent type must be task, page, or discussion.')]
+    #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Parent type must be task, page, discussion, or feedback.')]
     #[Groups(['comment:read'])]
     private string $commentableType = self::TYPE_TASK;
 
@@ -129,6 +136,11 @@ class Comment
     #[ORM\JoinColumn(name: 'discussion_id', nullable: true, onDelete: 'CASCADE')]
     #[Groups(['comment:read', 'comment:write'])]
     private ?Discussion $discussion = null;
+
+    #[ORM\ManyToOne(targetEntity: Feedback::class)]
+    #[ORM\JoinColumn(name: 'feedback_id', nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['comment:read', 'comment:write'])]
+    private ?Feedback $feedback = null;
 
     /**
      * Author is set server-side by {@see CommentAuthorProcessor} on
@@ -197,6 +209,8 @@ class Comment
             $this->commentableType = self::TYPE_PAGE;
         } elseif (null !== $this->discussion) {
             $this->commentableType = self::TYPE_DISCUSSION;
+        } elseif (null !== $this->feedback) {
+            $this->commentableType = self::TYPE_FEEDBACK;
         }
     }
 
@@ -222,6 +236,7 @@ class Comment
             $this->commentableType = self::TYPE_TASK;
             $this->page = null;
             $this->discussion = null;
+            $this->feedback = null;
         }
         return $this;
     }
@@ -238,6 +253,7 @@ class Comment
             $this->commentableType = self::TYPE_PAGE;
             $this->task = null;
             $this->discussion = null;
+            $this->feedback = null;
         }
         return $this;
     }
@@ -254,19 +270,37 @@ class Comment
             $this->commentableType = self::TYPE_DISCUSSION;
             $this->task = null;
             $this->page = null;
+            $this->feedback = null;
+        }
+        return $this;
+    }
+
+    public function getFeedback(): ?Feedback
+    {
+        return $this->feedback;
+    }
+
+    public function setFeedback(?Feedback $feedback): static
+    {
+        $this->feedback = $feedback;
+        if (null !== $feedback) {
+            $this->commentableType = self::TYPE_FEEDBACK;
+            $this->task = null;
+            $this->page = null;
+            $this->discussion = null;
         }
         return $this;
     }
 
     /**
-     * Returns the parent entity (Task, Page, or Discussion) the
-     * comment is attached to, or null if none is set yet (during
+     * Returns the parent entity (Task, Page, Discussion, or Feedback)
+     * the comment is attached to, or null if none is set yet (during
      * denormalization). Lets callers reach the parent without
      * branching on `commentableType`.
      */
-    public function getCommentable(): Task|Page|Discussion|null
+    public function getCommentable(): Task|Page|Discussion|Feedback|null
     {
-        return $this->task ?? $this->page ?? $this->discussion;
+        return $this->task ?? $this->page ?? $this->discussion ?? $this->feedback;
     }
 
     public function getAuthor(): ?User
@@ -319,14 +353,21 @@ class Comment
             $space = $this->discussion->getSpace();
             return null !== $space && $space->hasMember($user);
         }
+        // Feedback is an instance-level board: any authenticated user can
+        // read every ticket, so its comments are readable too.
+        if (null !== $this->feedback) {
+            return true;
+        }
         return false;
     }
 
     /**
      * Whether `$user` qualifies for the per-parent delete-escalation
      * path: task owner on a task comment, space admin on a page or
-     * discussion comment. Author-self deletion is handled by the
-     * security expression separately.
+     * discussion comment. Feedback comments have no extra escalation —
+     * author-self and platform admin (the security expression) are the
+     * only deleters. Author-self deletion is handled by the security
+     * expression separately.
      */
     public function isDeletableBy(User $user): bool
     {
@@ -359,7 +400,8 @@ class Comment
     {
         $set = (null !== $this->task ? 1 : 0)
             + (null !== $this->page ? 1 : 0)
-            + (null !== $this->discussion ? 1 : 0);
+            + (null !== $this->discussion ? 1 : 0)
+            + (null !== $this->feedback ? 1 : 0);
 
         if ($set > 1) {
             $context->buildViolation('A comment cannot reference more than one parent.')
@@ -368,7 +410,7 @@ class Comment
             return;
         }
         if (0 === $set) {
-            $context->buildViolation('A comment must reference a task, a page, or a discussion.')
+            $context->buildViolation('A comment must reference a task, a page, a discussion, or a feedback ticket.')
                 ->atPath('task')
                 ->addViolation();
         }

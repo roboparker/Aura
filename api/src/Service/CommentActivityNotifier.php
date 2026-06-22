@@ -78,6 +78,9 @@ final class CommentActivityNotifier
         if (null !== $comment->getPage()) {
             return $comment->getPage()->getCreatedBy();
         }
+        if (null !== $comment->getFeedback()) {
+            return $comment->getFeedback()->getOwner();
+        }
 
         return null;
     }
@@ -92,6 +95,9 @@ final class CommentActivityNotifier
         }
         if (null !== $comment->getPage()) {
             return $comment->getPage()->getTitle();
+        }
+        if (null !== $comment->getFeedback()) {
+            return $comment->getFeedback()->getTitle();
         }
 
         return 'a thread';

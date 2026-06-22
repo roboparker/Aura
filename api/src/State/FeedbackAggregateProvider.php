@@ -5,6 +5,7 @@ namespace App\State;
 use ApiPlatform\Metadata\CollectionOperationInterface;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
+use App\Entity\Comment;
 use App\Entity\Feedback;
 use App\Entity\FeedbackVote;
 use App\Entity\User;
@@ -75,12 +76,42 @@ final class FeedbackAggregateProvider implements ProviderInterface
 
         $scores = $this->loadScores($tickets);
         $myVotes = $this->loadMyVotes($tickets);
+        $commentCounts = $this->loadCommentCounts($tickets);
 
         foreach ($tickets as $ticket) {
             $key = (string) $ticket->getId();
             $ticket->setScore($scores[$key] ?? 0);
             $ticket->setMyVote($myVotes[$key] ?? 0);
+            $ticket->setCommentCount($commentCounts[$key] ?? 0);
         }
+    }
+
+    /**
+     * Comment count per ticket in one grouped query.
+     *
+     * @param list<Feedback> $tickets
+     *
+     * @return array<string, int>
+     */
+    private function loadCommentCounts(array $tickets): array
+    {
+        /** @var list<array{fid: string|null, cnt: int<0, max>}> $rows */
+        $rows = $this->em->createQuery(
+            'SELECT IDENTITY(c.feedback) AS fid, COUNT(c.id) AS cnt
+             FROM ' . Comment::class . ' c
+             WHERE c.feedback IN (:tickets)
+             GROUP BY c.feedback',
+        )->setParameter('tickets', $tickets)->getResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            if (null === $row['fid']) {
+                continue;
+            }
+            $map[$row['fid']] = $row['cnt'];
+        }
+
+        return $map;
     }
 
     /**

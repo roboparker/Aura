@@ -46,6 +46,8 @@ final class CommentRepository extends ServiceEntityRepository
             $qb->andWhere('c.page = :parent')->setParameter('parent', $comment->getPage());
         } elseif (null !== $comment->getDiscussion()) {
             $qb->andWhere('c.discussion = :parent')->setParameter('parent', $comment->getDiscussion());
+        } elseif (null !== $comment->getFeedback()) {
+            $qb->andWhere('c.feedback = :parent')->setParameter('parent', $comment->getFeedback());
         } else {
             return [];
         }
