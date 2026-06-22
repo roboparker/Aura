@@ -6,6 +6,7 @@ use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
+use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,6 +29,7 @@ class ProjectMemberController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private UsageLimiter $usageLimiter,
     ) {
     }
 
@@ -63,6 +65,17 @@ class ProjectMemberController extends AbstractController
         $candidate = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
         if (null === $candidate) {
             return $this->json(['error' => 'No user found with that email.'], 404);
+        }
+
+        // Freemium member cap on the project's space (lifted by a Team
+        // subscription; no-ops while billing is dark).
+        if (!$this->usageLimiter->canAddMembersToSpace($space)) {
+            return $this->json([
+                'error' => sprintf(
+                    'Free spaces are limited to %d members. Upgrade to the Team plan to add more.',
+                    $this->usageLimiter->freeSpaceMemberLimit(),
+                ),
+            ], 402);
         }
 
         // Already a direct member — including via the auto-admin row on
