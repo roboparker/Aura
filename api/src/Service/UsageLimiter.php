@@ -86,7 +86,7 @@ final class UsageLimiter
             ],
         );
 
-        return false === $count ? 0 : (int) $count;
+        return is_numeric($count) ? (int) $count : 0;
     }
 
     /**

@@ -26,7 +26,8 @@ final class SubscriptionRepository extends ServiceEntityRepository
      */
     public function findActiveForSpace(Space $space): ?Subscription
     {
-        return $this->createQueryBuilder('s')
+        /** @var Subscription|null $result */
+        $result = $this->createQueryBuilder('s')
             ->where('s.space = :space')
             ->andWhere('s.status IN (:statuses)')
             ->setParameter('space', $space)
@@ -35,6 +36,8 @@ final class SubscriptionRepository extends ServiceEntityRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+
+        return $result;
     }
 
     /**

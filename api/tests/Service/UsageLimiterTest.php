@@ -38,13 +38,10 @@ class UsageLimiterTest extends KernelTestCase
         $this->em = $em;
         $this->connection = $em->getConnection();
 
-        $subscriptions = $container->get(SubscriptionRepository::class);
-        assert($subscriptions instanceof SubscriptionRepository);
-        $this->subscriptions = $subscriptions;
-
-        $recorder = $container->get(UsageRecorder::class);
-        assert($recorder instanceof UsageRecorder);
-        $this->recorder = $recorder;
+        // phpstan-symfony already infers the concrete type from the
+        // class-string arg, so no instanceof assert is needed here.
+        $this->subscriptions = $container->get(SubscriptionRepository::class);
+        $this->recorder = $container->get(UsageRecorder::class);
 
         $this->em->createQuery('DELETE FROM App\Entity\Subscription')->execute();
         $this->em->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();

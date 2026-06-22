@@ -90,8 +90,8 @@ class BillingTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
         $this->assertJsonContains(['url' => InMemoryStripeGateway::CHECKOUT_URL]);
 
+        // phpstan-symfony infers InMemoryStripeGateway from the class-string.
         $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
-        $this->assertInstanceOf(InMemoryStripeGateway::class, $gateway);
         $this->assertCount(1, $gateway->checkoutSessions);
         $session = $gateway->checkoutSessions[0];
         $this->assertSame('price_test_yearly', $session['priceId']);
@@ -141,13 +141,13 @@ class BillingTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
         $this->assertJsonContains(['url' => InMemoryStripeGateway::PORTAL_URL]);
 
+        // phpstan-symfony infers InMemoryStripeGateway from the class-string.
         $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
-        $this->assertInstanceOf(InMemoryStripeGateway::class, $gateway);
         $this->assertCount(1, $gateway->portalSessions);
         $this->assertSame('cus_portal', $gateway->portalSessions[0]['customerId']);
     }
 
-    public function testStatusReportsFreeThenActive(): void
+    public function testStatusReportsFree(): void
     {
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Shared');
@@ -157,9 +157,18 @@ class BillingTest extends ApiTestCase
         $client->request('GET', '/spaces/' . $space->getId() . '/billing');
         $this->assertResponseStatusCodeSame(200);
         $this->assertJsonContains(['plan' => 'free', 'active' => false]);
+    }
 
-        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_x');
+    public function testStatusReportsActiveWhenSubscribed(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        // Seed before the request — entities created after a request are
+        // detached once the kernel reboots between requests.
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_x', 'sub_status');
 
+        $client = static::createClient();
+        $client->loginUser($alice);
         $client->request('GET', '/spaces/' . $space->getId() . '/billing');
         $this->assertResponseStatusCodeSame(200);
         $this->assertJsonContains(['plan' => 'team', 'active' => true, 'status' => 'active']);
@@ -175,18 +184,14 @@ class BillingTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
-    public function testWebhookCreatesAndCancelsSubscription(): void
+    public function testWebhookCreatesSubscription(): void
     {
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Shared');
-        $spaceId = (string) $space->getId();
 
-        $client = static::createClient();
-
-        // created → row exists, entitling.
-        $client->request('POST', '/billing/webhook', [
+        static::createClient()->request('POST', '/billing/webhook', [
             'headers' => ['Content-Type' => 'application/json', 'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE],
-            'body' => $this->subscriptionEvent('customer.subscription.created', 'sub_abc', 'active', $spaceId),
+            'body' => $this->subscriptionEvent('customer.subscription.created', 'sub_abc', 'active', (string) $space->getId()),
         ]);
         $this->assertResponseStatusCodeSame(200);
 
@@ -197,22 +202,42 @@ class BillingTest extends ApiTestCase
         $this->assertSame('cus_evt', $row->getStripeCustomerId());
         $this->assertSame(3, $row->getSeats());
         $this->assertSame('month', $row->getBillingInterval());
+    }
 
-        // updated with the same id is idempotent (no duplicate row).
-        $client->request('POST', '/billing/webhook', [
+    public function testWebhookUpdateIsIdempotent(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        // Seed the existing row before the request (cross-request writes
+        // aren't visible to a later request once the kernel reboots).
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_evt', 'sub_abc');
+
+        static::createClient()->request('POST', '/billing/webhook', [
             'headers' => ['Content-Type' => 'application/json', 'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE],
-            'body' => $this->subscriptionEvent('customer.subscription.updated', 'sub_abc', 'past_due', $spaceId),
+            'body' => $this->subscriptionEvent('customer.subscription.updated', 'sub_abc', 'past_due', (string) $space->getId()),
         ]);
         $this->assertResponseStatusCodeSame(200);
+
         $this->entityManager->clear();
         $this->assertCount(1, $this->entityManager->getRepository(Subscription::class)->findAll());
+        $row = $this->entityManager->getRepository(Subscription::class)->findOneBy(['stripeSubscriptionId' => 'sub_abc']);
+        $this->assertInstanceOf(Subscription::class, $row);
+        $this->assertSame(Subscription::STATUS_PAST_DUE, $row->getStatus());
+    }
 
-        // deleted → forced to canceled regardless of payload status.
-        $client->request('POST', '/billing/webhook', [
+    public function testWebhookDeleteCancels(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_evt', 'sub_abc');
+
+        static::createClient()->request('POST', '/billing/webhook', [
             'headers' => ['Content-Type' => 'application/json', 'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE],
-            'body' => $this->subscriptionEvent('customer.subscription.deleted', 'sub_abc', 'active', $spaceId),
+            // Payload says active, but a delete event forces canceled.
+            'body' => $this->subscriptionEvent('customer.subscription.deleted', 'sub_abc', 'active', (string) $space->getId()),
         ]);
         $this->assertResponseStatusCodeSame(200);
+
         $this->entityManager->clear();
         $row = $this->entityManager->getRepository(Subscription::class)->findOneBy(['stripeSubscriptionId' => 'sub_abc']);
         $this->assertInstanceOf(Subscription::class, $row);
@@ -244,13 +269,17 @@ class BillingTest extends ApiTestCase
         ], JSON_THROW_ON_ERROR);
     }
 
-    private function seedSubscription(Space $space, string $status, string $customerId): Subscription
-    {
+    private function seedSubscription(
+        Space $space,
+        string $status,
+        string $customerId,
+        ?string $stripeSubscriptionId = null,
+    ): Subscription {
         $subscription = (new Subscription())
             ->setSpace($space)
             ->setStatus($status)
             ->setStripeCustomerId($customerId)
-            ->setStripeSubscriptionId('sub_' . bin2hex(random_bytes(6)));
+            ->setStripeSubscriptionId($stripeSubscriptionId ?? 'sub_' . bin2hex(random_bytes(6)));
         $this->entityManager->persist($subscription);
         $this->entityManager->flush();
 
