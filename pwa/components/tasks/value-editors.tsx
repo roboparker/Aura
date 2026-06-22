@@ -190,7 +190,7 @@ const TextMultiValue = ({ value, onChange, disabled }: ValueEditorProps) => {
     setDraft("");
   };
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2.5 py-1.5">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-input bg-transparent px-2.5 py-1.5 dark:bg-input/30">
       {items.map((item) => (
         <span
           key={item}
