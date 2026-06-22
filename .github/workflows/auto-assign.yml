@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Assign PR to author
+        continue-on-error: true
         run: gh pr edit "$PR_URL" --add-assignee "$PR_AUTHOR"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

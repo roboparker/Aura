@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import Router from "next/router";
 import { ENTRYPOINT } from "../config/entrypoint";
 import { trackEvent } from "../lib/analytics";
@@ -304,6 +304,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     armSessionExpiry(user !== null);
   }, [user]);
+
+  // Re-validate the session when the tab regains focus. A session can die
+  // server-side while the tab is backgrounded (idle GC, a deploy), and the
+  // 401 interceptor only fires on the *next* API call — so a user returning
+  // to an idle tab would see a stale logged-in shell until they clicked
+  // something. On refocus, re-hit `/api/me`: it refreshes the user on
+  // success, and while armed a 401 trips the interceptor → clear + redirect
+  // to the expired screen. `fetchMe` doesn't toggle `isLoading`, so this is
+  // a silent background check (no loading flicker). Throttled so the paired
+  // focus + visibilitychange events don't double-fire.
+  const lastRecheckRef = useRef(0);
+  useEffect(() => {
+    const recheck = () => {
+      if (document.visibilityState !== "visible" || user === null) return;
+      const now = Date.now();
+      if (now - lastRecheckRef.current < 2000) return;
+      lastRecheckRef.current = now;
+      void fetchMe();
+    };
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("focus", recheck);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("focus", recheck);
+    };
+  }, [user, fetchMe]);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     setError(null);

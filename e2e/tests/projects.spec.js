@@ -139,7 +139,7 @@ test.describe("Projects", () => {
     await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
 
     // Open the inline add row in the default ("In progress") section.
-    await page.getByTestId("section-add-task").first().click();
+    await page.getByTestId("project-new-task").click();
     const titleInput = page.getByTestId("project-new-task-title");
     await expect(titleInput).toBeVisible();
     await titleInput.click();
@@ -184,7 +184,7 @@ test.describe("Projects", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
 
-    await page.getByTestId("section-add-task").first().click();
+    await page.getByTestId("project-new-task").click();
     const titleInput = page.getByTestId("project-new-task-title");
     await titleInput.fill("Tagged task");
 

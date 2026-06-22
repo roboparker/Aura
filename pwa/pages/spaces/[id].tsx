@@ -198,7 +198,7 @@ const SpaceDetail = () => {
   const queryTab = router.query.tab;
   const activeTab: TabKey = isTabKey(queryTab) ? queryTab : "overview";
   const handleTabChange = (value: string) => {
-    if (!isTabKey(value)) return;
+    if (!isTabKey(value) || !spaceId) return;
     const nextTab: TabKey = value;
     // Carry forward everything except the old `tab` value so a
     // deep-link with extra search params (e.g. a future ?invite=…)
@@ -208,9 +208,12 @@ const SpaceDetail = () => {
       if (k === "tab" || v === undefined) continue;
       nextQuery[k] = v as string | string[];
     }
+    // Interpolate `id` explicitly — Next 16 throws on the dynamic
+    // `/spaces/[id]` route if the param is momentarily absent mid-transition.
+    nextQuery.id = spaceId;
     if (nextTab !== "overview") nextQuery.tab = nextTab;
     void router.replace(
-      { pathname: router.pathname, query: nextQuery },
+      { pathname: "/spaces/[id]", query: nextQuery },
       undefined,
       { shallow: true },
     );

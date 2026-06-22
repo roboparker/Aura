@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import TaskTableColumns from "@/components/projects/TaskTableColumns";
+import type { CustomFieldDefinition } from "./types";
 import type { FooterResponse, FooterRow } from "./types";
 
 /**
@@ -26,6 +28,15 @@ interface Props {
   /** When set, only footers for these definition IRIs are shown — keeps the
    *  list footer in step with the list's `visibility`-filtered columns. */
   visibleDefinitions?: string[];
+  /** When set, render a column-aligned bar (a `table-fixed` table sharing the
+   *  section tables' columns via {@link TaskTableColumns}) so each total sits
+   *  under its custom-field column. Used for the grand-total bars. */
+  columns?: CustomFieldDefinition[];
+  /** Stronger styling for the grand-total bars. */
+  prominent?: boolean;
+  /** Render as a bare table (no card wrapper) to sit inside a section table's
+   *  scroll container as a flush, column-aligned footer. */
+  flush?: boolean;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -77,6 +88,9 @@ const CustomFieldFooterRow = ({
   heading,
   className,
   visibleDefinitions,
+  columns,
+  prominent,
+  flush,
 }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -111,10 +125,90 @@ const CustomFieldFooterRow = ({
 
   if (error || visibleRows.length === 0) return null;
 
+  // Column-aligned aggregate bar: a table-fixed table sharing the section
+  // tables' columns, so each aggregate lands under its custom-field column.
+  // Each cell stacks the aggregate type over its value (no field name — the
+  // column header conveys that). Used for both per-section and grand totals.
+  if (columns) {
+    const valueByDef = new Map(rows.map((row) => [row.definition, row]));
+    const cells = (
+      <>
+        <td className="px-3 py-2" />
+        <td className="px-1 py-2" />
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+        {columns.map((def) => {
+          const row = valueByDef.get(def["@id"]);
+          return (
+            <td
+              key={def["@id"]}
+              className="px-2 py-2 align-top"
+              data-testid="custom-field-footer-cell"
+            >
+              {row && (
+                <div className="flex flex-col leading-tight">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {row.label ?? row.kind}
+                  </span>
+                  <span className="truncate tabular-nums font-semibold">
+                    {formatValue(row)}
+                  </span>
+                </div>
+              )}
+            </td>
+          );
+        })}
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+      </>
+    );
+
+    // Flush: a bare table that lives inside a section table's scroll container,
+    // lining up with that table's columns and scrolling with it.
+    if (flush) {
+      return (
+        <table
+          className="w-full table-fixed border-t text-sm"
+          data-testid="custom-field-footer-row"
+        >
+          <TaskTableColumns definitions={columns} />
+          <tbody>
+            <tr>{cells}</tr>
+          </tbody>
+        </table>
+      );
+    }
+
+    // Standalone grand-total bar.
+    return (
+      <div
+        className={cn(
+          "overflow-hidden rounded-lg border",
+          prominent && "border-foreground/25 bg-muted/70",
+          className,
+        )}
+        data-testid="custom-field-footer-row"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed text-sm">
+            <TaskTableColumns definitions={columns} />
+            <tbody>
+              <tr>{cells}</tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Card
       className={cn(
-        heading ? "rounded-lg" : "rounded-t-none border-t-0",
+        // Per-section footer (no heading) sits flush inside the section
+        // table's rounded, clipped wrapper — just a top divider, no border or
+        // rounding of its own. Standalone (heading) footers keep their card.
+        heading ? "rounded-lg" : "rounded-none border-0 border-t",
         className,
       )}
       data-testid="custom-field-footer-row"

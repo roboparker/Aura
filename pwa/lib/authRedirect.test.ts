@@ -25,6 +25,13 @@ describe("isSafeNextPath", () => {
     expect(isSafeNextPath("//evil.com/x")).toBe(false);
     expect(isSafeNextPath("/\\evil.com/x")).toBe(false);
   });
+
+  it("rejects unresolved dynamic-route patterns", () => {
+    // These leak in when router.asPath is read before the router is ready;
+    // handed to router.push they throw "missing query values".
+    expect(isSafeNextPath("/projects/[id]")).toBe(false);
+    expect(isSafeNextPath("/spaces/[id]?tab=files")).toBe(false);
+  });
 });
 
 describe("safeNextPath", () => {
@@ -38,6 +45,9 @@ describe("safeNextPath", () => {
     expect(safeNextPath("https://evil.com/x")).toBe("/projects");
     expect(safeNextPath(undefined)).toBe("/projects");
     expect(safeNextPath("")).toBe("/projects");
+    // A captured route pattern must fall back, not crash router.push (the
+    // bug where sign-in appeared to do nothing).
+    expect(safeNextPath("/projects/[id]")).toBe("/projects");
   });
 
   it("honours a custom fallback", () => {

@@ -44,6 +44,11 @@ export const isSafeNextPath = (candidate: unknown): candidate is string => {
   if (!candidate.startsWith("/")) return false;
   if (candidate.startsWith("//")) return false;
   if (candidate.startsWith("/\\")) return false;
+  // Reject unresolved Next.js dynamic-route patterns like "/projects/[id]" —
+  // handed to router.push they throw "missing query values (id)", which
+  // aborts the navigation (so sign-in appears to do nothing). These leak in
+  // when router.asPath is read before the router is ready.
+  if (candidate.includes("[") || candidate.includes("]")) return false;
   try {
     const parsed = new URL(candidate, SANITIZER_BASE);
     return parsed.origin === SANITIZER_BASE;
