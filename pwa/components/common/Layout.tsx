@@ -1,4 +1,5 @@
 import { ReactNode, useState } from "react";
+import { useRouter } from "next/router";
 import {
   DehydratedState,
   HydrationBoundary,
@@ -15,14 +16,29 @@ import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
 /**
+ * Standalone auth/entry screens that must NEVER render inside the app chrome
+ * (sidebar/navbar) — even if a stale `user` lingers from an expired session
+ * mid-redirect. Gating on the route (not just auth state) is what stops the
+ * sign-in screen from appearing behind the logged-in sidebar.
+ */
+const CHROME_FREE_PATHS = new Set([
+  "/signin",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/waitlist",
+]);
+
+/**
  * Inner shell rendered beneath the auth/space providers. A waitlisted account
  * only ever sees the /waitlist gate, so we render its page chrome-free (no
  * sidebar/navbar) — it reads as a standalone screen rather than the empty app.
  */
 const AppShell = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
+  const router = useRouter();
 
-  if (user?.waitlisted) {
+  if (user?.waitlisted || CHROME_FREE_PATHS.has(router.pathname)) {
     return <>{children}</>;
   }
 
