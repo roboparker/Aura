@@ -6,6 +6,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Service\SpaceMemberAdder;
+use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -29,6 +30,7 @@ class SpaceMemberController extends AbstractController
         private EntityManagerInterface $em,
         private SpaceMemberAdder $memberAdder,
         private ValidatorInterface $validator,
+        private UsageLimiter $usageLimiter,
     ) {
     }
 
@@ -60,6 +62,19 @@ class SpaceMemberController extends AbstractController
                 ['error' => 'Cannot add members to a private space. Switch it to shared first.'],
                 409,
             );
+        }
+
+        // Freemium gate: a free shared space is capped on members; an active
+        // Team subscription lifts it. Block new adds/invites at the cap but
+        // always honor invites already issued (acceptance is not gated), so
+        // nobody who was invited gets stranded. No-ops while billing is dark.
+        if (!$this->usageLimiter->canAddMembersToSpace($space)) {
+            return $this->json([
+                'error' => sprintf(
+                    'Free spaces are limited to %d members. Upgrade to the Team plan to add more.',
+                    $this->usageLimiter->freeSpaceMemberLimit(),
+                ),
+            ], 402);
         }
 
         $payload = $request->toArray();

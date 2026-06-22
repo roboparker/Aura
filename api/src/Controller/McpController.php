@@ -9,6 +9,7 @@ use App\Mcp\McpToolPolicy;
 use App\Mcp\McpToolRegistry;
 use App\Mcp\Tool\McpToolInterface;
 use App\Security\ApiTokenAuthenticator;
+use App\Service\UsageLimiter;
 use App\Service\UsageRecorder;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -49,6 +50,7 @@ class McpController extends AbstractController
         private McpToolRegistry $tools,
         private LoggerInterface $logger,
         private UsageRecorder $usage,
+        private UsageLimiter $usageLimiter,
     ) {
     }
 
@@ -232,6 +234,18 @@ class McpController extends AbstractController
             throw McpException::invalidInput('tools/call "arguments" must be an object.');
         }
         /** @var array<string, mixed> $arguments */
+
+        // Freemium gate: free users get a daily MCP allowance; belonging to a
+        // space on the paid Team plan lifts it. No-ops while billing
+        // enforcement is dark. Checked before invoke so an over-limit call
+        // does no work; surfaced as a recoverable isError so the model can
+        // relay the upgrade prompt.
+        if (!$this->usageLimiter->isMcpCallAllowed($user)) {
+            throw McpException::forbidden(sprintf(
+                'Daily free MCP limit reached (%d calls/day). Upgrade a space to the Team plan for unlimited automation.',
+                $this->usageLimiter->freeMcpDailyLimit(),
+            ));
+        }
 
         $result = $tool->invoke($arguments, $user);
 

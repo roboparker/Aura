@@ -118,6 +118,11 @@ security:
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
         - { path: ^/mcp, roles: ROLE_USER }
+        # Stripe billing webhook: unauthenticated at the firewall (no Bearer,
+        # no cookie) — authenticity is proven by the Stripe-Signature HMAC,
+        # verified in App\Billing\StripeGateway. The other /spaces/{id}/billing
+        # routes fall through to the catch-all and enforce auth in the controller.
+        - { path: ^/billing/webhook$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/docs, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: PUBLIC_ACCESS }
 
