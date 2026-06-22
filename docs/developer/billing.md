@@ -55,8 +55,17 @@ back to our Space.
 |---|---|---|
 | `POST /spaces/{id}/billing/checkout` | space admin | Create a Checkout Session → `{url}` (body `{interval: month\|year}`) |
 | `POST /spaces/{id}/billing/portal` | space admin | Create a Customer Portal session → `{url}` |
+| `POST /spaces/{id}/billing/cancel` | space admin | Schedule cancel-at-period-end + record the churn survey (body `{reason, comment?}`) → `{ok, cancelAtPeriodEnd, currentPeriodEnd}` |
 | `GET /spaces/{id}/billing` | space member | Plan/status/seats/period + free limits |
 | `POST /billing/webhook` | Stripe (signed) | Upsert the Subscription from `customer.subscription.*` |
+
+The **cancel** route is owned in-app (rather than punting to the Stripe portal)
+so we control the moment the "why are you leaving?" survey is asked. It validates
+the required `reason`, calls `cancelSubscriptionAtPeriodEnd()` on the gateway
+(Stripe `cancel_at_period_end=true` — access continues until period end, no
+further charge), records the survey only after Stripe accepts, then optimistically
+flags the mirror row's `cancelAtPeriodEnd` (the webhook confirms it). See the
+**Cancellation feedback** section below.
 
 The webhook is unauthenticated at the firewall (no Bearer, no cookie) — its
 authenticity is the `Stripe-Signature` HMAC, verified in `StripeGateway`
@@ -109,6 +118,31 @@ STRIPE_PRICE_TEAM_YEARLY=   # price_... (Team product, yearly)
   configured and accepts a fixed signature).
 - `App\Tests\Billing\StripeGatewayTest` — the real HMAC signature verification,
   offline.
+
+## Cancellation feedback (churn survey)
+
+Every cancellation moment asks **"why are you leaving?"** and stores the answer
+in `cancellation_feedback` (`App\Entity\CancellationFeedback`). Three contexts:
+`account_deactivation`, `account_deletion`, `subscription_cancellation`. A
+**required** single-choice `reason` (one of `CancellationFeedback::REASONS`) plus
+an **optional** free-text `comment` ride in the body of the action that triggers
+them:
+
+| Action | Endpoint | Context |
+|---|---|---|
+| Deactivate account | `POST /me/deactivate` | `account_deactivation` |
+| Delete account | `POST /me/delete` | `account_deletion` |
+| Cancel subscription | `POST /spaces/{id}/billing/cancel` | `subscription_cancellation` |
+
+The shared writer is `App\Service\CancellationFeedbackRecorder` —
+`reasonError()` validates (controllers return 422 on a missing/invalid reason),
+`record()` persists. Both the `user` and `space` FKs are **SET NULL** so the row
+outlives the very action that created it: account deletion removes the user and
+the feedback stays behind, anonymized. The entity is **server-written only** (not
+an API resource). The PWA mirrors the reason list in
+`pwa/lib/cancellationReasons.ts`; the survey UI is `CancellationSurvey`
+(`pwa/components/feedback/`), mounted in the deactivate/delete dialogs and the
+`SpaceBillingCard` cancel dialog.
 
 ## Known follow-ups
 

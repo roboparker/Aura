@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\AccountExport;
+use App\Entity\CancellationFeedback;
 use App\Entity\User;
 use App\Message\GenerateAccountExport;
 use App\Repository\UserSessionRepository;
 use App\Service\AccountDeletionService;
+use App\Service\CancellationFeedbackRecorder;
 use App\Service\SensitiveActionVerifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,6 +36,7 @@ class AccountLifecycleController extends AbstractController
         private readonly SensitiveActionVerifier $verifier,
         private readonly UserSessionRepository $sessions,
         private readonly AccountDeletionService $deletion,
+        private readonly CancellationFeedbackRecorder $feedback,
         private readonly TokenStorageInterface $tokenStorage,
         private readonly MessageBusInterface $bus,
     ) {
@@ -45,10 +48,17 @@ class AccountLifecycleController extends AbstractController
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
-        $err = $this->verifier->verify($user, $this->jsonBody($request));
+        $body = $this->jsonBody($request);
+        $err = $this->verifier->verify($user, $body);
         if (null !== $err) {
             return $this->json(['error' => $err[1]], $err[0]);
         }
+        $reasonError = $this->feedback->reasonError($body);
+        if (null !== $reasonError) {
+            return $this->json(['error' => $reasonError], 422);
+        }
+
+        $this->feedback->record(CancellationFeedback::CONTEXT_ACCOUNT_DEACTIVATION, $user, null, $body);
 
         $user->setDeactivatedAt(new \DateTimeImmutable());
         $this->em->flush();
@@ -117,6 +127,14 @@ class AccountLifecycleController extends AbstractController
         if (null !== $err) {
             return $this->json(['error' => $err[1]], $err[0]);
         }
+        $reasonError = $this->feedback->reasonError($body);
+        if (null !== $reasonError) {
+            return $this->json(['error' => $reasonError], 422);
+        }
+
+        // Record before deletion — the user FK is SET NULL on delete, leaving
+        // the (now anonymized) feedback behind.
+        $this->feedback->record(CancellationFeedback::CONTEXT_ACCOUNT_DELETION, $user, null, $body);
 
         $this->deletion->deleteAccount($user);
         $this->endSession($request);

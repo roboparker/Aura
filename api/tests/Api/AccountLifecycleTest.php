@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\AccountExport;
+use App\Entity\CancellationFeedback;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Service\AccountDeletionService;
@@ -22,6 +23,7 @@ class AccountLifecycleTest extends ApiTestCase
         $em = $kernel->getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
+        $this->entityManager->createQuery('DELETE FROM App\Entity\CancellationFeedback')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -39,8 +41,19 @@ class AccountLifecycleTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(400);
 
+        // Step-up present but no reason → 422 (the survey is required).
         $client->request('POST', '/me/deactivate', [
             'json' => ['currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        $client->request('POST', '/me/deactivate', [
+            'json' => [
+                'currentPassword' => 'Password123!@#',
+                'reason' => CancellationFeedback::REASON_NOT_USING,
+                'comment' => 'Too quiet lately.',
+            ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseIsSuccessful();
@@ -49,6 +62,12 @@ class AccountLifecycleTest extends ApiTestCase
         $refreshed = $this->entityManager->getRepository(User::class)->find($alice->getId());
         $this->assertNotNull($refreshed);
         $this->assertTrue($refreshed->isDeactivated());
+
+        $feedback = $this->entityManager->getRepository(CancellationFeedback::class)->findOneBy([]);
+        $this->assertNotNull($feedback);
+        $this->assertSame(CancellationFeedback::CONTEXT_ACCOUNT_DEACTIVATION, $feedback->getContext());
+        $this->assertSame(CancellationFeedback::REASON_NOT_USING, $feedback->getReason());
+        $this->assertSame('Too quiet lately.', $feedback->getComment());
     }
 
     public function testExportQueuesArchiveAndEmailsLink(): void
@@ -110,7 +129,11 @@ class AccountLifecycleTest extends ApiTestCase
         $client->loginUser($alice);
 
         $client->request('POST', '/me/delete', [
-            'json' => ['confirmEmail' => 'alice@example.com', 'currentPassword' => 'Password123!@#'],
+            'json' => [
+                'confirmEmail' => 'alice@example.com',
+                'currentPassword' => 'Password123!@#',
+                'reason' => CancellationFeedback::REASON_SWITCHING,
+            ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(204);
@@ -124,6 +147,32 @@ class AccountLifecycleTest extends ApiTestCase
         $this->assertSame(
             AccountDeletionService::SENTINEL_EMAIL,
             $survivor->getOwner()?->getEmail(),
+        );
+
+        // The survey survives the deletion, anonymized (user FK set null).
+        $feedback = $this->entityManager->getRepository(CancellationFeedback::class)->findOneBy([]);
+        $this->assertNotNull($feedback);
+        $this->assertSame(CancellationFeedback::CONTEXT_ACCOUNT_DELETION, $feedback->getContext());
+        $this->assertSame(CancellationFeedback::REASON_SWITCHING, $feedback->getReason());
+        $this->assertNull($feedback->getUser());
+    }
+
+    public function testDeleteRequiresReason(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('POST', '/me/delete', [
+            'json' => ['confirmEmail' => 'alice@example.com', 'currentPassword' => 'Password123!@#'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // Account is untouched when the survey is missing.
+        $this->entityManager->clear();
+        $this->assertNotNull(
+            $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'alice@example.com']),
         );
     }
 
@@ -139,7 +188,10 @@ class AccountLifecycleTest extends ApiTestCase
         $client->loginUser($waiter);
 
         $client->request('POST', '/me/deactivate', [
-            'json' => ['currentPassword' => 'Password123!@#'],
+            'json' => [
+                'currentPassword' => 'Password123!@#',
+                'reason' => CancellationFeedback::REASON_OTHER,
+            ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseIsSuccessful();
@@ -178,7 +230,11 @@ class AccountLifecycleTest extends ApiTestCase
         $client->loginUser($waiter);
 
         $client->request('POST', '/me/delete', [
-            'json' => ['confirmEmail' => 'waiter@example.com', 'currentPassword' => 'Password123!@#'],
+            'json' => [
+                'confirmEmail' => 'waiter@example.com',
+                'currentPassword' => 'Password123!@#',
+                'reason' => CancellationFeedback::REASON_NOT_USING,
+            ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(204);
