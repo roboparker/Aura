@@ -710,12 +710,6 @@ const ProjectDetail = () => {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold">{project.title}</h1>
-                  {definitions.length > 0 && (
-                    <Badge variant="secondary" className="font-normal">
-                      {definitions.length} custom field
-                      {definitions.length === 1 ? "" : "s"}
-                    </Badge>
-                  )}
                   {space?.isPersonal && (
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                   )}
