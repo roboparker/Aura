@@ -123,7 +123,8 @@ final class FeedbackAggregateProvider implements ProviderInterface
      */
     private function loadScores(array $tickets): array
     {
-        /** @var list<array{fid: string|null, total: int|string|null}> $rows */
+        // IDENTITY(v.feedback) is non-null (the FK is non-nullable), so
+        // phpstan-doctrine infers `fid` as a plain string here.
         $rows = $this->em->createQuery(
             'SELECT IDENTITY(v.feedback) AS fid, SUM(v.value) AS total
              FROM ' . FeedbackVote::class . ' v
@@ -133,9 +134,6 @@ final class FeedbackAggregateProvider implements ProviderInterface
 
         $map = [];
         foreach ($rows as $row) {
-            if (null === $row['fid']) {
-                continue;
-            }
             $map[$row['fid']] = (int) $row['total'];
         }
 
@@ -157,7 +155,6 @@ final class FeedbackAggregateProvider implements ProviderInterface
             return [];
         }
 
-        /** @var list<array{fid: string|null, value: int}> $rows */
         $rows = $this->em->createQuery(
             'SELECT IDENTITY(v.feedback) AS fid, v.value AS value
              FROM ' . FeedbackVote::class . ' v
@@ -169,9 +166,6 @@ final class FeedbackAggregateProvider implements ProviderInterface
 
         $map = [];
         foreach ($rows as $row) {
-            if (null === $row['fid']) {
-                continue;
-            }
             $map[$row['fid']] = $row['value'];
         }
 

@@ -24,7 +24,8 @@ final class FeedbackRepository extends ServiceEntityRepository
     public function nextTicketNumber(): int
     {
         $connection = $this->getEntityManager()->getConnection();
+        $value = $connection->fetchOne("SELECT nextval('feedback_ticket_seq')");
 
-        return (int) $connection->fetchOne("SELECT nextval('feedback_ticket_seq')");
+        return is_numeric($value) ? (int) $value : 0;
     }
 }
