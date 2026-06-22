@@ -12,6 +12,9 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\FeedbackRepository;
+use App\State\FeedbackAggregateProvider;
+use App\State\FeedbackOwnerProcessor;
+use App\State\FeedbackUpdateProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -48,18 +51,22 @@ use Symfony\Component\Validator\Constraints as Assert;
         new GetCollection(
             uriTemplate: '/feedback',
             security: "is_granted('ROLE_USER')",
+            provider: FeedbackAggregateProvider::class,
         ),
         new Post(
             uriTemplate: '/feedback',
             security: "is_granted('ROLE_USER')",
+            processor: FeedbackOwnerProcessor::class,
         ),
         new Get(
             uriTemplate: '/feedback/{id}',
             security: "is_granted('ROLE_USER')",
+            provider: FeedbackAggregateProvider::class,
         ),
         new Patch(
             uriTemplate: '/feedback/{id}',
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            processor: FeedbackUpdateProcessor::class,
         ),
         new Delete(
             uriTemplate: '/feedback/{id}',
