@@ -1227,8 +1227,11 @@ const SectionBlock = ({
   const fullColSpan = definitions.length + 7;
   return (
     <div data-testid="project-section">
-      <div className="mb-1.5 flex items-center gap-2">
-        {section ? (
+      {/* Only user-created sections get a header (editable title, count,
+          add-task, delete). The default "In progress" group renders just its
+          table — adding there goes through the top-right "New task" button. */}
+      {section && (
+        <div className="mb-1.5 flex items-center gap-2">
           <input
             defaultValue={title}
             onBlur={(e) => void onRename(section, e.target.value)}
@@ -1239,19 +1242,15 @@ const SectionBlock = ({
             aria-label="Section title"
             data-testid="section-title-input"
           />
-        ) : (
-          <span className="px-1 text-sm font-semibold">{title}</span>
-        )}
-        <span className="text-xs text-muted-foreground">{tasks.length}</span>
-        <button
-          type="button"
-          onClick={onAddRow}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          data-testid="section-add-task"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add task
-        </button>
-        {section && (
+          <span className="text-xs text-muted-foreground">{tasks.length}</span>
+          <button
+            type="button"
+            onClick={onAddRow}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            data-testid="section-add-task"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add task
+          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -1273,8 +1272,8 @@ const SectionBlock = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-t-lg border">
         <table className="w-full text-sm">
