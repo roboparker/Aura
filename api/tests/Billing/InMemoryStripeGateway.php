@@ -24,6 +24,9 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
     /** @var list<array{customerId: string, returnUrl: string}> */
     public array $portalSessions = [];
 
+    /** @var list<string> Stripe subscription ids asked to cancel at period end. */
+    public array $canceledSubscriptions = [];
+
     public bool $configured = true;
 
     public function isConfigured(): bool
@@ -58,6 +61,11 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         return self::PORTAL_URL;
     }
 
+    public function cancelSubscriptionAtPeriodEnd(string $subscriptionId): void
+    {
+        $this->canceledSubscriptions[] = $subscriptionId;
+    }
+
     public function parseWebhookEvent(string $payload, string $signatureHeader): ?array
     {
         if (self::VALID_SIGNATURE !== $signatureHeader) {
@@ -81,6 +89,7 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
     {
         $this->checkoutSessions = [];
         $this->portalSessions = [];
+        $this->canceledSubscriptions = [];
         $this->configured = true;
     }
 }

@@ -48,6 +48,15 @@ interface StripeGatewayInterface
     public function createBillingPortalSession(string $customerId, string $returnUrl): string;
 
     /**
+     * Schedule a subscription to cancel at the end of the current billing
+     * period (Stripe `cancel_at_period_end=true`) — access continues until
+     * then and no further invoice is charged. The authoritative state change
+     * still arrives via the `customer.subscription.updated` webhook; this just
+     * initiates it. Throws {@see BillingException} on a transport / API error.
+     */
+    public function cancelSubscriptionAtPeriodEnd(string $subscriptionId): void;
+
+    /**
      * Verify the `Stripe-Signature` header against the raw request body and
      * return the decoded event, or null when the signature is missing /
      * invalid / outside the timestamp tolerance (caller answers 400).

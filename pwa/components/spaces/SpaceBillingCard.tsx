@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { CheckCircle2, CreditCard, Sparkles, Users } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2, Sparkles, Users } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { cn } from "@/lib/utils";
+import CancellationSurvey from "@/components/feedback/CancellationSurvey";
+import { cancellationFeedbackBody } from "@/lib/cancellationReasons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface BillingStatus {
   plan: string;
@@ -40,6 +50,13 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
   const [busy, setBusy] = useState(false);
   const [interval, setInterval] = useState<Interval>("month");
   const [error, setError] = useState<string | null>(null);
+
+  // Cancel-subscription survey dialog state.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [comment, setComment] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // Banner after returning from Stripe Checkout (?billing=success|cancelled).
   const billingParam = router.query.billing;
@@ -87,6 +104,44 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
       setBusy(false);
+    }
+  };
+
+  const feedback = cancellationFeedbackBody(reason, comment);
+
+  const closeCancel = () => {
+    setCancelOpen(false);
+    setReason("");
+    setComment("");
+    setCancelError(null);
+  };
+
+  const submitCancel = async () => {
+    if (!feedback) return;
+    setCancelBusy(true);
+    setCancelError(null);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/spaces/${encodeURIComponent(spaceId)}/billing/cancel`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(feedback),
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Could not cancel. Please try again.");
+      }
+      closeCancel();
+      await load();
+    } catch (err) {
+      setCancelError(
+        err instanceof Error ? err.message : "Something went wrong.",
+      );
+    } finally {
+      setCancelBusy(false);
     }
   };
 
@@ -158,16 +213,29 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
                   " Payment is past due — update your card to avoid losing access."}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 shrink-0"
-              onClick={() => void post("portal")}
-              disabled={busy}
-            >
-              <CreditCard className="h-4 w-4" aria-hidden />
-              Manage billing
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => void post("portal")}
+                disabled={busy}
+              >
+                <CreditCard className="h-4 w-4" aria-hidden />
+                Manage billing
+              </Button>
+              {status.isAdmin && !status.cancelAtPeriodEnd && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-destructive"
+                  onClick={() => setCancelOpen(true)}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+              )}
+            </div>
           </div>
         ) : (
           <>
@@ -237,6 +305,50 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
           </>
         )}
       </CardContent>
+
+      <Dialog open={cancelOpen} onOpenChange={(o) => (o ? setCancelOpen(true) : closeCancel())}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Team subscription</DialogTitle>
+            <DialogDescription>
+              Your plan stays active until the end of the current billing
+              period{renews ? ` (${renews})` : ""} — you won&apos;t be charged
+              again.
+            </DialogDescription>
+          </DialogHeader>
+          {cancelError && (
+            <Alert variant="destructive">
+              <AlertDescription>{cancelError}</AlertDescription>
+            </Alert>
+          )}
+          <CancellationSurvey
+            idPrefix="sub-cancel"
+            reason={reason}
+            comment={comment}
+            onReasonChange={setReason}
+            onCommentChange={setComment}
+            disabled={cancelBusy}
+          />
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeCancel} disabled={cancelBusy}>
+              Keep subscription
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void submitCancel()}
+              disabled={cancelBusy || !feedback}
+              data-testid="sub-cancel-confirm"
+            >
+              {cancelBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Cancel subscription"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };

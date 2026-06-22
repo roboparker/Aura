@@ -94,6 +94,16 @@ final class StripeGateway implements StripeGatewayInterface
         return $url;
     }
 
+    public function cancelSubscriptionAtPeriodEnd(string $subscriptionId): void
+    {
+        // Updating the subscription (rather than DELETE) keeps it live until
+        // the period end; Stripe flips it to canceled then and fires the
+        // webhook we mirror from.
+        $this->request('POST', '/subscriptions/' . rawurlencode($subscriptionId), [
+            'cancel_at_period_end' => 'true',
+        ]);
+    }
+
     public function parseWebhookEvent(string $payload, string $signatureHeader): ?array
     {
         if ('' === $this->webhookSecret) {
