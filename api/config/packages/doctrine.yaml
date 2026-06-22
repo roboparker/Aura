@@ -12,8 +12,11 @@ doctrine:
         # provisioned by a migration with auto_setup disabled, so the ORM
         # never learns about it. Exclude it from schema introspection or
         # doctrine:schema:validate / migrations:diff would flag it as an
-        # untracked table that schema:update would drop.
-        schema_filter: ~^(?!messenger_messages)~
+        # untracked table that schema:update would drop. Same treatment for
+        # feedback_ticket_seq: a standalone Postgres sequence (created by a
+        # migration, read via nextval in App\State\FeedbackOwnerProcessor)
+        # that no entity's ID generator owns, so the ORM never tracks it.
+        schema_filter: ~^(?!messenger_messages|feedback_ticket_seq)~
 
         # doctrine/dbal 4 dropped the legacy `array` type. Gedmo's
         # AbstractLogEntry still declares its `data` column as
