@@ -153,6 +153,12 @@ const ProjectDetail = () => {
     undefined,
   );
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  // Inline draft for the rest of the add row so the user can Tab from the title
+  // into tags / due / assignees before pressing Enter. Shared across sections
+  // since only one add row is open at a time.
+  const [newTaskTags, setNewTaskTags] = useState<TagOption[]>([]);
+  const [newTaskDue, setNewTaskDue] = useState<string | null>(null);
+  const [newTaskAssignees, setNewTaskAssignees] = useState<AssigneeOption[]>([]);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const newTaskInputRef = useRef<HTMLInputElement | null>(null);
   // Bumped whenever the task set changes so the aggregate footer re-fetches.
@@ -333,6 +339,17 @@ const ProjectDetail = () => {
     [definitions, patchTask],
   );
 
+  // Definitions surfaced per view. The drawer always shows every field; the
+  // list and board honour each field's `visibility` setting (default "both").
+  const listDefinitions = useMemo(
+    () => definitions.filter((d) => (d.visibility ?? "both") !== "board"),
+    [definitions],
+  );
+  const boardDefinitions = useMemo(
+    () => definitions.filter((d) => (d.visibility ?? "both") !== "list"),
+    [definitions],
+  );
+
   const toggleComplete = async (task: ProjectTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
     setError(null);
@@ -368,6 +385,13 @@ const ProjectDetail = () => {
           project: project["@id"],
           // `addSection` is the IRI of the group being added to; null = default.
           ...(typeof addSection === "string" ? { section: addSection } : {}),
+          ...(newTaskTags.length
+            ? { tags: newTaskTags.map((t) => t["@id"]) }
+            : {}),
+          ...(newTaskDue ? { dueDate: newTaskDue } : {}),
+          ...(newTaskAssignees.length
+            ? { assignees: newTaskAssignees.map((u) => u["@id"]) }
+            : {}),
         }),
       });
       if (!res.ok) {
@@ -381,7 +405,7 @@ const ProjectDetail = () => {
       }
       const created: ProjectTask = await res.json();
       setTasks((prev) => [...prev, created]);
-      setNewTaskTitle("");
+      resetNewTaskDraft();
       requestAnimationFrame(() => newTaskInputRef.current?.focus());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create task.");
@@ -390,13 +414,34 @@ const ProjectDetail = () => {
     }
   };
 
+  const resetNewTaskDraft = () => {
+    setNewTaskTitle("");
+    setNewTaskTags([]);
+    setNewTaskDue(null);
+    setNewTaskAssignees([]);
+  };
+  // The comboboxes report selection as a list of IRIs; resolve them back to the
+  // loaded options so the draft holds full objects for rendering chips.
+  const handleNewTaskTags = (iris: string[]) =>
+    setNewTaskTags(
+      iris
+        .map((iri) => allTags.find((t) => t["@id"] === iri))
+        .filter((t): t is TagOption => Boolean(t)),
+    );
+  const handleNewTaskAssignees = (iris: string[]) =>
+    setNewTaskAssignees(
+      iris
+        .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
+        .filter((u): u is AssigneeOption => Boolean(u)),
+    );
+
   const openAddRow = (section: string | null = null) => {
     setAddSection(section);
     requestAnimationFrame(() => newTaskInputRef.current?.focus());
   };
   const closeAddRow = () => {
     setAddSection(undefined);
-    setNewTaskTitle("");
+    resetNewTaskDraft();
   };
 
   const createSection = async () => {
@@ -965,6 +1010,7 @@ const ProjectDetail = () => {
 
                   {view === "board" ? (
                     <TaskBoard
+                      definitions={boardDefinitions}
                       columns={sectionGroups.map((group) => ({
                         key: group.key,
                         sectionIri: group.section ? group.section["@id"] : null,
@@ -998,6 +1044,7 @@ const ProjectDetail = () => {
                     refreshKey={footerKey}
                     heading="Grand total"
                     className="mb-6 rounded-lg"
+                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
                   />
 
                   <div className="space-y-6" data-testid="project-task-list">
@@ -1015,7 +1062,7 @@ const ProjectDetail = () => {
                               : DEFAULT_SECTION_LABEL
                           }
                           tasks={group.tasks}
-                          definitions={definitions}
+                          definitions={listDefinitions}
                           projectId={project.id}
                           projectIri={project["@id"]}
                           spaceIri={projectSpaceIri(project)}
@@ -1029,9 +1076,15 @@ const ProjectDetail = () => {
                           footerKey={footerKey}
                           addOpen={addSection === sectionIri}
                           newTaskTitle={newTaskTitle}
+                          newTaskTags={newTaskTags}
+                          newTaskDue={newTaskDue}
+                          newTaskAssignees={newTaskAssignees}
                           newTaskInputRef={newTaskInputRef}
                           isCreatingTask={isCreatingTask}
                           onNewTaskTitle={setNewTaskTitle}
+                          onNewTaskTags={handleNewTaskTags}
+                          onNewTaskDue={setNewTaskDue}
+                          onNewTaskAssignees={handleNewTaskAssignees}
                           onCreateTask={createTask}
                           onAddRow={() => openAddRow(sectionIri)}
                           onCloseAddRow={closeAddRow}
@@ -1052,6 +1105,7 @@ const ProjectDetail = () => {
                     refreshKey={footerKey}
                     heading="Grand total"
                     className="mt-6 rounded-lg"
+                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
                   />
                   </>
                   )}
@@ -1114,9 +1168,15 @@ interface SectionBlockProps {
   footerKey: number;
   addOpen: boolean;
   newTaskTitle: string;
+  newTaskTags: TagOption[];
+  newTaskDue: string | null;
+  newTaskAssignees: AssigneeOption[];
   newTaskInputRef: RefObject<HTMLInputElement | null>;
   isCreatingTask: boolean;
   onNewTaskTitle: (value: string) => void;
+  onNewTaskTags: (iris: string[]) => void;
+  onNewTaskDue: (next: string | null) => void;
+  onNewTaskAssignees: (iris: string[]) => void;
   onCreateTask: () => void | Promise<void>;
   onAddRow: () => void;
   onCloseAddRow: () => void;
@@ -1143,9 +1203,15 @@ const SectionBlock = ({
   footerKey,
   addOpen,
   newTaskTitle,
+  newTaskTags,
+  newTaskDue,
+  newTaskAssignees,
   newTaskInputRef,
   isCreatingTask,
   onNewTaskTitle,
+  onNewTaskTags,
+  onNewTaskDue,
+  onNewTaskAssignees,
   onCreateTask,
   onAddRow,
   onCloseAddRow,
@@ -1156,7 +1222,6 @@ const SectionBlock = ({
   onRename,
   onDelete,
 }: SectionBlockProps) => {
-  const addColSpan = definitions.length + 4;
   const fullColSpan = definitions.length + 7;
   return (
     <div data-testid="project-section">
@@ -1267,22 +1332,56 @@ const SectionBlock = ({
                         onCloseAddRow();
                       }
                     }}
-                    onBlur={() => {
-                      if (!newTaskTitle.trim()) onCloseAddRow();
+                    onBlur={(e) => {
+                      if (newTaskTitle.trim()) return;
+                      // Keep the row open while the user Tabs to a sibling field
+                      // (tags / due / assignees) before submitting; only close
+                      // when focus leaves the add row entirely.
+                      const next = e.relatedTarget as HTMLElement | null;
+                      if (next?.closest('[data-testid="project-new-task-row"]'))
+                        return;
+                      onCloseAddRow();
                     }}
-                    placeholder="Task title, then Enter…"
+                    placeholder="Task title, then Tab or Enter…"
                     maxLength={255}
                     disabled={isCreatingTask}
                     className="h-8"
                     data-testid="project-new-task-title"
                   />
                 </td>
-                <td
-                  colSpan={addColSpan}
-                  className="px-2 py-2 text-xs text-muted-foreground"
-                >
-                  Enter to add · Esc to cancel
+                <td className="px-2 py-2 align-middle" data-testid="new-task-tags">
+                  <TagsCombobox
+                    value={newTaskTags}
+                    options={allTags}
+                    onChange={onNewTaskTags}
+                    subjectLabel="new task"
+                  />
                 </td>
+                {definitions.map((def) => (
+                  // Custom fields are set after the task exists; render an empty
+                  // cell so the inline fields stay aligned with the columns.
+                  <td key={def["@id"]} className="px-2 py-2 align-middle" />
+                ))}
+                <td className="px-2 py-2 align-middle" data-testid="new-task-due">
+                  <DueDateCell
+                    value={newTaskDue}
+                    onChange={onNewTaskDue}
+                    ariaLabel="Due date for new task"
+                    testIdPrefix="project-new-task-due"
+                  />
+                </td>
+                <td
+                  className="px-2 py-2 align-middle"
+                  data-testid="new-task-assignees"
+                >
+                  <AssigneesCombobox
+                    value={newTaskAssignees}
+                    options={assignableUsers}
+                    onChange={onNewTaskAssignees}
+                    subjectLabel="new task"
+                  />
+                </td>
+                <td className="px-2 py-2 align-middle" />
               </tr>
             )}
             {tasks.length === 0 && !addOpen && (
@@ -1308,6 +1407,7 @@ const SectionBlock = ({
           projectId={projectId}
           filters={footerFilter}
           refreshKey={footerKey}
+          visibleDefinitions={definitions.map((d) => d["@id"])}
         />
       </div>
     </div>

@@ -13,6 +13,9 @@ import {
 import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Badge } from "@/components/ui/badge";
+import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
+import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import type { CustomFieldValuePair } from "@/components/tasks/CustomFieldValueList";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,6 +41,7 @@ export interface BoardTask {
   section: string | null;
   tags: { "@id": string; title: string }[];
   assignees: AvatarUser[];
+  customFieldValues: CustomFieldValuePair[];
 }
 
 export interface BoardColumn {
@@ -49,6 +53,8 @@ export interface BoardColumn {
 
 interface TaskBoardProps {
   columns: BoardColumn[];
+  /** Custom fields to surface on cards (already filtered to board visibility). */
+  definitions: CustomFieldDefinition[];
   onOpen: (taskIri: string) => void;
   onMove: (taskIri: string, sectionIri: string | null) => void;
   onAddTask: (sectionIri: string | null) => void;
@@ -64,7 +70,54 @@ const dueLabel = (iso: string): string => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-const CardBody = ({ task }: { task: BoardTask }) => (
+const isEmptyValue = (v: unknown): boolean =>
+  v === null ||
+  v === undefined ||
+  v === "" ||
+  (Array.isArray(v) && v.length === 0);
+
+const CardCustomFields = ({
+  task,
+  definitions,
+}: {
+  task: BoardTask;
+  definitions: CustomFieldDefinition[];
+}) => {
+  const chips = definitions
+    .map((def) => ({
+      def,
+      value: task.customFieldValues.find((v) => v.definition === def["@id"])
+        ?.value,
+    }))
+    .filter(({ value }) => !isEmptyValue(value));
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {chips.map(({ def, value }) => (
+        <span
+          key={def["@id"]}
+          className="inline-flex items-center gap-1 rounded border bg-muted/40 px-1.5 py-0.5 text-[10px]"
+          data-testid="board-card-field"
+        >
+          <span className="text-muted-foreground">{def.name}</span>
+          <CustomFieldValueCell
+            definition={def}
+            value={value}
+            className="text-[10px] font-medium"
+          />
+        </span>
+      ))}
+    </div>
+  );
+};
+
+const CardBody = ({
+  task,
+  definitions,
+}: {
+  task: BoardTask;
+  definitions: CustomFieldDefinition[];
+}) => (
   <div className="space-y-1.5">
     <p
       className={cn(
@@ -74,6 +127,7 @@ const CardBody = ({ task }: { task: BoardTask }) => (
     >
       {task.title}
     </p>
+    <CardCustomFields task={task} definitions={definitions} />
     {(task.tags.length > 0 || task.dueDate || task.assignees.length > 0) && (
       <div className="flex flex-wrap items-center gap-1">
         {task.dueDate && (
@@ -104,9 +158,11 @@ const CardBody = ({ task }: { task: BoardTask }) => (
 
 const TaskCard = ({
   task,
+  definitions,
   onOpen,
 }: {
   task: BoardTask;
+  definitions: CustomFieldDefinition[];
   onOpen: (taskIri: string) => void;
 }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -125,18 +181,20 @@ const TaskCard = ({
       )}
       data-testid="board-card"
     >
-      <CardBody task={task} />
+      <CardBody task={task} definitions={definitions} />
     </button>
   );
 };
 
 const BoardColumnView = ({
   column,
+  definitions,
   onOpen,
   onAddTask,
   onDeleteSection,
 }: {
   column: BoardColumn;
+  definitions: CustomFieldDefinition[];
   onOpen: (taskIri: string) => void;
   onAddTask: (sectionIri: string | null) => void;
   onDeleteSection: (sectionIri: string) => void;
@@ -177,7 +235,12 @@ const BoardColumnView = ({
         )}
       >
         {column.tasks.map((task) => (
-          <TaskCard key={task["@id"]} task={task} onOpen={onOpen} />
+          <TaskCard
+            key={task["@id"]}
+            task={task}
+            definitions={definitions}
+            onOpen={onOpen}
+          />
         ))}
         <button
           type="button"
@@ -194,6 +257,7 @@ const BoardColumnView = ({
 
 const TaskBoard = ({
   columns,
+  definitions,
   onOpen,
   onMove,
   onAddTask,
@@ -235,6 +299,7 @@ const TaskBoard = ({
           <BoardColumnView
             key={column.key}
             column={column}
+            definitions={definitions}
             onOpen={onOpen}
             onAddTask={onAddTask}
             onDeleteSection={onDeleteSection}
@@ -252,7 +317,7 @@ const TaskBoard = ({
       <DragOverlay>
         {draggingTask ? (
           <div className="w-72 rounded-lg border bg-card p-2.5 shadow-lg">
-            <CardBody task={draggingTask} />
+            <CardBody task={draggingTask} definitions={definitions} />
           </div>
         ) : null}
       </DragOverlay>

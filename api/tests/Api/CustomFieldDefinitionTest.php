@@ -53,6 +53,70 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
     }
 
+    public function testVisibilityDefaultsToBoth(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/custom_field_definitions', [
+            'json' => [
+                'project' => '/projects/' . $project->getId(),
+                'name' => 'Severity',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertJsonContains(['visibility' => 'both']);
+    }
+
+    public function testVisibilityCanBeSetToBoard(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/custom_field_definitions', [
+            'json' => [
+                'project' => '/projects/' . $project->getId(),
+                'name' => 'Severity',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
+                'visibility' => 'board',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertJsonContains(['visibility' => 'board']);
+    }
+
+    public function testInvalidVisibilityIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/custom_field_definitions', [
+            'json' => [
+                'project' => '/projects/' . $project->getId(),
+                'name' => 'Severity',
+                'kind' => 'text',
+                'subtype' => 'text',
+                'config' => ['multi' => false],
+                'visibility' => 'sidebar',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testNonOwnerMemberCannotCreate(): void
     {
         $alice = $this->createUser('alice@example.com');

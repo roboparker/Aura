@@ -51,6 +51,18 @@ parameters:
     app.usage_db_row_overhead_bytes: 512
     app.usage_counter_retention_days: 90
 
+    # Billing / freemium gate (App\Service\UsageLimiter). The paid "Team"
+    # plan is per-seat, billed to a Space; a free shared space is capped on
+    # both members and MCP throughput for its members, and an entitling
+    # subscription lifts both. `billing_enforcement_enabled` ships OFF so the
+    # gate can land + deploy dark before Stripe is live — flip it on (here or
+    # via a future env binding) once checkout works. dev + test keep it off so
+    # local work and the suite aren't gated; the limiter is unit-tested by
+    # constructing it directly with enforcement on.
+    app.free_mcp_daily_limit: 100
+    app.free_space_member_limit: 5
+    app.billing_enforcement_enabled: false
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -112,9 +124,21 @@ services:
 
     App\Push\PushSenderInterface: '@App\Push\WebPushSender'
 
+    # Billing gateway: the real Stripe-over-HttpClient implementation in
+    # prod/dev; the test suite swaps in an in-memory recorder (see when@test).
+    App\Billing\StripeGatewayInterface: '@App\Billing\StripeGateway'
+
     App\Validator\PasswordPolicyValidator:
         arguments:
             $minStrength: '%app.password_min_strength%'
+
+    # Freemium gate read-side. Caps + the dark-launch flag are bound from
+    # parameters so prod can size them independently of dev/test.
+    App\Service\UsageLimiter:
+        arguments:
+            $freeMcpDailyLimit: '%app.free_mcp_daily_limit%'
+            $freeSpaceMemberLimit: '%app.free_space_member_limit%'
+            $enforcementEnabled: '%app.billing_enforcement_enabled%'
 
     # Login throttling for the `main` firewall (security.yaml
     # `login_throttling.limiter`). Same shape as Symfony's built-in default
@@ -156,3 +180,8 @@ when@test:
         App\Tests\Push\InMemoryPushSender:
             public: true
         App\Push\PushSenderInterface: '@App\Tests\Push\InMemoryPushSender'
+        # Billing: never hit Stripe in tests — record calls in memory and
+        # accept a fixed webhook signature. Public so tests can fetch + inspect.
+        App\Tests\Billing\InMemoryStripeGateway:
+            public: true
+        App\Billing\StripeGatewayInterface: '@App\Tests\Billing\InMemoryStripeGateway'

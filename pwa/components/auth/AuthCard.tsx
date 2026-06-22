@@ -147,6 +147,9 @@ const AuthCard = ({ defaultTab }: Props) => {
     typeof router.query.invite === "string" ? router.query.invite : undefined;
   const registered = router.query.registered === "true";
   const reset = router.query.reset === "true";
+  // Set by AuthContext's session-expiry redirect — drives the "you were
+  // signed out" banner so the user understands why they're back here.
+  const expired = router.query.expired === "1";
 
   // Whether the instance is in waitlist mode — drives the signup copy/flow and
   // the footer CTA on both entry points. Invite signups always run the normal
@@ -369,6 +372,7 @@ const AuthCard = ({ defaultTab }: Props) => {
               next={next}
               registered={registered}
               reset={reset}
+              expired={expired}
               onTwoFactorRequired={(email) => {
                 setTwoFactorEmail(email);
                 setStep("totp");

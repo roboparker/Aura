@@ -39,6 +39,7 @@ import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
+import SpaceBillingCard from "@/components/spaces/SpaceBillingCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
@@ -680,6 +681,9 @@ const SpaceSettings = () => {
         </Card>
           </>
         )}
+
+        {/* Plan & billing — personal spaces are never billable. */}
+        {!space.isPersonal && <SpaceBillingCard spaceId={space.id} />}
 
         {/* Export space data */}
         <Card className="mb-6">

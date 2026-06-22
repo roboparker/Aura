@@ -70,6 +70,9 @@ export interface FooterDescriptor {
   label?: string;
 }
 
+/** Where a field's value is surfaced to readers (the task drawer always shows all). */
+export type CustomFieldVisibility = "list" | "board" | "both";
+
 export interface CustomFieldDefinition {
   "@id": string;
   id: string;
@@ -80,6 +83,7 @@ export interface CustomFieldDefinition {
   footer: FooterDescriptor | null;
   nullable: boolean;
   position: number;
+  visibility: CustomFieldVisibility;
 }
 
 export interface FooterRow {
