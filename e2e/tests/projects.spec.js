@@ -126,6 +126,82 @@ test.describe("Projects", () => {
     await bobContext.close();
   });
 
+  test("the inline add-task row supports Tab between fields", async ({ page }) => {
+    await registerAndSignIn(page, uniqueEmail());
+
+    // Creating a project lands on its detail page, which opens on the Tasks
+    // tab in list view by default.
+    await page.goto(`${BASE_URL}/projects`);
+    await page.getByTestId("new-project-button").click();
+    const title = `Tab nav ${Date.now()}`;
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+
+    // Open the inline add row in the default ("In progress") section.
+    await page.getByTestId("section-add-task").first().click();
+    const titleInput = page.getByTestId("project-new-task-title");
+    await expect(titleInput).toBeVisible();
+    await titleInput.click();
+    await titleInput.fill("Keyboard task");
+
+    // Tab walks the row in column order: title -> tags -> due -> assignees.
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel('Tags for "new task"')).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("button", { name: "Due date for new task" }),
+    ).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel('Assignees for "new task"')).toBeFocused();
+
+    // Tabbing away from a non-empty title keeps the row open; Enter on the
+    // title still creates the task.
+    await titleInput.press("Enter");
+    await expect(
+      page.locator('[data-testid="project-task-item"]', { hasText: "Keyboard task" }),
+    ).toBeVisible();
+  });
+
+  test("tags staged in the add row are saved on the created task", async ({ page }) => {
+    const email = uniqueEmail();
+    await registerAndSignIn(page, email);
+
+    // Seed a tag so the tags combobox has something to pick.
+    const tagRes = await page.request.post(`${BASE_URL}/tags`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title: `urgent-${Date.now()}`, color: "#ef4444" },
+    });
+    expect(tagRes.ok()).toBeTruthy();
+    const tag = await tagRes.json();
+
+    await page.goto(`${BASE_URL}/projects`);
+    await page.getByTestId("new-project-button").click();
+    const title = `Tag staging ${Date.now()}`;
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+
+    await page.getByTestId("section-add-task").first().click();
+    const titleInput = page.getByTestId("project-new-task-title");
+    await titleInput.fill("Tagged task");
+
+    // Stage a tag, then submit from the title input.
+    const tagsInput = page.getByLabel('Tags for "new task"');
+    await tagsInput.click();
+    await page.getByRole("option", { name: tag.title }).click();
+    await titleInput.press("Enter");
+
+    const item = page.locator('[data-testid="project-task-item"]', {
+      hasText: "Tagged task",
+    });
+    await expect(item).toBeVisible();
+    // The staged tag persisted onto the new task's row.
+    await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
+  });
+
   // Removed "account menu shows Projects link" — Projects is no
   // longer a top-level sidebar link after the sidebar redesign
   // (#nav-refresh). The /projects page is still reachable directly
