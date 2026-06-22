@@ -9,6 +9,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
+import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
@@ -134,11 +135,9 @@ const ProjectDetail = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Which detail tab is active — controlled so the header's "New task" button
-  // can show on the Tasks tab only.
-  const [activeTab, setActiveTab] = useState("tasks");
-  // Tasks tab view mode: the list (grouped tables) or the Kanban board.
-  const [view, setView] = useState<"list" | "board">("list");
+  // Which detail tab is active (list | board | activity | settings) —
+  // controlled so the header's "New task" button shows on the List tab only.
+  const [activeTab, setActiveTab] = useState("list");
   // Settings sub-section (left menu like the user settings page).
   const [settingsSection, setSettingsSection] = useState<
     "privacy" | "fields" | "danger"
@@ -644,8 +643,6 @@ const ProjectDetail = () => {
     return groups;
   }, [tasks, sections]);
 
-  const openCount = tasks.filter((t) => !t.completedOn).length;
-
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -710,17 +707,11 @@ const ProjectDetail = () => {
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <h1 className="text-2xl font-bold">{project.title}</h1>
-                  {definitions.length > 0 && (
-                    <Badge variant="secondary" className="font-normal">
-                      {definitions.length} custom field
-                      {definitions.length === 1 ? "" : "s"}
-                    </Badge>
-                  )}
                   {space?.isPersonal && (
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                   )}
                 </div>
-                {activeTab === "tasks" && (
+                {activeTab === "list" && (
                   <div className="flex items-center">
                     <Button
                       size="sm"
@@ -765,10 +756,8 @@ const ProjectDetail = () => {
 
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList variant="line">
-                  <TabsTrigger value="tasks">
-                    Tasks{" "}
-                    <span className="ml-1 text-xs text-muted-foreground">{openCount}</span>
-                  </TabsTrigger>
+                  <TabsTrigger value="list">List</TabsTrigger>
+                  <TabsTrigger value="board">Board</TabsTrigger>
                   <TabsTrigger value="activity">Activity</TabsTrigger>
                   <TabsTrigger value="settings" data-testid="project-settings-tab">
                     Settings
@@ -995,64 +984,14 @@ const ProjectDetail = () => {
                   />
                 </TabsContent>
 
-                <TabsContent value="tasks" className="mt-4">
-                  {/* List / Board view toggle. */}
-                  <div className="mb-4 inline-flex rounded-md border p-0.5">
-                    {(["list", "board"] as const).map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setView(mode)}
-                        className={cn(
-                          "rounded px-3 py-1 text-sm capitalize transition-colors",
-                          view === mode
-                            ? "bg-muted font-medium text-foreground"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                        data-testid={`view-${mode}`}
-                      >
-                        {mode}
-                      </button>
-                    ))}
-                  </div>
-
-                  {view === "board" ? (
-                    <TaskBoard
-                      definitions={boardDefinitions}
-                      columns={sectionGroups.map((group) => ({
-                        key: group.key,
-                        sectionIri: group.section ? group.section["@id"] : null,
-                        title: group.section
-                          ? group.section.title
-                          : DEFAULT_SECTION_LABEL,
-                        tasks: group.tasks,
-                      }))}
-                      onOpen={(taskIri) => {
-                        const task = tasks.find((t) => t["@id"] === taskIri);
-                        if (task) openTaskDetail(task);
-                      }}
-                      onMove={moveTaskToSection}
-                      onAddTask={(sectionIri) => {
-                        setView("list");
-                        openAddRow(sectionIri);
-                      }}
-                      onAddSection={() => void createSection()}
-                      onDeleteSection={(sectionIri) => {
-                        const section = sections.find(
-                          (s) => s["@id"] === sectionIri,
-                        );
-                        if (section) void deleteSection(section);
-                      }}
-                    />
-                  ) : (
-                  <>
+                <TabsContent value="list" className="mt-4">
                   {/* Grand totals across the whole board — top. */}
                   <CustomFieldFooterRow
                     projectId={project.id}
                     refreshKey={footerKey}
-                    heading="Grand total"
-                    className="mb-6 rounded-lg"
-                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
+                    columns={listDefinitions}
+                    prominent
+                    className="mb-6"
                   />
 
                   <div className="space-y-6" data-testid="project-task-list">
@@ -1111,12 +1050,40 @@ const ProjectDetail = () => {
                   <CustomFieldFooterRow
                     projectId={project.id}
                     refreshKey={footerKey}
-                    heading="Grand total"
-                    className="mt-6 rounded-lg"
-                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
+                    columns={listDefinitions}
+                    prominent
+                    className="mt-6"
                   />
-                  </>
-                  )}
+                </TabsContent>
+
+                <TabsContent value="board" className="mt-4">
+                  <TaskBoard
+                    definitions={boardDefinitions}
+                    columns={sectionGroups.map((group) => ({
+                      key: group.key,
+                      sectionIri: group.section ? group.section["@id"] : null,
+                      title: group.section
+                        ? group.section.title
+                        : DEFAULT_SECTION_LABEL,
+                      tasks: group.tasks,
+                    }))}
+                    onOpen={(taskIri) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) openTaskDetail(task);
+                    }}
+                    onMove={moveTaskToSection}
+                    onAddTask={(sectionIri) => {
+                      setActiveTab("list");
+                      openAddRow(sectionIri);
+                    }}
+                    onAddSection={() => void createSection()}
+                    onDeleteSection={(sectionIri) => {
+                      const section = sections.find(
+                        (s) => s["@id"] === sectionIri,
+                      );
+                      if (section) void deleteSection(section);
+                    }}
+                  />
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4">
@@ -1233,6 +1200,9 @@ const SectionBlock = ({
   const fullColSpan = definitions.length + 7;
   return (
     <div data-testid="project-section">
+      {/* Every section shows a title above its table. User-created sections
+          get an editable title + Add task + delete menu; the default
+          "In progress" group shows a static title (add via "New task"). */}
       <div className="mb-1.5 flex items-center gap-2">
         {section ? (
           <input
@@ -1246,44 +1216,52 @@ const SectionBlock = ({
             data-testid="section-title-input"
           />
         ) : (
-          <span className="px-1 text-sm font-semibold">{title}</span>
+          <span
+            className="px-1 text-sm font-semibold"
+            data-testid="section-title"
+          >
+            {title}
+          </span>
         )}
-        <span className="text-xs text-muted-foreground">{tasks.length}</span>
-        <button
-          type="button"
-          onClick={onAddRow}
-          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          data-testid="section-add-task"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add task
-        </button>
         {section && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Section actions"
-                data-testid="section-menu"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => void onDelete(section)}
-                className="text-destructive"
-                data-testid="section-delete"
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <button
+              type="button"
+              onClick={onAddRow}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+              data-testid="section-add-task"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add task
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label="Section actions"
+                  data-testid="section-menu"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => void onDelete(section)}
+                  className="text-destructive"
+                  data-testid="section-delete"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-t-lg border">
-        <table className="w-full text-sm">
+      <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-x-auto">
+        <table className="w-full table-fixed text-sm">
+          <TaskTableColumns definitions={definitions} />
           <thead>
             <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
               <th className="w-8 px-3 py-2" />
@@ -1293,7 +1271,7 @@ const SectionBlock = ({
               {definitions.map((def) => (
                 <th
                   key={def["@id"]}
-                  className="px-2 py-2 text-left font-medium whitespace-nowrap"
+                  className="truncate px-2 py-2 text-left font-medium"
                 >
                   {def.name}
                 </th>
@@ -1411,12 +1389,16 @@ const SectionBlock = ({
             )}
           </tbody>
         </table>
+        {/* Per-section aggregates: a flush, column-aligned footer inside the
+            same scroll container so it lines up with the columns above. */}
         <CustomFieldFooterRow
           projectId={projectId}
           filters={footerFilter}
           refreshKey={footerKey}
-          visibleDefinitions={definitions.map((d) => d["@id"])}
+          columns={definitions}
+          flush
         />
+        </div>
       </div>
     </div>
   );

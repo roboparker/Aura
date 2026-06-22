@@ -201,7 +201,10 @@ const BoardColumnView = ({
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${column.key}` });
   return (
-    <div className="flex w-72 shrink-0 flex-col" data-testid="board-column">
+    <div
+      className="flex w-72 shrink-0 flex-col rounded-xl bg-muted/40 p-2"
+      data-testid="board-column"
+    >
       <div className="mb-2 flex items-center gap-2 px-1">
         <span className="text-sm font-semibold">{column.title}</span>
         <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
@@ -230,8 +233,8 @@ const BoardColumnView = ({
       <div
         ref={setNodeRef}
         className={cn(
-          "flex min-h-24 flex-1 flex-col gap-2 rounded-lg border border-dashed border-transparent bg-muted/30 p-2 transition",
-          isOver && "border-foreground/30 bg-muted/60",
+          "flex min-h-24 flex-1 flex-col gap-2 rounded-lg p-1 transition",
+          isOver && "bg-foreground/5 ring-1 ring-inset ring-foreground/15",
         )}
       >
         {column.tasks.map((task) => (
