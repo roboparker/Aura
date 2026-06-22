@@ -3,6 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\CancellationFeedback;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
@@ -30,6 +31,7 @@ class BillingTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
+        $this->entityManager->createQuery('DELETE FROM App\Entity\CancellationFeedback')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Subscription')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -145,6 +147,105 @@ class BillingTest extends ApiTestCase
         $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
         $this->assertCount(1, $gateway->portalSessions);
         $this->assertSame('cus_portal', $gateway->portalSessions[0]['customerId']);
+    }
+
+    public function testCancelRequiresActiveSubscription(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/spaces/' . $space->getId() . '/billing/cancel', [
+            'json' => ['reason' => 'too_expensive'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(409);
+    }
+
+    public function testCancelRequiresReason(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_cancel', 'sub_cancel');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/spaces/' . $space->getId() . '/billing/cancel', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // Stripe was never called, and no feedback was recorded.
+        $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
+        $this->assertCount(0, $gateway->canceledSubscriptions);
+    }
+
+    public function testCancelForbiddenForNonAdminMember(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $this->ensureSpaceMembership($space, $bob, Space::ROLE_MEMBER);
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_cancel', 'sub_cancel');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('POST', '/spaces/' . $space->getId() . '/billing/cancel', [
+            'json' => ['reason' => 'too_expensive'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testCancelSchedulesAtPeriodEndAndRecordsFeedback(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_cancel', 'sub_cancel');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/spaces/' . $space->getId() . '/billing/cancel', [
+            'json' => ['reason' => 'too_expensive', 'comment' => 'Tightening the budget.'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertJsonContains(['ok' => true, 'cancelAtPeriodEnd' => true]);
+
+        // Stripe was asked to cancel the right subscription at period end.
+        $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
+        $this->assertSame(['sub_cancel'], $gateway->canceledSubscriptions);
+
+        $this->entityManager->clear();
+        $row = $this->entityManager->getRepository(Subscription::class)->findOneBy(['stripeSubscriptionId' => 'sub_cancel']);
+        $this->assertInstanceOf(Subscription::class, $row);
+        $this->assertTrue($row->getCancelAtPeriodEnd());
+
+        $feedback = $this->entityManager->getRepository(CancellationFeedback::class)->findOneBy([]);
+        $this->assertNotNull($feedback);
+        $this->assertSame(CancellationFeedback::CONTEXT_SUBSCRIPTION_CANCELLATION, $feedback->getContext());
+        $this->assertSame('too_expensive', $feedback->getReason());
+        $this->assertSame('Tightening the budget.', $feedback->getComment());
+        $this->assertSame((string) $space->getId(), (string) $feedback->getSpace()?->getId());
+    }
+
+    public function testCancelRejectsAlreadyCanceling(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $sub = $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_cancel', 'sub_cancel');
+        $sub->setCancelAtPeriodEnd(true);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/spaces/' . $space->getId() . '/billing/cancel', [
+            'json' => ['reason' => 'too_expensive'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(409);
     }
 
     public function testStatusReportsFree(): void

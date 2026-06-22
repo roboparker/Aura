@@ -157,7 +157,11 @@ class WaitlistTest extends ApiTestCase
 
         // Delete works too, and reaps the personal space with the account.
         $client->request('POST', '/me/delete', [
-            'json' => ['confirmEmail' => 'leaver@example.com', 'currentPassword' => 'Password123!@#'],
+            'json' => [
+                'confirmEmail' => 'leaver@example.com',
+                'currentPassword' => 'Password123!@#',
+                'reason' => 'not_using',
+            ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(204);

@@ -7,9 +7,11 @@ namespace App\Controller;
 use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
 use App\Entity\Space;
+use App\Entity\CancellationFeedback;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
+use App\Service\CancellationFeedbackRecorder;
 use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -44,6 +46,7 @@ class BillingController extends AbstractController
         private StripeGatewayInterface $stripe,
         private SubscriptionRepository $subscriptions,
         private UsageLimiter $usageLimiter,
+        private CancellationFeedbackRecorder $feedback,
         private LoggerInterface $logger,
         #[Autowire('%env(default::STRIPE_PRICE_TEAM_MONTHLY)%')]
         private string $priceMonthly,
@@ -127,6 +130,66 @@ class BillingController extends AbstractController
         }
 
         return $this->json(['url' => $url]);
+    }
+
+    /**
+     * Cancel the space's subscription at the end of the current period, after
+     * recording the required "why are you leaving?" survey. We cancel here (vs.
+     * sending the admin to the Stripe portal) so we own the moment the reason
+     * is asked. The authoritative state still lands via the webhook; we
+     * optimistically flag the mirror row so the UI updates immediately.
+     */
+    #[Route('/spaces/{id}/billing/cancel', name: 'billing_cancel', methods: ['POST'])]
+    public function cancel(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $space = $this->resolveAdminSpace($id, $user);
+        if ($space instanceof JsonResponse) {
+            return $space;
+        }
+
+        $subscription = $this->subscriptions->findActiveForSpace($space);
+        $stripeSubId = $subscription?->getStripeSubscriptionId();
+        if (null === $subscription || null === $stripeSubId) {
+            return $this->json(['error' => 'This space has no active subscription to cancel.'], 409);
+        }
+        if ($subscription->getCancelAtPeriodEnd()) {
+            return $this->json(['error' => 'This subscription is already set to cancel.'], 409);
+        }
+        if (!$this->stripe->isConfigured()) {
+            return $this->json(['error' => 'Billing is not available on this instance.'], 503);
+        }
+
+        $body = $this->readBody($request);
+        $reasonError = $this->feedback->reasonError($body);
+        if (null !== $reasonError) {
+            return $this->json(['error' => $reasonError], 422);
+        }
+
+        try {
+            $this->stripe->cancelSubscriptionAtPeriodEnd($stripeSubId);
+        } catch (BillingException $e) {
+            $this->logger->error('Stripe subscription cancel failed', ['exception' => $e, 'space' => $id]);
+            return $this->json(['error' => 'Could not cancel the subscription. Please try again.'], 502);
+        }
+
+        // Record the survey only after Stripe accepted the cancellation, so a
+        // failed cancel never leaves orphan feedback behind.
+        $this->feedback->record(
+            CancellationFeedback::CONTEXT_SUBSCRIPTION_CANCELLATION,
+            $user,
+            $space,
+            $body,
+        );
+
+        // Optimistic local mirror — the webhook will confirm/refine this.
+        $subscription->setCancelAtPeriodEnd(true)->touch();
+        $this->em->flush();
+
+        return $this->json([
+            'ok' => true,
+            'cancelAtPeriodEnd' => true,
+            'currentPeriodEnd' => $subscription->getCurrentPeriodEnd()?->format(\DateTimeInterface::ATOM),
+        ]);
     }
 
     #[Route('/spaces/{id}/billing', name: 'billing_status', methods: ['GET'])]
@@ -266,6 +329,24 @@ class BillingController extends AbstractController
         $interval = $data['interval'] ?? null;
 
         return Subscription::INTERVAL_YEAR === $interval ? Subscription::INTERVAL_YEAR : Subscription::INTERVAL_MONTH;
+    }
+
+    /**
+     * Decode the JSON request body to an associative array, returning [] for an
+     * empty or malformed body.
+     *
+     * @return array<int|string, mixed>
+     */
+    private function readBody(Request $request): array
+    {
+        if ('' === $request->getContent()) {
+            return [];
+        }
+        try {
+            return $request->toArray();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**

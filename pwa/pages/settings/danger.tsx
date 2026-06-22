@@ -10,6 +10,8 @@ import {
   StepUpField,
   stepUpBody,
 } from "@/components/settings/AccountLifecycleDialogs";
+import CancellationSurvey from "@/components/feedback/CancellationSurvey";
+import { cancellationFeedbackBody } from "@/lib/cancellationReasons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,10 +58,15 @@ const DeactivateCard = ({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
+  const [reason, setReason] = useState("");
+  const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const feedback = cancellationFeedbackBody(reason, comment);
+
   const submit = async () => {
+    if (!feedback) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -67,7 +74,10 @@ const DeactivateCard = ({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stepUpBody(twoFactorEnabled, value)),
+        body: JSON.stringify({
+          ...stepUpBody(twoFactorEnabled, value),
+          ...feedback,
+        }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -115,6 +125,14 @@ const DeactivateCard = ({
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
+          <CancellationSurvey
+            idPrefix="deactivate"
+            reason={reason}
+            comment={comment}
+            onReasonChange={setReason}
+            onCommentChange={setComment}
+            disabled={submitting}
+          />
           <StepUpField twoFactorEnabled={twoFactorEnabled} value={value} onChange={setValue} />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={submitting}>
@@ -124,7 +142,7 @@ const DeactivateCard = ({
               type="button"
               variant="destructive"
               onClick={() => void submit()}
-              disabled={submitting || value.trim() === ""}
+              disabled={submitting || value.trim() === "" || !feedback}
               data-testid="deactivate-confirm"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Deactivate"}

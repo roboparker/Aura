@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import CancellationSurvey from "@/components/feedback/CancellationSurvey";
+import { cancellationFeedbackBody } from "@/lib/cancellationReasons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -170,12 +172,16 @@ export const DeleteAccountDialog = ({
 }) => {
   const [confirmEmail, setConfirmEmail] = useState("");
   const [value, setValue] = useState("");
+  const [reason, setReason] = useState("");
+  const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const emailMatches = confirmEmail.trim().toLowerCase() === email.toLowerCase();
+  const feedback = cancellationFeedbackBody(reason, comment);
 
   const submit = async () => {
+    if (!feedback) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -183,7 +189,11 @@ export const DeleteAccountDialog = ({
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ confirmEmail, ...stepUpBody(twoFactorEnabled, value) }),
+        body: JSON.stringify({
+          confirmEmail,
+          ...stepUpBody(twoFactorEnabled, value),
+          ...feedback,
+        }),
       });
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
@@ -223,6 +233,14 @@ export const DeleteAccountDialog = ({
           />
         </div>
         <StepUpField twoFactorEnabled={twoFactorEnabled} value={value} onChange={setValue} />
+        <CancellationSurvey
+          idPrefix="delete"
+          reason={reason}
+          comment={comment}
+          onReasonChange={setReason}
+          onCommentChange={setComment}
+          disabled={submitting}
+        />
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
@@ -231,7 +249,7 @@ export const DeleteAccountDialog = ({
             type="button"
             variant="destructive"
             onClick={() => void submit()}
-            disabled={submitting || !emailMatches || value.trim() === ""}
+            disabled={submitting || !emailMatches || value.trim() === "" || !feedback}
             data-testid="delete-confirm"
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete my account"}
