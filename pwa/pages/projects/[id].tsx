@@ -9,6 +9,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
+import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
@@ -988,9 +989,9 @@ const ProjectDetail = () => {
                   <CustomFieldFooterRow
                     projectId={project.id}
                     refreshKey={footerKey}
-                    heading="Grand total"
-                    className="mb-6 rounded-lg"
-                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
+                    columns={listDefinitions}
+                    prominent
+                    className="mb-6"
                   />
 
                   <div className="space-y-6" data-testid="project-task-list">
@@ -1049,9 +1050,9 @@ const ProjectDetail = () => {
                   <CustomFieldFooterRow
                     projectId={project.id}
                     refreshKey={footerKey}
-                    heading="Grand total"
-                    className="mt-6 rounded-lg"
-                    visibleDefinitions={listDefinitions.map((d) => d["@id"])}
+                    columns={listDefinitions}
+                    prominent
+                    className="mt-6"
                   />
                 </TabsContent>
 
@@ -1249,7 +1250,8 @@ const SectionBlock = ({
 
       <div className="overflow-hidden rounded-lg border">
         <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
+          <TaskTableColumns definitions={definitions} />
           <thead>
             <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
               <th className="w-8 px-3 py-2" />
@@ -1259,7 +1261,7 @@ const SectionBlock = ({
               {definitions.map((def) => (
                 <th
                   key={def["@id"]}
-                  className="px-2 py-2 text-left font-medium whitespace-nowrap"
+                  className="truncate px-2 py-2 text-left font-medium"
                 >
                   {def.name}
                 </th>

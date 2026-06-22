@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import TaskTableColumns from "@/components/projects/TaskTableColumns";
+import type { CustomFieldDefinition } from "./types";
 import type { FooterResponse, FooterRow } from "./types";
 
 /**
@@ -26,6 +28,12 @@ interface Props {
   /** When set, only footers for these definition IRIs are shown — keeps the
    *  list footer in step with the list's `visibility`-filtered columns. */
   visibleDefinitions?: string[];
+  /** When set, render a column-aligned bar (a `table-fixed` table sharing the
+   *  section tables' columns via {@link TaskTableColumns}) so each total sits
+   *  under its custom-field column. Used for the grand-total bars. */
+  columns?: CustomFieldDefinition[];
+  /** Stronger styling for the grand-total bars. */
+  prominent?: boolean;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -77,6 +85,8 @@ const CustomFieldFooterRow = ({
   heading,
   className,
   visibleDefinitions,
+  columns,
+  prominent,
 }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +120,51 @@ const CustomFieldFooterRow = ({
     : rows;
 
   if (error || visibleRows.length === 0) return null;
+
+  // Column-aligned bar: a table-fixed table sharing the section tables'
+  // columns, so each total lands under its custom-field column.
+  if (columns) {
+    const valueByDef = new Map(rows.map((row) => [row.definition, row]));
+    return (
+      <div
+        className={cn(
+          "overflow-hidden rounded-lg border",
+          prominent && "border-foreground/25 bg-muted/70",
+          className,
+        )}
+        data-testid="custom-field-footer-row"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full table-fixed text-sm">
+            <TaskTableColumns definitions={columns} />
+            <tbody>
+              <tr className={cn(prominent && "font-semibold")}>
+                <td className="px-3 py-2.5" />
+                <td className="px-1 py-2.5" />
+                <td className="px-2 py-2.5" />
+                <td className="px-2 py-2.5" />
+                {columns.map((def) => {
+                  const row = valueByDef.get(def["@id"]);
+                  return (
+                    <td
+                      key={def["@id"]}
+                      className="truncate px-2 py-2.5 tabular-nums"
+                      data-testid="custom-field-footer-cell"
+                    >
+                      {row ? formatValue(row) : ""}
+                    </td>
+                  );
+                })}
+                <td className="px-2 py-2.5" />
+                <td className="px-2 py-2.5" />
+                <td className="px-2 py-2.5" />
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card
