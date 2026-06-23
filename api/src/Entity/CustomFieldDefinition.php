@@ -14,6 +14,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\CustomField\CustomFieldKind;
 use App\Repository\CustomFieldDefinitionRepository;
+use App\State\CustomFieldDefinitionUpdateProcessor;
 use App\Validator\ValidCustomFieldDefinition;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
@@ -58,6 +59,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
+            processor: CustomFieldDefinitionUpdateProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
