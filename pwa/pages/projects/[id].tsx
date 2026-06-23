@@ -145,6 +145,14 @@ const isEmptyFieldValue = (value: unknown): boolean =>
 const DEFAULT_SECTION_KEY = "__default__";
 const DEFAULT_SECTION_LABEL = "In progress";
 
+/** Draft payload for the inline add-task row (IRIs for the relations). */
+interface NewTaskDraft {
+  title: string;
+  dueDate: string | null;
+  assignees: string[];
+  tags: string[];
+}
+
 const ProjectDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { spaces } = useActiveSpace();
@@ -173,12 +181,12 @@ const ProjectDetail = () => {
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
-  // Every section carries a persistent quick-add row (managed locally by
-  // AddTaskRow). The top "New task" button just focuses the default group's
-  // add row via this ref.
-  const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+  // Each section shows a collapsed "+ Add task" trigger that expands into a
+  // full draft row (managed locally by AddTaskRow). The top "New task" button
+  // clicks the default group's trigger to open + focus it.
+  const defaultAddTriggerRef = useRef<HTMLButtonElement | null>(null);
   const focusDefaultAddRow = () =>
-    requestAnimationFrame(() => newTaskInputRef.current?.focus());
+    requestAnimationFrame(() => defaultAddTriggerRef.current?.click());
   // Bumped whenever the task set changes so the aggregate footer re-fetches.
   const [footerKey, setFooterKey] = useState(0);
 
@@ -436,12 +444,12 @@ const ProjectDetail = () => {
     }
   };
 
-  // Inline quick-add from a section's persistent add row: create with just the
-  // title; everything else is edited in the row afterwards. Returns true on
-  // success so the add row can clear + refocus for rapid entry.
+  // Inline add from a section's expandable add row: create with the drafted
+  // title + due / assignees / tags. Returns true on success so the add row
+  // can clear + refocus for rapid entry.
   const createTaskInSection = useCallback(
-    async (sectionIri: string | null, rawTitle: string): Promise<boolean> => {
-      const title = rawTitle.trim();
+    async (sectionIri: string | null, draft: NewTaskDraft): Promise<boolean> => {
+      const title = draft.title.trim();
       if (!project || !title) return false;
       setError(null);
       try {
@@ -453,6 +461,9 @@ const ProjectDetail = () => {
             title,
             project: project["@id"],
             ...(sectionIri ? { section: sectionIri } : {}),
+            ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
+            ...(draft.assignees.length ? { assignees: draft.assignees } : {}),
+            ...(draft.tags.length ? { tags: draft.tags } : {}),
           }),
         });
         if (!res.ok) {
@@ -1107,8 +1118,8 @@ const ProjectDetail = () => {
                                 sort={listView.sort}
                                 filters={listView.filters}
                                 footerKey={footerKey}
-                                newTaskInputRef={
-                                  group.section ? undefined : newTaskInputRef
+                                addTriggerRef={
+                                  group.section ? undefined : defaultAddTriggerRef
                                 }
                                 onCreate={createTaskInSection}
                                 onToggle={toggleComplete}
@@ -1226,8 +1237,8 @@ interface SectionRowsProps {
   sort: SortState | null;
   filters: FilterMap;
   footerKey: number;
-  newTaskInputRef?: RefObject<HTMLInputElement | null>;
-  onCreate: (sectionIri: string | null, title: string) => Promise<boolean>;
+  addTriggerRef?: RefObject<HTMLButtonElement | null>;
+  onCreate: (sectionIri: string | null, draft: NewTaskDraft) => Promise<boolean>;
   onToggle: (task: ProjectTask) => void;
   onOpen: (task: ProjectTask) => void;
   patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
@@ -1254,7 +1265,7 @@ const SectionRows = ({
   sort,
   filters,
   footerKey,
-  newTaskInputRef,
+  addTriggerRef,
   onCreate,
   onToggle,
   onOpen,
@@ -1317,8 +1328,10 @@ const SectionRows = ({
         <AddTaskRow
           columns={columns}
           sectionIri={sectionIri}
+          allTags={allTags}
+          assignableUsers={assignableUsers}
           onCreate={onCreate}
-          inputRef={newTaskInputRef}
+          triggerRef={addTriggerRef}
         />
       )}
       {!collapsed && (
@@ -1441,61 +1454,166 @@ const SectionTitleRow = ({
 };
 
 /**
- * Persistent quick-add row at the foot of every section. Title-only: Enter
- * creates the task in this section (other fields are edited on the row
- * afterwards). Keeps its own draft so each section adds independently.
+ * Foot-of-section add affordance. Collapsed it's just a "+ Add task" text
+ * trigger; clicking it expands into a full draft row (title + due +
+ * assignees + tags) that creates the task on Enter and stays open for rapid
+ * entry. Escape (or the top "New task" button via `triggerRef`) toggles it.
  */
 const AddTaskRow = ({
   columns,
   sectionIri,
+  allTags,
+  assignableUsers,
   onCreate,
-  inputRef,
+  triggerRef,
 }: {
   columns: ListColumn[];
   sectionIri: string | null;
-  onCreate: (sectionIri: string | null, title: string) => Promise<boolean>;
-  inputRef?: RefObject<HTMLInputElement | null>;
+  allTags: TagOption[];
+  assignableUsers: AssigneeOption[];
+  onCreate: (sectionIri: string | null, draft: NewTaskDraft) => Promise<boolean>;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }) => {
-  const [title, setTitle] = useState("");
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const [tags, setTags] = useState<TagOption[]>([]);
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const reset = () => {
+    setTitle("");
+    setDueDate(null);
+    setTags([]);
+    setAssignees([]);
+  };
+  const open = () => {
+    setAdding(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+  const close = () => {
+    setAdding(false);
+    reset();
+  };
 
   const submit = async () => {
     if (!title.trim() || busy) return;
     setBusy(true);
-    const ok = await onCreate(sectionIri, title);
+    const ok = await onCreate(sectionIri, {
+      title,
+      dueDate,
+      assignees: assignees.map((a) => a["@id"]),
+      tags: tags.map((t) => t["@id"]),
+    });
     setBusy(false);
-    if (ok) setTitle("");
+    if (ok) {
+      reset();
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
   };
 
+  if (!adding) {
+    return (
+      <tr className="border-b" data-testid="project-add-task-trigger">
+        <td className="px-3 py-2" />
+        <td colSpan={columns.length + 1} className="px-2 py-2">
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={open}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            data-testid="project-new-task"
+          >
+            <Plus className="h-4 w-4" /> Add task
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
   return (
-    <tr className="border-b bg-muted/5" data-testid="project-new-task-row">
+    <tr className="border-b bg-muted/10" data-testid="project-new-task-row">
       <td className="px-3 py-2 align-middle">
         <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
       </td>
-      {columns.map((column) =>
-        column.key === "task" ? (
-          <td key="task" className="px-2 py-2">
-            <Input
-              ref={inputRef}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void submit();
+      {columns.map((column) => {
+        if (column.key === "task") {
+          return (
+            <td key="task" className="px-2 py-2">
+              <Input
+                ref={inputRef}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submit();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    close();
+                  }
+                }}
+                placeholder="Task name…"
+                maxLength={255}
+                disabled={busy}
+                className="h-8"
+                data-testid="project-new-task-title"
+              />
+            </td>
+          );
+        }
+        if (column.key === "due") {
+          return (
+            <td key="due" className="px-2 py-2 align-middle" data-testid="new-task-due">
+              <DueDateCell
+                value={dueDate}
+                onChange={setDueDate}
+                ariaLabel="Due date for new task"
+                testIdPrefix="project-new-task-due"
+              />
+            </td>
+          );
+        }
+        if (column.key === "assignees") {
+          return (
+            <td key="assignees" className="px-2 py-2 align-middle" data-testid="new-task-assignees">
+              <AssigneesCombobox
+                value={assignees}
+                options={assignableUsers}
+                onChange={(iris) =>
+                  setAssignees(
+                    iris
+                      .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
+                      .filter((u): u is AssigneeOption => Boolean(u)),
+                  )
                 }
-              }}
-              placeholder="Add a task, then Enter…"
-              maxLength={255}
-              disabled={busy}
-              className="h-8 border-transparent bg-transparent hover:border-input focus-visible:border-input"
-              data-testid="project-new-task-title"
-            />
-          </td>
-        ) : (
-          <td key={column.key} className="px-2 py-2" />
-        ),
-      )}
+                subjectLabel="new task"
+              />
+            </td>
+          );
+        }
+        if (column.key === "tags") {
+          return (
+            <td key="tags" className="px-2 py-2 align-middle" data-testid="new-task-tags">
+              <TagsCombobox
+                value={tags}
+                options={allTags}
+                onChange={(iris) =>
+                  setTags(
+                    iris
+                      .map((iri) => allTags.find((t) => t["@id"] === iri))
+                      .filter((t): t is TagOption => Boolean(t)),
+                  )
+                }
+                subjectLabel="new task"
+              />
+            </td>
+          );
+        }
+        // Custom fields are set after the task exists.
+        return <td key={column.key} className="px-2 py-2 align-middle" />;
+      })}
       <td className="px-2 py-2" />
     </tr>
   );
