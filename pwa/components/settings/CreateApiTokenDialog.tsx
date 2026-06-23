@@ -20,59 +20,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import PermissionTree, {
-  type PermissionLevel,
-  type PermissionNode,
-} from "@/components/common/PermissionTree";
-
-const LEVELS: PermissionLevel[] = [
-  { value: "none", label: "None" },
-  { value: "view", label: "View" },
-  { value: "edit", label: "Edit" },
-];
-
-const NODES: PermissionNode[] = [
-  {
-    key: "content",
-    label: "Content",
-    description: "tasks, projects, pages, discussions, comments, files",
-    children: [
-      { key: "tasks", label: "Tasks" },
-      { key: "projects", label: "Projects" },
-      { key: "pages", label: "Pages" },
-      { key: "discussions", label: "Discussions" },
-      { key: "comments", label: "Comments" },
-      { key: "files", label: "Files" },
-    ],
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    description: "notifications, profile, security",
-    children: [
-      { key: "notifications", label: "Notifications" },
-      { key: "profile", label: "Profile" },
-      { key: "security", label: "Security" },
-    ],
-  },
-];
-
-const ALL_CATEGORIES = [
-  "tasks",
-  "projects",
-  "pages",
-  "discussions",
-  "comments",
-  "notifications",
-  "files",
-  "profile",
-  "security",
-];
-
-// When a token is restricted, start everything at read-only — a useful,
-// least-surprising baseline the user tightens or loosens.
-const defaultAccess = (): Record<string, string> =>
-  Object.fromEntries(ALL_CATEGORIES.map((c) => [c, "view"]));
+import {
+  TOKEN_PERMISSION_LEVELS,
+  TOKEN_PERMISSION_NODES,
+  defaultTokenAccess,
+} from "@/lib/tokenPermissions";
+import PermissionTree from "@/components/common/PermissionTree";
 
 interface CreateApiTokenDialogProps {
   open: boolean;
@@ -89,7 +42,7 @@ const CreateApiTokenDialog = ({
   const [name, setName] = useState("");
   const [expiry, setExpiry] = useState("90");
   const [restricted, setRestricted] = useState(false);
-  const [access, setAccess] = useState<Record<string, string>>(defaultAccess);
+  const [access, setAccess] = useState<Record<string, string>>(defaultTokenAccess);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedApiToken | null>(null);
@@ -99,7 +52,7 @@ const CreateApiTokenDialog = ({
     setName("");
     setExpiry("90");
     setRestricted(false);
-    setAccess(defaultAccess());
+    setAccess(defaultTokenAccess());
     setError(null);
     setCreated(null);
     setCopied(false);
@@ -246,8 +199,8 @@ const CreateApiTokenDialog = ({
               {restricted ? (
                 <div className="rounded-md border p-3">
                   <PermissionTree
-                    levels={LEVELS}
-                    nodes={NODES}
+                    levels={TOKEN_PERMISSION_LEVELS}
+                    nodes={TOKEN_PERMISSION_NODES}
                     values={access}
                     masterLabel="Token can access"
                     onChange={setAccess}
