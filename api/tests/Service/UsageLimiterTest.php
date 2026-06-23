@@ -93,6 +93,27 @@ class UsageLimiterTest extends KernelTestCase
         $this->assertNull($limiter->remainingMcpCalls($alice));
     }
 
+    public function testAdminIsUncappedButStillCounted(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $admin->setRoles(['ROLE_USER', 'ROLE_ADMIN']);
+        $this->em->flush();
+
+        $limiter = $this->limiter(mcpLimit: 1, memberLimit: 5);
+
+        // Two calls, well past the cap of 1 — but admins aren't capped.
+        $this->recorder->recordMcpCall($admin);
+        $this->recorder->recordMcpCall($admin);
+
+        $this->assertTrue($limiter->isAdmin($admin));
+        $this->assertFalse($limiter->isUserEntitled($admin));
+        $this->assertTrue($limiter->isMcpCallAllowed($admin));
+        $this->assertNull($limiter->remainingMcpCalls($admin));
+
+        // Tracking is unaffected — their usage is still recorded.
+        $this->assertSame(2, $limiter->mcpCallsToday($admin));
+    }
+
     public function testCanceledSubscriptionDoesNotEntitle(): void
     {
         $alice = $this->createUser('alice@example.com');
