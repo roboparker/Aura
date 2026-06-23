@@ -38,6 +38,9 @@ class UsageController extends AbstractController
             'freeMcpDailyLimit' => $this->usageLimiter->freeMcpDailyLimit(),
             'remaining' => $this->usageLimiter->remainingMcpCalls($user),
             'entitled' => $this->usageLimiter->isUserEntitled($user),
+            // Admins are tracked but never capped — surfaced so the UI can show
+            // the unlimited state with the right reason.
+            'admin' => $this->usageLimiter->isAdmin($user),
             'enforcementEnabled' => $this->usageLimiter->isEnforcementEnabled(),
         ]);
     }

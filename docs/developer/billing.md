@@ -26,6 +26,12 @@ subscription**. "Entitling" = status in
 so a transient payment hiccup doesn't instantly lock a team out; only a
 terminal `canceled`/`unpaid` revokes).
 
+**Admin exemption:** platform admins (`ROLE_ADMIN`) are never capped on MCP
+throughput — operating the instance shouldn't be rate-limited by the freemium
+gate. Their usage is *still counted* (so it shows up in usage reports and the
+settings panel); only the cap check is bypassed (`UsageLimiter::isAdmin()`,
+folded into the same unlimited path as entitlement).
+
 Only programmatic **MCP** traffic is metered — the PWA's own
 cookie-authenticated REST calls are never counted. Counting itself stays in the
 existing `UsageRecorder`/`UserUsageCounter` (off the request latency path);

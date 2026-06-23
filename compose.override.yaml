@@ -78,11 +78,21 @@ services:
       # Repo-root docs/ surfaced inside the container so scripts/sync-docs.mjs
       # can find a source when predev / prebuild runs from /srv/app.
       - ./docs:/srv/docs:ro
+    # Next 16 defaults `next dev` to Turbopack, whose file watcher relies on
+    # inotify and ignores WATCHPACK_POLLING. inotify events do NOT cross Docker
+    # Desktop's Windows/WSL bind mount, so edits never trigger a recompile —
+    # routes go stale and hot reload silently dies. Force the webpack dev
+    # server, which DOES honor the polling flag below. Linux/macOS devs with
+    # working native file events can drop this override for Turbopack's speed.
+    command: sh -c "pnpm install; pnpm run dev --webpack"
     environment:
       API_PLATFORM_CREATE_CLIENT_ENTRYPOINT: http://php
       API_PLATFORM_CREATE_CLIENT_OUTPUT: .
-      # On Linux, you may want to comment the following line for improved performance
+      # Poll the filesystem instead of relying on inotify (which doesn't fire
+      # over the Windows/WSL bind mount). Honored by the webpack dev server
+      # selected above. On native Linux you may comment this out for perf.
       WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
 
 ###> doctrine/doctrine-bundle ###
   database:

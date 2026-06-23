@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Entity\Comment;
 use App\Entity\Discussion;
+use App\Entity\Feedback;
 use App\Entity\MediaObject;
 use App\Entity\Page;
 use App\Entity\Project;
@@ -22,7 +23,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  *
  * Every authorship FK on User is `onDelete: CASCADE` and non-null, so a naive
  * `EntityManager::remove($user)` would erase their tasks, projects, pages,
- * discussions, comments and media. Instead we reassign those FKs to a reserved
+ * discussions, comments, feedback tickets and media. Instead we reassign those
+ * FKs to a reserved
  * "Former member" sentinel inside a transaction *before* removing the user, so
  * the content stays published under an anonymized author. Memberships, API
  * tokens, sessions, notifications, invites and personal tags clear via their
@@ -55,6 +57,7 @@ final class AccountDeletionService
             $this->reassign(Page::class, 'createdBy', $user, $sentinel);
             $this->reassign(Discussion::class, 'author', $user, $sentinel);
             $this->reassign(Comment::class, 'author', $user, $sentinel);
+            $this->reassign(Feedback::class, 'owner', $user, $sentinel);
             $this->reassign(MediaObject::class, 'owner', $user, $sentinel);
 
             $this->handleSpaces($user, $userId);

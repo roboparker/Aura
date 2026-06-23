@@ -164,7 +164,7 @@ const ScanStep = ({ qrDataUri, secret, onVerified }: ScanStepProps) => (
       <div className="text-center">
         <p className="text-xs text-muted-foreground">Or enter this key manually:</p>
         <code
-          className="text-sm font-mono bg-muted rounded px-2 py-1 inline-block mt-1 select-all"
+          className="text-sm font-mono bg-muted rounded px-2 py-1 inline-block mt-1 max-w-full break-all select-all"
           data-testid="2fa-secret"
         >
           {secret}

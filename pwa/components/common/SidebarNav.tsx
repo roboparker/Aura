@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection } from "@/lib/apiClient";
@@ -221,6 +221,101 @@ const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
   );
 };
 
+interface AdminLink {
+  href: string;
+  label: string;
+  /** Path prefix used to highlight the active row. */
+  match: string;
+  /** External (Caddy-served) link rendered as a plain <a>. */
+  external?: boolean;
+}
+
+/**
+ * Admin tooling as a collapsible nav section, mirroring {@see ContentSection}:
+ * a colored icon + heading with a persisted collapse chevron, over the static
+ * admin links. Lives inline in the scrollable nav (not pinned to the foot) so
+ * it reads as just another section of the left menu.
+ */
+const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) => {
+  const router = useRouter();
+
+  const storageKey = "madori.navCollapsed.admin";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  const links: AdminLink[] = [
+    { href: "/admin/users", label: "Users", match: "/admin/users" },
+    { href: "/admin/waitlist", label: "Waitlist", match: "/admin/waitlist" },
+    { href: "/admin/segments", label: "Segments", match: "/admin/segments" },
+    { href: "/feedback", label: "Feedback", match: "/feedback" },
+    ...ADMIN_EXTERNAL_LINKS.map((l) => ({ ...l, match: l.href, external: true })),
+  ];
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Admin`}
+        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        <ShieldCheck className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span className="truncate">Admin</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        links.map((link) => {
+          const active = router.pathname.startsWith(link.match);
+          const inner = (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "w-full min-w-0 justify-start font-normal",
+                active && "bg-accent text-accent-foreground",
+              )}
+            >
+              {link.external ? (
+                <a href={link.href} target="_blank" rel="noopener noreferrer">
+                  {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, lining the row
+                      text up under the heading label. */}
+                  <span className="truncate pl-5">{link.label}</span>
+                </a>
+              ) : (
+                <Link href={link.href}>
+                  <span className="truncate pl-5">{link.label}</span>
+                </Link>
+              )}
+            </Button>
+          );
+          return <span key={link.href}>{wrap(inner)}</span>;
+        })}
+    </div>
+  );
+};
+
 /**
  * Shared navigation contents used by both the persistent left-side
  * `<Sidebar>` (`md:` and up) and the mobile-only Sheet variant in the
@@ -233,7 +328,6 @@ const SidebarNav = ({
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
   const { activeSpace } = useActiveSpace();
-  const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
 
@@ -257,78 +351,9 @@ const SidebarNav = ({
               wrap={wrap}
             />
           ))}
-      </nav>
 
-      {/* Admin tooling is pinned to the foot of the sidebar, below the
-          (scrollable) space content, separated by a divider. */}
-      {isAdmin && (
-        <div className="flex flex-col gap-0.5 border-t px-2 py-3">
-          <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Admin
-          </p>
-            <span>
-              {wrap(
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "justify-start w-full",
-                    router.pathname.startsWith("/admin/users") &&
-                      "bg-accent text-accent-foreground",
-                  )}
-                >
-                  <Link href="/admin/users">Users</Link>
-                </Button>,
-              )}
-            </span>
-            <span>
-              {wrap(
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "justify-start w-full",
-                    router.pathname.startsWith("/admin/waitlist") &&
-                      "bg-accent text-accent-foreground",
-                  )}
-                >
-                  <Link href="/admin/waitlist">Waitlist</Link>
-                </Button>,
-              )}
-            </span>
-            <span>
-              {wrap(
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "justify-start w-full",
-                    router.pathname.startsWith("/admin/segments") &&
-                      "bg-accent text-accent-foreground",
-                  )}
-                >
-                  <Link href="/admin/segments">Segments</Link>
-                </Button>,
-              )}
-            </span>
-            {ADMIN_EXTERNAL_LINKS.map(({ href, label }) => (
-              <Button
-                key={href}
-                asChild
-                variant="ghost"
-                size="sm"
-                className="justify-start w-full"
-              >
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  {label}
-                </a>
-              </Button>
-            ))}
-        </div>
-      )}
+        {isAdmin && <AdminSection wrap={wrap} />}
+      </nav>
     </div>
   );
 };

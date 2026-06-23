@@ -8,6 +8,7 @@ interface Usage {
   freeMcpDailyLimit: number;
   remaining: number | null;
   entitled: boolean;
+  admin: boolean;
   enforcementEnabled: boolean;
 }
 
@@ -42,7 +43,10 @@ const UsageSummary = () => {
 
   if (!usage) return null;
 
-  const unlimited = usage.entitled;
+  // Admins are uncapped but we still surface today's count so their usage
+  // stays visible; entitled (Team) members get the plain "Unlimited" state.
+  const adminUncapped = usage.admin && !usage.entitled;
+  const unlimited = usage.entitled || usage.admin;
   const used = usage.mcpCallsToday;
   const limit = usage.freeMcpDailyLimit;
   const pct = unlimited ? 0 : Math.min(100, Math.round((used / Math.max(1, limit)) * 100));
@@ -55,7 +59,15 @@ const UsageSummary = () => {
           <Gauge className="h-4 w-4 text-muted-foreground" aria-hidden />
           MCP usage today
         </p>
-        {unlimited ? (
+        {adminUncapped ? (
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+            <span className="tabular-nums text-foreground">{used} today</span>
+            <span className="inline-flex items-center gap-1 text-violet-600">
+              <InfinityIcon className="h-4 w-4" aria-hidden />
+              No limit
+            </span>
+          </span>
+        ) : unlimited ? (
           <span className="inline-flex items-center gap-1 text-sm font-medium text-violet-600">
             <InfinityIcon className="h-4 w-4" aria-hidden />
             Unlimited
@@ -92,7 +104,9 @@ const UsageSummary = () => {
       )}
       {unlimited && (
         <p className="mt-2 text-xs text-muted-foreground">
-          You&apos;re on a Team space — unlimited MCP &amp; API throughput.
+          {usage.entitled
+            ? "You're on a Team space — unlimited MCP & API throughput."
+            : "Admin account — no MCP cap. Today's calls are still tracked above."}
         </p>
       )}
     </div>
