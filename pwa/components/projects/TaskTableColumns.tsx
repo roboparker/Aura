@@ -5,7 +5,7 @@ import type { ListColumn } from "@/components/projects/listColumns";
  * tables and the grand-total bar line up column-for-column. Every table that
  * uses it must be `table-fixed`. Layout:
  *
- *   checkbox · # · [data columns, in the user's order] · actions
+ *   checkbox · [data columns, in the user's order] · actions
  *
  * The data columns (Task / Due / Assignees / Tags / custom fields) carry
  * their own width class; Task's is "" so `table-fixed` gives it the slack.
@@ -13,7 +13,6 @@ import type { ListColumn } from "@/components/projects/listColumns";
 const TaskTableColumns = ({ columns }: { columns: ListColumn[] }) => (
   <colgroup>
     <col className="w-8" />
-    <col className="w-10" />
     {columns.map((column) => (
       <col key={column.key} className={column.widthClass} />
     ))}

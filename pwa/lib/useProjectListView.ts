@@ -16,6 +16,8 @@ export interface ProjectListView {
   filters: FilterMap;
   /** Saved column key order; [] = the natural/default order. */
   order: string[];
+  /** Saved section group-key order (incl. the default group); [] = natural. */
+  sectionOrder: string[];
 }
 
 interface UseProjectListView extends ProjectListView {
@@ -24,13 +26,19 @@ interface UseProjectListView extends ProjectListView {
   setFilter: (key: string, value: FilterValue | null) => void;
   clearAllFilters: () => void;
   setOrder: (order: string[]) => void;
+  setSectionOrder: (order: string[]) => void;
   activeFilterCount: number;
 }
 
 const storageKey = (projectId: string): string =>
   `madori.project.${projectId}.listview`;
 
-const empty: ProjectListView = { sort: null, filters: {}, order: [] };
+const empty: ProjectListView = {
+  sort: null,
+  filters: {},
+  order: [],
+  sectionOrder: [],
+};
 
 function load(projectId: string): ProjectListView {
   if (typeof window === "undefined") return empty;
@@ -42,6 +50,7 @@ function load(projectId: string): ProjectListView {
       sort: parsed.sort ?? null,
       filters: parsed.filters ?? {},
       order: Array.isArray(parsed.order) ? parsed.order : [],
+      sectionOrder: Array.isArray(parsed.sectionOrder) ? parsed.sectionOrder : [],
     };
   } catch {
     return empty;
@@ -98,14 +107,21 @@ export function useProjectListView(projectId: string | null): UseProjectListView
     [persist, view],
   );
 
+  const setSectionOrder = useCallback(
+    (sectionOrder: string[]) => persist({ ...view, sectionOrder }),
+    [persist, view],
+  );
+
   return {
     sort: view.sort,
     filters: view.filters,
     order: view.order,
+    sectionOrder: view.sectionOrder,
     setSort,
     setFilter,
     clearAllFilters,
     setOrder,
+    setSectionOrder,
     activeFilterCount: Object.keys(view.filters).length,
   };
 }
