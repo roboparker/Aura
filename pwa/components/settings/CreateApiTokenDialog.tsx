@@ -154,14 +154,14 @@ const CreateApiTokenDialog = ({
                 Madori stores only a hash and can&apos;t display it again.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-2">
+            <div className="flex items-start gap-2 rounded-md border bg-muted/40 p-2">
               <code
-                className="min-w-0 flex-1 truncate font-mono text-sm"
+                className="min-w-0 flex-1 break-all font-mono text-sm leading-relaxed"
                 data-testid="api-token-plaintext"
               >
                 {created.plainToken}
               </code>
-              <Button type="button" size="sm" variant="outline" onClick={() => void copyToken()}>
+              <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => void copyToken()}>
                 {copied ? (
                   <>
                     <Check className="mr-1 h-3.5 w-3.5" /> Copied
