@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import CreateApiTokenDialog from "./CreateApiTokenDialog";
+import EditApiTokenDialog from "./EditApiTokenDialog";
 
 const formatDate = (iso: string | null): string =>
   iso ? new Date(iso).toLocaleDateString() : "—";
@@ -31,6 +32,7 @@ const ApiTokensTable = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<ApiTokenRow | null>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -149,6 +151,15 @@ const ApiTokensTable = () => {
                       type="button"
                       variant="ghost"
                       size="sm"
+                      onClick={() => setEditing(t)}
+                      data-testid="api-token-edit"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => void revoke(t)}
                       data-testid="api-token-revoke"
@@ -167,6 +178,18 @@ const ApiTokensTable = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreated={() => void load()}
+      />
+
+      <EditApiTokenDialog
+        token={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={(updated) =>
+          setTokens((prev) =>
+            prev.map((t) => (t["@id"] === updated["@id"] ? updated : t)),
+          )
+        }
       />
     </div>
   );

@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\ApiTokenRepository;
 use App\Security\Access\AccessPolicy;
@@ -57,6 +58,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             // POST is the only moment the plaintext bearer is visible.
             // Subsequent GETs use the stricter `api_token:read` group.
             normalizationContext: ['groups' => ['api_token:read', 'api_token:create']],
+        ),
+        // Editing is limited to the human-managed fields (name / accessPolicy /
+        // expiresAt via the `api_token:write` group). The secret itself is
+        // immutable — there's no way to rotate the plaintext in place; revoke
+        // and re-create instead. `validateAccessPolicy()` re-runs on update.
+        new Patch(
+            uriTemplate: '/api-tokens/{id}',
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getUser() == user)",
         ),
         new Delete(
             uriTemplate: '/api-tokens/{id}',
