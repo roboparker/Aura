@@ -985,15 +985,6 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="list" className="mt-4">
-                  {/* Grand totals across the whole board — top. */}
-                  <CustomFieldFooterRow
-                    projectId={project.id}
-                    refreshKey={footerKey}
-                    columns={listDefinitions}
-                    prominent
-                    className="mb-6"
-                  />
-
                   <div className="space-y-6" data-testid="project-task-list">
                     {sectionGroups.map((group) => {
                       const sectionIri = group.section
@@ -1046,14 +1037,17 @@ const ProjectDetail = () => {
                     })}
                   </div>
 
-                  {/* Grand totals across the whole board — bottom. */}
-                  <CustomFieldFooterRow
-                    projectId={project.id}
-                    refreshKey={footerKey}
-                    columns={listDefinitions}
-                    prominent
-                    className="mt-6"
-                  />
+                  {/* Grand totals across the whole board — only when
+                      there's more than one section to total across. */}
+                  {sectionGroups.length > 1 && (
+                    <CustomFieldFooterRow
+                      projectId={project.id}
+                      refreshKey={footerKey}
+                      columns={listDefinitions}
+                      prominent
+                      className="mt-6"
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="board" className="mt-4">
@@ -1267,6 +1261,8 @@ const SectionBlock = ({
               <th className="w-8 px-3 py-2" />
               <th className="w-10 px-1 py-2 text-left font-medium">#</th>
               <th className="px-2 py-2 text-left font-medium">Task</th>
+              <th className="px-2 py-2 text-left font-medium">Due</th>
+              <th className="px-2 py-2 text-left font-medium">Assignees</th>
               <th className="px-2 py-2 text-left font-medium">Tags</th>
               {definitions.map((def) => (
                 <th
@@ -1276,8 +1272,6 @@ const SectionBlock = ({
                   {def.name}
                 </th>
               ))}
-              <th className="px-2 py-2 text-left font-medium">Due</th>
-              <th className="px-2 py-2 text-left font-medium">Assignees</th>
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
@@ -1335,19 +1329,6 @@ const SectionBlock = ({
                     data-testid="project-new-task-title"
                   />
                 </td>
-                <td className="px-2 py-2 align-middle" data-testid="new-task-tags">
-                  <TagsCombobox
-                    value={newTaskTags}
-                    options={allTags}
-                    onChange={onNewTaskTags}
-                    subjectLabel="new task"
-                  />
-                </td>
-                {definitions.map((def) => (
-                  // Custom fields are set after the task exists; render an empty
-                  // cell so the inline fields stay aligned with the columns.
-                  <td key={def["@id"]} className="px-2 py-2 align-middle" />
-                ))}
                 <td className="px-2 py-2 align-middle" data-testid="new-task-due">
                   <DueDateCell
                     value={newTaskDue}
@@ -1367,6 +1348,19 @@ const SectionBlock = ({
                     subjectLabel="new task"
                   />
                 </td>
+                <td className="px-2 py-2 align-middle" data-testid="new-task-tags">
+                  <TagsCombobox
+                    value={newTaskTags}
+                    options={allTags}
+                    onChange={onNewTaskTags}
+                    subjectLabel="new task"
+                  />
+                </td>
+                {definitions.map((def) => (
+                  // Custom fields are set after the task exists; render an empty
+                  // cell so the inline fields stay aligned with the columns.
+                  <td key={def["@id"]} className="px-2 py-2 align-middle" />
+                ))}
                 <td className="px-2 py-2 align-middle" />
               </tr>
             )}
@@ -1461,26 +1455,6 @@ const ProjectTaskRow = ({
         </button>
       </td>
       <td className="px-2 py-2 align-middle">
-        <TagsCombobox
-          value={task.tags}
-          options={allTags}
-          onChange={(iris) => void patchTask(task, { tags: iris })}
-          subjectLabel={task.title}
-        />
-      </td>
-      {definitions.map((def) => (
-        <td key={def["@id"]} className="px-2 py-2 align-middle">
-          <ProjectCustomFieldCell
-            task={task}
-            definition={def}
-            projectIri={projectIri}
-            spaceIri={spaceIri}
-            users={assignableUsers}
-            onCustomFieldChange={onCustomFieldChange}
-          />
-        </td>
-      ))}
-      <td className="px-2 py-2 align-middle">
         <DueDateCell
           value={task.dueDate}
           onChange={(next) => void patchTask(task, { dueDate: next })}
@@ -1503,6 +1477,26 @@ const ProjectTaskRow = ({
           subjectLabel={task.title}
         />
       </td>
+      <td className="px-2 py-2 align-middle">
+        <TagsCombobox
+          value={task.tags}
+          options={allTags}
+          onChange={(iris) => void patchTask(task, { tags: iris })}
+          subjectLabel={task.title}
+        />
+      </td>
+      {definitions.map((def) => (
+        <td key={def["@id"]} className="px-2 py-2 align-middle">
+          <ProjectCustomFieldCell
+            task={task}
+            definition={def}
+            projectIri={projectIri}
+            spaceIri={spaceIri}
+            users={assignableUsers}
+            onCustomFieldChange={onCustomFieldChange}
+          />
+        </td>
+      ))}
       <td className="px-2 py-2 align-middle">
         <button
           type="button"
