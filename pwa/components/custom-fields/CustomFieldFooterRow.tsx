@@ -139,9 +139,8 @@ const CustomFieldFooterRow = ({
     const valueByDef = new Map(rows.map((row) => [row.definition, row]));
     const cells = (
       <>
-        {/* checkbox + # — fixed leading columns, mirroring the task table. */}
+        {/* checkbox — fixed leading column, mirroring the task table. */}
         <td className="px-3 py-2" />
-        <td className="px-1 py-2" />
         {columns.map((column) => {
           // Only custom-field columns can carry an aggregate; built-ins
           // (Task / Due / Assignees / Tags) render an empty spacer so the

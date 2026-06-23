@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ChevronDown, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -405,7 +405,7 @@ const ProjectDetail = () => {
     [columns, listView],
   );
   // checkbox + # + each data column + trailing actions.
-  const fullColSpan = columns.length + 3;
+  const fullColSpan = columns.length + 2;
   const columnKeys = columns.map((c) => c.key);
   const listSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1026,7 +1026,6 @@ const ProjectDetail = () => {
                         <thead className="sticky top-0 z-20 bg-background">
                           <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <th className="w-8 px-3 py-2" />
-                            <th className="w-10 px-1 py-2 text-left font-medium">#</th>
                             <SortableContext
                               items={columnKeys}
                               strategy={horizontalListSortingStrategy}
@@ -1217,6 +1216,7 @@ const SectionRows = ({
   onDelete,
 }: SectionRowsProps) => {
   const sectionIri = section ? section["@id"] : null;
+  const [collapsed, setCollapsed] = useState(false);
   const visible = useMemo(
     () => applyView(tasks, columns, sort, filters),
     [tasks, columns, sort, filters],
@@ -1231,26 +1231,29 @@ const SectionRows = ({
       <SectionTitleRow
         section={section}
         colSpan={fullColSpan}
+        collapsed={collapsed}
+        count={tasks.length}
+        onToggleCollapsed={() => setCollapsed((c) => !c)}
         onRename={onRename}
         onDelete={onDelete}
       />
-      {visible.map((task, i) => (
-        <ProjectTaskRow
-          key={task["@id"]}
-          task={task}
-          index={i}
-          columns={columns}
-          allTags={allTags}
-          assignableUsers={assignableUsers}
-          projectIri={projectIri}
-          spaceIri={spaceIri}
-          onToggle={onToggle}
-          onOpen={onOpen}
-          patchTask={patchTask}
-          onCustomFieldChange={onCustomFieldChange}
-        />
-      ))}
-      {tasks.length > 0 && visible.length === 0 && filtersActive && (
+      {!collapsed &&
+        visible.map((task) => (
+          <ProjectTaskRow
+            key={task["@id"]}
+            task={task}
+            columns={columns}
+            allTags={allTags}
+            assignableUsers={assignableUsers}
+            projectIri={projectIri}
+            spaceIri={spaceIri}
+            onToggle={onToggle}
+            onOpen={onOpen}
+            patchTask={patchTask}
+            onCustomFieldChange={onCustomFieldChange}
+          />
+        ))}
+      {!collapsed && tasks.length > 0 && visible.length === 0 && filtersActive && (
         <tr>
           <td
             colSpan={fullColSpan}
@@ -1260,38 +1263,62 @@ const SectionRows = ({
           </td>
         </tr>
       )}
-      <AddTaskRow
-        columns={columns}
-        sectionIri={sectionIri}
-        onCreate={onCreate}
-        inputRef={newTaskInputRef}
-      />
-      <CustomFieldFooterRow
-        projectId={projectId}
-        filters={footerFilter}
-        refreshKey={footerKey}
-        columns={columns}
-        asRow
-      />
+      {!collapsed && (
+        <AddTaskRow
+          columns={columns}
+          sectionIri={sectionIri}
+          onCreate={onCreate}
+          inputRef={newTaskInputRef}
+        />
+      )}
+      {!collapsed && (
+        <CustomFieldFooterRow
+          projectId={projectId}
+          filters={footerFilter}
+          refreshKey={footerKey}
+          columns={columns}
+          asRow
+        />
+      )}
     </>
   );
 };
 
-/** Full-width section heading row (editable title + delete for user sections). */
+/** Full-width section heading row (collapse arrow + editable title + delete). */
 const SectionTitleRow = ({
   section,
   colSpan,
+  collapsed,
+  count,
+  onToggleCollapsed,
   onRename,
   onDelete,
 }: {
   section: TaskSection | null;
   colSpan: number;
+  collapsed: boolean;
+  count: number;
+  onToggleCollapsed: () => void;
   onRename: (section: TaskSection, title: string) => void | Promise<void>;
   onDelete: (section: TaskSection) => void | Promise<void>;
 }) => (
   <tr className="border-b bg-muted/40" data-testid="project-section">
     <td colSpan={colSpan} className="px-3 py-1.5">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand section" : "Collapse section"}
+          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          data-testid="section-collapse"
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </button>
         {section ? (
           <input
             defaultValue={section.title}
@@ -1308,6 +1335,7 @@ const SectionTitleRow = ({
             {DEFAULT_SECTION_LABEL}
           </span>
         )}
+        <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
         {section && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -1368,7 +1396,6 @@ const AddTaskRow = ({
       <td className="px-3 py-2 align-middle">
         <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
       </td>
-      <td className="px-1 py-2" />
       {columns.map((column) =>
         column.key === "task" ? (
           <td key="task" className="px-2 py-2">
@@ -1458,7 +1485,6 @@ const SortableHeaderCell = ({
 
 interface ProjectTaskRowProps {
   task: ProjectTask;
-  index: number;
   columns: ListColumn[];
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
@@ -1472,7 +1498,6 @@ interface ProjectTaskRowProps {
 
 const ProjectTaskRow = ({
   task,
-  index,
   columns,
   allTags,
   assignableUsers,
@@ -1564,9 +1589,6 @@ const ProjectTaskRow = ({
           aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
           className="size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
         />
-      </td>
-      <td className="px-1 py-2 align-middle text-xs text-muted-foreground">
-        T{index + 1}
       </td>
       {columns.map((column) => (
         <td
