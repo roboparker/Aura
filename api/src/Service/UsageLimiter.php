@@ -65,6 +65,26 @@ final class UsageLimiter
     }
 
     /**
+     * True for platform admins. Their usage is still counted (so we can see
+     * what they consume), but they are exempt from the free MCP throughput cap
+     * — operating the instance shouldn't be rate-limited by the freemium gate.
+     */
+    public function isAdmin(User $user): bool
+    {
+        return in_array('ROLE_ADMIN', $user->getRoles(), true);
+    }
+
+    /**
+     * Whether the user's MCP throughput is uncapped: an entitled (paid Team)
+     * member or a platform admin. Distinct from {@see $enforcementEnabled},
+     * which suppresses the cap globally while the gate ships dark.
+     */
+    private function hasUnlimitedMcp(User $user): bool
+    {
+        return $this->isUserEntitled($user) || $this->isAdmin($user);
+    }
+
+    /**
      * Today's (UTC) count of metered MCP tool calls for this user.
      */
     public function mcpCallsToday(User $user): int
@@ -95,7 +115,7 @@ final class UsageLimiter
      */
     public function remainingMcpCalls(User $user): ?int
     {
-        if (!$this->enforcementEnabled || $this->isUserEntitled($user)) {
+        if (!$this->enforcementEnabled || $this->hasUnlimitedMcp($user)) {
             return null;
         }
 
@@ -108,7 +128,7 @@ final class UsageLimiter
      */
     public function isMcpCallAllowed(User $user): bool
     {
-        if (!$this->enforcementEnabled || $this->isUserEntitled($user)) {
+        if (!$this->enforcementEnabled || $this->hasUnlimitedMcp($user)) {
             return true;
         }
 
