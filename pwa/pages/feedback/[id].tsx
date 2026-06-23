@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { ApiError, apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
@@ -237,12 +237,6 @@ const FeedbackDetailPage = () => {
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
-          <Button asChild variant="link" size="sm" className="px-0 h-auto">
-            <Link href="/feedback" data-testid="feedback-back-link">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Feedback
-            </Link>
-          </Button>
-
           {notFound ? (
             <Card>
               <CardContent className="pt-6">
@@ -284,22 +278,6 @@ const FeedbackDetailPage = () => {
                       {ticket.title}
                     </h1>
                   )}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-2">
-                      <UserAvatar user={ticket.owner} size="sm" />
-                      <span className="font-medium text-foreground">
-                        {displayName(ticket.owner)}
-                      </span>
-                    </span>
-                    <span>filed {formatRelative(ticket.createdAt)}</span>
-                    {ticket.updatedAt && (
-                      <span className="italic">· edited {formatRelative(ticket.updatedAt)}</span>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <MessageSquare className="h-3.5 w-3.5" />
-                      {comments.length} {comments.length === 1 ? "comment" : "comments"}
-                    </span>
-                  </div>
                 </div>
               </div>
 
@@ -307,7 +285,25 @@ const FeedbackDetailPage = () => {
               <Card>
                 <CardContent className="pt-6 space-y-4">
                   {!editing ? (
-                    <MarkdownView source={ticket.description} className="text-sm" />
+                    <>
+                      <MarkdownView source={ticket.description} className="text-sm" />
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-3 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-2">
+                          <UserAvatar user={ticket.owner} size="sm" />
+                          <span className="font-medium text-foreground">
+                            {displayName(ticket.owner)}
+                          </span>
+                        </span>
+                        <span>filed {formatRelative(ticket.createdAt)}</span>
+                        {ticket.updatedAt && (
+                          <span className="italic">· edited {formatRelative(ticket.updatedAt)}</span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          {comments.length} {comments.length === 1 ? "comment" : "comments"}
+                        </span>
+                      </div>
+                    </>
                   ) : (
                     <div className="space-y-3">
                       <div className="space-y-1.5">
