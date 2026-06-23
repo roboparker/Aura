@@ -418,33 +418,6 @@ const ProjectDetail = () => {
     }
   };
 
-  // Drag-to-reorder user sections (the default group stays pinned first).
-  const sectionIds = useMemo(
-    () => [...sections].sort((a, b) => a.position - b.position).map((s) => s["@id"]),
-    [sections],
-  );
-  const onSectionDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const ordered = [...sections].sort((a, b) => a.position - b.position);
-    const from = ordered.findIndex((s) => s["@id"] === active.id);
-    const to = ordered.findIndex((s) => s["@id"] === over.id);
-    if (from === -1 || to === -1) return;
-    const next = arrayMove(ordered, from, to).map((s, i) => ({ ...s, position: i }));
-    setSections(next);
-    // Persist only the rows whose position actually changed.
-    next.forEach((s, i) => {
-      if (ordered[i]?.["@id"] !== s["@id"]) {
-        void fetch(`${ENTRYPOINT}${s["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify({ position: i }),
-        });
-      }
-    });
-  };
-
   const toggleComplete = async (task: ProjectTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
     setError(null);
@@ -693,6 +666,36 @@ const ProjectDetail = () => {
     }
     return groups;
   }, [tasks, sections]);
+
+  // List-view section order is a personal preference (localStorage) so the
+  // default "In progress" group can be reordered too (it has no DB row to
+  // carry a position). Unknown/new groups fall to the end; the board keeps
+  // its own default-first order.
+  const orderedSectionGroups = useMemo(() => {
+    const order = listView.sectionOrder;
+    if (order.length === 0) return sectionGroups;
+    const byKey = new Map(sectionGroups.map((g) => [g.key, g]));
+    const seen = new Set<string>();
+    const out: typeof sectionGroups = [];
+    for (const key of order) {
+      const g = byKey.get(key);
+      if (g && !seen.has(key)) {
+        out.push(g);
+        seen.add(key);
+      }
+    }
+    for (const g of sectionGroups) if (!seen.has(g.key)) out.push(g);
+    return out;
+  }, [sectionGroups, listView.sectionOrder]);
+  const sectionIds = orderedSectionGroups.map((g) => g.key);
+  const onSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = sectionIds.indexOf(String(active.id));
+    const to = sectionIds.indexOf(String(over.id));
+    if (from === -1 || to === -1) return;
+    listView.setSectionOrder(arrayMove(sectionIds, from, to));
+  };
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -1088,9 +1091,10 @@ const ProjectDetail = () => {
                             items={sectionIds}
                             strategy={verticalListSortingStrategy}
                           >
-                            {sectionGroups.map((group) => (
+                            {orderedSectionGroups.map((group) => (
                               <SectionRows
                                 key={group.key}
+                                sortId={group.key}
                                 section={group.section}
                                 tasks={group.tasks}
                                 columns={columns}
@@ -1209,6 +1213,8 @@ const ProjectDetail = () => {
 
 interface SectionRowsProps {
   section: TaskSection | null;
+  /** Stable sortable id for the section's title row (the group key). */
+  sortId: string;
   tasks: ProjectTask[];
   columns: ListColumn[];
   fullColSpan: number;
@@ -1256,6 +1262,7 @@ const SectionRows = ({
   onCustomFieldChange,
   onRename,
   onDelete,
+  sortId,
 }: SectionRowsProps) => {
   const sectionIri = section ? section["@id"] : null;
   const [collapsed, setCollapsed] = useState(false);
@@ -1272,6 +1279,7 @@ const SectionRows = ({
     <>
       <SectionTitleRow
         section={section}
+        sortId={sortId}
         colSpan={fullColSpan}
         collapsed={collapsed}
         count={tasks.length}
@@ -1327,10 +1335,11 @@ const SectionRows = ({
 };
 
 /** Full-width section heading row: drag grip + collapse arrow + editable
- *  title + delete. User sections are drag-reorderable; the default group is
- *  pinned first (no grip). */
+ *  title + delete. Every section (including the default group) is
+ *  drag-reorderable in the list view. */
 const SectionTitleRow = ({
   section,
+  sortId,
   colSpan,
   collapsed,
   count,
@@ -1339,6 +1348,7 @@ const SectionTitleRow = ({
   onDelete,
 }: {
   section: TaskSection | null;
+  sortId: string;
   colSpan: number;
   collapsed: boolean;
   count: number;
@@ -1347,7 +1357,7 @@ const SectionTitleRow = ({
   onDelete: (section: TaskSection) => void | Promise<void>;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: section ? section["@id"] : "__default__", disabled: !section });
+    useSortable({ id: sortId });
   return (
     <tr
       ref={setNodeRef}
@@ -1360,18 +1370,16 @@ const SectionTitleRow = ({
     >
       <td colSpan={colSpan} className="px-3 py-1.5">
         <div className="flex items-center gap-1.5">
-          {section && (
-            <button
-              type="button"
-              className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/40 hover:text-foreground"
-              aria-label={`Reorder section "${section.title}"`}
-              data-testid="section-drag"
-              {...attributes}
-              {...listeners}
-            >
-              <GripVertical className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <button
+            type="button"
+            className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/40 hover:text-foreground"
+            aria-label={`Reorder ${section ? `section "${section.title}"` : DEFAULT_SECTION_LABEL}`}
+            data-testid="section-drag"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
           <button
             type="button"
             onClick={onToggleCollapsed}
