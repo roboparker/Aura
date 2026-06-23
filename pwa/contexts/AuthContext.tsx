@@ -492,6 +492,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       { credentials: "include" },
     );
     if (!res.ok) {
+      // A 403 here means the target hasn't opted in to impersonation — the
+      // firewall denies the switch (ImpersonationVoter). The response is an
+      // HTML error page, not JSON, so surface a clear, actionable message
+      // instead of the generic fallback. Switch-out ("_exit") never hits
+      // the consent check, so this only fires when starting one.
+      if (res.status === 403) {
+        throw new Error(
+          "This user hasn't enabled impersonation. They need to turn on " +
+            "“Allow administrators to impersonate me” under Settings → " +
+            "Security before you can switch into their account.",
+        );
+      }
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || data.detail || "Couldn't switch user.");
     }

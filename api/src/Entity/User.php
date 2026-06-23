@@ -564,6 +564,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     }
 
     /**
+     * Read-only mirror of {@see canBeImpersonated()} for the API. Exposed
+     * only under `user:read` — emitted by the admin-gated `/users`
+     * collection and the user's own item, never by the embedded user chips
+     * (which serialize under project:read / space:read / … instead) — so an
+     * admin can tell which accounts have opted in before attempting a
+     * switch, without leaking the flag onto every comment/task author chip.
+     */
+    #[Groups(['user:read'])]
+    public function getCanBeImpersonated(): bool
+    {
+        return $this->canBeImpersonated();
+    }
+
+    /**
      * The access level ('none' | 'view' | 'edit') an impersonating admin
      * has for the given content category. Unknown / malformed values fall
      * back to the safe default 'none'. Read by
