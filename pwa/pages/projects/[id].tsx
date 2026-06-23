@@ -33,6 +33,7 @@ import {
   SortableContext,
   useSortable,
   horizontalListSortingStrategy,
+  verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -404,17 +405,44 @@ const ProjectDetail = () => {
     },
     [columns, listView],
   );
-  // checkbox + # + each data column + trailing actions.
+  // checkbox + each data column + trailing actions.
   const fullColSpan = columns.length + 2;
   const columnKeys = columns.map((c) => c.key);
   const listSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
-  const onListDragEnd = (event: DragEndEvent) => {
+  const onColumnDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
       handleColumnReorder(String(active.id), String(over.id));
     }
+  };
+
+  // Drag-to-reorder user sections (the default group stays pinned first).
+  const sectionIds = useMemo(
+    () => [...sections].sort((a, b) => a.position - b.position).map((s) => s["@id"]),
+    [sections],
+  );
+  const onSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const ordered = [...sections].sort((a, b) => a.position - b.position);
+    const from = ordered.findIndex((s) => s["@id"] === active.id);
+    const to = ordered.findIndex((s) => s["@id"] === over.id);
+    if (from === -1 || to === -1) return;
+    const next = arrayMove(ordered, from, to).map((s, i) => ({ ...s, position: i }));
+    setSections(next);
+    // Persist only the rows whose position actually changed.
+    next.forEach((s, i) => {
+      if (ordered[i]?.["@id"] !== s["@id"]) {
+        void fetch(`${ENTRYPOINT}${s["@id"]}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/merge-patch+json" },
+          body: JSON.stringify({ position: i }),
+        });
+      }
+    });
   };
 
   const toggleComplete = async (task: ProjectTask) => {
@@ -1012,17 +1040,20 @@ const ProjectDetail = () => {
                       top, section titles as in-table rows, and a persistent
                       add-task row at the foot of every section. The container
                       scrolls internally so the header can stick. */}
-                  <DndContext
-                    sensors={listSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={onListDragEnd}
+                  <div
+                    className="max-h-[calc(100vh-13rem)] overflow-auto rounded-lg border"
+                    data-testid="project-task-list"
                   >
-                    <div
-                      className="max-h-[calc(100vh-13rem)] overflow-auto rounded-lg border"
-                      data-testid="project-task-list"
-                    >
-                      <table className="w-full table-fixed text-sm">
-                        <TaskTableColumns columns={columns} />
+                    <table className="w-full table-fixed text-sm">
+                      <TaskTableColumns columns={columns} />
+                      {/* Column header reorder (horizontal) is its own DnD
+                          context, separate from section reorder (vertical) so
+                          the two never cross-target. */}
+                      <DndContext
+                        sensors={listSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onColumnDragEnd}
+                      >
                         <thead className="sticky top-0 z-20 bg-background">
                           <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
                             <th className="w-8 px-3 py-2" />
@@ -1046,34 +1077,45 @@ const ProjectDetail = () => {
                             <th className="w-10 px-2 py-2" />
                           </tr>
                         </thead>
+                      </DndContext>
+                      <DndContext
+                        sensors={listSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onSectionDragEnd}
+                      >
                         <tbody>
-                          {sectionGroups.map((group) => (
-                            <SectionRows
-                              key={group.key}
-                              section={group.section}
-                              tasks={group.tasks}
-                              columns={columns}
-                              fullColSpan={fullColSpan}
-                              projectId={project.id}
-                              projectIri={project["@id"]}
-                              spaceIri={projectSpaceIri(project)}
-                              allTags={allTags}
-                              assignableUsers={projectAssignableUsers}
-                              sort={listView.sort}
-                              filters={listView.filters}
-                              footerKey={footerKey}
-                              newTaskInputRef={
-                                group.section ? undefined : newTaskInputRef
-                              }
-                              onCreate={createTaskInSection}
-                              onToggle={toggleComplete}
-                              onOpen={openTaskDetail}
-                              patchTask={patchTask}
-                              onCustomFieldChange={handleCustomFieldChange}
-                              onRename={renameSection}
-                              onDelete={deleteSection}
-                            />
-                          ))}
+                          <SortableContext
+                            items={sectionIds}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {sectionGroups.map((group) => (
+                              <SectionRows
+                                key={group.key}
+                                section={group.section}
+                                tasks={group.tasks}
+                                columns={columns}
+                                fullColSpan={fullColSpan}
+                                projectId={project.id}
+                                projectIri={project["@id"]}
+                                spaceIri={projectSpaceIri(project)}
+                                allTags={allTags}
+                                assignableUsers={projectAssignableUsers}
+                                sort={listView.sort}
+                                filters={listView.filters}
+                                footerKey={footerKey}
+                                newTaskInputRef={
+                                  group.section ? undefined : newTaskInputRef
+                                }
+                                onCreate={createTaskInSection}
+                                onToggle={toggleComplete}
+                                onOpen={openTaskDetail}
+                                patchTask={patchTask}
+                                onCustomFieldChange={handleCustomFieldChange}
+                                onRename={renameSection}
+                                onDelete={deleteSection}
+                              />
+                            ))}
+                          </SortableContext>
                           {/* Grand total across the whole board. */}
                           {sectionGroups.length > 1 && (
                             <CustomFieldFooterRow
@@ -1085,9 +1127,9 @@ const ProjectDetail = () => {
                             />
                           )}
                         </tbody>
-                      </table>
-                    </div>
-                  </DndContext>
+                      </DndContext>
+                    </table>
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="board" className="mt-4">
@@ -1284,7 +1326,9 @@ const SectionRows = ({
   );
 };
 
-/** Full-width section heading row (collapse arrow + editable title + delete). */
+/** Full-width section heading row: drag grip + collapse arrow + editable
+ *  title + delete. User sections are drag-reorderable; the default group is
+ *  pinned first (no grip). */
 const SectionTitleRow = ({
   section,
   colSpan,
@@ -1301,18 +1345,41 @@ const SectionTitleRow = ({
   onToggleCollapsed: () => void;
   onRename: (section: TaskSection, title: string) => void | Promise<void>;
   onDelete: (section: TaskSection) => void | Promise<void>;
-}) => (
-  <tr className="border-b bg-muted/40" data-testid="project-section">
-    <td colSpan={colSpan} className="px-3 py-1.5">
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onToggleCollapsed}
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? "Expand section" : "Collapse section"}
-          className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          data-testid="section-collapse"
-        >
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: section ? section["@id"] : "__default__", disabled: !section });
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "border-b bg-muted/40",
+        isDragging && "relative z-10 opacity-70",
+      )}
+      data-testid="project-section"
+    >
+      <td colSpan={colSpan} className="px-3 py-1.5">
+        <div className="flex items-center gap-1.5">
+          {section && (
+            <button
+              type="button"
+              className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/40 hover:text-foreground"
+              aria-label={`Reorder section "${section.title}"`}
+              data-testid="section-drag"
+              {...attributes}
+              {...listeners}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand section" : "Collapse section"}
+            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-testid="section-collapse"
+          >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
@@ -1359,10 +1426,11 @@ const SectionTitleRow = ({
             </DropdownMenuContent>
           </DropdownMenu>
         )}
-      </div>
-    </td>
-  </tr>
-);
+        </div>
+      </td>
+    </tr>
+  );
+};
 
 /**
  * Persistent quick-add row at the foot of every section. Title-only: Enter
