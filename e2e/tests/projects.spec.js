@@ -145,10 +145,7 @@ test.describe("Projects", () => {
     await titleInput.click();
     await titleInput.fill("Keyboard task");
 
-    // Tab walks the row in column order: title -> tags -> due -> assignees.
-    await page.keyboard.press("Tab");
-    await expect(page.getByLabel('Tags for "new task"')).toBeFocused();
-
+    // Tab walks the row in column order: title -> due -> assignees -> tags.
     await page.keyboard.press("Tab");
     await expect(
       page.getByRole("button", { name: "Due date for new task" }),
@@ -156,6 +153,9 @@ test.describe("Projects", () => {
 
     await page.keyboard.press("Tab");
     await expect(page.getByLabel('Assignees for "new task"')).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(page.getByLabel('Tags for "new task"')).toBeFocused();
 
     // Tabbing away from a non-empty title keeps the row open; Enter on the
     // title still creates the task.

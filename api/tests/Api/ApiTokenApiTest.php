@@ -52,6 +52,95 @@ class ApiTokenApiTest extends ApiTestCase
         $this->assertCount(0, $remaining);
     }
 
+    public function testPatchUpdatesAccessPolicy(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('POST', '/api-tokens', [
+            'json' => [
+                'name' => 'ci',
+                'accessPolicy' => ['categories' => ['tasks' => 'view'], 'items' => []],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $created = $client->getResponse();
+        self::assertNotNull($created);
+        $iri = $this->stringField($created->toArray(), '@id');
+
+        // Tighten tasks to edit and drop the token to a different name.
+        $client->request('PATCH', $iri, [
+            'json' => [
+                'name' => 'ci-renamed',
+                'accessPolicy' => ['categories' => ['tasks' => 'edit', 'projects' => 'view'], 'items' => []],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $this->assertSame('ci-renamed', $this->stringField($body, 'name'));
+        $policy = $body['accessPolicy'];
+        $this->assertIsArray($policy);
+        $categories = $policy['categories'];
+        $this->assertIsArray($categories);
+        $this->assertSame('edit', $categories['tasks']);
+        $this->assertSame('view', $categories['projects']);
+
+        // The POST response must never echo the plaintext on a later read.
+        $this->assertArrayNotHasKey('plainToken', $body);
+    }
+
+    public function testPatchRejectsInvalidAccessPolicy(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('POST', '/api-tokens', [
+            'json' => ['name' => 'ci'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $created = $client->getResponse();
+        self::assertNotNull($created);
+        $iri = $this->stringField($created->toArray(), '@id');
+
+        $client->request('PATCH', $iri, [
+            'json' => ['accessPolicy' => ['categories' => ['tasks' => 'bogus'], 'items' => []]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPatchRejectsForeignToken(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $client->request('POST', '/api-tokens', [
+            'json' => ['name' => 'alice-token'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $created = $client->getResponse();
+        self::assertNotNull($created);
+        $iri = $this->stringField($created->toArray(), '@id');
+
+        $client->loginUser($bob);
+        $client->request('PATCH', $iri, [
+            'json' => ['name' => 'hijacked'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        // Owner-scoped security expression hides the row from a non-owner.
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testCreateRejectsInvalidAccessPolicy(): void
     {
         $alice = $this->createUser('alice@example.com');
