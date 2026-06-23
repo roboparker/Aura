@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ChevronDown, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -33,6 +33,7 @@ import {
   SortableContext,
   useSortable,
   horizontalListSortingStrategy,
+  verticalListSortingStrategy,
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -144,6 +145,14 @@ const isEmptyFieldValue = (value: unknown): boolean =>
 const DEFAULT_SECTION_KEY = "__default__";
 const DEFAULT_SECTION_LABEL = "In progress";
 
+/** Draft payload for the inline add-task row (IRIs for the relations). */
+interface NewTaskDraft {
+  title: string;
+  dueDate: string | null;
+  assignees: string[];
+  tags: string[];
+}
+
 const ProjectDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { spaces } = useActiveSpace();
@@ -172,21 +181,12 @@ const ProjectDetail = () => {
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
-  // Quick add-task. `addSection` is which group the inline add row is open in:
-  // undefined = closed, null = the default "In progress" group, a string = that
-  // section's IRI. So new tasks land in the section the user added them under.
-  const [addSection, setAddSection] = useState<string | null | undefined>(
-    undefined,
-  );
-  const [newTaskTitle, setNewTaskTitle] = useState("");
-  // Inline draft for the rest of the add row so the user can Tab from the title
-  // into tags / due / assignees before pressing Enter. Shared across sections
-  // since only one add row is open at a time.
-  const [newTaskTags, setNewTaskTags] = useState<TagOption[]>([]);
-  const [newTaskDue, setNewTaskDue] = useState<string | null>(null);
-  const [newTaskAssignees, setNewTaskAssignees] = useState<AssigneeOption[]>([]);
-  const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const newTaskInputRef = useRef<HTMLInputElement | null>(null);
+  // Each section shows a collapsed "+ Add task" trigger that expands into a
+  // full draft row (managed locally by AddTaskRow). The top "New task" button
+  // clicks the default group's trigger to open + focus it.
+  const defaultAddTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const focusDefaultAddRow = () =>
+    requestAnimationFrame(() => defaultAddTriggerRef.current?.click());
   // Bumped whenever the task set changes so the aggregate footer re-fetches.
   const [footerKey, setFooterKey] = useState(0);
 
@@ -413,6 +413,18 @@ const ProjectDetail = () => {
     },
     [columns, listView],
   );
+  // checkbox + each data column + trailing actions.
+  const fullColSpan = columns.length + 2;
+  const columnKeys = columns.map((c) => c.key);
+  const listSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+  const onColumnDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      handleColumnReorder(String(active.id), String(over.id));
+    }
+  };
 
   const toggleComplete = async (task: ProjectTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
@@ -432,81 +444,47 @@ const ProjectDetail = () => {
     }
   };
 
-  // Inline quick-add: create with just the title; everything else is edited in
-  // the row afterwards. Keeps the add row open + refocused for rapid entry.
-  const createTask = async () => {
-    const title = newTaskTitle.trim();
-    if (!project || !title) return;
-    setIsCreatingTask(true);
-    setError(null);
-    try {
-      const res = await fetch(`${ENTRYPOINT}/tasks`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/ld+json" },
-        body: JSON.stringify({
-          title,
-          project: project["@id"],
-          // `addSection` is the IRI of the group being added to; null = default.
-          ...(typeof addSection === "string" ? { section: addSection } : {}),
-          ...(newTaskTags.length
-            ? { tags: newTaskTags.map((t) => t["@id"]) }
-            : {}),
-          ...(newTaskDue ? { dueDate: newTaskDue } : {}),
-          ...(newTaskAssignees.length
-            ? { assignees: newTaskAssignees.map((u) => u["@id"]) }
-            : {}),
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(
-          data.description ||
-            data.detail ||
-            data["hydra:description"] ||
-            "Failed to create task.",
-        );
+  // Inline add from a section's expandable add row: create with the drafted
+  // title + due / assignees / tags. Returns true on success so the add row
+  // can clear + refocus for rapid entry.
+  const createTaskInSection = useCallback(
+    async (sectionIri: string | null, draft: NewTaskDraft): Promise<boolean> => {
+      const title = draft.title.trim();
+      if (!project || !title) return false;
+      setError(null);
+      try {
+        const res = await fetch(`${ENTRYPOINT}/tasks`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/ld+json" },
+          body: JSON.stringify({
+            title,
+            project: project["@id"],
+            ...(sectionIri ? { section: sectionIri } : {}),
+            ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
+            ...(draft.assignees.length ? { assignees: draft.assignees } : {}),
+            ...(draft.tags.length ? { tags: draft.tags } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(
+            data.description ||
+              data.detail ||
+              data["hydra:description"] ||
+              "Failed to create task.",
+          );
+        }
+        const created: ProjectTask = await res.json();
+        setTasks((prev) => [...prev, created]);
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to create task.");
+        return false;
       }
-      const created: ProjectTask = await res.json();
-      setTasks((prev) => [...prev, created]);
-      resetNewTaskDraft();
-      requestAnimationFrame(() => newTaskInputRef.current?.focus());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create task.");
-    } finally {
-      setIsCreatingTask(false);
-    }
-  };
-
-  const resetNewTaskDraft = () => {
-    setNewTaskTitle("");
-    setNewTaskTags([]);
-    setNewTaskDue(null);
-    setNewTaskAssignees([]);
-  };
-  // The comboboxes report selection as a list of IRIs; resolve them back to the
-  // loaded options so the draft holds full objects for rendering chips.
-  const handleNewTaskTags = (iris: string[]) =>
-    setNewTaskTags(
-      iris
-        .map((iri) => allTags.find((t) => t["@id"] === iri))
-        .filter((t): t is TagOption => Boolean(t)),
-    );
-  const handleNewTaskAssignees = (iris: string[]) =>
-    setNewTaskAssignees(
-      iris
-        .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
-        .filter((u): u is AssigneeOption => Boolean(u)),
-    );
-
-  const openAddRow = (section: string | null = null) => {
-    setAddSection(section);
-    requestAnimationFrame(() => newTaskInputRef.current?.focus());
-  };
-  const closeAddRow = () => {
-    setAddSection(undefined);
-    resetNewTaskDraft();
-  };
+    },
+    [project],
+  );
 
   const createSection = async () => {
     if (!project) return;
@@ -700,6 +678,36 @@ const ProjectDetail = () => {
     return groups;
   }, [tasks, sections]);
 
+  // List-view section order is a personal preference (localStorage) so the
+  // default "In progress" group can be reordered too (it has no DB row to
+  // carry a position). Unknown/new groups fall to the end; the board keeps
+  // its own default-first order.
+  const orderedSectionGroups = useMemo(() => {
+    const order = listView.sectionOrder;
+    if (order.length === 0) return sectionGroups;
+    const byKey = new Map(sectionGroups.map((g) => [g.key, g]));
+    const seen = new Set<string>();
+    const out: typeof sectionGroups = [];
+    for (const key of order) {
+      const g = byKey.get(key);
+      if (g && !seen.has(key)) {
+        out.push(g);
+        seen.add(key);
+      }
+    }
+    for (const g of sectionGroups) if (!seen.has(g.key)) out.push(g);
+    return out;
+  }, [sectionGroups, listView.sectionOrder]);
+  const sectionIds = orderedSectionGroups.map((g) => g.key);
+  const onSectionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = sectionIds.indexOf(String(active.id));
+    const to = sectionIds.indexOf(String(over.id));
+    if (from === -1 || to === -1) return;
+    listView.setSectionOrder(arrayMove(sectionIds, from, to));
+  };
+
   if (authLoading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -773,7 +781,7 @@ const ProjectDetail = () => {
                     <Button
                       size="sm"
                       className="rounded-r-none"
-                      onClick={() => openAddRow(null)}
+                      onClick={focusDefaultAddRow}
                       data-testid="project-new-task"
                     >
                       <Plus className="mr-1 h-3.5 w-3.5" /> New task
@@ -790,7 +798,7 @@ const ProjectDetail = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openAddRow(null)}>
+                        <DropdownMenuItem onClick={focusDefaultAddRow}>
                           <Plus className="mr-2 h-4 w-4" /> New task
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -1042,74 +1050,101 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="list" className="mt-4">
-                  <div className="space-y-6" data-testid="project-task-list">
-                    {sectionGroups.map((group) => {
-                      const sectionIri = group.section
-                        ? group.section["@id"]
-                        : null;
-                      return (
-                        <SectionBlock
-                          key={group.key}
-                          section={group.section}
-                          title={
-                            group.section
-                              ? group.section.title
-                              : DEFAULT_SECTION_LABEL
-                          }
-                          tasks={group.tasks}
-                          columns={columns}
-                          projectId={project.id}
-                          projectIri={project["@id"]}
-                          spaceIri={projectSpaceIri(project)}
-                          allTags={allTags}
-                          assignableUsers={projectAssignableUsers}
-                          sort={listView.sort}
-                          filters={listView.filters}
-                          onSetSort={listView.setSort}
-                          onSetFilter={listView.setFilter}
-                          onReorder={handleColumnReorder}
-                          footerFilter={
-                            sectionIri
-                              ? `section=${encodeURIComponent(sectionIri)}`
-                              : "section=none"
-                          }
-                          footerKey={footerKey}
-                          addOpen={addSection === sectionIri}
-                          newTaskTitle={newTaskTitle}
-                          newTaskTags={newTaskTags}
-                          newTaskDue={newTaskDue}
-                          newTaskAssignees={newTaskAssignees}
-                          newTaskInputRef={newTaskInputRef}
-                          isCreatingTask={isCreatingTask}
-                          onNewTaskTitle={setNewTaskTitle}
-                          onNewTaskTags={handleNewTaskTags}
-                          onNewTaskDue={setNewTaskDue}
-                          onNewTaskAssignees={handleNewTaskAssignees}
-                          onCreateTask={createTask}
-                          onAddRow={() => openAddRow(sectionIri)}
-                          onCloseAddRow={closeAddRow}
-                          onToggle={toggleComplete}
-                          onOpen={openTaskDetail}
-                          patchTask={patchTask}
-                          onCustomFieldChange={handleCustomFieldChange}
-                          onRename={renameSection}
-                          onDelete={deleteSection}
-                        />
-                      );
-                    })}
+                  {/* One continuous table: a single sticky column header at the
+                      top, section titles as in-table rows, and a persistent
+                      add-task row at the foot of every section. The container
+                      scrolls internally so the header can stick. */}
+                  <div
+                    className="max-h-[calc(100vh-13rem)] overflow-auto rounded-lg border"
+                    data-testid="project-task-list"
+                  >
+                    <table className="w-full table-fixed text-sm">
+                      <TaskTableColumns columns={columns} />
+                      {/* Column header reorder (horizontal) is its own DnD
+                          context, separate from section reorder (vertical) so
+                          the two never cross-target. */}
+                      <DndContext
+                        sensors={listSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onColumnDragEnd}
+                      >
+                        <thead className="sticky top-0 z-20 bg-background">
+                          <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
+                            <th className="w-8 px-3 py-2" />
+                            <SortableContext
+                              items={columnKeys}
+                              strategy={horizontalListSortingStrategy}
+                            >
+                              {columns.map((column) => (
+                                <SortableHeaderCell
+                                  key={column.key}
+                                  column={column}
+                                  sort={listView.sort}
+                                  filter={listView.filters[column.key]}
+                                  onSetSort={listView.setSort}
+                                  onSetFilter={listView.setFilter}
+                                  assignableUsers={projectAssignableUsers}
+                                  allTags={allTags}
+                                />
+                              ))}
+                            </SortableContext>
+                            <th className="w-10 px-2 py-2" />
+                          </tr>
+                        </thead>
+                      </DndContext>
+                      <DndContext
+                        sensors={listSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onSectionDragEnd}
+                      >
+                        <tbody>
+                          <SortableContext
+                            items={sectionIds}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {orderedSectionGroups.map((group) => (
+                              <SectionRows
+                                key={group.key}
+                                sortId={group.key}
+                                section={group.section}
+                                tasks={group.tasks}
+                                columns={columns}
+                                fullColSpan={fullColSpan}
+                                projectId={project.id}
+                                projectIri={project["@id"]}
+                                spaceIri={projectSpaceIri(project)}
+                                allTags={allTags}
+                                assignableUsers={projectAssignableUsers}
+                                sort={listView.sort}
+                                filters={listView.filters}
+                                footerKey={footerKey}
+                                addTriggerRef={
+                                  group.section ? undefined : defaultAddTriggerRef
+                                }
+                                onCreate={createTaskInSection}
+                                onToggle={toggleComplete}
+                                onOpen={openTaskDetail}
+                                patchTask={patchTask}
+                                onCustomFieldChange={handleCustomFieldChange}
+                                onRename={renameSection}
+                                onDelete={deleteSection}
+                              />
+                            ))}
+                          </SortableContext>
+                          {/* Grand total across the whole board. */}
+                          {sectionGroups.length > 1 && (
+                            <CustomFieldFooterRow
+                              projectId={project.id}
+                              refreshKey={footerKey}
+                              columns={columns}
+                              asRow
+                              prominent
+                            />
+                          )}
+                        </tbody>
+                      </DndContext>
+                    </table>
                   </div>
-
-                  {/* Grand totals across the whole board — only when
-                      there's more than one section to total across. */}
-                  {sectionGroups.length > 1 && (
-                    <CustomFieldFooterRow
-                      projectId={project.id}
-                      refreshKey={footerKey}
-                      columns={columns}
-                      prominent
-                      className="mt-6"
-                    />
-                  )}
                 </TabsContent>
 
                 <TabsContent value="board" className="mt-4">
@@ -1128,9 +1163,11 @@ const ProjectDetail = () => {
                       if (task) openTaskDetail(task);
                     }}
                     onMove={moveTaskToSection}
-                    onAddTask={(sectionIri) => {
+                    onAddTask={() => {
+                      // Every section has a persistent add row now; just jump
+                      // to the list and focus the default one.
                       setActiveTab("list");
-                      openAddRow(sectionIri);
+                      focusDefaultAddRow();
                     }}
                     onAddSection={() => void createSection()}
                     onDeleteSection={(sectionIri) => {
@@ -1185,11 +1222,13 @@ const ProjectDetail = () => {
   );
 };
 
-interface SectionBlockProps {
+interface SectionRowsProps {
   section: TaskSection | null;
-  title: string;
+  /** Stable sortable id for the section's title row (the group key). */
+  sortId: string;
   tasks: ProjectTask[];
   columns: ListColumn[];
+  fullColSpan: number;
   projectId: string;
   projectIri: string;
   spaceIri: string;
@@ -1197,25 +1236,9 @@ interface SectionBlockProps {
   assignableUsers: AssigneeOption[];
   sort: SortState | null;
   filters: FilterMap;
-  onSetSort: (sort: SortState | null) => void;
-  onSetFilter: (key: string, value: FilterValue | null) => void;
-  onReorder: (activeKey: string, overKey: string) => void;
-  footerFilter: string;
   footerKey: number;
-  addOpen: boolean;
-  newTaskTitle: string;
-  newTaskTags: TagOption[];
-  newTaskDue: string | null;
-  newTaskAssignees: AssigneeOption[];
-  newTaskInputRef: RefObject<HTMLInputElement | null>;
-  isCreatingTask: boolean;
-  onNewTaskTitle: (value: string) => void;
-  onNewTaskTags: (iris: string[]) => void;
-  onNewTaskDue: (next: string | null) => void;
-  onNewTaskAssignees: (iris: string[]) => void;
-  onCreateTask: () => void | Promise<void>;
-  onAddRow: () => void;
-  onCloseAddRow: () => void;
+  addTriggerRef?: RefObject<HTMLButtonElement | null>;
+  onCreate: (sectionIri: string | null, draft: NewTaskDraft) => Promise<boolean>;
   onToggle: (task: ProjectTask) => void;
   onOpen: (task: ProjectTask) => void;
   patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
@@ -1224,12 +1247,16 @@ interface SectionBlockProps {
   onDelete: (section: TaskSection) => void | Promise<void>;
 }
 
-/** One board section: editable title + its own task table + a footer. */
-const SectionBlock = ({
+/**
+ * One section rendered as a group of rows inside the shared list table: a
+ * full-width title row, its filtered/sorted task rows, a persistent
+ * add-task row, and the section's aggregate footer row.
+ */
+const SectionRows = ({
   section,
-  title,
   tasks,
   columns,
+  fullColSpan,
   projectId,
   projectIri,
   spaceIri,
@@ -1237,61 +1264,152 @@ const SectionBlock = ({
   assignableUsers,
   sort,
   filters,
-  onSetSort,
-  onSetFilter,
-  onReorder,
-  footerFilter,
   footerKey,
-  addOpen,
-  newTaskTitle,
-  newTaskTags,
-  newTaskDue,
-  newTaskAssignees,
-  newTaskInputRef,
-  isCreatingTask,
-  onNewTaskTitle,
-  onNewTaskTags,
-  onNewTaskDue,
-  onNewTaskAssignees,
-  onCreateTask,
-  onAddRow,
-  onCloseAddRow,
+  addTriggerRef,
+  onCreate,
   onToggle,
   onOpen,
   patchTask,
   onCustomFieldChange,
   onRename,
   onDelete,
-}: SectionBlockProps) => {
-  // checkbox + # + each data column + trailing actions.
-  const fullColSpan = columns.length + 3;
-  // Sort + filter the section's rows per the active column view. Falls back
-  // to the raw list when nothing is set (the common case).
-  const visibleTasks = useMemo(
+  sortId,
+}: SectionRowsProps) => {
+  const sectionIri = section ? section["@id"] : null;
+  const [collapsed, setCollapsed] = useState(false);
+  const visible = useMemo(
     () => applyView(tasks, columns, sort, filters),
     [tasks, columns, sort, filters],
   );
   const filtersActive = Object.keys(filters).length > 0;
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
-  const columnKeys = columns.map((c) => c.key);
-  const onDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      onReorder(String(active.id), String(over.id));
-    }
-  };
+  const footerFilter = sectionIri
+    ? `section=${encodeURIComponent(sectionIri)}`
+    : "section=none";
 
   return (
-    <div data-testid="project-section">
-      {/* Every section shows a title above its table. User-created sections
-          get an editable title + Add task + delete menu; the default
-          "In progress" group shows a static title (add via "New task"). */}
-      <div className="mb-1.5 flex items-center gap-2">
+    <>
+      <SectionTitleRow
+        section={section}
+        sortId={sortId}
+        colSpan={fullColSpan}
+        collapsed={collapsed}
+        count={tasks.length}
+        onToggleCollapsed={() => setCollapsed((c) => !c)}
+        onRename={onRename}
+        onDelete={onDelete}
+      />
+      {!collapsed &&
+        visible.map((task) => (
+          <ProjectTaskRow
+            key={task["@id"]}
+            task={task}
+            columns={columns}
+            allTags={allTags}
+            assignableUsers={assignableUsers}
+            projectIri={projectIri}
+            spaceIri={spaceIri}
+            onToggle={onToggle}
+            onOpen={onOpen}
+            patchTask={patchTask}
+            onCustomFieldChange={onCustomFieldChange}
+          />
+        ))}
+      {!collapsed && tasks.length > 0 && visible.length === 0 && filtersActive && (
+        <tr>
+          <td
+            colSpan={fullColSpan}
+            className="px-3 py-3 text-sm text-muted-foreground"
+          >
+            No tasks match the active filters.
+          </td>
+        </tr>
+      )}
+      {!collapsed && (
+        <AddTaskRow
+          columns={columns}
+          sectionIri={sectionIri}
+          allTags={allTags}
+          assignableUsers={assignableUsers}
+          onCreate={onCreate}
+          triggerRef={addTriggerRef}
+        />
+      )}
+      {!collapsed && (
+        <CustomFieldFooterRow
+          projectId={projectId}
+          filters={footerFilter}
+          refreshKey={footerKey}
+          columns={columns}
+          asRow
+        />
+      )}
+    </>
+  );
+};
+
+/** Full-width section heading row: drag grip + collapse arrow + editable
+ *  title + delete. Every section (including the default group) is
+ *  drag-reorderable in the list view. */
+const SectionTitleRow = ({
+  section,
+  sortId,
+  colSpan,
+  collapsed,
+  count,
+  onToggleCollapsed,
+  onRename,
+  onDelete,
+}: {
+  section: TaskSection | null;
+  sortId: string;
+  colSpan: number;
+  collapsed: boolean;
+  count: number;
+  onToggleCollapsed: () => void;
+  onRename: (section: TaskSection, title: string) => void | Promise<void>;
+  onDelete: (section: TaskSection) => void | Promise<void>;
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: sortId });
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "border-b bg-muted/40",
+        isDragging && "relative z-10 opacity-70",
+      )}
+      data-testid="project-section"
+    >
+      <td colSpan={colSpan} className="px-3 py-1.5">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="cursor-grab touch-none rounded p-0.5 text-muted-foreground/40 hover:text-foreground"
+            aria-label={`Reorder ${section ? `section "${section.title}"` : DEFAULT_SECTION_LABEL}`}
+            data-testid="section-drag"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand section" : "Collapse section"}
+            className="rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-testid="section-collapse"
+          >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </button>
         {section ? (
           <input
-            defaultValue={title}
+            defaultValue={section.title}
             onBlur={(e) => void onRename(section, e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
@@ -1301,222 +1419,203 @@ const SectionBlock = ({
             data-testid="section-title-input"
           />
         ) : (
-          <span
-            className="px-1 text-sm font-semibold"
-            data-testid="section-title"
-          >
-            {title}
+          <span className="px-1 text-sm font-semibold" data-testid="section-title">
+            {DEFAULT_SECTION_LABEL}
           </span>
         )}
+        <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
         {section && (
-          <>
-            <button
-              type="button"
-              onClick={onAddRow}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              data-testid="section-add-task"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add task
-            </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="Section actions"
-                  data-testid="section-menu"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => void onDelete(section)}
-                  className="text-destructive"
-                  data-testid="section-delete"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" /> Delete section
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="ml-auto rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Section actions"
+                data-testid="section-menu"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => void onDelete(section)}
+                className="text-destructive"
+                data-testid="section-delete"
+              >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete section
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
-      </div>
-
-      <div className="overflow-hidden rounded-lg border">
-        <div className="overflow-x-auto">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={onDragEnd}
-        >
-        <table className="w-full table-fixed text-sm">
-          <TaskTableColumns columns={columns} />
-          <thead>
-            <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="w-8 px-3 py-2" />
-              <th className="w-10 px-1 py-2 text-left font-medium">#</th>
-              <SortableContext items={columnKeys} strategy={horizontalListSortingStrategy}>
-                {columns.map((column) => (
-                  <SortableHeaderCell
-                    key={column.key}
-                    column={column}
-                    sort={sort}
-                    filter={filters[column.key]}
-                    onSetSort={onSetSort}
-                    onSetFilter={onSetFilter}
-                    assignableUsers={assignableUsers}
-                    allTags={allTags}
-                  />
-                ))}
-              </SortableContext>
-              <th className="w-10 px-2 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {visibleTasks.map((task, i) => (
-              <ProjectTaskRow
-                key={task["@id"]}
-                task={task}
-                index={i}
-                columns={columns}
-                allTags={allTags}
-                assignableUsers={assignableUsers}
-                projectIri={projectIri}
-                spaceIri={spaceIri}
-                onToggle={onToggle}
-                onOpen={onOpen}
-                patchTask={patchTask}
-                onCustomFieldChange={onCustomFieldChange}
-              />
-            ))}
-            {tasks.length > 0 && visibleTasks.length === 0 && filtersActive && (
-              <tr>
-                <td
-                  colSpan={fullColSpan}
-                  className="px-3 py-3 text-sm text-muted-foreground"
-                >
-                  No tasks match the active filters.
-                </td>
-              </tr>
-            )}
-            {addOpen && (
-              <tr className="border-b bg-muted/20" data-testid="project-new-task-row">
-                <td className="px-3 py-2 align-middle">
-                  <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
-                </td>
-                <td className="px-1 py-2" />
-                {columns.map((column) => {
-                  if (column.key === "task") {
-                    return (
-                      <td key="task" className="px-2 py-2">
-                        <Input
-                          ref={newTaskInputRef}
-                          value={newTaskTitle}
-                          onChange={(e) => onNewTaskTitle(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void onCreateTask();
-                            } else if (e.key === "Escape") {
-                              e.preventDefault();
-                              onCloseAddRow();
-                            }
-                          }}
-                          onBlur={(e) => {
-                            if (newTaskTitle.trim()) return;
-                            // Keep the row open while the user Tabs to a sibling
-                            // field before submitting; only close when focus
-                            // leaves the add row entirely.
-                            const next = e.relatedTarget as HTMLElement | null;
-                            if (next?.closest('[data-testid="project-new-task-row"]'))
-                              return;
-                            onCloseAddRow();
-                          }}
-                          placeholder="Task title, then Tab or Enter…"
-                          maxLength={255}
-                          disabled={isCreatingTask}
-                          className="h-8"
-                          data-testid="project-new-task-title"
-                        />
-                      </td>
-                    );
-                  }
-                  if (column.key === "due") {
-                    return (
-                      <td key="due" className="px-2 py-2 align-middle" data-testid="new-task-due">
-                        <DueDateCell
-                          value={newTaskDue}
-                          onChange={onNewTaskDue}
-                          ariaLabel="Due date for new task"
-                          testIdPrefix="project-new-task-due"
-                        />
-                      </td>
-                    );
-                  }
-                  if (column.key === "assignees") {
-                    return (
-                      <td key="assignees" className="px-2 py-2 align-middle" data-testid="new-task-assignees">
-                        <AssigneesCombobox
-                          value={newTaskAssignees}
-                          options={assignableUsers}
-                          onChange={onNewTaskAssignees}
-                          subjectLabel="new task"
-                        />
-                      </td>
-                    );
-                  }
-                  if (column.key === "tags") {
-                    return (
-                      <td key="tags" className="px-2 py-2 align-middle" data-testid="new-task-tags">
-                        <TagsCombobox
-                          value={newTaskTags}
-                          options={allTags}
-                          onChange={onNewTaskTags}
-                          subjectLabel="new task"
-                        />
-                      </td>
-                    );
-                  }
-                  // Custom fields are set after the task exists; an empty cell
-                  // keeps the inline fields aligned with the columns.
-                  return <td key={column.key} className="px-2 py-2 align-middle" />;
-                })}
-                <td className="px-2 py-2 align-middle" />
-              </tr>
-            )}
-            {tasks.length === 0 && !addOpen && (
-              <tr>
-                <td
-                  colSpan={fullColSpan}
-                  className="px-3 py-3 text-sm text-muted-foreground"
-                >
-                  No tasks here yet.{" "}
-                  <button
-                    type="button"
-                    onClick={onAddRow}
-                    className="text-foreground underline underline-offset-2 hover:no-underline"
-                  >
-                    Add one
-                  </button>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        </DndContext>
-        {/* Per-section aggregates: a flush, column-aligned footer inside the
-            same scroll container so it lines up with the columns above. */}
-        <CustomFieldFooterRow
-          projectId={projectId}
-          filters={footerFilter}
-          refreshKey={footerKey}
-          columns={columns}
-          flush
-        />
         </div>
-      </div>
-    </div>
+      </td>
+    </tr>
+  );
+};
+
+/**
+ * Foot-of-section add affordance. Collapsed it's just a "+ Add task" text
+ * trigger; clicking it expands into a full draft row (title + due +
+ * assignees + tags) that creates the task on Enter and stays open for rapid
+ * entry. Escape (or the top "New task" button via `triggerRef`) toggles it.
+ */
+const AddTaskRow = ({
+  columns,
+  sectionIri,
+  allTags,
+  assignableUsers,
+  onCreate,
+  triggerRef,
+}: {
+  columns: ListColumn[];
+  sectionIri: string | null;
+  allTags: TagOption[];
+  assignableUsers: AssigneeOption[];
+  onCreate: (sectionIri: string | null, draft: NewTaskDraft) => Promise<boolean>;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
+}) => {
+  const [adding, setAdding] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [title, setTitle] = useState("");
+  const [dueDate, setDueDate] = useState<string | null>(null);
+  const [tags, setTags] = useState<TagOption[]>([]);
+  const [assignees, setAssignees] = useState<AssigneeOption[]>([]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const reset = () => {
+    setTitle("");
+    setDueDate(null);
+    setTags([]);
+    setAssignees([]);
+  };
+  const open = () => {
+    setAdding(true);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+  const close = () => {
+    setAdding(false);
+    reset();
+  };
+
+  const submit = async () => {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    const ok = await onCreate(sectionIri, {
+      title,
+      dueDate,
+      assignees: assignees.map((a) => a["@id"]),
+      tags: tags.map((t) => t["@id"]),
+    });
+    setBusy(false);
+    if (ok) {
+      reset();
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  };
+
+  if (!adding) {
+    return (
+      <tr className="border-b" data-testid="project-add-task-trigger">
+        <td className="px-3 py-2" />
+        <td colSpan={columns.length + 1} className="px-2 py-2">
+          <button
+            ref={triggerRef}
+            type="button"
+            onClick={open}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            data-testid="project-add-task"
+          >
+            <Plus className="h-4 w-4" /> Add task
+          </button>
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr className="border-b bg-muted/10" data-testid="project-new-task-row">
+      <td className="px-3 py-2 align-middle">
+        <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
+      </td>
+      {columns.map((column) => {
+        if (column.key === "task") {
+          return (
+            <td key="task" className="px-2 py-2">
+              <Input
+                ref={inputRef}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void submit();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    close();
+                  }
+                }}
+                placeholder="Task name…"
+                maxLength={255}
+                disabled={busy}
+                className="h-8"
+                data-testid="project-new-task-title"
+              />
+            </td>
+          );
+        }
+        if (column.key === "due") {
+          return (
+            <td key="due" className="px-2 py-2 align-middle" data-testid="new-task-due">
+              <DueDateCell
+                value={dueDate}
+                onChange={setDueDate}
+                ariaLabel="Due date for new task"
+                testIdPrefix="project-new-task-due"
+              />
+            </td>
+          );
+        }
+        if (column.key === "assignees") {
+          return (
+            <td key="assignees" className="px-2 py-2 align-middle" data-testid="new-task-assignees">
+              <AssigneesCombobox
+                value={assignees}
+                options={assignableUsers}
+                onChange={(iris) =>
+                  setAssignees(
+                    iris
+                      .map((iri) => assignableUsers.find((u) => u["@id"] === iri))
+                      .filter((u): u is AssigneeOption => Boolean(u)),
+                  )
+                }
+                subjectLabel="new task"
+              />
+            </td>
+          );
+        }
+        if (column.key === "tags") {
+          return (
+            <td key="tags" className="px-2 py-2 align-middle" data-testid="new-task-tags">
+              <TagsCombobox
+                value={tags}
+                options={allTags}
+                onChange={(iris) =>
+                  setTags(
+                    iris
+                      .map((iri) => allTags.find((t) => t["@id"] === iri))
+                      .filter((t): t is TagOption => Boolean(t)),
+                  )
+                }
+                subjectLabel="new task"
+              />
+            </td>
+          );
+        }
+        // Custom fields are set after the task exists.
+        return <td key={column.key} className="px-2 py-2 align-middle" />;
+      })}
+      <td className="px-2 py-2" />
+    </tr>
   );
 };
 
@@ -1580,7 +1679,6 @@ const SortableHeaderCell = ({
 
 interface ProjectTaskRowProps {
   task: ProjectTask;
-  index: number;
   columns: ListColumn[];
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
@@ -1594,7 +1692,6 @@ interface ProjectTaskRowProps {
 
 const ProjectTaskRow = ({
   task,
-  index,
   columns,
   allTags,
   assignableUsers,
@@ -1686,9 +1783,6 @@ const ProjectTaskRow = ({
           aria-label={`Mark "${task.title}" as ${task.completedOn ? "open" : "done"}`}
           className="size-[18px] cursor-pointer rounded-full border-muted-foreground/40 data-[state=checked]:border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:text-white"
         />
-      </td>
-      <td className="px-1 py-2 align-middle text-xs text-muted-foreground">
-        T{index + 1}
       </td>
       {columns.map((column) => (
         <td
