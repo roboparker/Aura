@@ -137,6 +137,8 @@ const CustomFieldFooterRow = ({
         <td className="px-1 py-2" />
         <td className="px-2 py-2" />
         <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
+        <td className="px-2 py-2" />
         {columns.map((def) => {
           const row = valueByDef.get(def["@id"]);
           return (
@@ -158,8 +160,6 @@ const CustomFieldFooterRow = ({
             </td>
           );
         })}
-        <td className="px-2 py-2" />
-        <td className="px-2 py-2" />
         <td className="px-2 py-2" />
       </>
     );
