@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ListChecks,
   LogOut,
+  MessagesSquare,
   Settings,
   Users,
   VenetianMask,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 const USER_MENU_LINKS = [
   { href: "/my-tasks", label: "My Tasks", icon: ListChecks },
   { href: "/groups", label: "Manage Groups", icon: Users },
+  { href: "/feedback", label: "Feedback", icon: MessagesSquare },
   { href: "/settings/profile", label: "Settings", icon: Settings },
 ];
 

@@ -12,7 +12,8 @@ export type RegistryEntry = {
     | "Discussions"
     | "Custom fields"
     | "Groups"
-    | "Notifications";
+    | "Notifications"
+    | "Feedback";
   description: string;
 };
 
@@ -70,4 +71,5 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-project custom field definitions." },
   { slug: "group-tile", name: "GroupTile", category: "Groups", description: "Square colored tile with a grid glyph for a UserGroup avatar." },
   { slug: "notification-row", name: "NotificationRow", category: "Notifications", description: "Inbox row with unread/read/selected states and hover quick-actions." },
+  { slug: "vote-control", name: "VoteControl", category: "Feedback", description: "Up/down vote control with net score and the caller's own highlighted vote; clear/flip toggle owned by the parent." },
 ];

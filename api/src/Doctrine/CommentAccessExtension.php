@@ -107,15 +107,20 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceGroupMembership::class,
         );
 
+        // Feedback branch: the feedback board is instance-level, so any
+        // authenticated user (already guaranteed above) can read every
+        // ticket's comments — the branch just needs the FK to be set.
         $queryBuilder
             ->leftJoin(sprintf('%s.task', $rootAlias), 'ca_task')
             ->leftJoin('ca_task.project', 'ca_project')
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
             ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ca_discussion')
+            ->leftJoin(sprintf('%s.feedback', $rootAlias), 'ca_feedback')
             ->andWhere(sprintf(
                 '(ca_task.id IS NOT NULL AND (%s OR EXISTS(%s) OR EXISTS(%s)))
                  OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
-                 OR (ca_discussion.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))',
+                 OR (ca_discussion.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
+                 OR ca_feedback.id IS NOT NULL',
                 $taskOwnerCheck,
                 $taskSpaceDirect,
                 $taskSpaceGroup,

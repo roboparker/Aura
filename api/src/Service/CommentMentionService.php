@@ -158,6 +158,18 @@ final class CommentMentionService
                     $bag[$this->localPart($member)] = $member;
                 }
             }
+            return $bag;
+        }
+
+        // Feedback is instance-level with no bounded membership, so the
+        // mentionable set is just the ticket owner — enough to let a
+        // commenter @-ping the person who filed it.
+        $feedback = $comment->getFeedback();
+        if (null !== $feedback) {
+            $owner = $feedback->getOwner();
+            if (null !== $owner) {
+                $bag[$this->localPart($owner)] = $owner;
+            }
         }
         return $bag;
     }
@@ -191,6 +203,10 @@ final class CommentMentionService
         $discussion = $comment->getDiscussion();
         if (null !== $discussion) {
             return sprintf('%s mentioned you on "%s"', $name, $discussion->getTitle());
+        }
+        $feedback = $comment->getFeedback();
+        if (null !== $feedback) {
+            return sprintf('%s mentioned you on "%s"', $name, $feedback->getTitle());
         }
         return sprintf('%s mentioned you', $name);
     }

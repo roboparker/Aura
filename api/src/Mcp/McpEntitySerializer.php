@@ -172,6 +172,7 @@ final class McpEntitySerializer
             'taskId' => null === $comment->getTask() ? null : (string) $comment->getTask()->getId(),
             'pageId' => null === $comment->getPage() ? null : (string) $comment->getPage()->getId(),
             'discussionId' => null === $comment->getDiscussion() ? null : (string) $comment->getDiscussion()->getId(),
+            'feedbackId' => null === $comment->getFeedback() ? null : (string) $comment->getFeedback()->getId(),
             'body' => $comment->getBody(),
             'author' => $this->userSummary($comment->getAuthor()),
             'createdAt' => $comment->getCreatedAt()->format(\DateTimeInterface::ATOM),
