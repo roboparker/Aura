@@ -37,6 +37,8 @@ interface AdminUser {
   personalizedColor: string;
   avatarUrls?: { thumb?: string; profile?: string } | null;
   roles?: string[];
+  /** Whether this user has opted in to admin impersonation. */
+  canBeImpersonated?: boolean;
 }
 
 const isAdminUser = (u: AdminUser): boolean =>
@@ -171,6 +173,8 @@ const AdminUsers: NextPage = () => {
               <div className="space-y-2">
                 {visible.map((u) => {
                   const isSelf = u.id === user?.id;
+                  const optedIn = u.canBeImpersonated === true;
+                  const canImpersonate = !isSelf && optedIn;
                   return (
                     <div
                       key={u.id}
@@ -191,13 +195,27 @@ const AdminUsers: NextPage = () => {
                           {u.email}
                         </p>
                       </div>
+                      {!isSelf && !optedIn && (
+                        <span
+                          className="hidden text-xs text-muted-foreground sm:inline"
+                          data-testid="users-impersonation-disabled"
+                        >
+                          This user has not enabled impersonation
+                        </span>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"
-                        disabled={isSelf}
+                        disabled={!canImpersonate}
                         onClick={() => setTarget(u)}
                         aria-label={`Impersonate ${displayName(u)}`}
-                        title={isSelf ? "That's you" : "Impersonate"}
+                        title={
+                          isSelf
+                            ? "That's you"
+                            : optedIn
+                              ? "Impersonate"
+                              : "This user has not enabled impersonation"
+                        }
                         data-testid="users-impersonate"
                       >
                         <VenetianMask className="h-4 w-4" />

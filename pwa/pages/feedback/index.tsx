@@ -5,8 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageSquare, MessagesSquare, Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import { apiGetCollection, apiSend } from "@/lib/apiClient";
-import { displayName } from "@/lib/userDisplay";
+import { apiGetCollection } from "@/lib/apiClient";
 import {
   STATUS_META,
   STATUS_ORDER,
@@ -17,8 +16,6 @@ import {
   type FeedbackStatus,
   type FeedbackType,
 } from "@/lib/feedbackTypes";
-import VoteControl from "@/components/feedback/VoteControl";
-import UserAvatar from "@/components/user/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,31 +61,6 @@ const FeedbackBoardPage = () => {
   useEffect(() => {
     if (isAuthenticated) void load();
   }, [isAuthenticated, load]);
-
-  const handleVote = useCallback(
-    async (ticket: Feedback, value: 1 | -1) => {
-      // Optimistic isn't required — the endpoint returns the authoritative
-      // score + myVote, so we just patch the row from the response.
-      try {
-        const res = await apiSend<{ score: number; myVote: number }>(
-          "POST",
-          `/feedback/${ticket.id}/vote`,
-          { body: { value }, errorMessage: "Failed to vote." },
-        );
-        if (!res) return;
-        setTickets((prev) =>
-          prev.map((t) =>
-            t["@id"] === ticket["@id"]
-              ? { ...t, score: res.score, myVote: res.myVote }
-              : t,
-          ),
-        );
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to vote.");
-      }
-    },
-    [],
-  );
 
   const visible = useMemo(() => {
     const filtered = tickets.filter(
@@ -146,51 +118,31 @@ const FeedbackBoardPage = () => {
           </header>
 
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <FilterRow label="Type">
-              <FilterPill
-                active={typeFilter === "all"}
-                onClick={() => setTypeFilter("all")}
-              >
-                All
-              </FilterPill>
-              {TYPE_ORDER.map((t) => (
-                <FilterPill
-                  key={t}
-                  active={typeFilter === t}
-                  onClick={() => setTypeFilter(t)}
-                >
-                  {TYPE_META[t].label}
-                </FilterPill>
-              ))}
-            </FilterRow>
-
-            <FilterRow label="Status">
-              <FilterPill
-                active={statusFilter === "all"}
-                onClick={() => setStatusFilter("all")}
-              >
-                All
-              </FilterPill>
-              {STATUS_ORDER.map((s) => (
-                <FilterPill
-                  key={s}
-                  active={statusFilter === s}
-                  onClick={() => setStatusFilter(s)}
-                >
-                  {STATUS_META[s].label}
-                </FilterPill>
-              ))}
-            </FilterRow>
-
-            <FilterRow label="Sort">
-              <FilterPill active={sort === "votes"} onClick={() => setSort("votes")}>
-                Most votes
-              </FilterPill>
-              <FilterPill active={sort === "recent"} onClick={() => setSort("recent")}>
-                Most recent
-              </FilterPill>
-            </FilterRow>
+          <div className="flex flex-wrap items-center gap-3">
+            <SegmentGroup
+              value={typeFilter}
+              options={[
+                { value: "all", label: "All" },
+                ...TYPE_ORDER.map((t) => ({ value: t, label: TYPE_META[t].label })),
+              ]}
+              onChange={(v) => setTypeFilter(v as TypeFilter)}
+            />
+            <SegmentGroup
+              value={statusFilter}
+              options={[
+                { value: "all", label: "All" },
+                ...STATUS_ORDER.map((s) => ({ value: s, label: STATUS_META[s].label })),
+              ]}
+              onChange={(v) => setStatusFilter(v as StatusFilter)}
+            />
+            <SegmentGroup
+              value={sort}
+              options={[
+                { value: "votes", label: "Most votes" },
+                { value: "recent", label: "Most recent" },
+              ]}
+              onChange={(v) => setSort(v as SortKey)}
+            />
           </div>
 
           {error && (
@@ -226,11 +178,26 @@ const FeedbackBoardPage = () => {
                 <li key={ticket["@id"]}>
                   <Card className="transition-colors hover:border-cyan-600/40">
                     <CardContent className="flex items-start gap-4 py-4">
-                      <VoteControl
-                        score={ticket.score}
-                        myVote={ticket.myVote}
-                        onVote={(v) => void handleVote(ticket, v)}
-                      />
+                      <div
+                        className="inline-flex min-w-10 flex-col items-center justify-center text-center"
+                        data-testid="vote-score"
+                      >
+                        <span
+                          className={cn(
+                            "text-base font-semibold tabular-nums",
+                            ticket.myVote === 1
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : ticket.myVote === -1
+                                ? "text-rose-600 dark:text-rose-400"
+                                : "text-foreground",
+                          )}
+                        >
+                          {ticket.score}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {Math.abs(ticket.score) === 1 ? "vote" : "votes"}
+                        </span>
+                      </div>
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-xs font-medium text-muted-foreground tabular-nums">
@@ -251,10 +218,6 @@ const FeedbackBoardPage = () => {
                           {ticket.title}
                         </Link>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          <span className="flex items-center gap-1.5">
-                            <UserAvatar user={ticket.owner} size="sm" />
-                            {displayName(ticket.owner)}
-                          </span>
                           <span>{formatRelative(ticket.createdAt)}</span>
                           <span className="flex items-center gap-1">
                             <MessageSquare className="h-3.5 w-3.5" />
@@ -274,42 +237,36 @@ const FeedbackBoardPage = () => {
   );
 };
 
-const FilterRow = ({
-  label,
-  children,
+const SegmentGroup = ({
+  value,
+  options,
+  onChange,
 }: {
-  label: string;
-  children: React.ReactNode;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (value: string) => void;
 }) => (
-  <div className="flex items-center gap-2">
-    <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-      {label}
-    </span>
-    <div className="flex flex-wrap items-center gap-1">{children}</div>
+  <div className="inline-flex items-center divide-x divide-input overflow-hidden rounded-full border border-input">
+    {options.map((o) => {
+      const active = o.value === value;
+      return (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          aria-pressed={active}
+          className={cn(
+            "px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+            active
+              ? "bg-cyan-700 text-white hover:bg-cyan-800"
+              : "bg-background text-muted-foreground hover:bg-accent",
+          )}
+        >
+          {o.label}
+        </button>
+      );
+    })}
   </div>
-);
-
-const FilterPill = ({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={cn(
-      "rounded-full px-3 py-1 text-xs font-medium transition-colors",
-      active
-        ? "bg-cyan-700 text-white"
-        : "bg-background text-muted-foreground hover:bg-accent border border-input",
-    )}
-  >
-    {children}
-  </button>
 );
 
 export default FeedbackBoardPage;

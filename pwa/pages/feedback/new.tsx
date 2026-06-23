@@ -2,7 +2,6 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { apiSend } from "@/lib/apiClient";
@@ -75,12 +74,6 @@ const NewFeedbackPage = () => {
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-          <Button asChild variant="link" size="sm" className="px-0 h-auto">
-            <Link href="/feedback">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Feedback
-            </Link>
-          </Button>
-
           <h1 className="text-2xl font-bold">New feedback</h1>
 
           <Card>

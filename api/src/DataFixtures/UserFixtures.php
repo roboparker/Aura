@@ -37,6 +37,31 @@ class UserFixtures extends Fixture
     ];
 
     /**
+     * Demo opt-in to admin impersonation for the non-admin fixture users
+     * (Uma + the team). Production accounts start with this OFF
+     * ({@see User::DEFAULT_PREFERENCES}) — an admin can't switch into an
+     * account until its owner consents — so the demo would otherwise show
+     * "Couldn't switch user." on every attempt. Enabling consent + full
+     * per-category access here makes the impersonation flow exercisable end
+     * to end on a fixture DB. {@see setPreferences()} merges over the
+     * defaults, so only these two keys need to be stored.
+     *
+     * @var array<string, mixed>
+     */
+    private const DEMO_IMPERSONATION_PREFS = [
+        'canBeImpersonated' => true,
+        'impersonationAccess' => [
+            'tasks' => 'edit',
+            'projects' => 'edit',
+            'pages' => 'edit',
+            'discussions' => 'edit',
+            'comments' => 'edit',
+            'notifications' => 'edit',
+            'files' => 'edit',
+        ],
+    ];
+
+    /**
      * Hardcoded TOTP secret for the Uma fixture user so dev / E2E flows can
      * pre-pair an authenticator once and reuse the same QR across fixture
      * reloads. Valid base32 (A-Z, 2-7), length matches what
@@ -91,6 +116,7 @@ class UserFixtures extends Fixture
         $user->setFamilyName('User');
         $user->setPersonalizedColor($this->colorService->pick());
         $user->setPassword($this->passwordHasher->hashPassword($user, 'user123'));
+        $user->setPreferences(self::DEMO_IMPERSONATION_PREFS);
 
         // Pre-enable TOTP 2FA on Uma so the sign-in flow exercises the
         // challenge step without a manual pairing step every fixture reload.
@@ -120,6 +146,12 @@ class UserFixtures extends Fixture
             $member->setFamilyName($spec['family']);
             $member->setPersonalizedColor($this->colorService->pick());
             $member->setPassword($teamPasswordHash);
+            // Ava deliberately stays opted OUT of impersonation so the admin
+            // users page demonstrates the disabled "this user has not enabled
+            // impersonation" state alongside the opted-in members.
+            if ('user-ava' !== $spec['reference']) {
+                $member->setPreferences(self::DEMO_IMPERSONATION_PREFS);
+            }
             $manager->persist($member);
             $teamUsers[$spec['reference']] = $member;
         }
