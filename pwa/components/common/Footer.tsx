@@ -97,14 +97,12 @@ const Footer = () => (
               </a>
             </li>
             <li>
-              <a
-                href="https://github.com/roboparker/Aura/issues"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/feedback"
                 className="text-foreground hover:underline"
               >
-                Report an issue
-              </a>
+                Feedback
+              </Link>
             </li>
           </ul>
         </div>
