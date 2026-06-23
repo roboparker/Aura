@@ -38,6 +38,10 @@ interface Props {
   /** Render as a bare table (no card wrapper) to sit inside a section table's
    *  scroll container as a flush, column-aligned footer. */
   flush?: boolean;
+  /** Render as a single `<tr>` (no table/colgroup wrapper) so the totals can
+   *  live inside a shared table body, e.g. one continuous list with section
+   *  rows. Requires `columns`; the parent owns the `<table>` + `<colgroup>`. */
+  asRow?: boolean;
 }
 
 const formatValue = (row: FooterRow): string => {
@@ -92,6 +96,7 @@ const CustomFieldFooterRow = ({
   columns,
   prominent,
   flush,
+  asRow,
 }: Props) => {
   const [rows, setRows] = useState<FooterRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +173,22 @@ const CustomFieldFooterRow = ({
         <td className="px-2 py-2" />
       </>
     );
+
+    // As a single row inside a shared table body (the parent owns the table
+    // + colgroup), so per-section totals sit in one continuous list.
+    if (asRow) {
+      return (
+        <tr
+          className={cn(
+            "border-t",
+            prominent ? "bg-muted/60 font-semibold" : "bg-muted/20",
+          )}
+          data-testid="custom-field-footer-row"
+        >
+          {cells}
+        </tr>
+      );
+    }
 
     // Flush: a bare table that lives inside a section table's scroll container,
     // lining up with that table's columns and scrolling with it.
