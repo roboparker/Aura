@@ -1,29 +1,21 @@
-import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import type { ListColumn } from "@/components/projects/listColumns";
 
 /**
  * Shared `<colgroup>` for the project list view's tables, so the per-section
  * tables and the grand-total bar line up column-for-column. Every table that
- * uses it must be `table-fixed`. Column order mirrors the section table:
+ * uses it must be `table-fixed`. Layout:
  *
- *   checkbox · # · Task · Due · Assignees · Tags · [custom fields…] · actions
+ *   checkbox · # · [data columns, in the user's order] · actions
  *
- * The Task column carries no width so `table-fixed` gives it the remaining
- * space; everything else is fixed so the columns are identical across tables.
+ * The data columns (Task / Due / Assignees / Tags / custom fields) carry
+ * their own width class; Task's is "" so `table-fixed` gives it the slack.
  */
-const TaskTableColumns = ({
-  definitions,
-}: {
-  definitions: CustomFieldDefinition[];
-}) => (
+const TaskTableColumns = ({ columns }: { columns: ListColumn[] }) => (
   <colgroup>
     <col className="w-8" />
     <col className="w-10" />
-    <col />
-    <col className="w-32" />
-    <col className="w-44" />
-    <col className="w-44" />
-    {definitions.map((d) => (
-      <col key={d["@id"]} className="w-32" />
+    {columns.map((column) => (
+      <col key={column.key} className={column.widthClass} />
     ))}
     <col className="w-10" />
   </colgroup>

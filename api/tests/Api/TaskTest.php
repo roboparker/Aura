@@ -1378,6 +1378,46 @@ class TaskTest extends ApiTestCase
     }
 
     /**
+     * Guards the cross-space information leak fixed alongside this test:
+     * a user who is an effective member of a space the caller does NOT
+     * belong to must never surface in the caller's assignable-users list.
+     * The old controller did a raw `Project::findAll()` (unscoped by the
+     * access extension), so every effective member of every space in the
+     * instance leaked through.
+     */
+    public function testAssignableUsersExcludesMembersOfOtherSpaces(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $carol = $this->createUser('carol@example.com');
+
+        // Alice's own space, shared with Bob.
+        $this->createSharedProject($alice, [$alice, $bob], 'Alice Team');
+        // A separate space Alice has no part in — Carol + Dave only.
+        $dave = $this->createUser('dave@example.com');
+        $this->createSharedProject($carol, [$carol, $dave], 'Carol Team');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/me/assignable-users');
+
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $members = $body['member'] ?? null;
+        $this->assertIsArray($members);
+        $emails = array_map(
+            static fn (mixed $u): mixed => is_array($u) ? $u['email'] ?? null : null,
+            $members,
+        );
+        sort($emails);
+        $this->assertSame(['alice@example.com', 'bob@example.com'], $emails);
+        $this->assertNotContains('carol@example.com', $emails);
+        $this->assertNotContains('dave@example.com', $emails);
+    }
+
+    /**
      * @param User[] $members
      */
     private function createSharedProject(User $owner, array $members, string $title): Project

@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Doctrine\SpaceMembershipDql;
 use App\Entity\Project;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -38,10 +39,18 @@ class AssignableUsersController extends AbstractController
         }
 
         $byId = [(string) $user->getId() => $user];
-        // The ProjectAccessExtension already scopes "projects the user
-        // can see" to those whose space they belong to, so a plain
-        // findAll here returns exactly the right set.
-        $projects = $this->em->getRepository(Project::class)->findAll();
+        // ProjectAccessExtension only scopes API Platform's collection data
+        // providers, NOT a raw Doctrine query — a plain findAll() here would
+        // leak the effective members of every space in the instance. Scope
+        // explicitly to projects whose space the caller belongs to (directly
+        // or via group), mirroring ProjectAccessExtension's predicate.
+        /** @var list<Project> $projects */
+        $projects = $this->em->getRepository(Project::class)
+            ->createQueryBuilder('project')
+            ->where(SpaceMembershipDql::userBelongsToProjectSpace('project'))
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->getResult();
         foreach ($projects as $project) {
             foreach ($project->getEffectiveMembers() as $id => $member) {
                 $byId[$id] = $member;

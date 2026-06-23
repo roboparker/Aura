@@ -993,17 +993,34 @@ const Tasks = () => {
 
   const assignableForTask = useCallback(
     (task: Task): AssigneeOption[] => {
+      const self =
+        currentUserIri !== null
+          ? assignableUsers.find((u) => u["@id"] === currentUserIri)
+          : undefined;
+      // The current user is always a valid assignee for a task they own —
+      // mirrors the server's ValidAssignees rule (owner is always allowed),
+      // which matters on a personal / private board where the project lists
+      // no other members.
+      const ownsTask = task.owner["@id"] === currentUserIri;
+
       if (!task.project) {
-        // Personal task — only the owner can be assigned. The owner is
-        // always in the assignable-users set when it's the current user; for
-        // admin-viewed tasks owned by others, fall back to the task's
-        // current assignees (already known-valid).
-        const owner = task.assignees.find((a) => a["@id"] === currentUserIri);
-        return owner ? [owner] : task.assignees;
+        // Personal task — only the owner is assignable. For an admin viewing
+        // someone else's personal task, fall back to its current assignees
+        // (already known-valid).
+        if (self && ownsTask) return [self];
+        return task.assignees;
       }
+
       const memberIris = projectMembers.get(task.project);
-      if (!memberIris) return assignableUsers;
-      return assignableUsers.filter((u) => memberIris.has(u["@id"]));
+      const base = memberIris
+        ? assignableUsers.filter((u) => memberIris.has(u["@id"]))
+        : assignableUsers;
+      // Guarantee the owner is offered even if the project's member list
+      // hasn't caught up (e.g. a private space with no member projection).
+      if (self && ownsTask && !base.some((u) => u["@id"] === self["@id"])) {
+        return [self, ...base];
+      }
+      return base;
     },
     [assignableUsers, projectMembers, currentUserIri],
   );
