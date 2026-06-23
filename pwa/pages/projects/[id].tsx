@@ -1523,7 +1523,7 @@ const AddTaskRow = ({
             type="button"
             onClick={open}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            data-testid="project-new-task"
+            data-testid="project-add-task"
           >
             <Plus className="h-4 w-4" /> Add task
           </button>
