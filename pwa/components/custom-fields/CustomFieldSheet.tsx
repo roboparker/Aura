@@ -9,6 +9,7 @@ import { Copy, MoreHorizontal, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import ConfirmDialog from "@/components/common/ConfirmDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -161,6 +162,10 @@ const CustomFieldSheet = ({
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When a type change would orphan existing task values, the server
+  // replies 409 with the count; we hold it here to drive the confirm
+  // dialog, then retry the save with the confirmation flag.
+  const [conversionLost, setConversionLost] = useState<number | null>(null);
   const [optionStats, setOptionStats] = useState<Record<string, number>>({});
 
   // Live preview: build a definition from the current form state and render
@@ -280,55 +285,78 @@ const CustomFieldSheet = ({
     setFooter((prev) => ({ kind: fk, label: prev?.label }));
   };
 
+  // Performs the actual POST/PATCH. On edit, `confirmConversion` appends
+  // the flag that tells the server to delete values that can't be migrated
+  // to the new field type.
+  const sendSave = (confirmConversion: boolean): Promise<Response> => {
+    const body: Record<string, unknown> = {
+      name: name.trim(),
+      kind,
+      subtype,
+      config,
+      nullable,
+      footer,
+      visibility,
+    };
+    if (isEdit && initial) {
+      const url = `${ENTRYPOINT}${initial["@id"]}${
+        confirmConversion ? "?confirmValueConversion=1" : ""
+      }`;
+      return fetch(url, {
+        method: "PATCH",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/merge-patch+json",
+          Accept: "application/ld+json",
+        },
+        body: JSON.stringify(body),
+      });
+    }
+    return fetch(`${ENTRYPOINT}/custom_field_definitions`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/ld+json" },
+      body: JSON.stringify({ ...body, project: projectIri, position: initialPosition }),
+    });
+  };
+
+  const finishSave = async (res: Response) => {
+    if (!res.ok) throw new Error(await errorMessage(res));
+    const saved: CustomFieldDefinition = await res.json();
+    onSaved(saved);
+    onOpenChange(false);
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!name.trim()) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = {
-        name: trimmedName,
-        kind,
-        subtype,
-        config,
-        nullable,
-        footer,
-        visibility,
-      };
-      let res: Response;
-      if (isEdit && initial) {
-        res = await fetch(`${ENTRYPOINT}${initial["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/merge-patch+json",
-            Accept: "application/ld+json",
-          },
-          body: JSON.stringify(body),
-        });
-      } else {
-        res = await fetch(`${ENTRYPOINT}/custom_field_definitions`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/ld+json" },
-          body: JSON.stringify({
-            ...body,
-            project: projectIri,
-            position: initialPosition,
-          }),
-        });
+      const res = await sendSave(false);
+      // The type change would orphan some values — pause and confirm
+      // before anything is deleted.
+      if (isEdit && res.status === 409) {
+        const header = res.headers.get("X-Conversion-Lost-Count");
+        const count = header ? Number.parseInt(header, 10) : 0;
+        setConversionLost(Number.isFinite(count) && count > 0 ? count : 1);
+        return;
       }
-      if (!res.ok) throw new Error(await errorMessage(res));
-      const saved: CustomFieldDefinition = await res.json();
-      onSaved(saved);
-      onOpenChange(false);
+      await finishSave(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  // Retry the save after the user confirms the lossy conversion. Throws on
+  // failure so the ConfirmDialog keeps itself open and surfaces the error.
+  const confirmConversion = async () => {
+    const res = await sendSave(true);
+    await finishSave(res);
+    setConversionLost(null);
   };
 
   const handleDelete = async () => {
@@ -366,6 +394,7 @@ const CustomFieldSheet = ({
     // which would swallow clicks on those portaled popups. The
     // onInteractOutside guard keeps the drawer open when the user is
     // interacting with one of those popups rather than truly clicking out.
+    <>
     <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
       <SheetContent
         side="right"
@@ -730,6 +759,23 @@ const CustomFieldSheet = ({
         </form>
       </SheetContent>
     </Sheet>
+    <ConfirmDialog
+      open={conversionLost !== null}
+      onOpenChange={(o) => {
+        if (!o) setConversionLost(null);
+      }}
+      title="Some values can't be converted"
+      description={
+        conversionLost === null
+          ? undefined
+          : `${conversionLost} task value${conversionLost === 1 ? "" : "s"} can't be converted to the new field type and will be permanently deleted. Values that can be converted are kept.`
+      }
+      confirmLabel="Convert & delete"
+      cancelLabel="Keep editing"
+      destructive
+      onConfirm={confirmConversion}
+    />
+    </>
   );
 };
 

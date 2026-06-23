@@ -3,7 +3,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
-import type { CustomFieldDefinition } from "./types";
+import type { ListColumn } from "@/components/projects/listColumns";
 import type { FooterResponse, FooterRow } from "./types";
 
 /**
@@ -30,8 +30,9 @@ interface Props {
   visibleDefinitions?: string[];
   /** When set, render a column-aligned bar (a `table-fixed` table sharing the
    *  section tables' columns via {@link TaskTableColumns}) so each total sits
-   *  under its custom-field column. Used for the grand-total bars. */
-  columns?: CustomFieldDefinition[];
+   *  under its custom-field column — in the same (possibly reordered) order as
+   *  the table above. Used for the per-section + grand-total bars. */
+  columns?: ListColumn[];
   /** Stronger styling for the grand-total bars. */
   prominent?: boolean;
   /** Render as a bare table (no card wrapper) to sit inside a section table's
@@ -133,17 +134,21 @@ const CustomFieldFooterRow = ({
     const valueByDef = new Map(rows.map((row) => [row.definition, row]));
     const cells = (
       <>
+        {/* checkbox + # — fixed leading columns, mirroring the task table. */}
         <td className="px-3 py-2" />
         <td className="px-1 py-2" />
-        <td className="px-2 py-2" />
-        <td className="px-2 py-2" />
-        <td className="px-2 py-2" />
-        <td className="px-2 py-2" />
-        {columns.map((def) => {
-          const row = valueByDef.get(def["@id"]);
+        {columns.map((column) => {
+          // Only custom-field columns can carry an aggregate; built-ins
+          // (Task / Due / Assignees / Tags) render an empty spacer so the
+          // totals stay aligned under their column after any reorder.
+          const def = column.definition;
+          const row = def ? valueByDef.get(def["@id"]) : undefined;
+          if (!def) {
+            return <td key={column.key} className="px-2 py-2" />;
+          }
           return (
             <td
-              key={def["@id"]}
+              key={column.key}
               className="px-2 py-2 align-top"
               data-testid="custom-field-footer-cell"
             >
@@ -172,7 +177,7 @@ const CustomFieldFooterRow = ({
           className="w-full table-fixed border-t text-sm"
           data-testid="custom-field-footer-row"
         >
-          <TaskTableColumns definitions={columns} />
+          <TaskTableColumns columns={columns} />
           <tbody>
             <tr>{cells}</tr>
           </tbody>
@@ -192,7 +197,7 @@ const CustomFieldFooterRow = ({
       >
         <div className="overflow-x-auto">
           <table className="w-full table-fixed text-sm">
-            <TaskTableColumns definitions={columns} />
+            <TaskTableColumns columns={columns} />
             <tbody>
               <tr>{cells}</tr>
             </tbody>

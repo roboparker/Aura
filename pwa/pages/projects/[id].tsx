@@ -10,6 +10,33 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
+import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
+import {
+  applyView,
+  buildColumns,
+  orderColumns,
+  type FilterMap,
+  type FilterValue,
+  type ListColumn,
+  type SortState,
+} from "@/components/projects/listColumns";
+import { useProjectListView } from "@/lib/useProjectListView";
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
@@ -355,6 +382,36 @@ const ProjectDetail = () => {
   const boardDefinitions = useMemo(
     () => definitions.filter((d) => (d.visibility ?? "both") !== "list"),
     [definitions],
+  );
+
+  // The assignee picker must only offer users who can actually be assigned
+  // to this project's tasks — its space members — not the caller's whole
+  // assignable universe (which spans every space they're in). On a private
+  // board that narrows the list to just the user. `assignableUsers` carries
+  // the rich avatar/colour shape the picker needs, so we filter it by the
+  // project's member IRIs rather than using the bare `project.members`.
+  const projectAssignableUsers = useMemo(() => {
+    if (!project) return assignableUsers;
+    const memberIris = new Set(project.members.map((m) => m["@id"]));
+    return assignableUsers.filter((u) => memberIris.has(u["@id"]));
+  }, [assignableUsers, project]);
+
+  // Per-user, per-project list-view state (column order + sort + filters),
+  // persisted in localStorage. Applied within each section by SectionBlock.
+  const listView = useProjectListView(projectId);
+  const columns = useMemo(
+    () => orderColumns(buildColumns(listDefinitions), listView.order),
+    [listDefinitions, listView.order],
+  );
+  const handleColumnReorder = useCallback(
+    (activeKey: string, overKey: string) => {
+      const keys = columns.map((c) => c.key);
+      const from = keys.indexOf(activeKey);
+      const to = keys.indexOf(overKey);
+      if (from === -1 || to === -1 || from === to) return;
+      listView.setOrder(arrayMove(keys, from, to));
+    },
+    [columns, listView],
   );
 
   const toggleComplete = async (task: ProjectTask) => {
@@ -1000,12 +1057,17 @@ const ProjectDetail = () => {
                               : DEFAULT_SECTION_LABEL
                           }
                           tasks={group.tasks}
-                          definitions={listDefinitions}
+                          columns={columns}
                           projectId={project.id}
                           projectIri={project["@id"]}
                           spaceIri={projectSpaceIri(project)}
                           allTags={allTags}
-                          assignableUsers={assignableUsers}
+                          assignableUsers={projectAssignableUsers}
+                          sort={listView.sort}
+                          filters={listView.filters}
+                          onSetSort={listView.setSort}
+                          onSetFilter={listView.setFilter}
+                          onReorder={handleColumnReorder}
                           footerFilter={
                             sectionIri
                               ? `section=${encodeURIComponent(sectionIri)}`
@@ -1043,7 +1105,7 @@ const ProjectDetail = () => {
                     <CustomFieldFooterRow
                       projectId={project.id}
                       refreshKey={footerKey}
-                      columns={listDefinitions}
+                      columns={columns}
                       prominent
                       className="mt-6"
                     />
@@ -1094,7 +1156,7 @@ const ProjectDetail = () => {
         open={Boolean(activeTaskId)}
         onOpenChange={closeTaskDetail}
         currentUserIri={currentUserIri}
-        assignableUsers={assignableUsers}
+        assignableUsers={projectAssignableUsers}
         allTags={allTags}
         onTaskChanged={(updated) =>
           setTasks((prev) =>
@@ -1127,12 +1189,17 @@ interface SectionBlockProps {
   section: TaskSection | null;
   title: string;
   tasks: ProjectTask[];
-  definitions: CustomFieldDefinition[];
+  columns: ListColumn[];
   projectId: string;
   projectIri: string;
   spaceIri: string;
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
+  sort: SortState | null;
+  filters: FilterMap;
+  onSetSort: (sort: SortState | null) => void;
+  onSetFilter: (key: string, value: FilterValue | null) => void;
+  onReorder: (activeKey: string, overKey: string) => void;
   footerFilter: string;
   footerKey: number;
   addOpen: boolean;
@@ -1162,12 +1229,17 @@ const SectionBlock = ({
   section,
   title,
   tasks,
-  definitions,
+  columns,
   projectId,
   projectIri,
   spaceIri,
   allTags,
   assignableUsers,
+  sort,
+  filters,
+  onSetSort,
+  onSetFilter,
+  onReorder,
   footerFilter,
   footerKey,
   addOpen,
@@ -1191,7 +1263,26 @@ const SectionBlock = ({
   onRename,
   onDelete,
 }: SectionBlockProps) => {
-  const fullColSpan = definitions.length + 7;
+  // checkbox + # + each data column + trailing actions.
+  const fullColSpan = columns.length + 3;
+  // Sort + filter the section's rows per the active column view. Falls back
+  // to the raw list when nothing is set (the common case).
+  const visibleTasks = useMemo(
+    () => applyView(tasks, columns, sort, filters),
+    [tasks, columns, sort, filters],
+  );
+  const filtersActive = Object.keys(filters).length > 0;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+  const columnKeys = columns.map((c) => c.key);
+  const onDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorder(String(active.id), String(over.id));
+    }
+  };
+
   return (
     <div data-testid="project-section">
       {/* Every section shows a title above its table. User-created sections
@@ -1254,34 +1345,41 @@ const SectionBlock = ({
 
       <div className="overflow-hidden rounded-lg border">
         <div className="overflow-x-auto">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
+        >
         <table className="w-full table-fixed text-sm">
-          <TaskTableColumns definitions={definitions} />
+          <TaskTableColumns columns={columns} />
           <thead>
             <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
               <th className="w-8 px-3 py-2" />
               <th className="w-10 px-1 py-2 text-left font-medium">#</th>
-              <th className="px-2 py-2 text-left font-medium">Task</th>
-              <th className="px-2 py-2 text-left font-medium">Due</th>
-              <th className="px-2 py-2 text-left font-medium">Assignees</th>
-              <th className="px-2 py-2 text-left font-medium">Tags</th>
-              {definitions.map((def) => (
-                <th
-                  key={def["@id"]}
-                  className="truncate px-2 py-2 text-left font-medium"
-                >
-                  {def.name}
-                </th>
-              ))}
+              <SortableContext items={columnKeys} strategy={horizontalListSortingStrategy}>
+                {columns.map((column) => (
+                  <SortableHeaderCell
+                    key={column.key}
+                    column={column}
+                    sort={sort}
+                    filter={filters[column.key]}
+                    onSetSort={onSetSort}
+                    onSetFilter={onSetFilter}
+                    assignableUsers={assignableUsers}
+                    allTags={allTags}
+                  />
+                ))}
+              </SortableContext>
               <th className="w-10 px-2 py-2" />
             </tr>
           </thead>
           <tbody>
-            {tasks.map((task, i) => (
+            {visibleTasks.map((task, i) => (
               <ProjectTaskRow
                 key={task["@id"]}
                 task={task}
                 index={i}
-                definitions={definitions}
+                columns={columns}
                 allTags={allTags}
                 assignableUsers={assignableUsers}
                 projectIri={projectIri}
@@ -1292,75 +1390,98 @@ const SectionBlock = ({
                 onCustomFieldChange={onCustomFieldChange}
               />
             ))}
+            {tasks.length > 0 && visibleTasks.length === 0 && filtersActive && (
+              <tr>
+                <td
+                  colSpan={fullColSpan}
+                  className="px-3 py-3 text-sm text-muted-foreground"
+                >
+                  No tasks match the active filters.
+                </td>
+              </tr>
+            )}
             {addOpen && (
               <tr className="border-b bg-muted/20" data-testid="project-new-task-row">
                 <td className="px-3 py-2 align-middle">
                   <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
                 </td>
                 <td className="px-1 py-2" />
-                <td className="px-2 py-2">
-                  <Input
-                    ref={newTaskInputRef}
-                    value={newTaskTitle}
-                    onChange={(e) => onNewTaskTitle(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void onCreateTask();
-                      } else if (e.key === "Escape") {
-                        e.preventDefault();
-                        onCloseAddRow();
-                      }
-                    }}
-                    onBlur={(e) => {
-                      if (newTaskTitle.trim()) return;
-                      // Keep the row open while the user Tabs to a sibling field
-                      // (tags / due / assignees) before submitting; only close
-                      // when focus leaves the add row entirely.
-                      const next = e.relatedTarget as HTMLElement | null;
-                      if (next?.closest('[data-testid="project-new-task-row"]'))
-                        return;
-                      onCloseAddRow();
-                    }}
-                    placeholder="Task title, then Tab or Enter…"
-                    maxLength={255}
-                    disabled={isCreatingTask}
-                    className="h-8"
-                    data-testid="project-new-task-title"
-                  />
-                </td>
-                <td className="px-2 py-2 align-middle" data-testid="new-task-due">
-                  <DueDateCell
-                    value={newTaskDue}
-                    onChange={onNewTaskDue}
-                    ariaLabel="Due date for new task"
-                    testIdPrefix="project-new-task-due"
-                  />
-                </td>
-                <td
-                  className="px-2 py-2 align-middle"
-                  data-testid="new-task-assignees"
-                >
-                  <AssigneesCombobox
-                    value={newTaskAssignees}
-                    options={assignableUsers}
-                    onChange={onNewTaskAssignees}
-                    subjectLabel="new task"
-                  />
-                </td>
-                <td className="px-2 py-2 align-middle" data-testid="new-task-tags">
-                  <TagsCombobox
-                    value={newTaskTags}
-                    options={allTags}
-                    onChange={onNewTaskTags}
-                    subjectLabel="new task"
-                  />
-                </td>
-                {definitions.map((def) => (
-                  // Custom fields are set after the task exists; render an empty
-                  // cell so the inline fields stay aligned with the columns.
-                  <td key={def["@id"]} className="px-2 py-2 align-middle" />
-                ))}
+                {columns.map((column) => {
+                  if (column.key === "task") {
+                    return (
+                      <td key="task" className="px-2 py-2">
+                        <Input
+                          ref={newTaskInputRef}
+                          value={newTaskTitle}
+                          onChange={(e) => onNewTaskTitle(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void onCreateTask();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              onCloseAddRow();
+                            }
+                          }}
+                          onBlur={(e) => {
+                            if (newTaskTitle.trim()) return;
+                            // Keep the row open while the user Tabs to a sibling
+                            // field before submitting; only close when focus
+                            // leaves the add row entirely.
+                            const next = e.relatedTarget as HTMLElement | null;
+                            if (next?.closest('[data-testid="project-new-task-row"]'))
+                              return;
+                            onCloseAddRow();
+                          }}
+                          placeholder="Task title, then Tab or Enter…"
+                          maxLength={255}
+                          disabled={isCreatingTask}
+                          className="h-8"
+                          data-testid="project-new-task-title"
+                        />
+                      </td>
+                    );
+                  }
+                  if (column.key === "due") {
+                    return (
+                      <td key="due" className="px-2 py-2 align-middle" data-testid="new-task-due">
+                        <DueDateCell
+                          value={newTaskDue}
+                          onChange={onNewTaskDue}
+                          ariaLabel="Due date for new task"
+                          testIdPrefix="project-new-task-due"
+                        />
+                      </td>
+                    );
+                  }
+                  if (column.key === "assignees") {
+                    return (
+                      <td key="assignees" className="px-2 py-2 align-middle" data-testid="new-task-assignees">
+                        <AssigneesCombobox
+                          value={newTaskAssignees}
+                          options={assignableUsers}
+                          onChange={onNewTaskAssignees}
+                          subjectLabel="new task"
+                        />
+                      </td>
+                    );
+                  }
+                  if (column.key === "tags") {
+                    return (
+                      <td key="tags" className="px-2 py-2 align-middle" data-testid="new-task-tags">
+                        <TagsCombobox
+                          value={newTaskTags}
+                          options={allTags}
+                          onChange={onNewTaskTags}
+                          subjectLabel="new task"
+                        />
+                      </td>
+                    );
+                  }
+                  // Custom fields are set after the task exists; an empty cell
+                  // keeps the inline fields aligned with the columns.
+                  return <td key={column.key} className="px-2 py-2 align-middle" />;
+                })}
                 <td className="px-2 py-2 align-middle" />
               </tr>
             )}
@@ -1383,13 +1504,14 @@ const SectionBlock = ({
             )}
           </tbody>
         </table>
+        </DndContext>
         {/* Per-section aggregates: a flush, column-aligned footer inside the
             same scroll container so it lines up with the columns above. */}
         <CustomFieldFooterRow
           projectId={projectId}
           filters={footerFilter}
           refreshKey={footerKey}
-          columns={definitions}
+          columns={columns}
           flush
         />
         </div>
@@ -1398,10 +1520,68 @@ const SectionBlock = ({
   );
 };
 
+/**
+ * One draggable list-view column header: a grip to reorder + the
+ * {@link ColumnHeaderMenu} for sort/filter. The grip carries the drag
+ * listeners so clicking the menu doesn't start a drag.
+ */
+const SortableHeaderCell = ({
+  column,
+  sort,
+  filter,
+  onSetSort,
+  onSetFilter,
+  assignableUsers,
+  allTags,
+}: {
+  column: ListColumn;
+  sort: SortState | null;
+  filter: FilterValue | undefined;
+  onSetSort: (sort: SortState | null) => void;
+  onSetFilter: (key: string, value: FilterValue | null) => void;
+  assignableUsers: AssigneeOption[];
+  allTags: TagOption[];
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: column.key });
+  return (
+    <th
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn(
+        "px-2 py-2 text-left font-medium",
+        isDragging && "bg-accent opacity-60",
+      )}
+      data-testid={`column-th-${column.key}`}
+    >
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          className="shrink-0 cursor-grab touch-none text-muted-foreground/40 hover:text-foreground"
+          aria-label={`Reorder ${column.label} column`}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="size-3.5" />
+        </button>
+        <ColumnHeaderMenu
+          column={column}
+          sort={sort}
+          filter={filter}
+          onSetSort={onSetSort}
+          onSetFilter={onSetFilter}
+          assignableUsers={assignableUsers}
+          allTags={allTags}
+        />
+      </div>
+    </th>
+  );
+};
+
 interface ProjectTaskRowProps {
   task: ProjectTask;
   index: number;
-  definitions: CustomFieldDefinition[];
+  columns: ListColumn[];
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
   projectIri: string;
@@ -1415,7 +1595,7 @@ interface ProjectTaskRowProps {
 const ProjectTaskRow = ({
   task,
   index,
-  definitions,
+  columns,
   allTags,
   assignableUsers,
   projectIri,
@@ -1425,6 +1605,75 @@ const ProjectTaskRow = ({
   patchTask,
   onCustomFieldChange,
 }: ProjectTaskRowProps) => {
+  const cellFor = (column: ListColumn) => {
+    switch (column.key) {
+      case "task":
+        return (
+          <button
+            type="button"
+            onClick={() => onOpen(task)}
+            className={cn(
+              "w-full cursor-pointer text-left font-medium hover:text-primary",
+              task.completedOn && "text-muted-foreground line-through",
+            )}
+            data-testid="project-task-title"
+          >
+            {task.title}
+          </button>
+        );
+      case "due":
+        return (
+          <DueDateCell
+            value={task.dueDate}
+            onChange={(next) => void patchTask(task, { dueDate: next })}
+            ariaLabel={`Due date for "${task.title}"`}
+            testIdPrefix="project-task-due-date"
+            recurrenceValue={task.recurrenceRule}
+            onRecurrenceChange={(next) =>
+              void patchTask(task, { recurrenceRule: next })
+            }
+            remindersValue={task.reminders}
+            onRemindersChange={(next) =>
+              void patchTask(task, { reminders: next })
+            }
+            status={dueDateStatus(task.dueDate, !!task.completedOn)}
+          />
+        );
+      case "assignees":
+        return (
+          <AssigneesCombobox
+            value={task.assignees}
+            options={assignableUsers}
+            onChange={(iris) => void patchTask(task, { assignees: iris })}
+            subjectLabel={task.title}
+          />
+        );
+      case "tags":
+        return (
+          <TagsCombobox
+            value={task.tags}
+            options={allTags}
+            onChange={(iris) => void patchTask(task, { tags: iris })}
+            subjectLabel={task.title}
+          />
+        );
+      default: {
+        const def = column.definition;
+        if (!def) return null;
+        return (
+          <ProjectCustomFieldCell
+            task={task}
+            definition={def}
+            projectIri={projectIri}
+            spaceIri={spaceIri}
+            users={assignableUsers}
+            onCustomFieldChange={onCustomFieldChange}
+          />
+        );
+      }
+    }
+  };
+
   return (
     <tr
       className="border-b last:border-0 hover:bg-accent/40"
@@ -1441,60 +1690,15 @@ const ProjectTaskRow = ({
       <td className="px-1 py-2 align-middle text-xs text-muted-foreground">
         T{index + 1}
       </td>
-      <td className="min-w-[12rem] px-2 py-2 align-middle">
-        <button
-          type="button"
-          onClick={() => onOpen(task)}
+      {columns.map((column) => (
+        <td
+          key={column.key}
           className={cn(
-            "w-full cursor-pointer text-left font-medium hover:text-primary",
-            task.completedOn && "text-muted-foreground line-through",
+            "px-2 py-2 align-middle",
+            column.key === "task" && "min-w-[12rem]",
           )}
-          data-testid="project-task-title"
         >
-          {task.title}
-        </button>
-      </td>
-      <td className="px-2 py-2 align-middle">
-        <DueDateCell
-          value={task.dueDate}
-          onChange={(next) => void patchTask(task, { dueDate: next })}
-          ariaLabel={`Due date for "${task.title}"`}
-          testIdPrefix="project-task-due-date"
-          recurrenceValue={task.recurrenceRule}
-          onRecurrenceChange={(next) =>
-            void patchTask(task, { recurrenceRule: next })
-          }
-          remindersValue={task.reminders}
-          onRemindersChange={(next) => void patchTask(task, { reminders: next })}
-          status={dueDateStatus(task.dueDate, !!task.completedOn)}
-        />
-      </td>
-      <td className="px-2 py-2 align-middle">
-        <AssigneesCombobox
-          value={task.assignees}
-          options={assignableUsers}
-          onChange={(iris) => void patchTask(task, { assignees: iris })}
-          subjectLabel={task.title}
-        />
-      </td>
-      <td className="px-2 py-2 align-middle">
-        <TagsCombobox
-          value={task.tags}
-          options={allTags}
-          onChange={(iris) => void patchTask(task, { tags: iris })}
-          subjectLabel={task.title}
-        />
-      </td>
-      {definitions.map((def) => (
-        <td key={def["@id"]} className="px-2 py-2 align-middle">
-          <ProjectCustomFieldCell
-            task={task}
-            definition={def}
-            projectIri={projectIri}
-            spaceIri={spaceIri}
-            users={assignableUsers}
-            onCustomFieldChange={onCustomFieldChange}
-          />
+          {cellFor(column)}
         </td>
       ))}
       <td className="px-2 py-2 align-middle">

@@ -105,6 +105,8 @@ services:
             tags: ['app.mcp_tool']
         App\CustomField\Type\CustomFieldTypeInterface:
             tags: ['app.custom_field_type']
+        App\CustomField\Converter\CustomFieldTypeConverterInterface:
+            tags: ['app.custom_field_converter']
 
     App\Mcp\McpToolRegistry:
         arguments:
@@ -113,6 +115,10 @@ services:
     App\CustomField\CustomFieldTypeRegistry:
         arguments:
             $types: !tagged_iterator app.custom_field_type
+
+    App\CustomField\Converter\CustomFieldConverterRegistry:
+        arguments:
+            $converters: !tagged_iterator app.custom_field_converter
 
     # Replace stof's default actor provider with one that yields the
     # user's IRI (`/users/{uuid}`) instead of `getUserIdentifier()`
