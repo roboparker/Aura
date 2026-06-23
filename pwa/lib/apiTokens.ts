@@ -81,6 +81,28 @@ export const createApiToken = async (input: {
   return res.json();
 };
 
+export const updateApiToken = async (
+  iri: string,
+  patch: Partial<Pick<ApiTokenRow, "name" | "accessPolicy" | "expiresAt">>,
+): Promise<ApiTokenRow> => {
+  const res = await fetch(`${ENTRYPOINT}${iri}`, {
+    method: "PATCH",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/merge-patch+json",
+      Accept: "application/ld+json",
+    },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      data["hydra:description"] || data.detail || "Failed to update token.",
+    );
+  }
+  return res.json();
+};
+
 export const revokeApiToken = async (iri: string): Promise<void> => {
   const res = await fetch(`${ENTRYPOINT}${iri}`, {
     method: "DELETE",
