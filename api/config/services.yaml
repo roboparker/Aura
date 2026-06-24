@@ -120,6 +120,21 @@ services:
         arguments:
             $converters: !tagged_iterator app.custom_field_converter
 
+    # Database-backed session storage (wired via framework.session.handler_id)
+    # so logins persist across container swaps / deploys. Uses a DEDICATED
+    # PDO (see SessionPdoFactory) — sharing Doctrine's connection makes the
+    # handler's row-lock transaction collide with the request's ORM
+    # transaction. The `sessions` table is provisioned by a migration and
+    # excluded from ORM schema management.
+    session.pdo:
+        class: PDO
+        factory: ['App\Session\SessionPdoFactory', 'create']
+        arguments: ['@doctrine.dbal.default_connection']
+
+    Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler:
+        arguments:
+            - '@session.pdo'
+
     # Replace stof's default actor provider with one that yields the
     # user's IRI (`/users/{uuid}`) instead of `getUserIdentifier()`
     # (= email). The IRI is stable across email changes and lets the

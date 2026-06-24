@@ -16,6 +16,10 @@ framework:
         cookie_secure: auto
         cookie_httponly: true
         cookie_samesite: lax
+        # Persist sessions in Postgres (see services.yaml) instead of the
+        # container's filesystem, so a deploy / container swap doesn't log
+        # everyone out. The store survives because the database does.
+        handler_id: Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler
 
     # UUIDv7 is time-ordered, which keeps B-tree index locality good.
     # Configured globally so `doctrine.uuid_generator` emits v7.
@@ -81,4 +85,7 @@ when@test:
     framework:
         test: true
         session:
+            # The suite uses in-memory mock storage; null the DB handler so
+            # tests never touch the sessions table.
+            handler_id: null
             storage_factory_id: session.storage.factory.mock_file
