@@ -16,7 +16,10 @@ doctrine:
         # feedback_ticket_seq: a standalone Postgres sequence (created by a
         # migration, read via nextval in App\State\FeedbackOwnerProcessor)
         # that no entity's ID generator owns, so the ORM never tracks it.
-        schema_filter: ~^(?!messenger_messages|feedback_ticket_seq)~
+        # `sessions`: the PdoSessionHandler store (created by a migration) so
+        # logins survive a container swap / deploy — owned by Symfony's
+        # session handler, not the ORM.
+        schema_filter: ~^(?!messenger_messages|feedback_ticket_seq|sessions)~
 
         # doctrine/dbal 4 dropped the legacy `array` type. Gedmo's
         # AbstractLogEntry still declares its `data` column as
