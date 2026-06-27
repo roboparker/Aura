@@ -104,11 +104,10 @@ final class DownloadFileTool implements McpToolInterface
             \App\Entity\SpaceMembership::class,
         );
         $group = sprintf(
-            'SELECT 1 FROM %s mcp_dl_space_grp '
-            . 'JOIN mcp_dl_space_grp.userGroup mcp_dl_space_grp_obj '
+            'SELECT 1 FROM %s mcp_dl_space_grp_obj '
             . 'JOIN mcp_dl_space_grp_obj.memberships mcp_dl_space_grp_member '
-            . 'WHERE mcp_dl_space_grp.space = s AND mcp_dl_space_grp_member.user = :user',
-            \App\Entity\SpaceGroupMembership::class,
+            . 'WHERE mcp_dl_space_grp_obj.space = s AND mcp_dl_space_grp_member.user = :user',
+            \App\Entity\UserGroup::class,
         );
         $spaceHit = (int) $this->em->getRepository(Space::class)
             ->createQueryBuilder('s')

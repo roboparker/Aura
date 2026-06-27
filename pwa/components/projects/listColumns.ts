@@ -62,7 +62,13 @@ export interface SortState {
 
 export type FilterValue =
   | { kind: "text"; query: string }
-  | { kind: "due"; mode: "all" | "has" | "none" | "overdue" }
+  | {
+      kind: "due";
+      mode: "all" | "has" | "none" | "overdue";
+      /** Inclusive YYYY-MM-DD bounds, AND-ed with mode. */
+      after?: string;
+      before?: string;
+    }
   | { kind: "date" | "presence"; mode: "all" | "has" | "none" }
   | { kind: "boolean"; mode: "all" | "true" | "false" }
   | { kind: "assignees"; iris: string[]; unassigned: boolean }
@@ -102,11 +108,13 @@ const SORTABLE_KIND: Record<CustomFieldKind, boolean> = {
 export const buildColumns = (
   definitions: CustomFieldDefinition[],
 ): ListColumn[] => {
+  // Fixed, compact widths — including Task — so columns stay tight and the
+  // trailing (flex) column absorbs the slack as an empty area on the right.
   const builtins: ListColumn[] = [
-    { key: "task", label: "Task", sortable: true, filter: "text", widthClass: "" },
-    { key: "due", label: "Due", sortable: true, filter: "due", widthClass: "w-32" },
-    { key: "assignees", label: "Assignees", sortable: true, filter: "assignees", widthClass: "w-44" },
-    { key: "tags", label: "Tags", sortable: true, filter: "tags", widthClass: "w-44" },
+    { key: "task", label: "Task", sortable: true, filter: "text", widthClass: "w-72" },
+    { key: "due", label: "Due", sortable: true, filter: "due", widthClass: "w-36" },
+    { key: "assignees", label: "Assignees", sortable: true, filter: "assignees", widthClass: "w-40" },
+    { key: "tags", label: "Tags", sortable: true, filter: "tags", widthClass: "w-36" },
   ];
   const custom: ListColumn[] = definitions.map((def) => ({
     key: cfColumnKey(def),
@@ -222,6 +230,7 @@ export const isFilterActive = (value: FilterValue | undefined): boolean => {
     case "text":
       return value.query.trim() !== "";
     case "due":
+      return value.mode !== "all" || Boolean(value.after) || Boolean(value.before);
     case "date":
     case "presence":
     case "boolean":
@@ -255,11 +264,18 @@ const passesFilter = (
       const raw = def ? cfValue(task, def) : null;
       return typeof raw === "string" && raw.toLowerCase().includes(q);
     }
-    case "due":
-      if (value.mode === "has") return task.dueDate !== null;
-      if (value.mode === "none") return task.dueDate === null;
-      if (value.mode === "overdue") return isOverdue(task);
+    case "due": {
+      if (value.mode === "has" && task.dueDate === null) return false;
+      if (value.mode === "none" && task.dueDate !== null) return false;
+      if (value.mode === "overdue" && !isOverdue(task)) return false;
+      if (value.after || value.before) {
+        if (task.dueDate === null) return false;
+        const day = task.dueDate.slice(0, 10);
+        if (value.after && day < value.after) return false;
+        if (value.before && day > value.before) return false;
+      }
       return true;
+    }
     case "date":
     case "presence": {
       if (value.mode === "all") return true;

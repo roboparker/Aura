@@ -7,7 +7,7 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\Comment;
-use App\Entity\SpaceGroupMembership;
+use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\QueryBuilder;
@@ -81,8 +81,8 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceMembership::class,
         );
         $taskSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_t_grp JOIN ca_t_grp.userGroup ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp.space = ca_project.space AND ca_t_grp_member.user = :currentUser',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp_obj.space = ca_project.space AND ca_t_grp_member.user = :currentUser',
+            UserGroup::class,
         );
 
         // Page branch: comment is on a page whose space contains the
@@ -92,8 +92,8 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceMembership::class,
         );
         $pageSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_p_grp JOIN ca_p_grp.userGroup ca_p_grp_obj JOIN ca_p_grp_obj.memberships ca_p_grp_member WHERE ca_p_grp.space = ca_page.space AND ca_p_grp_member.user = :currentUser',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s ca_p_grp_obj JOIN ca_p_grp_obj.memberships ca_p_grp_member WHERE ca_p_grp_obj.space = ca_page.space AND ca_p_grp_member.user = :currentUser',
+            UserGroup::class,
         );
 
         // Discussion branch: comment is on a discussion whose space
@@ -103,8 +103,8 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             SpaceMembership::class,
         );
         $discussionSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_d_grp JOIN ca_d_grp.userGroup ca_d_grp_obj JOIN ca_d_grp_obj.memberships ca_d_grp_member WHERE ca_d_grp.space = ca_discussion.space AND ca_d_grp_member.user = :currentUser',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s ca_d_grp_obj JOIN ca_d_grp_obj.memberships ca_d_grp_member WHERE ca_d_grp_obj.space = ca_discussion.space AND ca_d_grp_member.user = :currentUser',
+            UserGroup::class,
         );
 
         // Feedback branch: the feedback board is instance-level, so any

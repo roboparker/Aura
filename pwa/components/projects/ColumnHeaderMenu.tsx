@@ -1,11 +1,18 @@
-import { useState } from "react";
-import { ArrowDown, ArrowUp, ChevronsUpDown, Filter } from "lucide-react";
+import { useState, type HTMLAttributes } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsUpDown,
+  Filter,
+  Pencil,
+} from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { displayName } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
@@ -26,7 +33,78 @@ interface ColumnHeaderMenuProps {
   onSetFilter: (key: string, value: FilterValue | null) => void;
   assignableUsers: AssigneeOption[];
   allTags: TagOption[];
+  /** When set (custom-field columns), the menu shows an "Edit field" action. */
+  onEdit?: () => void;
+  /** Drag listeners/attributes applied to the label area (the drag handle). */
+  dragHandleProps?: HTMLAttributes<HTMLDivElement>;
 }
+
+// Local date <-> YYYY-MM-DD helpers (no timezone shift; date-only filter bounds).
+const toDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+const fromDay = (s: string) => {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y ?? 1970, (m ?? 1) - 1, d ?? 1);
+};
+const formatDay = (s: string) =>
+  fromDay(s).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+/** A labelled row whose value text opens a calendar date picker on click. */
+const DateBound = ({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-accent"
+        >
+          <span className="text-muted-foreground">{label}</span>
+          <span className={value ? "font-medium" : "text-muted-foreground/60"}>
+            {value ? formatDay(value) : "Any date"}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0">
+        <Calendar
+          mode="single"
+          selected={value ? fromDay(value) : undefined}
+          onSelect={(d) => {
+            onChange(d ? toDay(d) : "");
+            setOpen(false);
+          }}
+          autoFocus
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+            className="w-full border-t px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent"
+          >
+            Clear
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 /** A radio-style choice button used by the single-select filter kinds. */
 const Choice = ({
@@ -78,6 +156,8 @@ const ColumnHeaderMenu = ({
   onSetFilter,
   assignableUsers,
   allTags,
+  onEdit,
+  dragHandleProps,
 }: ColumnHeaderMenuProps) => {
   const [open, setOpen] = useState(false);
   const sortedHere = sort?.key === column.key;
@@ -85,83 +165,96 @@ const ColumnHeaderMenu = ({
 
   const set = (value: FilterValue | null) => onSetFilter(column.key, value);
 
+  // Cycle the sort on click: unsorted → ascending → descending → unsorted.
+  const cycleSort = () => {
+    if (!sortedHere) onSetSort({ key: column.key, dir: "asc" });
+    else if (sort.dir === "asc") onSetSort({ key: column.key, dir: "desc" });
+    else onSetSort(null);
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <div className="flex w-full items-center gap-1">
+      {/* The whole label area is the drag handle — click anywhere to reorder. */}
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 cursor-grab touch-none items-center gap-1 select-none",
+          (sortedHere || filtered) && "text-foreground",
+        )}
+        aria-label={`Reorder ${column.label} column`}
+        {...dragHandleProps}
+      >
+        <span className="truncate">{column.label}</span>
+      </div>
+      {/* Click to cycle the sort direction without opening the menu. */}
+      {column.sortable && (
         <button
           type="button"
+          onClick={cycleSort}
           className={cn(
-            "-mx-1 flex w-full items-center gap-1 rounded px-1 py-0.5 text-left font-medium hover:bg-accent",
-            (sortedHere || filtered) && "text-foreground",
+            "shrink-0 rounded p-0.5 hover:bg-accent hover:text-foreground",
+            sortedHere ? "text-foreground" : "text-muted-foreground",
           )}
-          aria-label={`${column.label} column options`}
-          data-testid={`column-header-${column.key}`}
+          aria-label={`Sort by ${column.label}`}
+          data-testid={`column-sort-${column.key}`}
         >
-          <span className="truncate">{column.label}</span>
           {sortedHere ? (
             sort.dir === "asc" ? (
-              <ArrowUp className="size-3 shrink-0" />
+              <ArrowUp className="size-3.5" />
             ) : (
-              <ArrowDown className="size-3 shrink-0" />
+              <ArrowDown className="size-3.5" />
             )
           ) : (
-            <ChevronsUpDown className="size-3 shrink-0 opacity-40" />
-          )}
-          {filtered && (
-            <Filter className="size-3 shrink-0 fill-current text-cyan-600 dark:text-cyan-400" />
+            <ChevronsUpDown className="size-3.5 opacity-40" />
           )}
         </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-60 p-2">
-        {column.sortable && (
-          <div className="mb-1 flex flex-col gap-0.5">
-            <Choice
-              active={sortedHere && sort.dir === "asc"}
-              onClick={() => onSetSort({ key: column.key, dir: "asc" })}
-            >
-              <span className="flex items-center gap-2">
-                <ArrowUp className="size-3.5" /> Sort ascending
-              </span>
-            </Choice>
-            <Choice
-              active={sortedHere && sort.dir === "desc"}
-              onClick={() => onSetSort({ key: column.key, dir: "desc" })}
-            >
-              <span className="flex items-center gap-2">
-                <ArrowDown className="size-3.5" /> Sort descending
-              </span>
-            </Choice>
-            {sortedHere && (
-              <Choice active={false} onClick={() => onSetSort(null)}>
-                <span className="text-muted-foreground">Clear sort</span>
-              </Choice>
-            )}
-          </div>
-        )}
-
-        {column.sortable && column.filter !== "presence" && (
-          <div className="my-1 h-px bg-border" />
-        )}
-
-        <FilterControls
-          column={column}
-          filter={filter}
-          set={set}
-          assignableUsers={assignableUsers}
-          allTags={allTags}
-        />
-
-        {filtered && (
+      )}
+      {/* Right-aligned filter funnel — click to change or clear the filter. */}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
           <button
             type="button"
-            onClick={() => set(null)}
-            className="mt-1 w-full rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent"
+            className={cn(
+              "shrink-0 rounded p-0.5 hover:bg-accent hover:text-foreground",
+              filtered ? "text-foreground" : "text-muted-foreground",
+            )}
+            aria-label={`Filter ${column.label}`}
+            data-testid={`column-header-${column.key}`}
           >
-            Clear filter
+            <Filter className={cn("size-3.5", filtered && "fill-current")} />
           </button>
-        )}
-      </PopoverContent>
-    </Popover>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-60 p-2">
+          <FilterControls
+            column={column}
+            filter={filter}
+            set={set}
+            assignableUsers={assignableUsers}
+            allTags={allTags}
+          />
+          {filtered && (
+            <button
+              type="button"
+              onClick={() => set(null)}
+              className="mt-1 w-full rounded-md px-2 py-1 text-left text-sm text-muted-foreground hover:bg-accent"
+            >
+              Clear filter
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
+      {/* Edit the field definition (custom-field columns only). */}
+      {onEdit && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label={`Edit ${column.label}`}
+          data-testid={`column-edit-${column.key}`}
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -194,7 +287,29 @@ const FilterControls = ({
       );
     }
     case "due": {
-      const mode = filter?.kind === "due" ? filter.mode : "all";
+      const current = filter?.kind === "due" ? filter : undefined;
+      const mode = current?.mode ?? "all";
+      const after = current?.after ?? "";
+      const before = current?.before ?? "";
+      // Merge a change with the rest of the due filter; collapse to "no filter"
+      // when nothing meaningful is set.
+      const update = (patch: {
+        mode?: "all" | "has" | "none" | "overdue";
+        after?: string;
+        before?: string;
+      }) => {
+        const merged = { mode, after, before, ...patch };
+        const next = {
+          mode: merged.mode,
+          after: merged.after || undefined,
+          before: merged.before || undefined,
+        };
+        if (next.mode === "all" && !next.after && !next.before) {
+          set(null);
+          return;
+        }
+        set({ kind: "due", ...next });
+      };
       const opts: Array<{ value: "all" | "has" | "none" | "overdue"; label: string }> = [
         { value: "all", label: "Any" },
         { value: "has", label: "Has a due date" },
@@ -202,18 +317,30 @@ const FilterControls = ({
         { value: "overdue", label: "Overdue" },
       ];
       return (
-        <div className="flex flex-col gap-0.5">
-          {opts.map((o) => (
-            <Choice
-              key={o.value}
-              active={mode === o.value}
-              onClick={() =>
-                set(o.value === "all" ? null : { kind: "due", mode: o.value })
-              }
-            >
-              {o.label}
-            </Choice>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0.5">
+            {opts.map((o) => (
+              <Choice
+                key={o.value}
+                active={mode === o.value}
+                onClick={() => update({ mode: o.value })}
+              >
+                {o.label}
+              </Choice>
+            ))}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <DateBound
+              label="Due after"
+              value={after}
+              onChange={(v) => update({ after: v })}
+            />
+            <DateBound
+              label="Due before"
+              value={before}
+              onChange={(v) => update({ before: v })}
+            />
+          </div>
         </div>
       );
     }

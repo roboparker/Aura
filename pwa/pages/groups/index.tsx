@@ -11,14 +11,13 @@ import {
   Search,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { resolveGroupColor } from "@/lib/avatarPalette";
 import { formatRelative, isRecent } from "@/lib/relativeTime";
-import { displayName } from "@/lib/userDisplay";
 import { type Group, toGroupAvatarUser } from "@/lib/groupTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -30,6 +29,7 @@ import {
 import { Input } from "@/components/ui/input";
 import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
+import PageHeader from "@/components/common/PageHeader";
 import UserAvatar from "@/components/user/UserAvatar";
 
 // Updates within this window get a green "edited" dot; older ones read
@@ -49,14 +49,17 @@ const ONBOARDING_STEPS: { n: string; title: string; hint: string }[] = [
   },
   {
     n: "03",
-    title: "Attach to a space",
-    hint: "Everyone in the group joins at once",
+    title: "They get access",
+    hint: "Everyone in the group can see this space",
   },
 ];
 
 const Groups = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
+  const spaceIri = activeSpace?.["@id"] ?? null;
+  const spaceName = activeSpace?.name;
 
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -70,15 +73,20 @@ const Groups = () => {
   }, [authLoading, isAuthenticated, router]);
 
   const groupsQuery = useQuery({
-    queryKey: ["groups"],
-    enabled: isAuthenticated,
-    queryFn: () => apiGetCollection<Group>("/groups", { errorMessage: "Failed to load groups." }),
+    queryKey: ["groups", spaceIri],
+    enabled: isAuthenticated && !!spaceIri,
+    queryFn: () =>
+      apiGetCollection<Group>(
+        `/groups?space=${encodeURIComponent(spaceIri as string)}`,
+        { errorMessage: "Failed to load groups." },
+      ),
   });
-  // Stable reference so the filtered/owned useMemos below don't recompute
-  // every render (react-query returns a new array identity each call).
+  // Stable reference so the filtered useMemo below doesn't recompute every
+  // render (react-query returns a new array identity each call).
   const groups = useMemo(() => groupsQuery.data ?? [], [groupsQuery.data]);
   const isLoading = groupsQuery.isLoading;
-  const refreshGroups = () => queryClient.invalidateQueries({ queryKey: ["groups"] });
+  const refreshGroups = () =>
+    queryClient.invalidateQueries({ queryKey: ["groups", spaceIri] });
   const error =
     actionError ??
     (groupsQuery.isError
@@ -96,16 +104,6 @@ const Groups = () => {
         g.slug.toLowerCase().includes(q),
     );
   }, [groups, search]);
-
-  const { owned, memberOf } = useMemo(() => {
-    const owned: Group[] = [];
-    const memberOf: Group[] = [];
-    for (const g of filtered) {
-      if (user && g.owner.id === user.id) owned.push(g);
-      else memberOf.push(g);
-    }
-    return { owned, memberOf };
-  }, [filtered, user]);
 
   const handleLeave = async (group: Group) => {
     if (!window.confirm(`Leave "${group.title}"?`)) return;
@@ -135,33 +133,16 @@ const Groups = () => {
       </Head>
 
       <main className="px-6 py-8 max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-wrap items-end justify-between gap-4 pb-6 mb-6 border-b">
-          <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
-              <LayoutGrid className="h-6 w-6 text-emerald-600" aria-hidden />
-              Groups
-              {groups.length > 0 && (
-                <span className="text-base font-normal text-muted-foreground">
-                  {groups.length}
-                </span>
-              )}
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Reusable named sets of people you can drop into any space.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                type="search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search groups…"
-                className="pl-8"
-              />
-            </div>
+        <PageHeader
+          title="Groups"
+          icon={<LayoutGrid className="h-6 w-6 text-emerald-600" aria-hidden />}
+          count={groups.length > 0 ? groups.length : null}
+          subtitle={
+            spaceName
+              ? `Named sets of people in “${spaceName}”. Everyone in a group gets access to the space.`
+              : "Named sets of people in this space. Everyone in a group gets access to the space."
+          }
+          actions={
             <Button
               asChild
               size="sm"
@@ -172,8 +153,19 @@ const Groups = () => {
                 New group
               </Link>
             </Button>
+          }
+        >
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search groups…"
+              className="pl-8"
+            />
           </div>
-        </div>
+        </PageHeader>
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -190,29 +182,25 @@ const Groups = () => {
             No groups match “{search}”.
           </div>
         ) : (
-          <div className="space-y-10">
-            {owned.length > 0 && (
-              <GroupSection
-                label="Owned by you"
-                count={owned.length}
-                hint="You can add or remove members and rename or delete these."
-                groups={owned}
-                currentUserId={user.id}
-                onDelete={setDeleteTarget}
-                onLeave={handleLeave}
-              />
-            )}
-            {memberOf.length > 0 && (
-              <GroupSection
-                label="Member of"
-                count={memberOf.length}
-                hint="Groups other people own that include you."
-                groups={memberOf}
-                currentUserId={user.id}
-                onDelete={setDeleteTarget}
-                onLeave={handleLeave}
-              />
-            )}
+          <div className="overflow-hidden rounded-lg border" data-testid="group-list-wrap">
+            {/* Column header (hidden on small screens) */}
+            <div className="hidden sm:grid grid-cols-[1fr_140px_150px_40px] gap-3 border-b bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <span>Group</span>
+              <span>Members</span>
+              <span>Last updated</span>
+              <span className="sr-only">Actions</span>
+            </div>
+            <ul className="divide-y" data-testid="group-list">
+              {filtered.map((group) => (
+                <GroupRow
+                  key={group["@id"]}
+                  group={group}
+                  currentUserId={user.id}
+                  onDelete={setDeleteTarget}
+                  onLeave={handleLeave}
+                />
+              ))}
+            </ul>
           </div>
         )}
 
@@ -223,7 +211,6 @@ const Groups = () => {
               if (!o) setDeleteTarget(null);
             }}
             group={deleteTarget}
-            twoFactorEnabled={user.twoFactor?.enabled ?? false}
             onDeleted={() => {
               setDeleteTarget(null);
               void refreshGroups();
@@ -245,9 +232,10 @@ const EmptyState = () => (
       </div>
       <h2 className="text-lg font-semibold">No groups yet</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Groups are <span className="font-medium text-foreground">reusable
-        named sets of people</span> you can drop into any space — instead of
-        inviting the same five teammates by email each time.
+        Groups are <span className="font-medium text-foreground">named sets
+        of people</span> in this space — add a group and everyone in it gets
+        access to the space at once, instead of inviting the same teammates
+        one by one.
       </p>
       <div className="mt-6 flex items-center justify-center gap-2">
         <Button
@@ -281,53 +269,6 @@ const EmptyState = () => (
   </div>
 );
 
-const GroupSection = ({
-  label,
-  count,
-  hint,
-  groups,
-  currentUserId,
-  onDelete,
-  onLeave,
-}: {
-  label: string;
-  count: number;
-  hint: string;
-  groups: Group[];
-  currentUserId: string;
-  onDelete: (g: Group) => void;
-  onLeave: (g: Group) => void;
-}) => (
-  <section>
-    <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-      {label}
-      <span className="text-muted-foreground/70">{count}</span>
-    </div>
-    <p className="mb-3 text-xs text-muted-foreground">{hint}</p>
-    <div className="overflow-hidden rounded-lg border">
-      {/* Column header (hidden on small screens) */}
-      <div className="hidden sm:grid grid-cols-[1fr_140px_180px_150px_40px] gap-3 border-b bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        <span>Group</span>
-        <span>Members</span>
-        <span>Owner</span>
-        <span>Last updated</span>
-        <span className="sr-only">Actions</span>
-      </div>
-      <ul className="divide-y" data-testid="group-list">
-        {groups.map((group) => (
-          <GroupRow
-            key={group["@id"]}
-            group={group}
-            currentUserId={currentUserId}
-            onDelete={onDelete}
-            onLeave={onLeave}
-          />
-        ))}
-      </ul>
-    </div>
-  </section>
-);
-
 const GroupRow = ({
   group,
   currentUserId,
@@ -339,33 +280,25 @@ const GroupRow = ({
   onDelete: (g: Group) => void;
   onLeave: (g: Group) => void;
 }) => {
-  const isOwner = group.owner.id === currentUserId;
   const members = group.memberships;
-  const spaceCount = group.attachedSpaces.length;
+  const isMember = members.some((m) => m.user.id === currentUserId);
   const recent = isRecent(group.updatedAt, RECENT_MS);
 
   return (
     <li
-      className="grid grid-cols-1 sm:grid-cols-[1fr_140px_180px_150px_40px] items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
+      className="grid grid-cols-1 sm:grid-cols-[1fr_140px_150px_40px] items-center gap-3 px-4 py-3 hover:bg-accent/50 transition-colors"
       data-testid="group-item"
     >
       {/* Group */}
       <div className="flex items-center gap-3 min-w-0">
         <GroupTile color={resolveGroupColor(group)} size="sm" />
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Link
-              href={`/groups/${group.id}`}
-              className="font-semibold truncate hover:underline no-underline"
-            >
-              {group.title}
-            </Link>
-            {spaceCount > 0 && (
-              <Badge variant="outline" className="font-normal shrink-0">
-                {spaceCount} {spaceCount === 1 ? "space" : "spaces"}
-              </Badge>
-            )}
-          </div>
+          <Link
+            href={`/groups/${group.id}`}
+            className="font-semibold truncate hover:underline no-underline"
+          >
+            {group.title}
+          </Link>
           <div className="font-mono text-xs text-muted-foreground truncate">
             g-{group.slug}
           </div>
@@ -385,17 +318,6 @@ const GroupRow = ({
           ))}
         </div>
         <span className="text-sm text-muted-foreground">{members.length}</span>
-      </div>
-
-      {/* Owner */}
-      <div className="flex items-center gap-2 min-w-0">
-        <UserAvatar user={toGroupAvatarUser(group.owner)} size="sm" />
-        <span className="text-sm truncate">{displayName(group.owner)}</span>
-        {isOwner && (
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            you
-          </span>
-        )}
       </div>
 
       {/* Last updated */}
@@ -426,27 +348,18 @@ const GroupRow = ({
             <DropdownMenuItem asChild>
               <Link href={`/groups/${group.id}`}>Open group</Link>
             </DropdownMenuItem>
-            {isOwner ? (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => onDelete(group)}
-                >
-                  Delete group
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => onLeave(group)}
-                >
-                  Leave group
-                </DropdownMenuItem>
-              </>
+            {isMember && (
+              <DropdownMenuItem onSelect={() => onLeave(group)}>
+                Leave group
+              </DropdownMenuItem>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={() => onDelete(group)}
+            >
+              Delete group
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

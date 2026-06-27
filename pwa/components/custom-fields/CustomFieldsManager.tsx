@@ -13,10 +13,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CircleCheck, Copy, GripVertical, History, Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, GripVertical, History, Pencil, Plus, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -52,9 +51,13 @@ interface Collection<T> {
 }
 
 interface Props {
-  projectIri: string;
-  /** Project title — slugified for the header `slug · N fields` badge. */
+  /** Space that owns the fields (#custom-fields-space). Drives load + create. */
+  spaceIri: string;
+  /** Header `slug · N fields` badge label (space or project title). */
   projectTitle: string;
+  /** When mounted in a project's Settings tab, enables drag-reorder (via the
+   *  project route) + the FILLED stat. Omit on the space-level manager. */
+  projectIri?: string;
   /** Active space name, surfaced in the admin notice + reference scope note. */
   spaceName?: string;
   isSpaceAdmin: boolean;
@@ -70,14 +73,6 @@ const VISIBILITY_LABELS: Record<CustomFieldVisibility, string> = {
   board: "Board",
   both: "Both",
 };
-
-/** `Spring Collection Launch` → `spring-collection-launch` (header badge). */
-const slugify = (value: string): string =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -98,13 +93,13 @@ const sortByPosition = (
   );
 
 const CustomFieldsManager = ({
+  spaceIri,
   projectIri,
-  projectTitle,
   spaceName,
   isSpaceAdmin,
   onDefinitionsChanged,
 }: Props) => {
-  const projectId = projectIdFromIri(projectIri);
+  const projectId = projectIri ? projectIdFromIri(projectIri) : null;
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -122,7 +117,6 @@ const CustomFieldsManager = ({
   // clicking Edit. A fresh mount per open sidesteps the stale Presence.
   const [openSeq, setOpenSeq] = useState(0);
   const [changeLogOpen, setChangeLogOpen] = useState(false);
-  const [noticeDismissed, setNoticeDismissed] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -130,7 +124,7 @@ const CustomFieldsManager = ({
     setIsLoading(true);
     setLoadError(null);
     try {
-      const url = `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(projectIri)}`;
+      const url = `${ENTRYPOINT}/custom_field_definitions?space=${encodeURIComponent(spaceIri)}`;
       const res = await fetch(url, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
@@ -145,9 +139,10 @@ const CustomFieldsManager = ({
     } finally {
       setIsLoading(false);
     }
-  }, [projectIri]);
+  }, [spaceIri]);
 
   const loadStats = useCallback(async () => {
+    if (null === projectId) return;
     try {
       const res = await fetch(
         `${ENTRYPOINT}/projects/${projectId}/custom_field_stats`,
@@ -172,7 +167,6 @@ const CustomFieldsManager = ({
   const nextPosition =
     defs.length > 0 ? Math.max(...defs.map((d) => d.position)) + 1 : 0;
 
-  const slug = slugify(projectTitle) || "project";
 
   const openCreate = () => {
     setEditing(null);
@@ -232,7 +226,7 @@ const CustomFieldsManager = ({
             nullable: def.nullable,
             footer: def.footer,
             visibility: def.visibility,
-            project: projectIri,
+            space: spaceIri,
             position: nextPosition,
           }),
         });
@@ -245,11 +239,12 @@ const CustomFieldsManager = ({
         );
       }
     },
-    [projectIri, nextPosition],
+    [spaceIri, nextPosition],
   );
 
   const persistOrder = useCallback(
     async (ordered: CustomFieldDefinition[]) => {
+      if (null === projectId) return;
       try {
         const res = await fetch(
           `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/reorder`,
@@ -293,65 +288,18 @@ const CustomFieldsManager = ({
 
   return (
     <div className="space-y-6" data-testid="custom-fields-manager">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold">Custom fields</h1>
-            <Badge
-              variant="outline"
-              className="font-mono text-xs font-normal text-muted-foreground"
-            >
-              {slug} · {defs.length} {defs.length === 1 ? "field" : "fields"}
-            </Badge>
-          </div>
-          <p className="max-w-2xl text-sm text-muted-foreground">
-            Schema for every task in this project. Each field has a kind,
-            subtype, footer aggregation, and a required flag.
-            <br />
-            Only space admins can edit definitions.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isSpaceAdmin && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={openCreate}
-              data-testid="custom-field-add"
-            >
-              <Plus className="mr-1 h-3.5 w-3.5" /> Add field
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {!noticeDismissed && (
-        <div className="flex items-center gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm">
-          <CircleCheck className="h-4 w-4 shrink-0 text-emerald-400" />
-          <p className="flex-1 text-muted-foreground">
-            {isSpaceAdmin ? (
-              <>
-                You&apos;re editing as a{" "}
-                <span className="font-medium text-foreground">space admin</span>.
-                Members in {spaceName ?? "this space"}{" "}
-                can use these fields on tasks but can&apos;t change definitions.
-              </>
-            ) : (
-              <>
-                Only space admins can edit definitions. You can use these fields
-                on tasks in {spaceName ?? "this space"}.
-              </>
-            )}
-          </p>
-          <button
+      <div className="flex justify-end">
+        {isSpaceAdmin && (
+          <Button
             type="button"
-            onClick={() => setNoticeDismissed(true)}
-            className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground transition hover:text-foreground"
+            size="sm"
+            onClick={openCreate}
+            data-testid="custom-field-add"
           >
-            Dismiss
-          </button>
-        </div>
-      )}
+            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
+          </Button>
+        )}
+      </div>
 
       {loadError && (
         <Alert variant="destructive">
@@ -461,6 +409,7 @@ const CustomFieldsManager = ({
         key={openSeq}
         open={sheetOpen}
         onOpenChange={setSheetOpen}
+        spaceIri={spaceIri}
         projectIri={projectIri}
         spaceName={spaceName}
         initial={editing ?? undefined}

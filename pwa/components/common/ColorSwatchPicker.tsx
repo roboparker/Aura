@@ -39,7 +39,7 @@ const ColorSwatchPicker = ({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={cn("flex flex-wrap gap-2", className)}
+      className={cn("grid w-fit grid-cols-8 gap-2", className)}
     >
       {options.map((color) => {
         const isSelected = value === color;
@@ -54,9 +54,9 @@ const ColorSwatchPicker = ({
             disabled={disabled}
             onClick={() => onChange(color)}
             className={cn(
-              "h-8 w-8 rounded-full transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:cursor-not-allowed",
+              "h-8 w-8 rounded-md transition focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed",
               isSelected
-                ? "ring-2 ring-offset-2 ring-ring scale-110"
+                ? "ring-2 ring-ring scale-110"
                 : "hover:scale-105",
               isSaving && "animate-pulse",
             )}

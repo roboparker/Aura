@@ -87,8 +87,9 @@ final class CustomFieldDefinitionReorderController extends AbstractController
             $ids[$uuid] = true;
         }
 
+        // Field order is space-level now; reorder the project's space's fields.
         $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project]);
+            ->findBy(['space' => $project->getSpace()]);
         $byId = [];
         foreach ($definitions as $def) {
             $byId[(string) $def->getId()] = $def;
@@ -102,7 +103,7 @@ final class CustomFieldDefinitionReorderController extends AbstractController
         foreach (array_keys($ids) as $uuid) {
             if (!isset($byId[$uuid])) {
                 return new JsonResponse(
-                    ['error' => sprintf('CustomFieldDefinition /custom_field_definitions/%s is not part of this project.', $uuid)],
+                    ['error' => sprintf('CustomFieldDefinition /custom_field_definitions/%s is not part of this space.', $uuid)],
                     400,
                 );
             }
@@ -127,6 +128,7 @@ final class CustomFieldDefinitionReorderController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        return $project->isSpaceAdmin($user);
+        // Fields are editable by any space member for now (#custom-fields-space).
+        return $project->isAccessibleBy($user);
     }
 }

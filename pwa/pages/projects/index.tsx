@@ -12,6 +12,7 @@ import { contentSectionFor } from "@/lib/contentSections";
 import { cn } from "@/lib/utils";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
+import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -196,27 +197,22 @@ const Projects = () => {
       </Head>
       <div className="min-h-screen bg-muted px-4 py-12">
         <div className="max-w-2xl mx-auto">
-          <header className="flex items-start justify-between gap-3 mb-6">
-            <div className="flex items-center gap-2">
+          <PageHeader
+            title="Projects"
+            icon={
               <ProjectsIcon className={cn("h-6 w-6 shrink-0", projectsMeta.iconClass)} />
-              <h1 className="text-2xl font-bold">Projects</h1>
-              {!projectsQuery.isLoading && (
-                <span
-                  className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                  data-testid="projects-count"
-                >
-                  {projects.length}
-                </span>
-              )}
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setShowComposer((v) => !v)}
-              data-testid="new-project-button"
-            >
-              {showComposer ? "Cancel" : "New project"}
-            </Button>
-          </header>
+            }
+            count={projectsQuery.isLoading ? null : projects.length}
+            actions={
+              <Button
+                size="sm"
+                onClick={() => setShowComposer((v) => !v)}
+                data-testid="new-project-button"
+              >
+                {showComposer ? "Cancel" : "New project"}
+              </Button>
+            }
+          />
 
           {showComposer && (
             <Card className="mb-6">

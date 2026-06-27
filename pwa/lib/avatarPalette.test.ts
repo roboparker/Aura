@@ -44,11 +44,11 @@ describe("resolveSpaceColor", () => {
 });
 
 describe("resolveGroupColor", () => {
-  it("prefers an explicit color, then owner color, then fallback", () => {
+  it("prefers an explicit color, then the space color, then fallback", () => {
     expect(resolveGroupColor({ color: "#111111" })).toBe("#111111");
-    expect(resolveGroupColor({ owner: { personalizedColor: "#222222" } })).toBe("#222222");
+    expect(resolveGroupColor({ spaceSummary: { color: "#222222" } })).toBe("#222222");
     expect(resolveGroupColor({})).toBe(AVATAR_PALETTE[0]);
-    expect(resolveGroupColor({ color: null, owner: { personalizedColor: null } })).toBe(
+    expect(resolveGroupColor({ color: null, spaceSummary: { color: null } })).toBe(
       AVATAR_PALETTE[0],
     );
   });

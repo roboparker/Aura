@@ -23,15 +23,12 @@ export interface GroupMembership {
   joinedAt: string;
 }
 
-/** Flattened summary emitted by `UserGroup::getAttachedSpaces()`. */
-export interface GroupAttachedSpace {
+/** Lean summary emitted by `UserGroup::getSpaceSummary()` (the owning space). */
+export interface GroupSpaceSummary {
   id: string;
   name: string;
   color: string | null;
   isPersonal: boolean;
-  ownerColor: string | null;
-  role: string;
-  since: string;
 }
 
 export interface Group {
@@ -41,9 +38,8 @@ export interface Group {
   slug: string;
   description: string | null;
   color: string | null;
-  owner: GroupUser;
+  spaceSummary: GroupSpaceSummary | null;
   memberships: GroupMembership[];
-  attachedSpaces: GroupAttachedSpace[];
   createdOn: string;
   updatedAt: string;
 }

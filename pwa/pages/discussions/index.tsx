@@ -1,6 +1,6 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { MessagesSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
@@ -12,22 +12,12 @@ const AllDiscussionsPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
   const router = useRouter();
-  const [count, setCount] = useState<number | null>(null);
-  const activeSpaceIri = activeSpace?.["@id"];
-
-  // Stable so it doesn't retrigger the panel's load effect.
-  const onCountChange = useCallback((n: number) => setCount(n), []);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace(signinHrefForCurrent(router.asPath));
     }
   }, [authLoading, isAuthenticated, router]);
-
-  // Reset the chip when switching spaces so a stale count never flashes.
-  useEffect(() => {
-    setCount(null);
-  }, [activeSpaceIri]);
 
   if (authLoading || !user) {
     return (
@@ -43,32 +33,17 @@ const AllDiscussionsPage = () => {
         <title>Discussions - Madori</title>
       </Head>
       <main className="min-h-screen bg-muted">
-        <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-          <header className="space-y-1">
-            <div className="flex items-center gap-2">
-              <MessagesSquare className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
-              <h1 className="text-2xl font-bold">Discussions</h1>
-              {count !== null && (
-                <span
-                  className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                  data-testid="discussions-count"
-                >
-                  {count}
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Space-level threads — announcements, ideas, Q&amp;A, and anything
-              that doesn&apos;t belong inside a project.
-            </p>
-          </header>
-
+        <div className="max-w-5xl mx-auto px-4 py-8">
           {activeSpace ? (
             <DiscussionsPanel
               spaceIri={activeSpace["@id"]}
               currentUserIri={`/users/${user.id}`}
               isSpaceAdmin={isActiveSpaceAdmin}
-              onCountChange={onCountChange}
+              title="Discussions"
+              description="Space-level threads — announcements, ideas, Q&A, and anything that doesn’t belong inside a project."
+              icon={
+                <MessagesSquare className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
+              }
             />
           ) : (
             <Card>

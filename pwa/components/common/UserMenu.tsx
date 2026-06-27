@@ -59,7 +59,7 @@ const UserMenu = () => {
             "hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
           )}
         >
-          <UserAvatar user={user} size="sm" shape="square" />
+          <UserAvatar user={user} size="sm" />
           <ChevronDown
             className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
             aria-hidden
@@ -68,7 +68,7 @@ const UserMenu = () => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[220px]">
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <UserAvatar user={user} size="sm" shape="square" />
+          <UserAvatar user={user} size="sm" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{displayName(user)}</p>
             <p className="truncate text-xs text-muted-foreground">

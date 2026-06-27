@@ -28,13 +28,6 @@ export interface SpaceMembershipRow {
   role: "admin" | "member";
 }
 
-export interface SpaceGroupMembershipRow {
-  "@id": string;
-  id: string;
-  userGroup: { "@id": string; id: string; title?: string };
-  role: "admin" | "member";
-}
-
 export interface SpaceAttachment {
   "@id": string;
   id: string;
@@ -71,11 +64,12 @@ export interface Space {
     personalizedColor?: string;
   } | null;
   userMemberships: SpaceMembershipRow[];
-  groupMemberships: SpaceGroupMembershipRow[];
   /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
   projectsCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */
   pagesCount: number;
+  /** EXTRA_LAZY-counted on the API (`Space::getGroupsCount`). */
+  groupsCount: number;
   /** Shared files attached at the space level. Present on the detail
    *  endpoint; may be undefined on the list endpoint when the
    *  collection isn't expanded. */

@@ -1,6 +1,8 @@
+import { Tag as TagIcon } from "lucide-react";
 import PageHeader from "@/components/common/PageHeader";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const PageHeaderPage = () => (
   <ComponentDoc
@@ -51,6 +53,35 @@ const PageHeaderPage = () => (
               </>
             }
           />
+        ),
+      },
+      {
+        title: "Icon, count, action + search toolbar",
+        description:
+          "Pass `icon` for a leading glyph, `count` for the badge next to the title, `actions` for the top-right button, and `children` for a full-width toolbar (search / filters) below the title row.",
+        code: `<PageHeader
+  title="Tags"
+  icon={<TagIcon className="h-6 w-6 text-cyan-600" />}
+  count={12}
+  subtitle="Shared across everyone in the space."
+  actions={<Button size="sm">Add tag</Button>}
+>
+  <Input type="search" placeholder="Search tags…" className="w-full sm:max-w-md" />
+</PageHeader>`,
+        preview: (
+          <PageHeader
+            title="Tags"
+            icon={<TagIcon className="h-6 w-6 text-cyan-600" />}
+            count={12}
+            subtitle="Shared across everyone in the space."
+            actions={<Button size="sm">Add tag</Button>}
+          >
+            <Input
+              type="search"
+              placeholder="Search tags…"
+              className="w-full sm:max-w-md"
+            />
+          </PageHeader>
         ),
       },
     ]}

@@ -67,12 +67,21 @@ class ProjectMoveTest extends ApiTestCase
         $this->assertNotNull($reloaded);
         $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()?->getId());
 
-        // CFDs follow the project into the new space. Discussions
-        // live in the space directly and are unaffected by project
-        // moves.
-        $defs = $this->entityManager->getRepository(CustomFieldDefinition::class)->findBy(['project' => $reloaded]);
-        $this->assertCount(1, $defs);
-        $this->assertSame((string) $target->getId(), (string) $defs[0]->getSpace()?->getId());
+        // Custom fields are space-owned (#custom-fields-space): a project's
+        // field selections belong to the SOURCE space, so the move detaches
+        // them — the project starts fresh in the target and opts into the
+        // target's own fields afterwards. The field itself stays in the
+        // source space. Discussions live on the space directly and are
+        // unaffected by project moves.
+        /** @var list<CustomFieldDefinition> $attached */
+        $attached = $this->entityManager->createQuery(
+            'SELECT d FROM App\Entity\CustomFieldDefinition d JOIN d.projects p WHERE p = :project',
+        )->setParameter('project', $reloaded)->getResult();
+        $this->assertCount(0, $attached);
+
+        $sourceFields = $this->entityManager->getRepository(CustomFieldDefinition::class)
+            ->findBy(['space' => $source]);
+        $this->assertCount(1, $sourceFields);
     }
 
     public function testNonMemberOfSourceGets404(): void

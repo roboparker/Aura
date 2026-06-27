@@ -24,7 +24,8 @@ import type {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  /** Null on the space-level manager (no project route → no change log). */
+  projectId: string | null;
 }
 
 const ACTION_VERB: Record<string, string> = {
@@ -50,7 +51,7 @@ const CustomFieldChangeLog = ({ open, onOpenChange, projectId }: Props) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || null === projectId) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);

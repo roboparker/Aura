@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { trackEvent } from "@/lib/analytics";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
@@ -33,7 +34,9 @@ interface CreatedGroup {
  */
 const NewGroupPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
+  const spaceIri = activeSpace?.["@id"] ?? null;
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -76,6 +79,10 @@ const NewGroupPage = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!title.trim()) return;
+    if (!spaceIri) {
+      setError("Select a space first.");
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -88,6 +95,7 @@ const NewGroupPage = () => {
           title: title.trim(),
           description: description.trim() || null,
           color,
+          space: spaceIri,
         }),
       });
       if (!res.ok) {
@@ -163,7 +171,9 @@ const NewGroupPage = () => {
                   Create a group
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  A reusable set of people you can drop into any space.
+                  {activeSpace
+                    ? `A named set of people in “${activeSpace.name}”. Everyone in it gets access to the space.`
+                    : "A named set of people in this space. Everyone in it gets access to the space."}
                 </p>
               </div>
             </div>
@@ -222,7 +232,7 @@ const NewGroupPage = () => {
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  You&apos;re added as the owner automatically. Existing users
+                  You&apos;re added to the group automatically. Existing users
                   join immediately; others get an email invite to sign up.
                 </p>
               </div>
@@ -254,7 +264,7 @@ const NewGroupPage = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !title.trim()}
+                  disabled={isSubmitting || !title.trim() || !spaceIri}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
                   {isSubmitting ? "Creating…" : "Create group"}

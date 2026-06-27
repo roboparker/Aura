@@ -453,21 +453,32 @@ const SpaceSettings = () => {
           </Alert>
         )}
 
-        {/* Details */}
+        {/* Details & appearance */}
         <Card className="mb-6">
           <CardContent className="pt-6 space-y-5">
             <h2 className="font-semibold">Details</h2>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="space-name">
-                Name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="space-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                maxLength={120}
-              />
+            <div className="flex items-start gap-4">
+              <div className="flex shrink-0 flex-col items-center gap-1">
+                <SpaceTile
+                  name={name || space.name}
+                  color={color ?? resolveSpaceColor(space)}
+                  isPersonal={space.isPersonal}
+                  size="lg"
+                />
+                <span className="text-xs text-muted-foreground">Preview</span>
+              </div>
+              <div className="flex-1 space-y-1.5">
+                <Label htmlFor="space-name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="space-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={120}
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -484,42 +495,20 @@ const SpaceSettings = () => {
                 onChange={setDescription}
               />
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Appearance */}
-        <Card className="mb-6">
-          <CardContent className="pt-6 space-y-3">
-            <h2 className="font-semibold">Appearance</h2>
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-2">
-                <Label>
-                  Color{" "}
-                  <span className="text-muted-foreground font-normal">
-                    Used for the tile and accents
-                  </span>
-                </Label>
-                <ColorSwatchPicker
-                  value={color ?? resolveSpaceColor(space)}
-                  onChange={(c) => setColor(c)}
-                  ariaLabel="Space color"
-                  disabled={isSaving}
-                />
-              </div>
-              <div className="flex items-center gap-2 rounded-md border px-3 py-2 shrink-0">
-                <SpaceTile
-                  name={name || space.name}
-                  color={color ?? resolveSpaceColor(space)}
-                  isPersonal={space.isPersonal}
-                  size="md"
-                />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate max-w-[120px]">
-                    {name || space.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">preview</p>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label>
+                Color{" "}
+                <span className="text-muted-foreground font-normal">
+                  Used for the tile and accents
+                </span>
+              </Label>
+              <ColorSwatchPicker
+                value={color ?? resolveSpaceColor(space)}
+                onChange={(c) => setColor(c)}
+                ariaLabel="Space color"
+                disabled={isSaving}
+              />
             </div>
           </CardContent>
         </Card>

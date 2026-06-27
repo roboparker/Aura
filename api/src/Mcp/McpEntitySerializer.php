@@ -211,7 +211,7 @@ final class McpEntitySerializer
             'nullable' => $field->isNullable(),
             'position' => $field->getPosition(),
             'visibility' => $field->getVisibility(),
-            'projectId' => null === $field->getProject() ? null : (string) $field->getProject()->getId(),
+            'spaceId' => null === $field->getSpace() ? null : (string) $field->getSpace()->getId(),
         ];
     }
 

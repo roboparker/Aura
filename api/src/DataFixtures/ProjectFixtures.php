@@ -4,7 +4,6 @@ namespace App\DataFixtures;
 
 use App\Entity\Project;
 use App\Entity\Space;
-use App\Entity\SpaceGroupMembership;
 use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
@@ -17,10 +16,9 @@ use Doctrine\Persistence\ObjectManager;
 /**
  * Demo project + spaces / groups for fixture-driven dev and E2E. Uma
  * owns the "Launch team" space along with four team members (Noah,
- * Emma, Liam, Ava); admin (Ada) is *not* a member of the team space —
- * she lives on her own "Admin desk" space so /projects has content
- * whichever fixture user signs in. The team setup doubles as the
- * source the invite fixture attaches new signups to.
+ * Emma, Liam, Ava). Admin (Ada) is *not* a member of the team space —
+ * her data lives in {@see AdminDeskFixtures}. The team setup doubles as
+ * the source the invite fixture attaches new signups to.
  */
 class ProjectFixtures extends Fixture implements DependentFixtureInterface
 {
@@ -36,26 +34,6 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
     {
         /** @var User $uma */
         $uma = $this->getReference(UserFixtures::USER_REFERENCE, User::class);
-        /** @var User $ada */
-        $ada = $this->getReference(UserFixtures::ADMIN_REFERENCE, User::class);
-
-        // Tags are owned per-user; create them on Uma since she owns the
-        // tasks we'll attach them to.
-        $tagDefinitions = [
-            'urgent' => '#dc2626',
-            'design' => '#7c3aed',
-            'backend' => '#0d9488',
-            'docs' => '#f59e0b',
-        ];
-        $tags = [];
-        foreach ($tagDefinitions as $title => $color) {
-            $tag = new Tag();
-            $tag->setOwner($uma);
-            $tag->setTitle($title);
-            $tag->setColor($color);
-            $manager->persist($tag);
-            $tags[$title] = $tag;
-        }
 
         // Pull the team members in. Uma owns the space; Noah/Emma/Liam/Ava
         // are regular members. Admin (Ada) is intentionally excluded —
@@ -78,6 +56,25 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $manager->flush();
         $this->addReference(self::LAUNCH_SPACE_REFERENCE, $sharedSpace);
 
+        // Tags are scoped to a space (#tags): create them in the launch space
+        // whose tasks attach them. Owner = Uma (the space admin).
+        $tagDefinitions = [
+            'urgent' => '#dc2626',
+            'design' => '#7c3aed',
+            'backend' => '#0d9488',
+            'docs' => '#f59e0b',
+        ];
+        $tags = [];
+        foreach ($tagDefinitions as $title => $color) {
+            $tag = new Tag();
+            $tag->setOwner($uma);
+            $tag->setSpace($sharedSpace);
+            $tag->setTitle($title);
+            $tag->setColor($color);
+            $manager->persist($tag);
+            $tags[$title] = $tag;
+        }
+
         $manager->persist((new SpaceMembership())
             ->setSpace($sharedSpace)
             ->setUser($uma)
@@ -89,34 +86,12 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
                 ->setRole(Space::ROLE_MEMBER));
         }
 
-        // Standalone admin space so an admin sign-in still has /projects
-        // content, without putting admin in the team space.
-        $adminSpace = (new Space())
-            ->setName('Admin desk')
-            ->setDescription(
-                'Housekeeping, account chores, and one-off admin tasks — the '
-                . 'workspace that keeps the lights on.',
-            )
-            ->setCreatedBy($ada);
-        $manager->persist($adminSpace);
-        $manager->flush();
-        $manager->persist((new SpaceMembership())
-            ->setSpace($adminSpace)
-            ->setUser($ada)
-            ->setRole(Space::ROLE_ADMIN));
-
-        $adminProject = new Project();
-        $adminProject->setOwner($ada);
-        $adminProject->setSpace($adminSpace);
-        $adminProject->setTitle('Admin checklist');
-        $adminProject->setDescription("Admin housekeeping tasks live here so /projects isn't empty after a fresh fixtures load.");
-        $manager->persist($adminProject);
-
-        // Engineering group: Uma owns, the four team members + Uma are
-        // in it. Doubles as a target for the invite fixture's GroupInvite
-        // attachment so the signup page renders the "GROUP · N ppl" row.
+        // Engineering group: owned by the shared space (#groups-space), with
+        // the four team members + Uma in it — so every group member has access
+        // to the shared space. Doubles as a target for the invite fixture's
+        // GroupInvite so the signup page renders the "GROUP · N ppl" row.
         $engineering = new UserGroup();
-        $engineering->setOwner($uma);
+        $engineering->setSpace($sharedSpace);
         $engineering->setTitle('Engineering');
         $engineering->setSlug('eng');
         $engineering->setColor('#0369a1');
@@ -127,19 +102,11 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $manager->persist($engineering);
         $this->addReference(self::ENGINEERING_GROUP_REFERENCE, $engineering);
 
-        // Attach the engineering group to the shared space so the group
-        // detail's "Attached to" card and the index "N spaces" badge have
-        // something to show.
-        $manager->persist((new SpaceGroupMembership())
-            ->setSpace($sharedSpace)
-            ->setUserGroup($engineering));
-
-        // A second group owned by a teammate that still includes Uma — so a
-        // Uma sign-in sees both the "Owned by you" and "Member of" sections
-        // on /groups.
+        // A second group in the same shared space so /groups lists more than
+        // one row.
         $noah = $teamUsers['user-noah'];
         $designCrew = new UserGroup();
-        $designCrew->setOwner($noah);
+        $designCrew->setSpace($sharedSpace);
         $designCrew->setTitle('Design crew');
         $designCrew->setSlug('design');
         $designCrew->setColor('#7e22ce');

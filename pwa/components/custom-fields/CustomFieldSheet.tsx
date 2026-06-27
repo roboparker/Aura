@@ -60,10 +60,17 @@ import type {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectIri: string;
+  /** Space that owns the field (#custom-fields-space) — set on create. */
+  spaceIri: string;
+  /** Optional project context, used to scope reference-field option lists. */
+  projectIri?: string;
   spaceName?: string;
   /** Present when editing an existing field. */
   initial?: CustomFieldDefinition;
+  /** Preset the (kind, subtype) for a new field (e.g. opened from the list
+   *  view's "add column" type picker). Ignored when editing. */
+  initialKind?: CustomFieldKind;
+  initialSubtype?: CustomFieldSubtype;
   /** Position to assign a newly created field. */
   initialPosition?: number;
   /** Tasks-with-a-value count, shown in the edit header. */
@@ -137,9 +144,12 @@ const sampleValueFor = (
 const CustomFieldSheet = ({
   open,
   onOpenChange,
+  spaceIri,
   projectIri,
   spaceName,
   initial,
+  initialKind,
+  initialSubtype,
   initialPosition = 0,
   valueCount,
   onSaved,
@@ -208,15 +218,17 @@ const CustomFieldSheet = ({
       setFooter(initial.footer);
       setVisibility(initial.visibility ?? "both");
     } else {
+      const k = initialKind ?? "text";
+      const s = initialSubtype ?? fallbackSubtypeFor(k);
       setName("");
-      setKind("text");
-      setSubtype(fallbackSubtypeFor("text"));
-      setConfig(defaultConfigFor("text", "text"));
+      setKind(k);
+      setSubtype(s);
+      setConfig(defaultConfigFor(k, s));
       setNullable(true);
       setFooter(null);
       setVisibility("both");
     }
-  }, [open, initial]);
+  }, [open, initial, initialKind, initialSubtype]);
 
   // Pull per-option usage counts for select fields being edited.
   useEffect(() => {
@@ -316,7 +328,7 @@ const CustomFieldSheet = ({
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/ld+json" },
-      body: JSON.stringify({ ...body, project: projectIri, position: initialPosition }),
+      body: JSON.stringify({ ...body, space: spaceIri, position: initialPosition }),
     });
   };
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Plus, ShieldCheck } from "lucide-react";
+import { ChevronDown, Plus, Settings, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection } from "@/lib/apiClient";
@@ -317,6 +317,100 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
 };
 
 /**
+ * Workspace settings as a collapsible nav section, mirroring {@see AdminSection}
+ * but visible to every member. Sits under the content sections (below
+ * Discussions). Currently just the space-scoped tag manager.
+ */
+const SettingsSection = ({
+  wrap,
+}: {
+  wrap: (children: ReactNode) => ReactNode;
+}) => {
+  const router = useRouter();
+  const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
+
+  const storageKey = "madori.navCollapsed.settings";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  const links = [
+    // "General" edits the active space's metadata; the target page is
+    // admin-gated, so only surface it to space admins.
+    ...(activeSpace && isActiveSpaceAdmin
+      ? [
+          {
+            href: `/spaces/${activeSpace.id}/settings`,
+            label: "General",
+            match: "/spaces/[id]/settings",
+          },
+        ]
+      : []),
+    { href: "/tags", label: "Tags", match: "/tags" },
+    { href: "/custom-fields", label: "Custom fields", match: "/custom-fields" },
+    { href: "/groups", label: "Groups", match: "/groups" },
+  ];
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Settings`}
+        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        <Settings className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="truncate">Settings</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        links.map((link) => {
+          const active = router.pathname.startsWith(link.match);
+          return (
+            <span key={link.href}>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full min-w-0 justify-start font-normal",
+                    active && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href={link.href}>
+                    <span className="truncate pl-5">{link.label}</span>
+                  </Link>
+                </Button>,
+              )}
+            </span>
+          );
+        })}
+    </div>
+  );
+};
+
+/**
  * Shared navigation contents used by both the persistent left-side
  * `<Sidebar>` (`md:` and up) and the mobile-only Sheet variant in the
  * navbar. Single source of truth so the space switcher, content
@@ -351,6 +445,8 @@ const SidebarNav = ({
               wrap={wrap}
             />
           ))}
+
+        <SettingsSection wrap={wrap} />
 
         {isAdmin && <AdminSection wrap={wrap} />}
       </nav>

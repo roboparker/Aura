@@ -2,7 +2,7 @@
 
 namespace App\Repository;
 
-use App\Entity\SpaceGroupMembership;
+use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
@@ -82,8 +82,8 @@ final class TaskRepository extends ServiceEntityRepository
             SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s reorder_group JOIN reorder_group.userGroup reorder_group_obj JOIN reorder_group_obj.memberships reorder_group_member WHERE reorder_group.space = p.space AND reorder_group_member.user = :user',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s reorder_group_obj JOIN reorder_group_obj.memberships reorder_group_member WHERE reorder_group_obj.space = p.space AND reorder_group_member.user = :user',
+            UserGroup::class,
         );
         return $this->createQueryBuilder('t')
             ->leftJoin('t.project', 'p')

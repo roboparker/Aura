@@ -177,8 +177,13 @@ final class SpaceExportBuilder
      */
     private function projectData(Project $project): array
     {
-        $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project], ['position' => 'ASC']);
+        // Fields are space-owned; export the ones this project has opted into.
+        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        usort(
+            $definitions,
+            static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
+                => $a->getPosition() <=> $b->getPosition(),
+        );
 
         return [
             'id' => (string) $project->getId(),

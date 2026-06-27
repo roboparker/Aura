@@ -2,7 +2,6 @@
 
 namespace App\Controller;
 
-use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\User;
@@ -16,8 +15,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Moves a project — and its denormalised child rows (discussions,
- * custom field definitions) — into a different space (#182).
+ * Moves a project into a different space (#182).
  *
  * Auth bar: caller must be a member of the project's CURRENT space
  * (so they can already write to it) AND of the TARGET space (so
@@ -26,9 +24,10 @@ use Symfony\Component\Uid\Uuid;
  *
  * Tasks don't carry a denormalised `space` FK — their access is
  * derived through `task.project.space`, so updating the project is
- * enough. Discussions and CustomFieldDefinitions cache the space on
- * insert via PrePersist, so we re-stamp them explicitly here. Page
- * is space-owned (not project-owned) and isn't touched by this move.
+ * enough. Custom fields are space-owned now (#custom-fields-space) and
+ * shared across a space's projects, so the project just picks up the
+ * target space's fields. Discussions and pages are space-owned too and
+ * aren't touched by this move.
  *
  * Audit history is preserved automatically: Project is `Loggable`,
  * so the `space` change lands as a regular update entry.
@@ -94,18 +93,11 @@ class ProjectMoveController extends AbstractController
 
         $project->setSpace($target);
 
-        // Re-stamp child entities that cache the parent space on insert
-        // (`CustomFieldDefinition::syncSpaceFromProject`). Without this
-        // their cached space drifts out of sync with the project's,
-        // breaking access extensions and search filters. Discussions
-        // live on the space directly (no project link) and stay in
-        // their source space — they aren't carried by the move.
-        foreach (
-            $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project]) as $definition
-        ) {
-            $definition->setSpace($target);
-        }
+        // Custom fields are space-owned now (#custom-fields-space) and
+        // per-project shown: the project's selected fields belong to the SOURCE
+        // space, so detach them on move — the target space's own fields can be
+        // opted into afterwards. Discussions/pages are space-owned, not moved.
+        $project->getCustomFieldDefinitions()->clear();
 
         $this->em->flush();
 
