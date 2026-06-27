@@ -44,6 +44,11 @@ import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
+// Billing (Stripe) is off until a real payment system is wired up. Flip
+// NEXT_PUBLIC_BILLING_ENABLED=true (and configure the Stripe env) to surface
+// the plan/upgrade card again. Off = the card isn't mounted or fetched.
+const BILLING_ENABLED = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true";
+
 type Role = "admin" | "member";
 
 interface PendingInvite {
@@ -110,7 +115,6 @@ const SpaceSettings = () => {
 
   const [space, setSpace] = useState<Space | null>(null);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,7 +152,6 @@ const SpaceSettings = () => {
   const load = useCallback(async () => {
     if (!spaceId) return;
     setError(null);
-    setIsLoading(true);
     try {
       const res = await fetch(
         `${ENTRYPOINT}/spaces/${encodeURIComponent(spaceId)}`,
@@ -192,8 +195,6 @@ const SpaceSettings = () => {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load space.");
-    } finally {
-      setIsLoading(false);
     }
   }, [spaceId, user]);
 
@@ -203,11 +204,14 @@ const SpaceSettings = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  // Load once per auth/space change — NOT on `load` identity, so an unstable
+  // callback ref can't re-fetch (and blank the page) on every render.
   useEffect(() => {
     if (isAuthenticated && spaceId) {
       void load();
     }
-  }, [isAuthenticated, spaceId, load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, spaceId]);
 
   const isAdmin =
     !!space &&
@@ -424,7 +428,7 @@ const SpaceSettings = () => {
     );
   }
 
-  if (isLoading || !space) {
+  if (!space) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
         <p className="text-muted-foreground">Loading…</p>
@@ -671,8 +675,11 @@ const SpaceSettings = () => {
           </>
         )}
 
-        {/* Plan & billing — personal spaces are never billable. */}
-        {!space.isPersonal && <SpaceBillingCard spaceId={space.id} />}
+        {/* Plan & billing — personal spaces are never billable, and the whole
+            surface is gated off until Stripe is wired up (BILLING_ENABLED). */}
+        {BILLING_ENABLED && !space.isPersonal && (
+          <SpaceBillingCard spaceId={space.id} />
+        )}
 
         {/* Export space data */}
         <Card className="mb-6">
