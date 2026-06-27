@@ -2,17 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import {
-  ArrowRightLeft,
-  Lock,
-  Mail,
-  Pencil,
-  Pin,
-  Plus,
-  Trash2,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { Mail, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
@@ -29,7 +19,6 @@ import { cn } from "@/lib/utils";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
-import TransferOwnershipDialog from "@/components/groups/TransferOwnershipDialog";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar from "@/components/user/UserAvatar";
 
@@ -74,7 +62,6 @@ const GroupDetail = () => {
   const [memberInfo, setMemberInfo] = useState<string | null>(null);
 
   const [pendingInvites, setPendingInvites] = useState<GroupPendingInvite[]>([]);
-  const [transferOpen, setTransferOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -85,8 +72,6 @@ const GroupDetail = () => {
 
   const loadPendingInvites = useCallback(async () => {
     if (!groupId) return;
-    // Owner-only endpoint; non-owners get a non-2xx and just see no
-    // pending-invites section.
     try {
       const res = await fetch(
         `${ENTRYPOINT}/groups/${encodeURIComponent(groupId)}/invites`,
@@ -142,7 +127,10 @@ const GroupDetail = () => {
     }
   }, [router.query.inviteError]);
 
-  const isOwner = !!group && !!user && group.owner.id === user.id;
+  // Any member of the group's space can manage it (#groups-space); the
+  // viewer reached this page through the space-scoped access extension, so
+  // they may edit/delete/manage. "Leave" only applies if they're in the roster.
+  const isMember = !!group && !!user && group.memberships.some((m) => m.user.id === user.id);
 
   const handleSaveEdit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -308,7 +296,7 @@ const GroupDetail = () => {
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Group not found</h1>
             <p className="text-muted-foreground mb-4">
-              It may have been deleted, or you may not be a member.
+              It may have been deleted, or you may not belong to its space.
             </p>
             <Link href="/groups" className="text-primary font-medium">
               Back to groups
@@ -325,13 +313,6 @@ const GroupDetail = () => {
         <title>{group ? `${group.title} - Madori` : "Group - Madori"}</title>
       </Head>
       <main className="px-6 py-8 max-w-6xl mx-auto">
-        <Link
-          href="/groups"
-          className="inline-block text-sm text-primary hover:underline mb-4 no-underline"
-        >
-          ← All groups
-        </Link>
-
         {isLoading || !group ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : (
@@ -340,68 +321,58 @@ const GroupDetail = () => {
             <div className="flex flex-wrap items-start gap-4 mb-8">
               <GroupTile color={resolveGroupColor(group)} size="lg" />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl font-bold truncate">{group.title}</h1>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "font-normal",
-                      isOwner
-                        ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
-                        : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
-                    )}
-                  >
-                    {isOwner ? "owner" : "member"}
-                  </Badge>
-                </div>
+                <h1 className="text-2xl font-bold truncate">{group.title}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {group.memberships.length}{" "}
                   {group.memberships.length === 1 ? "member" : "members"}
-                  {" · "}
-                  attached to {group.attachedSpaces.length}{" "}
-                  {group.attachedSpaces.length === 1 ? "space" : "spaces"}
-                  {" · owned by "}
-                  {group.owner.givenName?.trim() || displayName(group.owner)}
+                  {group.spaceSummary && (
+                    <>
+                      {" · in "}
+                      <Link
+                        href={`/spaces/${group.spaceSummary.id}`}
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        {group.spaceSummary.name}
+                      </Link>
+                    </>
+                  )}
                   {" · "}
                   <span className="font-mono">g-{group.slug}</span>
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {isOwner ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5"
-                      onClick={() => setIsEditing((v) => !v)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden />
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-destructive hover:text-destructive"
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                      Delete
-                    </Button>
-                  </>
-                ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setIsEditing((v) => !v)}
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Edit
+                </Button>
+                {isMember && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 text-destructive hover:text-destructive"
+                    className="gap-1.5"
                     onClick={handleLeave}
                   >
                     <X className="h-3.5 w-3.5" aria-hidden />
-                    Leave group
+                    Leave
                   </Button>
                 )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-destructive hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                  Delete
+                </Button>
               </div>
             </div>
 
@@ -414,7 +385,7 @@ const GroupDetail = () => {
             <div className="grid gap-6 lg:grid-cols-3">
               {/* Main column */}
               <div className="lg:col-span-2 space-y-6">
-                {isEditing && isOwner && (
+                {isEditing && (
                   <Card>
                     <CardContent className="pt-6">
                       <form onSubmit={handleSaveEdit} className="space-y-4">
@@ -480,25 +451,22 @@ const GroupDetail = () => {
                       </h2>
                     </div>
                     <p className="text-xs text-muted-foreground mb-4">
-                      Everyone in this group is added to every space the group
-                      is attached to.
+                      Everyone in this group has access to its space.
                     </p>
 
                     <div className="overflow-hidden rounded-md border">
-                      <div className="hidden sm:grid grid-cols-[1fr_120px_120px_40px] gap-3 border-b bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <div className="hidden sm:grid grid-cols-[1fr_120px_40px] gap-3 border-b bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         <span>Member</span>
-                        <span>Role</span>
                         <span>Joined</span>
                         <span className="sr-only">Actions</span>
                       </div>
                       <ul className="divide-y" data-testid="member-list">
                         {group.memberships.map((m) => {
-                          const memberIsOwner = m.user.id === group.owner.id;
                           const isSelf = m.user.id === user.id;
                           return (
                             <li
                               key={m["@id"]}
-                              className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px_40px] items-center gap-3 px-3 py-2.5"
+                              className="grid grid-cols-1 sm:grid-cols-[1fr_120px_40px] items-center gap-3 px-3 py-2.5"
                               data-testid="member-row"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
@@ -522,38 +490,20 @@ const GroupDetail = () => {
                                   </span>
                                 </div>
                               </div>
-                              <div>
-                                <Badge
-                                  variant="outline"
-                                  className={cn(
-                                    "font-normal gap-1",
-                                    memberIsOwner
-                                      ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
-                                      : "border-emerald-500/40 text-emerald-600 dark:text-emerald-400",
-                                  )}
-                                >
-                                  {memberIsOwner && (
-                                    <Pin className="h-3 w-3" aria-hidden />
-                                  )}
-                                  {memberIsOwner ? "owner" : "member"}
-                                </Badge>
-                              </div>
                               <div className="text-xs text-muted-foreground">
                                 {formatDate(m.joinedAt)}
                               </div>
                               <div className="flex justify-end">
-                                {isOwner && !memberIsOwner && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                    aria-label={`Remove ${displayName(m.user)}`}
-                                    onClick={() => handleRemoveMember(m)}
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                  aria-label={`Remove ${displayName(m.user)}`}
+                                  onClick={() => handleRemoveMember(m)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
                             </li>
                           );
@@ -561,35 +511,33 @@ const GroupDetail = () => {
                       </ul>
                     </div>
 
-                    {isOwner && (
-                      <form
-                        onSubmit={handleAddMember}
-                        className="mt-3 flex items-center gap-2"
-                        data-testid="add-member-form"
+                    <form
+                      onSubmit={handleAddMember}
+                      className="mt-3 flex items-center gap-2"
+                      data-testid="add-member-form"
+                    >
+                      <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                        <UserPlus className="h-4 w-4" aria-hidden />
+                      </span>
+                      <Input
+                        type="email"
+                        value={newMemberEmail}
+                        onChange={(e) => setNewMemberEmail(e.target.value)}
+                        placeholder="member@example.com"
+                        aria-label="New member email"
+                        required
+                        className="flex-1"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                        disabled={isAddingMember || !newMemberEmail.trim()}
                       >
-                        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                          <UserPlus className="h-4 w-4" aria-hidden />
-                        </span>
-                        <Input
-                          type="email"
-                          value={newMemberEmail}
-                          onChange={(e) => setNewMemberEmail(e.target.value)}
-                          placeholder="member@example.com"
-                          aria-label="New member email"
-                          required
-                          className="flex-1"
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-                          disabled={isAddingMember || !newMemberEmail.trim()}
-                        >
-                          <Plus className="h-3.5 w-3.5" aria-hidden />
-                          {isAddingMember ? "Adding…" : "Add member"}
-                        </Button>
-                      </form>
-                    )}
+                        <Plus className="h-3.5 w-3.5" aria-hidden />
+                        {isAddingMember ? "Adding…" : "Add member"}
+                      </Button>
+                    </form>
 
                     {memberError && (
                       <p role="alert" className="mt-2 text-sm text-destructive">
@@ -604,8 +552,8 @@ const GroupDetail = () => {
                   </CardContent>
                 </Card>
 
-                {/* Pending invitations (owner) */}
-                {isOwner && pendingInvites.length > 0 && (
+                {/* Pending invitations */}
+                {pendingInvites.length > 0 && (
                   <Card data-testid="pending-invites-section">
                     <CardContent className="pt-6">
                       <h2 className="font-semibold mb-1">
@@ -659,65 +607,37 @@ const GroupDetail = () => {
                   </Card>
                 )}
 
-                {/* Danger zone (owner) */}
-                {isOwner && (
-                  <Card className="border-destructive/30">
-                    <CardContent className="pt-6">
-                      <h2 className="font-semibold mb-1">Danger zone</h2>
-                      <p className="text-xs text-muted-foreground mb-4">
-                        Destructive actions on this group. Members and attached
-                        spaces are affected.
-                      </p>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium flex items-center gap-1.5">
-                              <ArrowRightLeft
-                                className="h-3.5 w-3.5 text-amber-600"
-                                aria-hidden
-                              />
-                              Transfer ownership
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Hand this group off to another member. You stay on
-                              as a regular member.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setTransferOpen(true)}
-                          >
-                            Transfer…
-                          </Button>
-                        </div>
-                        <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-3 py-3">
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium flex items-center gap-1.5 text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                              Delete group
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Removes the group everywhere. Members lose access to
-                              every space it&apos;s attached to.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="gap-1.5"
-                            onClick={() => setDeleteOpen(true)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                            Delete group
-                          </Button>
-                        </div>
+                {/* Danger zone */}
+                <Card className="border-destructive/30">
+                  <CardContent className="pt-6">
+                    <h2 className="font-semibold mb-1">Danger zone</h2>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      Deleting the group removes it for everyone — its members
+                      lose the access this group grants to the space.
+                    </p>
+                    <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 px-3 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium flex items-center gap-1.5 text-destructive">
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                          Delete group
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          This can&apos;t be undone.
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="gap-1.5"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                        Delete group
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Rail */}
@@ -728,7 +648,7 @@ const GroupDetail = () => {
                       <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         About
                       </h2>
-                      {isOwner && !isEditing && (
+                      {!isEditing && (
                         <button
                           type="button"
                           onClick={() => setIsEditing(true)}
@@ -748,48 +668,29 @@ const GroupDetail = () => {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardContent className="pt-6">
-                    <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Attached to{" "}
-                      <span className="text-muted-foreground/70">
-                        {group.attachedSpaces.length}
-                      </span>
-                    </h2>
-                    {group.attachedSpaces.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        Not attached to any space yet. Attach this group from a
-                        space&apos;s member settings.
-                      </p>
-                    ) : (
-                      <ul className="space-y-2.5">
-                        {group.attachedSpaces.map((s) => (
-                          <li key={s.id}>
-                            <Link
-                              href={`/spaces/${s.id}`}
-                              className="flex items-center gap-2.5 no-underline group"
-                            >
-                              <SpaceTile
-                                name={s.name}
-                                color={s.color ?? s.ownerColor ?? "#334155"}
-                                isPersonal={s.isPersonal}
-                                size="sm"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium truncate group-hover:underline">
-                                  {s.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  as {s.role} · since {formatDate(s.since)}
-                                </p>
-                              </div>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
+                {group.spaceSummary && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Belongs to
+                      </h2>
+                      <Link
+                        href={`/spaces/${group.spaceSummary.id}`}
+                        className="flex items-center gap-2.5 no-underline group"
+                      >
+                        <SpaceTile
+                          name={group.spaceSummary.name}
+                          color={group.spaceSummary.color ?? "#334155"}
+                          isPersonal={group.spaceSummary.isPersonal}
+                          size="sm"
+                        />
+                        <p className="text-sm font-medium truncate group-hover:underline">
+                          {group.spaceSummary.name}
+                        </p>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <Card>
                   <CardContent className="pt-6">
@@ -799,10 +700,9 @@ const GroupDetail = () => {
                     <dl className="space-y-2 text-sm">
                       <GlanceRow label="id" value={`g-${group.slug}`} mono />
                       <GlanceRow label="members" value={`${group.memberships.length}`} />
-                      <GlanceRow
-                        label="owner"
-                        value={group.owner.givenName?.trim() || displayName(group.owner)}
-                      />
+                      {group.spaceSummary && (
+                        <GlanceRow label="space" value={group.spaceSummary.name} />
+                      )}
                       <GlanceRow label="created" value={formatDate(group.createdOn)} />
                       <GlanceRow
                         label="updated"
@@ -811,47 +711,13 @@ const GroupDetail = () => {
                     </dl>
                   </CardContent>
                 </Card>
-
-                {!isOwner && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Your access
-                      </h2>
-                      <p className="text-sm text-muted-foreground">
-                        You&apos;re a{" "}
-                        <span className="font-medium text-foreground">member</span>{" "}
-                        of this group. Only the owner can rename it, change
-                        membership, or delete it.
-                      </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-                        <span className="text-xs text-muted-foreground">Owner</span>
-                        <UserAvatar user={toGroupAvatarUser(group.owner)} size="sm" />
-                        <span className="text-xs">{group.owner.email}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
               </div>
             </div>
-
-            <TransferOwnershipDialog
-              open={transferOpen}
-              onOpenChange={setTransferOpen}
-              group={group}
-              twoFactorEnabled={user.twoFactor?.enabled ?? false}
-              onTransferred={() => {
-                setTransferOpen(false);
-                void load();
-              }}
-            />
 
             <DeleteGroupDialog
               open={deleteOpen}
               onOpenChange={setDeleteOpen}
               group={group}
-              twoFactorEnabled={user.twoFactor?.enabled ?? false}
               onDeleted={() => {
                 setDeleteOpen(false);
                 void router.push("/groups");

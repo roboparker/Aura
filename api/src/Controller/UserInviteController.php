@@ -158,12 +158,8 @@ class UserInviteController extends AbstractController
             return $this->json(['error' => 'Group not found.'], 404);
         }
 
-        if (!$this->isOwnerOrAdmin($group, $user)) {
-            // Hide existence from non-members; non-owner members get 403.
-            if (!$group->hasMember($user)) {
-                return $this->json(['error' => 'Group not found.'], 404);
-            }
-            return $this->json(['error' => 'Only the group owner can view invites.'], 403);
+        if (!$this->canManage($group, $user)) {
+            return $this->json(['error' => 'Group not found.'], 404);
         }
 
         $payload = array_map(fn ($gi) => [
@@ -196,11 +192,8 @@ class UserInviteController extends AbstractController
             return $this->json(['error' => 'Group not found.'], 404);
         }
 
-        if (!$this->isOwnerOrAdmin($group, $user)) {
-            if (!$group->hasMember($user)) {
-                return $this->json(['error' => 'Group not found.'], 404);
-            }
-            return $this->json(['error' => 'Only the group owner can revoke invites.'], 403);
+        if (!$this->canManage($group, $user)) {
+            return $this->json(['error' => 'Group not found.'], 404);
         }
 
         $groupInvite = $this->groupInviteRepository->find($groupInviteId);
@@ -249,11 +242,8 @@ class UserInviteController extends AbstractController
             return $this->json(['error' => 'Group not found.'], 404);
         }
 
-        if (!$this->isOwnerOrAdmin($group, $user)) {
-            if (!$group->hasMember($user)) {
-                return $this->json(['error' => 'Group not found.'], 404);
-            }
-            return $this->json(['error' => 'Only the group owner can resend invites.'], 403);
+        if (!$this->canManage($group, $user)) {
+            return $this->json(['error' => 'Group not found.'], 404);
         }
 
         $groupInvite = $this->groupInviteRepository->find($groupInviteId);
@@ -276,11 +266,15 @@ class UserInviteController extends AbstractController
         ], 200);
     }
 
-    private function isOwnerOrAdmin(UserGroup $group, User $user): bool
+    /**
+     * Any member of the group's space (or an instance admin) may manage its
+     * invites (#groups-space).
+     */
+    private function canManage(UserGroup $group, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        return $group->getOwner()?->getId()?->equals($user->getId()) ?? false;
+        return true === $group->getSpace()?->hasMember($user);
     }
 }

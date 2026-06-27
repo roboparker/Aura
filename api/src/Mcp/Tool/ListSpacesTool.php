@@ -3,7 +3,7 @@
 namespace App\Mcp\Tool;
 
 use App\Entity\Space;
-use App\Entity\SpaceGroupMembership;
+use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
@@ -51,10 +51,10 @@ final class ListSpacesTool implements McpToolInterface
             SpaceMembership::class,
         );
         $group = sprintf(
-            'SELECT 1 FROM %s sp_grp JOIN sp_grp.userGroup sp_grp_obj '
+            'SELECT 1 FROM %s sp_grp_obj '
             . 'JOIN sp_grp_obj.memberships sp_grp_member '
-            . 'WHERE sp_grp.space = s AND sp_grp_member.user = :user',
-            SpaceGroupMembership::class,
+            . 'WHERE sp_grp_obj.space = s AND sp_grp_member.user = :user',
+            UserGroup::class,
         );
 
         $spaces = $this->em->getRepository(Space::class)

@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -24,25 +26,28 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
             processor: TagOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
     ],
     normalizationContext: ['groups' => ['tag:read']],
     denormalizationContext: ['groups' => ['tag:write']],
     order: ['title' => 'ASC'],
 )]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact'])]
 #[ORM\Entity(repositoryClass: TagRepository::class)]
 #[ORM\Table(name: 'tag')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_tag_owner')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_tag_space')]
 class Tag
 {
     #[ORM\Id]
@@ -56,6 +61,16 @@ class Tag
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['tag:read'])]
     private ?User $owner = null;
+
+    /**
+     * Tags are scoped to a Space (#tags): every member of the space shares the
+     * same tag pool. Set on create from the request; required.
+     */
+    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
+    #[Assert\NotNull(message: 'Space is required.')]
+    #[Groups(['tag:read', 'tag:write'])]
+    private ?Space $space = null;
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -108,6 +123,17 @@ class Tag
     public function setOwner(?User $owner): static
     {
         $this->owner = $owner;
+        return $this;
+    }
+
+    public function getSpace(): ?Space
+    {
+        return $this->space;
+    }
+
+    public function setSpace(?Space $space): static
+    {
+        $this->space = $space;
         return $this;
     }
 

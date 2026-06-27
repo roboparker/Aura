@@ -51,7 +51,8 @@ class McpTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceGroupMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroupMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -404,6 +405,9 @@ class McpTest extends ApiTestCase
     public function testCreateAndListTags(): void
     {
         $alice = $this->createUser('alice@example.com');
+        // Provision Alice's personal space (create_tag defaults to it) the way
+        // the app does on signup — persisting a project triggers the listener.
+        $this->makeProject($alice, [$alice], 'Seed');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();

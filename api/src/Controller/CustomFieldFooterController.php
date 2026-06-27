@@ -71,8 +71,13 @@ class CustomFieldFooterController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project], ['position' => 'ASC']);
+        // The fields this project has opted into, in space order.
+        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        usort(
+            $definitions,
+            static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
+                => $a->getPosition() <=> $b->getPosition(),
+        );
         $haveFooters = array_filter(
             $definitions,
             static fn (CustomFieldDefinition $d) => null !== $d->getFooter(),

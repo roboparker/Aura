@@ -10,6 +10,30 @@ const {
 
 const uniqueEmail = () => shared("tags");
 
+// Tags are space-scoped now (#tags). The /tags page opens an inline create
+// row from the header "Add tag" button, and delete goes through the styled
+// ConfirmDialog (not window.confirm).
+async function createTag(page, title, description) {
+  await page.getByRole("button", { name: "Add tag" }).first().click();
+  const row = page.getByTestId("tag-create-row");
+  await row.getByLabel("Title").fill(title);
+  if (description) {
+    await fillDescription(page, undefined, description);
+  }
+  await row.getByRole("button", { name: "Add tag" }).click();
+  await expect(
+    page.locator('[data-testid="tag-item"]', { hasText: title }),
+  ).toBeVisible();
+}
+
+async function deleteTag(page, title) {
+  await page
+    .locator('[data-testid="tag-item"]', { hasText: title })
+    .getByRole("button", { name: `Delete "${title}"` })
+    .click();
+  await page.getByRole("dialog").getByRole("button", { name: "Delete tag" }).click();
+}
+
 test.describe("Tags", () => {
   test("unauthenticated visitors are redirected to sign in", async ({ page }) => {
     await page.goto(`${BASE_URL}/tags`);
@@ -24,9 +48,7 @@ test.describe("Tags", () => {
     await expect(page.locator("text=No tags yet")).toBeVisible();
 
     const title = `Urgent-${Date.now()}`;
-    await page.fill("#title", title);
-    await fillDescription(page, undefined, "High priority");
-    await page.click('button[type="submit"]');
+    await createTag(page, title, "High priority");
 
     const item = page.locator('[data-testid="tag-item"]', { hasText: title });
     await expect(item).toBeVisible();
@@ -43,12 +65,8 @@ test.describe("Tags", () => {
       page.locator('[data-testid="tag-item"]', { hasText: `${title}-edited` }),
     ).toBeVisible();
 
-    // Delete — accept the confirm dialog
-    page.once("dialog", (dialog) => dialog.accept());
-    await page
-      .locator('[data-testid="tag-item"]', { hasText: `${title}-edited` })
-      .getByRole("button", { name: /Delete "/ })
-      .click();
+    // Delete — confirm in the styled dialog.
+    await deleteTag(page, `${title}-edited`);
     await expect(page.locator("text=No tags yet")).toBeVisible();
   });
 
@@ -59,11 +77,7 @@ test.describe("Tags", () => {
     const suffix = Date.now();
     await page.goto(`${BASE_URL}/tags`);
     for (const title of [`Blue-${suffix}`, `Red-${suffix}`]) {
-      await page.fill("#title", title);
-      await page.click('button[type="submit"]');
-      await expect(
-        page.locator('[data-testid="tag-item"]', { hasText: title }),
-      ).toBeVisible();
+      await createTag(page, title);
     }
 
     // Create a task
@@ -114,9 +128,7 @@ test.describe("Tags", () => {
 
     // Create tag and task, then attach
     await page.goto(`${BASE_URL}/tags`);
-    await page.fill("#title", tagTitle);
-    await page.click('button[type="submit"]');
-    await expect(page.locator('[data-testid="tag-item"]', { hasText: tagTitle })).toBeVisible();
+    await createTag(page, tagTitle);
 
     await page.goto(`${BASE_URL}/tasks`);
     await createTaskInline(page, taskTitle);
@@ -130,11 +142,7 @@ test.describe("Tags", () => {
 
     // Delete the tag from the Tags page
     await page.goto(`${BASE_URL}/tags`);
-    page.once("dialog", (dialog) => dialog.accept());
-    await page
-      .locator('[data-testid="tag-item"]', { hasText: tagTitle })
-      .getByRole("button", { name: /Delete "/ })
-      .click();
+    await deleteTag(page, tagTitle);
     await expect(page.locator("text=No tags yet")).toBeVisible();
 
     // Badge is gone from the task
@@ -153,11 +161,7 @@ test.describe("Tags", () => {
     const alicePage = await aliceContext.newPage();
     await registerAndSignIn(alicePage, aliceEmail);
     await alicePage.goto(`${BASE_URL}/tags`);
-    await alicePage.fill("#title", aliceTag);
-    await alicePage.click('button[type="submit"]');
-    await expect(
-      alicePage.locator('[data-testid="tag-item"]', { hasText: aliceTag }),
-    ).toBeVisible();
+    await createTag(alicePage, aliceTag);
 
     const bobContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const bobPage = await bobContext.newPage();

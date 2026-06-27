@@ -4,6 +4,8 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +34,8 @@ class UserGroupMemberEdgeTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\GroupInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -159,12 +163,26 @@ class UserGroupMemberEdgeTest extends ApiTestCase
     }
 
     /**
+     * Creates a group in a fresh space owned (admin) by $owner — so $owner
+     * (the actor in these tests) is a member of the group's space and may
+     * manage it.
+     *
      * @param User[] $members
      */
     private function createGroup(User $owner, string $title, array $members): UserGroup
     {
+        $space = new Space();
+        $space->setName($title . ' space');
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+        $admin = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($admin);
+        $this->entityManager->persist($admin);
+
         $group = new UserGroup();
-        $group->setOwner($owner);
+        $group->setSpace($space);
         $group->setTitle($title);
         $slug = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
         $group->setSlug('' === $slug ? 'group' : $slug);

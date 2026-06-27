@@ -78,7 +78,7 @@ const AvatarSection = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <UserAvatar user={user} size="lg" shape="square" />
+        <UserAvatar user={user} size="lg" />
         <div>
           <Button type="button" onClick={onPick} disabled={isUploading} size="sm">
             {isUploading ? "Uploading..." : "Change avatar"}

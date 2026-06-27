@@ -16,6 +16,8 @@ use App\CustomField\CustomFieldKind;
 use App\Repository\CustomFieldDefinitionRepository;
 use App\State\CustomFieldDefinitionUpdateProcessor;
 use App\Validator\ValidCustomFieldDefinition;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -40,9 +42,11 @@ use Symfony\Component\Validator\Constraints as Assert;
  * dispatches into the strategy. Per-value validation lives on Task's
  * {@see App\Validator\ValidCustomFieldValues}.
  *
- * Read access mirrors the parent project's space (any space member).
- * Write access is space-admin only — the field schema is structural
- * and easy to disrupt for the rest of the project.
+ * Owned by a Space (#custom-fields-space): the field schema is defined
+ * once per space and shared. Projects opt in to the fields they want via
+ * a {@see Project::$customFieldDefinitions} many-to-many, so each project's
+ * task list shows only its chosen subset. Read + write (create/edit/delete)
+ * are open to any space member for now.
  */
 #[ApiResource(
     shortName: 'CustomFieldDefinition',
@@ -52,35 +56,35 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isSpaceAdmin(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
             processor: CustomFieldDefinitionUpdateProcessor::class,
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getProject().isSpaceAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
     ],
     normalizationContext: ['groups' => ['custom_field_definition:read']],
     denormalizationContext: ['groups' => ['custom_field_definition:write']],
     order: ['position' => 'ASC', 'createdAt' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'projects' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: CustomFieldDefinitionRepository::class)]
 #[ORM\Table(name: 'custom_field_definition')]
-#[ORM\Index(columns: ['project_id', 'position'], name: 'idx_cfd_project_position')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_cfd_space')]
-#[ORM\UniqueConstraint(name: 'uniq_cfd_project_name', columns: ['project_id', 'name'])]
+#[ORM\Index(columns: ['space_id', 'position'], name: 'idx_cfd_space_position')]
+#[ORM\UniqueConstraint(name: 'uniq_cfd_space_name', columns: ['space_id', 'name'])]
 #[ORM\HasLifecycleCallbacks]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
 #[UniqueEntity(
-    fields: ['project', 'name'],
-    message: 'A field with this name already exists in the project.',
+    fields: ['space', 'name'],
+    message: 'A field with this name already exists in this space.',
 )]
 #[ValidCustomFieldDefinition]
 class CustomFieldDefinition
@@ -119,20 +123,24 @@ class CustomFieldDefinition
     private ?Uuid $id = null;
 
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Assert\NotNull(message: 'Project is required.')]
-    // Versioned so the audit log records which project the field belonged to —
+    #[Assert\NotNull(message: 'Space is required.')]
+    // Versioned so the audit log records which space the field belonged to —
     // the change-log endpoint keys on this to recover the history of fields
     // that have since been deleted (their log rows outlive the row itself).
     #[Gedmo\Versioned]
     #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
-    private ?Project $project = null;
-
-    #[ORM\ManyToOne(targetEntity: Space::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['custom_field_definition:read'])]
     private ?Space $space = null;
+
+    /**
+     * Projects that show this field on their tasks. Inverse side — the join
+     * table is owned by {@see Project::$customFieldDefinitions}.
+     *
+     * @var Collection<int, Project>
+     */
+    #[ORM\ManyToMany(targetEntity: Project::class, mappedBy: 'customFieldDefinitions')]
+    private Collection $projects;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'Field name is required.')]
@@ -239,22 +247,12 @@ class CustomFieldDefinition
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->projects = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
     {
         return $this->id;
-    }
-
-    public function getProject(): ?Project
-    {
-        return $this->project;
-    }
-
-    public function setProject(?Project $project): static
-    {
-        $this->project = $project;
-        return $this;
     }
 
     public function getSpace(): ?Space
@@ -268,12 +266,54 @@ class CustomFieldDefinition
         return $this;
     }
 
-    #[ORM\PrePersist]
-    public function syncSpaceFromProject(): void
+    /**
+     * @return Collection<int, Project>
+     */
+    public function getProjects(): Collection
     {
-        if (null === $this->space && null !== $this->project) {
-            $this->space = $this->project->getSpace();
+        return $this->projects;
+    }
+
+    public function addProject(Project $project): static
+    {
+        if (!$this->projects->contains($project)) {
+            $this->projects->add($project);
+            $project->addCustomFieldDefinition($this);
         }
+        return $this;
+    }
+
+    public function removeProject(Project $project): static
+    {
+        if ($this->projects->removeElement($project)) {
+            $project->removeCustomFieldDefinition($this);
+        }
+        return $this;
+    }
+
+    /**
+     * Back-compat: fields are space-owned + project-attached now. Attaches the
+     * project and, when the space isn't set yet, inherits it from the project —
+     * so the many test seeders that still do `new CustomFieldDefinition()
+     * ->setProject($p)` keep producing valid (space + attachment) rows. Prefer
+     * {@see setSpace()} + {@see addProject()} in new code.
+     */
+    public function setProject(?Project $project): static
+    {
+        if (null !== $project) {
+            if (null === $this->space) {
+                $this->space = $project->getSpace();
+            }
+            $this->addProject($project);
+        }
+        return $this;
+    }
+
+    /** Back-compat: the first project this field is attached to, if any. */
+    public function getProject(): ?Project
+    {
+        $first = $this->projects->first();
+        return false === $first ? null : $first;
     }
 
     /**

@@ -3,12 +3,19 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
+/**
+ * Tags are space-scoped (#tags): every member of a space shares its tag pool.
+ * Access is enforced by TagAccessExtension (space membership) — non-members
+ * can't see, fetch, edit, delete, or attach a space's tags.
+ */
 class TagTest extends ApiTestCase
 {
     private EntityManagerInterface $entityManager;
@@ -20,10 +27,12 @@ class TagTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        // task_tag rows are cleared automatically via FK cascade when Tasks
-        // and Tags are deleted, so no explicit DELETE for the join table.
+        // Children first, then spaces, then users. DB-level ON DELETE CASCADE
+        // also covers task_tag / membership rows.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -33,9 +42,10 @@ class TagTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(401);
     }
 
-    public function testCreateTagAuthenticated(): void
+    public function testCreateTagInOwnSpace(): void
     {
         $user = $this->createUser('alice@example.com');
+        $space = $this->createSpace($user, 'Alice space');
 
         $client = static::createClient();
         $client->loginUser($user);
@@ -45,6 +55,7 @@ class TagTest extends ApiTestCase
                 'title' => 'Urgent',
                 'description' => 'Needs doing today',
                 'color' => '#ef4444',
+                'space' => '/spaces/' . $space->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -59,12 +70,14 @@ class TagTest extends ApiTestCase
 
         $tag = $this->reloadTagByTitle('Urgent');
         $this->assertTrue($user->getId()?->equals($tag->getOwner()?->getId()));
+        $this->assertTrue($space->getId()?->equals($tag->getSpace()?->getId()));
     }
 
     public function testCreateTagIgnoresClientSuppliedOwner(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
+        $space = $this->createSpace($alice, 'Alice space');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -73,6 +86,7 @@ class TagTest extends ApiTestCase
             'json' => [
                 'title' => 'Sneaky',
                 'color' => '#22c55e',
+                'space' => '/spaces/' . $space->getId(),
                 'owner' => '/users/' . $bob->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -83,14 +97,50 @@ class TagTest extends ApiTestCase
         $this->assertTrue($alice->getId()?->equals($tag->getOwner()?->getId()));
     }
 
-    public function testCreateTagRequiresTitle(): void
+    public function testCreateTagInSpaceYouDontBelongToIsForbidden(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $bobsSpace = $this->createSpace($bob, 'Bob space');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/tags', [
+            'json' => [
+                'title' => 'Trespass',
+                'color' => '#22c55e',
+                'space' => '/spaces/' . $bobsSpace->getId(),
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        // Alice can't see Bob's space, so the IRI doesn't resolve (400) —
+        // existence-hiding before the space-membership security gate.
+        $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testCreateTagRequiresSpace(): void
     {
         $user = $this->createUser('alice@example.com');
         $client = static::createClient();
         $client->loginUser($user);
 
         $client->request('POST', '/tags', [
-            'json' => ['title' => '', 'color' => '#22c55e'],
+            'json' => ['title' => 'No space', 'color' => '#22c55e'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        // securityPostDenormalize rejects a tag with no (accessible) space.
+        $this->assertResponseStatusCodeSame(403);
+    }
+
+    public function testCreateTagRequiresTitle(): void
+    {
+        $user = $this->createUser('alice@example.com');
+        $space = $this->createSpace($user, 'Alice space');
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        $client->request('POST', '/tags', [
+            'json' => ['title' => '', 'color' => '#22c55e', 'space' => '/spaces/' . $space->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -99,24 +149,27 @@ class TagTest extends ApiTestCase
     public function testCreateTagRejectsInvalidColor(): void
     {
         $user = $this->createUser('alice@example.com');
+        $space = $this->createSpace($user, 'Alice space');
         $client = static::createClient();
         $client->loginUser($user);
 
         $client->request('POST', '/tags', [
-            'json' => ['title' => 'Bad', 'color' => 'red'],
+            'json' => ['title' => 'Bad', 'color' => 'red', 'space' => '/spaces/' . $space->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testListTagsOnlyShowsOwnTags(): void
+    public function testListTagsOnlyShowsTagsInSpacesYouBelongTo(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
+        $aliceSpace = $this->createSpace($alice, 'Alice space');
+        $bobSpace = $this->createSpace($bob, 'Bob space');
 
-        $this->createTag($alice, 'A1');
-        $this->createTag($alice, 'A2');
-        $this->createTag($bob, 'B1');
+        $this->createTag($alice, $aliceSpace, 'A1');
+        $this->createTag($alice, $aliceSpace, 'A2');
+        $this->createTag($bob, $bobSpace, 'B1');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -125,11 +178,28 @@ class TagTest extends ApiTestCase
         $this->assertJsonContains(['totalItems' => 2]);
     }
 
-    public function testGetOtherUsersTagReturns404(): void
+    public function testFilterTagsBySpace(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $first = $this->createSpace($alice, 'First');
+        $second = $this->createSpace($alice, 'Second');
+        $this->createTag($alice, $first, 'F1');
+        $this->createTag($alice, $first, 'F2');
+        $this->createTag($alice, $second, 'S1');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/tags?space=/spaces/' . $first->getId());
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains(['totalItems' => 2]);
+    }
+
+    public function testGetTagInInaccessibleSpaceReturns404(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $bobsTag = $this->createTag($bob, 'Bob only');
+        $bobSpace = $this->createSpace($bob, 'Bob space');
+        $bobsTag = $this->createTag($bob, $bobSpace, 'Bob only');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -137,13 +207,16 @@ class TagTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testUpdateOwnTag(): void
+    public function testAnySpaceMemberCanUpdateTag(): void
     {
-        $alice = $this->createUser('alice@example.com');
-        $tag = $this->createTag($alice, 'Before');
+        $owner = $this->createUser('alice@example.com');
+        $member = $this->createUser('bob@example.com');
+        $space = $this->createSpace($owner, 'Shared');
+        $this->ensureSpaceMembership($space, $member);
+        $tag = $this->createTag($owner, $space, 'Before');
 
         $client = static::createClient();
-        $client->loginUser($alice);
+        $client->loginUser($member);
         $client->request('PATCH', '/tags/' . $tag->getId(), [
             'json' => ['title' => 'After', 'color' => '#3b82f6'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
@@ -154,10 +227,11 @@ class TagTest extends ApiTestCase
         $this->assertSame('#3b82f6', $reloaded->getColor());
     }
 
-    public function testDeleteOwnTag(): void
+    public function testDeleteTagInOwnSpace(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $tag = $this->createTag($alice, 'Delete me');
+        $space = $this->createSpace($alice, 'Alice space');
+        $tag = $this->createTag($alice, $space, 'Delete me');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -168,8 +242,9 @@ class TagTest extends ApiTestCase
     public function testAddTagToTaskViaPatch(): void
     {
         $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Write docs');
-        $tag = $this->createTag($alice, 'Writing', '#3b82f6');
+        $tag = $this->createTag($alice, $space, 'Writing', '#3b82f6');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -192,9 +267,10 @@ class TagTest extends ApiTestCase
     public function testRemoveTagFromTaskViaPatch(): void
     {
         $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Write docs');
-        $keep = $this->createTag($alice, 'Keep', '#22c55e');
-        $drop = $this->createTag($alice, 'Drop', '#ef4444');
+        $keep = $this->createTag($alice, $space, 'Keep', '#22c55e');
+        $drop = $this->createTag($alice, $space, 'Drop', '#ef4444');
         $task->addTag($keep);
         $task->addTag($drop);
         $this->entityManager->flush();
@@ -216,31 +292,32 @@ class TagTest extends ApiTestCase
         $this->assertSame('Keep', $firstTag->getTitle());
     }
 
-    public function testCannotAttachOtherUsersTag(): void
+    public function testCannotAttachTagFromInaccessibleSpace(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
+        $bobSpace = $this->createSpace($bob, 'Bob space');
         $aliceTask = $this->createTask($alice, 'Alice task');
-        $bobsTag = $this->createTag($bob, 'Bob only');
+        $bobsTag = $this->createTag($bob, $bobSpace, 'Bob only');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        // TagOwnerExtension scopes item lookups, so the IRI resolves to no
-        // row for Alice and the serializer rejects the reference.
+        // TagAccessExtension scopes item lookups, so the IRI resolves to no
+        // row for Alice and the deserializer rejects the reference.
         $client->request('PATCH', '/tasks/' . $aliceTask->getId(), [
             'json' => ['tags' => ['/tags/' . $bobsTag->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
-        // 400 because the deserializer cannot resolve the IRI for this user.
         $this->assertResponseStatusCodeSame(400);
     }
 
     public function testTagAppearsOnTaskCollection(): void
     {
         $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Visible task');
-        $tag = $this->createTag($alice, 'Badge', '#f59e0b');
+        $tag = $this->createTag($alice, $space, 'Badge', '#f59e0b');
         $task->addTag($tag);
         $this->entityManager->flush();
 
@@ -269,8 +346,9 @@ class TagTest extends ApiTestCase
     public function testDeletingTagRemovesItFromTasks(): void
     {
         $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Has a tag');
-        $tag = $this->createTag($alice, 'Temp', '#ef4444');
+        $tag = $this->createTag($alice, $space, 'Temp', '#ef4444');
         $task->addTag($tag);
         $this->entityManager->flush();
 
@@ -308,10 +386,44 @@ class TagTest extends ApiTestCase
         return $user;
     }
 
-    private function createTag(User $owner, string $title, string $color = '#6b7280'): Tag
+    private function createSpace(User $owner, string $name): Space
     {
+        $space = new Space();
+        $space->setName($name);
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+
+        $admin = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($admin);
+        $this->entityManager->persist($admin);
+        $this->entityManager->flush();
+        return $space;
+    }
+
+    private function ensureSpaceMembership(
+        Space $space,
+        User $user,
+        string $role = Space::ROLE_MEMBER,
+    ): void {
+        $membership = (new SpaceMembership())
+            ->setUser($user)
+            ->setRole($role);
+        $space->addUserMembership($membership);
+        $this->entityManager->persist($membership);
+        $this->entityManager->flush();
+    }
+
+    private function createTag(
+        User $owner,
+        Space $space,
+        string $title,
+        string $color = '#6b7280',
+    ): Tag {
         $tag = new Tag();
         $tag->setOwner($owner);
+        $tag->setSpace($space);
         $tag->setTitle($title);
         $tag->setColor($color);
 

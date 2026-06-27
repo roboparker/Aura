@@ -46,7 +46,7 @@ const ChangeVisibilityDialog = ({
   const memberCount = space.userMemberships.filter(
     (m) => m.user.id !== space.createdBy?.id,
   ).length;
-  const groupCount = space.groupMemberships.length;
+  const groupCount = space.groupsCount;
 
   const impact: { count: number; label: string }[] = [
     { count: memberCount, label: "members removed" },

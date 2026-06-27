@@ -6,7 +6,7 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
-use App\Entity\SpaceGroupMembership;
+use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
@@ -92,8 +92,8 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
             SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s task_access_group JOIN task_access_group.userGroup task_access_group_obj JOIN task_access_group_obj.memberships task_access_group_member WHERE task_access_group.space = tp_access.space AND task_access_group_member.user = :currentUser',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s task_access_group_obj JOIN task_access_group_obj.memberships task_access_group_member WHERE task_access_group_obj.space = tp_access.space AND task_access_group_member.user = :currentUser',
+            UserGroup::class,
         );
         $queryBuilder
             ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')

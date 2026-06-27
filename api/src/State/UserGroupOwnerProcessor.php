@@ -10,10 +10,10 @@ use App\Security\AuthenticatedUserResolver;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Stamps the creator as owner of a new UserGroup, adds them to the
- * membership roster so collection access checks can look at members
- * alone, and generates a stable, unique slug ("g-handle") from the
- * title.
+ * Adds the creator to a new UserGroup's membership roster (so a new group
+ * always has at least one member) and generates a stable, unique slug
+ * ("g-handle") from the title. The group's owning space comes from the
+ * request payload (#groups-space); there is no per-group owner.
  *
  * @implements ProcessorInterface<UserGroup, UserGroup>
  */
@@ -37,7 +37,6 @@ final class UserGroupOwnerProcessor implements ProcessorInterface
     {
         $user = $this->auth->requireUser('create a group');
 
-        $data->setOwner($user);
         $data->addMember($user);
         if ('' === $data->getSlug()) {
             $data->setSlug($this->generateUniqueSlug($data->getTitle()));

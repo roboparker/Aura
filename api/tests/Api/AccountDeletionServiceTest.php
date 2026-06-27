@@ -29,12 +29,12 @@ class AccountDeletionServiceTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
         // Child/join rows first — DQL DELETE bypasses cascade, so parents
-        // can't go until their FK-holders are gone.
-        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceGroupMembership')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        // can't go until their FK-holders are gone. UserGroup holds a space
+        // FK, so it must go before Space.
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroupMembership')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -77,25 +77,32 @@ class AccountDeletionServiceTest extends ApiTestCase
         );
     }
 
-    public function testOwnedGroupTransfersToRemainingMember(): void
+    public function testGroupSurvivesWhenItsSpaceSurvives(): void
     {
+        // A group lives in a shared space that outlives the deleted user; the
+        // group stays and the deleted user just drops out of its roster.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $group = $this->ownedGroup('Designers', $alice, $bob);
+        $space = $this->sharedSpace('Team', $alice);
+        $this->ensureSpaceMembership($space, $bob, Space::ROLE_MEMBER);
+        $group = $this->groupInSpace($space, 'Designers', [$alice, $bob]);
         $groupId = (string) $group->getId();
 
-        $this->service()->deleteAccount($alice);
+        // Delete bob — a member, not the sole admin, so the space (and group) survive.
+        $this->service()->deleteAccount($bob);
         $this->entityManager->clear();
 
         $survivor = $this->entityManager->getRepository(UserGroup::class)->find($groupId);
-        $this->assertNotNull($survivor, 'Group with a remaining member should survive.');
-        $this->assertSame('bob@example.com', $survivor->getOwner()?->getEmail(), 'Ownership should pass to the member.');
+        $this->assertNotNull($survivor, 'Group in a surviving space should survive.');
+        $this->assertCount(1, $survivor->getMembers(), 'Deleted user should drop out of the roster.');
     }
 
-    public function testOwnedGroupWithNoMembersIsRemoved(): void
+    public function testGroupRemovedWhenItsSpaceRemoved(): void
     {
+        // A group in the sole-admin's only-occupant space dies with the space.
         $alice = $this->createUser('alice@example.com');
-        $group = $this->ownedGroup('Lonely', $alice);
+        $space = $this->sharedSpace('Solo', $alice);
+        $group = $this->groupInSpace($space, 'Lonely', [$alice]);
         $groupId = (string) $group->getId();
 
         $this->service()->deleteAccount($alice);
@@ -103,7 +110,7 @@ class AccountDeletionServiceTest extends ApiTestCase
 
         $this->assertNull(
             $this->entityManager->getRepository(UserGroup::class)->find($groupId),
-            'A group with no remaining members should be deleted.',
+            'A group whose space is removed should be deleted too.',
         );
     }
 
@@ -116,14 +123,16 @@ class AccountDeletionServiceTest extends ApiTestCase
         return $space;
     }
 
-    private function ownedGroup(string $title, User $owner, ?User $member = null): UserGroup
+    /**
+     * @param User[] $members
+     */
+    private function groupInSpace(Space $space, string $title, array $members): UserGroup
     {
         $group = (new UserGroup())
             ->setTitle($title)
             ->setSlug('g-' . strtolower($title))
-            ->setOwner($owner);
-        $group->addMember($owner);
-        if (null !== $member) {
+            ->setSpace($space);
+        foreach ($members as $member) {
             $group->addMember($member);
         }
         $this->entityManager->persist($group);

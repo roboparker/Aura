@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Bell, Repeat } from "lucide-react";
+import { AlertTriangle, Bell, Repeat, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -10,14 +10,11 @@ import {
 import RecurrencePicker from "@/components/tasks/RecurrencePicker";
 import {
   REMINDER_PRESETS,
-  addDays,
-  addMonths,
   formatDueDate,
   formatRecurrenceSummary,
   isoToLocalDate,
   localDateToIso,
   reminderKey,
-  todayLocalMidnight,
   type DueDateStatus,
   type RecurrenceRule,
   type Reminder,
@@ -67,13 +64,6 @@ const DueDateCell = ({
     void onChange(next);
   };
 
-  const handleQuickPick = (date: Date) => {
-    setOpen(false);
-    const next = localDateToIso(date);
-    if (next === value) return;
-    void onChange(next);
-  };
-
   const handleClear = () => {
     setOpen(false);
     if (value === null) return;
@@ -89,17 +79,10 @@ const DueDateCell = ({
     void onChange(null);
   };
 
-  const today = todayLocalMidnight();
-  const quickPicks: Array<{ label: string; date: Date; testId: string }> = [
-    { label: "Today", date: today, testId: "today" },
-    { label: "Tomorrow", date: addDays(today, 1), testId: "tomorrow" },
-    { label: "Next week", date: addDays(today, 7), testId: "next-week" },
-    { label: "Next month", date: addMonths(today, 1), testId: "next-month" },
-  ];
 
   const dateClassName = cn(
-    "text-left text-sm rounded-sm inline-flex items-center gap-1 hover:text-foreground",
-    status === "overdue" && "text-destructive font-medium hover:text-destructive",
+    "flex h-full min-h-11 w-full items-center gap-1 rounded-none border border-transparent px-2 text-left text-sm hover:border-input focus-visible:border-input group-hover/due:border-input",
+    status === "overdue" && "text-destructive font-medium",
     status === "today" && "text-amber-600 dark:text-amber-400 font-medium",
   );
 
@@ -114,6 +97,7 @@ const DueDateCell = ({
   };
 
   return (
+    <div className="group/due relative flex h-full w-full items-center">
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {value ? (
@@ -157,7 +141,7 @@ const DueDateCell = ({
           <button
             type="button"
             aria-label={ariaLabel}
-            className="text-left text-sm italic text-muted-foreground/60 hover:text-muted-foreground rounded-sm"
+            className="flex h-full min-h-11 w-full items-center rounded-none border border-transparent px-2 text-left text-sm text-muted-foreground hover:border-input focus-visible:border-input group-hover/due:border-input"
             data-testid={`${testIdPrefix}-add`}
           >
             Add date
@@ -174,31 +158,11 @@ const DueDateCell = ({
         align="start"
         data-testid={`${testIdPrefix}-popover`}
       >
-        {/* Quick-picks above the calendar — covers the common case of "soon"
-            without making the user navigate the grid. */}
-        <div className="grid grid-cols-2 gap-1 border-b p-2">
-          {quickPicks.map((pick) => (
-            <Button
-              key={pick.testId}
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="justify-start"
-              onClick={() => handleQuickPick(pick.date)}
-              data-testid={`${testIdPrefix}-quick-${pick.testId}`}
-            >
-              {pick.label}
-            </Button>
-          ))}
-        </div>
         <Calendar
           mode="single"
           selected={selected}
           onSelect={handleSelect}
           autoFocus
-          // Small top margin so the month nav arrows (anchored to the calendar
-          // top) sit clear of the quick-pick buttons above.
-          className="mt-1"
         />
         {onRecurrenceChange && value && (
           <RecurrencePicker
@@ -253,6 +217,21 @@ const DueDateCell = ({
         )}
       </PopoverContent>
     </Popover>
+      {value && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClear();
+          }}
+          aria-label="Clear due date"
+          className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/due:opacity-100 focus-visible:opacity-100"
+          data-testid={`${testIdPrefix}-clear-inline`}
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
+    </div>
   );
 };
 

@@ -181,7 +181,7 @@ const AdminUsers: NextPage = () => {
                       className="flex items-center gap-3 rounded-md border p-3"
                       data-testid="users-row"
                     >
-                      <UserAvatar user={u} size="sm" shape="square" />
+                      <UserAvatar user={u} size="sm" />
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">
                           {displayName(u)}

@@ -19,8 +19,8 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
  * Side effects for `PATCH /spaces/{id}`. Today the only one is the
  * shared → private transition: a private space is single-occupant by
  * definition, so flipping the toggle has to clean up every existing
- * non-creator membership (direct user + via group) and revoke every
- * pending invite. The reverse (private → shared) needs no cleanup —
+ * non-creator membership (direct users + the space's groups) and revoke
+ * every pending invite. The reverse (private → shared) needs no cleanup —
  * there's nothing to remove — so the persist processor handles it
  * directly.
  *
@@ -92,10 +92,12 @@ final class SpaceUpdateProcessor implements ProcessorInterface
     }
 
     /**
-     * Remove every user + group membership that isn't the creator's.
-     * orphanRemoval on the Space collections turns the detach into a
-     * delete on flush. Snapshotting the collection up-front avoids
-     * iterate-while-mutating issues.
+     * Remove every direct membership that isn't the creator's, and delete
+     * the space's groups outright — a private space is single-occupant, and
+     * a group's members would otherwise transitively re-enter the space.
+     * orphanRemoval on userMemberships turns the detach into a delete on
+     * flush; group deletion cascades its memberships + invites. Snapshotting
+     * the collections up-front avoids iterate-while-mutating issues.
      */
     private function kickEveryoneButCreator(Space $space): void
     {
@@ -109,9 +111,8 @@ final class SpaceUpdateProcessor implements ProcessorInterface
             }
         }
 
-        $groupMemberships = $space->getGroupMemberships()->toArray();
-        foreach ($groupMemberships as $groupMembership) {
-            $space->removeGroupMembership($groupMembership);
+        foreach ($space->getGroups()->toArray() as $group) {
+            $this->em->remove($group);
         }
     }
 

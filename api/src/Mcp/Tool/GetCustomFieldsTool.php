@@ -51,9 +51,12 @@ final class GetCustomFieldsTool implements McpToolInterface
             throw McpException::notFound(sprintf('Project %s', $projectId));
         }
 
+        // Fields are space-owned now (#custom-fields-space) but per-project
+        // shown — list the fields this project has opted into.
         $fields = $this->em->getRepository(CustomFieldDefinition::class)
             ->createQueryBuilder('f')
-            ->where('f.project = :project')
+            ->innerJoin('f.projects', 'p')
+            ->where('p = :project')
             ->setParameter('project', $project)
             ->orderBy('f.position', 'ASC')
             ->addOrderBy('f.createdAt', 'ASC')

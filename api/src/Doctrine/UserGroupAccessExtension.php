@@ -12,8 +12,9 @@ use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
- * Filters UserGroup queries so users only see groups they own or
- * belong to. Item lookups for non-member groups return 404 rather than 403,
+ * Filters UserGroup queries so users only see groups whose owning space
+ * they belong to (#groups-space) — directly or via another group in that
+ * space. Item lookups for inaccessible groups return 404 rather than 403,
  * matching the existence-hiding behavior used elsewhere (Project, Task).
  *
  * Instance admins are scoped like everyone else — they reach another
@@ -59,19 +60,14 @@ final class UserGroupAccessExtension implements QueryCollectionExtensionInterfac
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
-        // EXISTS subquery rather than a join on the root query — see the same
-        // note on ProjectAccessExtension. A members join here would partially
-        // hydrate the collection and corrupt later flushes.
-        //
-        // Also OR on `owner` so a freshly transferred owner who hasn't been
-        // added to members yet still sees their group.
-        $subQuery = sprintf(
-            'SELECT 1 FROM %s user_group_access_probe JOIN user_group_access_probe.memberships user_group_access_member WHERE user_group_access_probe = %s AND user_group_access_member.user = :currentUser',
-            UserGroup::class,
-            $rootAlias,
-        );
+        // Visible when the caller belongs to the group's owning space —
+        // directly or via any group in that space. The root alias holds the
+        // `space` association, so the shared membership fragment applies.
+        // EXISTS (not a join) so the collection isn't partially hydrated.
         $queryBuilder
-            ->andWhere(sprintf('(EXISTS(%s) OR %s.owner = :currentUser)', $subQuery, $rootAlias))
+            ->andWhere(
+                SpaceMembershipDql::userBelongsToProjectSpace($rootAlias, 'ug_access', 'currentUser'),
+            )
             ->setParameter('currentUser', $user);
     }
 }

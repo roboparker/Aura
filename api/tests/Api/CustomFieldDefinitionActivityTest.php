@@ -42,7 +42,7 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
 
         $created = $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'space' => $this->spaceIri($project),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -91,7 +91,7 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
 
         $created = $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'space' => $this->spaceIri($project),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -136,6 +136,13 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
         $client->loginUser($bob);
         $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
         $this->assertResponseStatusCodeSame(404);
+    }
+
+    private function spaceIri(Project $project): string
+    {
+        $space = $project->getSpace();
+        self::assertNotNull($space);
+        return '/spaces/' . $space->getId();
     }
 
     private function createProject(User $owner, string $title): Project

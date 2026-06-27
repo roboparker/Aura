@@ -148,8 +148,8 @@ class MediaObjectDownloadController extends AbstractController
             \App\Entity\SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s media_dl_group JOIN media_dl_group.userGroup media_dl_group_obj JOIN media_dl_group_obj.memberships media_dl_group_member WHERE media_dl_group.space = p.space AND media_dl_group_member.user = :user',
-            \App\Entity\SpaceGroupMembership::class,
+            'SELECT 1 FROM %s media_dl_group_obj JOIN media_dl_group_obj.memberships media_dl_group_member WHERE media_dl_group_obj.space = p.space AND media_dl_group_member.user = :user',
+            \App\Entity\UserGroup::class,
         );
         $count = (int) $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
@@ -188,8 +188,8 @@ class MediaObjectDownloadController extends AbstractController
             \App\Entity\SpaceMembership::class,
         );
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s space_attach_group JOIN space_attach_group.userGroup space_attach_group_obj JOIN space_attach_group_obj.memberships space_attach_group_member WHERE space_attach_group.space = s AND space_attach_group_member.user = :user',
-            \App\Entity\SpaceGroupMembership::class,
+            'SELECT 1 FROM %s space_attach_group_obj JOIN space_attach_group_obj.memberships space_attach_group_member WHERE space_attach_group_obj.space = s AND space_attach_group_member.user = :user',
+            \App\Entity\UserGroup::class,
         );
         $count = (int) $this->em->getRepository(Space::class)
             ->createQueryBuilder('s')

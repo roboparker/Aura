@@ -50,7 +50,10 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     // renders nothing for unauthenticated visitors so the marketing/auth
     // screens keep their original full-width layout.
     <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30">
+      {/* Above the page's sticky layers (project title/tabs bar = z-30, column
+          header = z-20) so a short page scrolling up can't push them over the
+          navbar. Stays below portalled popovers/menus (z-50). */}
+      <div className="sticky top-0 z-40">
         <ImpersonationBanner />
         <Navbar />
       </div>

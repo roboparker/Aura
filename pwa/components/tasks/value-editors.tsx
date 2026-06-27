@@ -17,6 +17,7 @@ import {
   ComboboxValue,
 } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
+import type { Elevation } from "@/lib/elevation";
 import {
   InputGroup,
   InputGroupAddon,
@@ -78,6 +79,8 @@ export interface ValueEditorProps {
   /** Compact mode (e.g. the new-task form): drop redundant adornments like
    *  the money currency badge. */
   compact?: boolean;
+  /** Surface elevation; 0 = inline (flush in a list cell). Defaults to 1. */
+  elevation?: Elevation;
 }
 
 const isMulti = (definition: CustomFieldDefinition): boolean =>
@@ -159,6 +162,7 @@ const TextValue = (props: ValueEditorProps) => {
         disabled={disabled}
         aria-invalid={Boolean(error)}
         rows={4}
+        elevation={props.elevation}
         data-testid="custom-field-value-text"
       />
     );
@@ -171,6 +175,7 @@ const TextValue = (props: ValueEditorProps) => {
       disabled={disabled}
       aria-invalid={Boolean(error)}
       placeholder={definition.subtype === "url" ? "https://…" : undefined}
+      elevation={props.elevation}
       data-testid="custom-field-value-text"
     />
   );
@@ -238,6 +243,7 @@ const NumericValue = ({
   onChange,
   disabled,
   error,
+  elevation,
 }: ValueEditorProps) => (
   <Input
     type="number"
@@ -254,6 +260,7 @@ const NumericValue = ({
     }}
     disabled={disabled}
     aria-invalid={Boolean(error)}
+    elevation={elevation}
     data-testid="custom-field-value-numeric"
   />
 );
@@ -280,6 +287,7 @@ const MoneyValue = ({
   disabled,
   error,
   compact,
+  elevation,
 }: ValueEditorProps) => {
   const currency = definition.config.currency ?? "USD";
   const digits = currencyFractionDigits(currency);
@@ -309,7 +317,15 @@ const MoneyValue = ({
 
   return (
     <div className="flex items-center gap-2">
-      <InputGroup className="flex-1">
+      <InputGroup
+        className={cn(
+          "flex-1",
+          // Inline (list cell): square, borderless at rest, border on
+          // hover/focus to match the other grid editors.
+          elevation === 0 &&
+            "min-h-11 rounded-none border-transparent bg-transparent shadow-none hover:border-input dark:bg-transparent",
+        )}
+      >
         <InputGroupAddon>
           <InputGroupText>{currencySymbol(currency)}</InputGroupText>
         </InputGroupAddon>
@@ -391,6 +407,7 @@ const DateSingle = ({
   onChange,
   disabled,
   error,
+  elevation,
 }: ValueEditorProps) => {
   const [open, setOpen] = useState(false);
   const str = asString(value);
@@ -403,6 +420,7 @@ const DateSingle = ({
         onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
         disabled={disabled}
         aria-invalid={Boolean(error)}
+        elevation={elevation}
         data-testid="custom-field-value-date"
       />
     );
@@ -416,6 +434,7 @@ const DateSingle = ({
         onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
         disabled={disabled}
         aria-invalid={Boolean(error)}
+        elevation={elevation}
         data-testid="custom-field-value-date"
       />
     );
@@ -483,6 +502,7 @@ const SelectValue = ({
   value,
   onChange,
   disabled,
+  elevation,
 }: ValueEditorProps) => {
   const options = useMemo(
     () => definition.config.options ?? [],
@@ -508,7 +528,7 @@ const SelectValue = ({
         itemToStringLabel={(o) => o.label}
         itemToStringValue={(o) => o.key}
       >
-        <ComboboxChips>
+        <ComboboxChips elevation={elevation}>
           <ComboboxValue>
             {selected.map((o) => (
               <ComboboxChip key={o.key} className="gap-1">
@@ -610,7 +630,7 @@ const ReferenceValue = (props: ValueEditorProps) => {
         itemToStringLabel={(o) => o.label}
         itemToStringValue={(o) => o.iri}
       >
-        <ComboboxChips>
+        <ComboboxChips elevation={props.elevation}>
           <ComboboxValue>
             {selected.map((o) => (
               <ComboboxChip key={o.iri} className="gap-1">

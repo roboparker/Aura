@@ -7,24 +7,24 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\Space;
-use App\Entity\SpaceGroupMembership;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
+use App\Entity\UserGroup;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Filters Space queries so users only see spaces they belong to —
  * directly via `SpaceMembership` or transitively via a `UserGroup`
- * listed in `SpaceGroupMembership`. Item lookups for non-member spaces
- * return 404 rather than 403, mirroring ProjectAccessExtension.
+ * owned by the space. Item lookups for non-member spaces return 404
+ * rather than 403, mirroring ProjectAccessExtension.
  *
  * Instance admins are scoped like everyone else — they reach another
  * user's spaces only by impersonating them (`switch_user`), which works
  * because the filter resolves against the impersonated user.
  *
  * Implemented as an EXISTS subquery on the root query (rather than a
- * join) so the Space's `userMemberships` and `groupMemberships`
+ * join) so the Space's `userMemberships` and `groups`
  * collections are not partially hydrated by the access predicate —
  * the same hazard ProjectAccessExtension documents at length.
  */
@@ -74,11 +74,11 @@ final class SpaceAccessExtension implements
             SpaceMembership::class,
             $rootAlias,
         );
-        // Group-inherited membership: any SpaceGroupMembership where the
-        // attached UserGroup contains the current user.
+        // Group-inherited membership: any UserGroup owned by this space
+        // whose roster contains the current user.
         $groupSubquery = sprintf(
-            'SELECT 1 FROM %s space_access_group JOIN space_access_group.userGroup space_access_group_obj JOIN space_access_group_obj.memberships space_access_group_member WHERE space_access_group.space = %s AND space_access_group_member.user = :currentUser',
-            SpaceGroupMembership::class,
+            'SELECT 1 FROM %s space_access_group_obj JOIN space_access_group_obj.memberships space_access_group_member WHERE space_access_group_obj.space = %s AND space_access_group_member.user = :currentUser',
+            UserGroup::class,
             $rootAlias,
         );
         $queryBuilder
