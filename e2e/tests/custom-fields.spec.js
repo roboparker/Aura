@@ -8,17 +8,13 @@ const {
 
 const uniqueEmail = () => shared("custom-fields");
 
-const openCustomFields = async (page, projectTitle) => {
-  await page.goto(`${BASE_URL}/projects`);
-  // The create form lives behind the "New project" toggle.
-  await page.getByTestId("new-project-button").click();
-  await page.fill("#title", projectTitle);
-  await page.click('button[type="submit"]');
-  // Creating navigates straight to the new project's detail page. Custom
-  // fields live under the Settings tab's "Custom fields" section now.
-  await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-  await page.getByTestId("project-settings-tab").click();
-  await page.getByTestId("project-settings-fields").click();
+const openCustomFields = async (page) => {
+  // Custom fields are space-owned now (#custom-fields-space): the full
+  // definition manager lives at the space-level /custom-fields page (the
+  // sidebar Settings section). A fresh signup lands with its personal space
+  // active, which is where these fields get created.
+  await page.goto(`${BASE_URL}/custom-fields`);
+  await expect(page.getByTestId("custom-fields-manager")).toBeVisible();
 };
 
 test.describe("Custom field definitions (kind-aware, #227)", () => {
@@ -26,7 +22,7 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await openCustomFields(page, `CF-host-${Date.now()}`);
+    await openCustomFields(page);
 
     // Open the create drawer.
     await page.getByTestId("custom-field-add").click();
@@ -82,7 +78,7 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await openCustomFields(page, `CF-kinds-${Date.now()}`);
+    await openCustomFields(page);
 
     await page.getByTestId("custom-field-add").click();
     const sheet = page.getByTestId("custom-field-sheet");
@@ -111,11 +107,11 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     await expect(item.locator("text=SUM")).toBeVisible();
   });
 
-  test("reference field offers the project target and the change log opens", async ({
+  test("reference field offers the project target", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await openCustomFields(page, `CF-ref-${Date.now()}`);
+    await openCustomFields(page);
 
     await page.getByTestId("custom-field-add").click();
     const sheet = page.getByTestId("custom-field-sheet");
@@ -134,15 +130,10 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     });
     await expect(item).toBeVisible();
     await expect(item.locator("text=reference · project")).toBeVisible();
-
-    // Change log drawer opens and lists the create entry.
-    await page.getByTestId("custom-fields-changelog").click();
-    const log = page.getByTestId("custom-fields-changelog-sheet");
-    await expect(log).toBeVisible();
-    await expect(log.locator("text=Related project")).toBeVisible();
   });
 });
 
-// API-side authorization (members can read, only space admins can write),
-// the reorder endpoint, fill/option stats, and the Loggable change feed are
-// covered by PHPUnit (CustomField* tests under api/tests/Api/).
+// API-side authorization (any space member can write), the reorder endpoint,
+// fill/option stats, and the Loggable change feed (project-scoped) are covered
+// by PHPUnit (CustomField* tests under api/tests/Api/). The change-log drawer
+// is only shown in a project context, not on the space-level manager.

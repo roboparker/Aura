@@ -330,20 +330,24 @@ const CustomFieldsManager = ({
         </div>
       ) : (
         <div className="rounded-lg border">
-          <div className="flex items-center justify-end border-b px-2 py-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              onClick={() => setChangeLogOpen(true)}
-              aria-label="Custom fields change log"
-              title="Change log"
-              data-testid="custom-fields-changelog"
-            >
-              <History className="h-4 w-4" />
-            </Button>
-          </div>
+          {/* Change log is project-scoped activity; only shown in a
+              project context (not on the space-level manager). */}
+          {projectId && (
+            <div className="flex items-center justify-end border-b px-2 py-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={() => setChangeLogOpen(true)}
+                aria-label="Custom fields change log"
+                title="Change log"
+                data-testid="custom-fields-changelog"
+              >
+                <History className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <Table>
             <TableHeader>
               <TableRow>

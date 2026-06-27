@@ -169,10 +169,18 @@ test.describe("Projects", () => {
     const email = uniqueEmail();
     await registerAndSignIn(page, email);
 
+    // Tags are space-scoped now (#tags) — grab the user's personal space.
+    const spacesRes = await page.request.get(`${BASE_URL}/spaces`, {
+      headers: { Accept: "application/ld+json" },
+    });
+    expect(spacesRes.ok()).toBeTruthy();
+    const spacesBody = await spacesRes.json();
+    const spaceIri = (spacesBody.member ?? spacesBody["hydra:member"])[0]["@id"];
+
     // Seed a tag so the tags combobox has something to pick.
     const tagRes = await page.request.post(`${BASE_URL}/tags`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { title: `urgent-${Date.now()}`, color: "#ef4444" },
+      data: { title: `urgent-${Date.now()}`, color: "#ef4444", space: spaceIri },
     });
     expect(tagRes.ok()).toBeTruthy();
     const tag = await tagRes.json();
