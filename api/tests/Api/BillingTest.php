@@ -8,6 +8,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Entity\UserGroup;
 use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -258,6 +259,28 @@ class BillingTest extends ApiTestCase
         $client->request('GET', '/spaces/' . $space->getId() . '/billing');
         $this->assertResponseStatusCodeSame(200);
         $this->assertJsonContains(['plan' => 'free', 'active' => false]);
+    }
+
+    public function testStatusWithGroupInTheSpace(): void
+    {
+        // Repro for the prod billing 500: getEffectiveUsers() walks the space's
+        // groups (#groups-space), so a space that owns a group must still
+        // return a clean status.
+        $alice = $this->createUser('alice-grp@example.com');
+        $bob = $this->createUser('bob-grp@example.com');
+        $space = $this->createSpace($alice, 'Shared with a group');
+
+        $group = (new UserGroup())->setSpace($space)->setTitle('Crew')->setSlug('crew-billing');
+        $group->addMember($alice);
+        $group->addMember($bob);
+        $this->entityManager->persist($group);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/spaces/' . $space->getId() . '/billing');
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertJsonContains(['limits' => ['memberCount' => 2]]);
     }
 
     public function testStatusReportsActiveWhenSubscribed(): void
