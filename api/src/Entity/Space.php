@@ -27,9 +27,10 @@ use Symfony\Component\Validator\Constraints as Assert;
  * Top-level container for content (#181). Every user has a personal
  * "Private" space, created on signup and not deletable. Additional
  * shared spaces can be created and shared with other users and
- * `UserGroup`s. Membership (`SpaceMembership` + `SpaceGroupMembership`)
- * is what gates access to the space's content; the `createdBy` field
- * is audit-only.
+ * `UserGroup`s (a group is owned by one space; its members get access to
+ * that space). Membership — direct `SpaceMembership` plus the members of the
+ * space's `UserGroup`s — is what gates access to the space's content; the
+ * `createdBy` field is audit-only.
  *
  * PR 1 ships only the Space entity, its memberships, and a backfill
  * that links existing projects/discussions/custom-field-definitions to
@@ -224,20 +225,18 @@ class Space
     private Collection $userMemberships;
 
     /**
-     * Group memberships — adds every member of a `UserGroup` to the
-     * space transitively. PR 1 only models the relationship; the
-     * management UI for adding groups lands in PR 4 (#187).
+     * Groups owned by this space (#groups-space). Every member of each group
+     * gains access to the space transitively, so groups are this space's
+     * access-granting "teams". A group belongs to exactly one space.
      *
-     * @var Collection<int, SpaceGroupMembership>
+     * @var Collection<int, UserGroup>
      */
     #[ORM\OneToMany(
         mappedBy: 'space',
-        targetEntity: SpaceGroupMembership::class,
-        cascade: ['persist', 'remove'],
-        orphanRemoval: true,
+        targetEntity: UserGroup::class,
+        fetch: 'EXTRA_LAZY',
     )]
-    #[Groups(['space:read'])]
-    private Collection $groupMemberships;
+    private Collection $groups;
 
     /**
      * MediaObjects attached at the space level (cover docs, shared
@@ -317,7 +316,7 @@ class Space
         // flush (the column is NOT NULL).
         $this->updatedAt = new \DateTime();
         $this->userMemberships = new ArrayCollection();
-        $this->groupMemberships = new ArrayCollection();
+        $this->groups = new ArrayCollection();
         $this->attachments = new ArrayCollection();
         $this->projects = new ArrayCollection();
         $this->pages = new ArrayCollection();
@@ -457,6 +456,15 @@ class Space
         return $this->pages->count();
     }
 
+    /**
+     * Number of groups owned by this space. EXTRA_LAZY → single COUNT query.
+     */
+    #[Groups(['space:read'])]
+    public function getGroupsCount(): int
+    {
+        return $this->groups->count();
+    }
+
     public function getCreatedBy(): ?User
     {
         return $this->createdBy;
@@ -492,26 +500,11 @@ class Space
     }
 
     /**
-     * @return Collection<int, SpaceGroupMembership>
+     * @return Collection<int, UserGroup>
      */
-    public function getGroupMemberships(): Collection
+    public function getGroups(): Collection
     {
-        return $this->groupMemberships;
-    }
-
-    public function addGroupMembership(SpaceGroupMembership $membership): static
-    {
-        if (!$this->groupMemberships->contains($membership)) {
-            $this->groupMemberships->add($membership);
-            $membership->setSpace($this);
-        }
-        return $this;
-    }
-
-    public function removeGroupMembership(SpaceGroupMembership $membership): static
-    {
-        $this->groupMemberships->removeElement($membership);
-        return $this;
+        return $this->groups;
     }
 
     /**
@@ -567,11 +560,7 @@ class Space
         if ($this->hasUserAt($user, null)) {
             return true;
         }
-        foreach ($this->groupMemberships as $groupMembership) {
-            $group = $groupMembership->getUserGroup();
-            if (null === $group) {
-                continue;
-            }
+        foreach ($this->groups as $group) {
             foreach ($group->getMembers() as $member) {
                 if ($user->getId()->equals($member->getId())) {
                     return true;
@@ -625,11 +614,7 @@ class Space
                 $bag[(string) $u->getId()] = $u;
             }
         }
-        foreach ($this->groupMemberships as $groupMembership) {
-            $group = $groupMembership->getUserGroup();
-            if (null === $group) {
-                continue;
-            }
+        foreach ($this->groups as $group) {
             foreach ($group->getMembers() as $member) {
                 if (null !== $member->getId()) {
                     $bag[(string) $member->getId()] = $member;

@@ -76,6 +76,27 @@
     body {
         @apply bg-background text-foreground;
     }
+    /* Pointer cursor on everything clickable. Tailwind's reset leaves native
+       <button> at the default arrow, and many raw buttons + Radix/base-ui
+       controls (checkboxes, switches, menu/combobox items, tabs) don't set a
+       cursor — so a lot of obviously-clickable things felt dead. Cover them
+       in one place; disabled controls keep the default arrow. */
+    button:not(:disabled),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="checkbox"]:not([aria-disabled="true"]),
+    [role="switch"]:not([aria-disabled="true"]),
+    [role="radio"]:not([aria-disabled="true"]),
+    [role="option"],
+    [role="menuitem"],
+    [role="menuitemcheckbox"],
+    [role="menuitemradio"],
+    [role="tab"],
+    summary,
+    label:has(> input[type="checkbox"]:not(:disabled)),
+    label:has([role="checkbox"]:not([aria-disabled="true"])),
+    label:has([role="switch"]:not([aria-disabled="true"])) {
+        cursor: pointer;
+    }
     /* Smooth color / border-color transitions on interactive elements.
        The `body` prefix bumps specificity to (0,0,2) so this wins over
        BlockNote's unlayered `a { transition: color .15s }` from

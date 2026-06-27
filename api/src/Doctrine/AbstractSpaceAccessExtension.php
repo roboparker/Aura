@@ -15,7 +15,7 @@ use Symfony\Bundle\SecurityBundle\Security;
  * the current user belongs to (#185). All of them have the same shape:
  * require an authenticated User, then AND an EXISTS predicate over the
  * resource's `space` FK matching direct membership (`SpaceMembership`) OR
- * transitive membership via a `UserGroup` (`SpaceGroupMembership`). EXISTS
+ * transitive membership via a `UserGroup` owned by that space. EXISTS
  * subqueries (rather than joins on the root) keep the resource's own
  * collections from being partially hydrated by the access predicate, and
  * unreachable item lookups return 404 rather than 403 so existence isn't

@@ -77,8 +77,7 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertSame((string) $alice->getId(), (string) $copy->getOwner()?->getId());
 
         // CFDs cloned with same shape, attached to the new project.
-        $defs = $this->entityManager->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $copy], ['position' => 'ASC']);
+        $defs = $this->definitionsForProjectId((string) $copy->getId());
         $this->assertCount(2, $defs);
         $this->assertSame('Severity', $defs[0]->getName());
         $this->assertSame('select.single', $defs[0]->getTypeKey());
@@ -94,8 +93,7 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertSame('Notes', $defs[1]->getName());
 
         // Source project is untouched (its 2 CFDs still there).
-        $sourceDefs = $this->entityManager->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project]);
+        $sourceDefs = $this->definitionsForProjectId((string) $project->getId());
         $this->assertCount(2, $sourceDefs);
     }
 
@@ -318,8 +316,8 @@ class ProjectCopyTest extends ApiTestCase
         $source = $this->createSpace($alice, 'Shared');
         $this->ensureSpaceMembership($source, $bob);
         $project = $this->createProject($alice, 'P', $source);
-        $aliceTag = $this->seedTag($alice, 'alice-tag');
-        $bobTag = $this->seedTag($bob, 'bob-tag');
+        $aliceTag = $this->seedTag($alice, 'alice-tag', $source);
+        $bobTag = $this->seedTag($bob, 'bob-tag', $source);
         $task = $this->seedTask($alice, $project, 'Tagged task', 0);
         $task->addTag($aliceTag);
         $task->addTag($bobTag);
@@ -381,6 +379,21 @@ class ProjectCopyTest extends ApiTestCase
     }
 
     /**
+     * Definitions attached to a project via the (space-owned) many-to-many.
+     *
+     * @return list<CustomFieldDefinition>
+     */
+    private function definitionsForProjectId(string $projectId): array
+    {
+        /** @var list<CustomFieldDefinition> $defs */
+        $defs = $this->entityManager->createQuery(
+            'SELECT d FROM App\Entity\CustomFieldDefinition d '
+            . 'JOIN d.projects p WHERE p.id = :id ORDER BY d.position ASC',
+        )->setParameter('id', $projectId)->getResult();
+        return $defs;
+    }
+
+    /**
      * @param string[]|null $options
      *
      * @param list<string>|null $options
@@ -412,10 +425,11 @@ class ProjectCopyTest extends ApiTestCase
         return $task;
     }
 
-    private function seedTag(User $owner, string $title): Tag
+    private function seedTag(User $owner, string $title, Space $space): Tag
     {
         $tag = new Tag();
         $tag->setOwner($owner);
+        $tag->setSpace($space);
         $tag->setTitle($title);
         $tag->setColor('#0369a1');
         $this->entityManager->persist($tag);

@@ -2,8 +2,8 @@
 
 namespace App\Doctrine;
 
-use App\Entity\SpaceGroupMembership;
 use App\Entity\SpaceMembership;
+use App\Entity\UserGroup;
 
 /**
  * DQL fragment helpers for "is the caller a member of the space at
@@ -18,7 +18,7 @@ use App\Entity\SpaceMembership;
  *
  * Each call returns a DQL boolean expression that's true when the
  * referenced space contains the user as a direct member OR via a
- * `UserGroup` linked through `SpaceGroupMembership`. The
+ * `UserGroup` owned by that space (the group's `space` FK). The
  * `$aliasPrefix` parameter prevents collisions when more than one
  * helper call appears in the same query.
  */
@@ -43,13 +43,10 @@ final class SpaceMembershipDql
             $userParam,
         );
         $group = sprintf(
-            'SELECT 1 FROM %s %s_grp '
-            . 'JOIN %s_grp.userGroup %s_grp_obj '
+            'SELECT 1 FROM %s %s_grp_obj '
             . 'JOIN %s_grp_obj.memberships %s_grp_member '
-            . 'WHERE %s_grp.space = %s.space AND %s_grp_member.user = :%s',
-            SpaceGroupMembership::class,
-            $aliasPrefix,
-            $aliasPrefix,
+            . 'WHERE %s_grp_obj.space = %s.space AND %s_grp_member.user = :%s',
+            UserGroup::class,
             $aliasPrefix,
             $aliasPrefix,
             $aliasPrefix,

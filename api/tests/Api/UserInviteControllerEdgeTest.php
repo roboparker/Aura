@@ -4,6 +4,8 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\GroupInvite;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use App\Entity\UserInvite;
@@ -30,6 +32,8 @@ class UserInviteControllerEdgeTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\GroupInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -105,24 +109,25 @@ class UserInviteControllerEdgeTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testNonOwnerMemberCannotResend(): void
+    public function testNonSpaceMemberCannotResend(): void
     {
         $owner = $this->createUser('alice@example.com');
-        $member = $this->createUser('bob@example.com');
-        $group = $this->createGroup($owner, 'Shared', [$owner, $member]);
+        // Stranger: not in the group and not a member of its space.
+        $stranger = $this->createUser('stranger@example.com');
+        $group = $this->createGroup($owner, 'Backend', [$owner]);
         $this->inviteEmail($owner, $group, 'newcomer@example.com');
         $invite = $this->entityManager->getRepository(GroupInvite::class)->findAll()[0];
 
         $client = static::createClient();
-        $client->loginUser($member);
+        $client->loginUser($stranger);
         $client->request('POST', sprintf(
             '/groups/%s/invites/%s/resend',
             $group->getId(),
             $invite->getId(),
         ), ['headers' => ['Content-Type' => 'application/json']]);
 
-        // Non-owner member of the group → 403 (existence not hidden).
-        $this->assertResponseStatusCodeSame(403);
+        // Not a member of the group's space → existence-hidden 404.
+        $this->assertResponseStatusCodeSame(404);
     }
 
     public function testStrangerListingInvitesIs404(): void
@@ -225,8 +230,19 @@ class UserInviteControllerEdgeTest extends ApiTestCase
      */
     private function createGroup(User $owner, string $title, array $members): UserGroup
     {
+        // Group owned by a fresh space with $owner as its only (admin) member.
+        $space = new Space();
+        $space->setName($title . ' space');
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+        $admin = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($admin);
+        $this->entityManager->persist($admin);
+
         $group = new UserGroup();
-        $group->setOwner($owner);
+        $group->setSpace($space);
         $group->setTitle($title);
         $base = trim((string) preg_replace('/[^a-z0-9]+/', '-', strtolower($title)), '-');
         $group->setSlug(('' === $base ? 'group' : $base) . '-' . (++self::$slugCounter));

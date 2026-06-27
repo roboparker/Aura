@@ -212,9 +212,9 @@ class Task
 
     /**
      * Owning side of the Task↔Tag many-to-many. Membership is edited via
-     * PATCH /tasks/{id} with a `tags` array of Tag IRIs. Tags are scoped to
-     * the task's owner; cross-user IRIs are rejected by TagOwnerExtension
-     * during deserialization.
+     * PATCH /tasks/{id} with a `tags` array of Tag IRIs. Tags are scoped to a
+     * Space; cross-space IRIs are rejected by TagAccessExtension during
+     * deserialization (the IRI resolves to no row for non-members).
      *
      * @var Collection<int, Tag>
      */

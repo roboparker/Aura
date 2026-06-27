@@ -26,10 +26,9 @@ use Symfony\Component\Uid\Uuid;
  *  - The project metadata (title, description) carries over. Title gets
  *    a " (copy)" suffix so the source and clone are distinguishable at
  *    a glance.
- *  - Every `CustomFieldDefinition` attached to the source is cloned into
- *    the new project (name, type, options, position, required). The
- *    schema is the most reusable part of a project, so this is the
- *    primary thing copy buys you.
+ *  - Custom fields are space-owned now (#custom-fields-space); the copy keeps
+ *    the source's field SELECTION (same-space: the same definitions;
+ *    cross-space: reuse-or-clone same-named fields in the target space).
  *  - The clone's `createdBy` is the current user — not the source's
  *    owner. Fresh audit history.
  *  - Attachments are NOT copied (per-row authorship + binary storage
@@ -109,16 +108,24 @@ class ProjectCopyController extends AbstractController
         $this->em->persist($copy);
         $this->em->flush();
 
-        // Clone every custom field definition into the new project.
-        // syncSpaceFromProject only fires when space is null at
-        // PrePersist; we set it explicitly here to mirror the existing
-        // create paths.
-        foreach (
-            $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $source]) as $sourceDefinition
-        ) {
+        // Carry the source project's field SELECTION onto the copy. Fields are
+        // space-owned now (#custom-fields-space): a same-space copy opts into
+        // the same definitions; a cross-space copy reuses a same-named field in
+        // the target space or clones it there.
+        foreach ($source->getCustomFieldDefinitions() as $sourceDefinition) {
+            $sameSpace = (string) $target->getId()
+                === (string) $sourceDefinition->getSpace()?->getId();
+            if ($sameSpace) {
+                $copy->addCustomFieldDefinition($sourceDefinition);
+                continue;
+            }
+            $existing = $this->em->getRepository(CustomFieldDefinition::class)
+                ->findOneBy(['space' => $target, 'name' => $sourceDefinition->getName()]);
+            if (null !== $existing) {
+                $copy->addCustomFieldDefinition($existing);
+                continue;
+            }
             $clone = (new CustomFieldDefinition())
-                ->setProject($copy)
                 ->setSpace($target)
                 ->setName($sourceDefinition->getName())
                 ->setKind($sourceDefinition->getKind())
@@ -129,6 +136,7 @@ class ProjectCopyController extends AbstractController
                 ->setNullable($sourceDefinition->isNullable())
                 ->setVisibility($sourceDefinition->getVisibility());
             $this->em->persist($clone);
+            $copy->addCustomFieldDefinition($clone);
         }
 
         // Optional task clone (#182 deep-copy). Opt-in via

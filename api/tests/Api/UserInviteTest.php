@@ -4,6 +4,8 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\GroupInvite;
+use App\Entity\Space;
+use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use App\Entity\UserInvite;
@@ -21,10 +23,13 @@ class UserInviteTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        // Order matters — group_invite -> user_invite -> user_group -> user.
+        // Order matters — group_invite -> user_invite -> user_group ->
+        // space_membership -> space -> user (user_group holds a space FK).
         $this->entityManager->createQuery('DELETE FROM App\Entity\GroupInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserInvite')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroup')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -158,20 +163,22 @@ class UserInviteTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testNonOwnerMemberCannotInvite(): void
+    public function testNonSpaceMemberCannotInvite(): void
     {
         $owner = $this->createUser('alice@example.com');
-        $member = $this->createUser('bob@example.com');
-        $group = $this->createGroup($owner, 'Shared', [$owner, $member]);
+        // Stranger: not in the group and not a member of its space.
+        $stranger = $this->createUser('stranger@example.com');
+        $group = $this->createGroup($owner, 'Backend', [$owner]);
 
         $client = static::createClient();
-        $client->loginUser($member);
+        $client->loginUser($stranger);
         $client->request('POST', '/groups/' . $group->getId() . '/members', [
             'json' => ['email' => 'newcomer@example.com'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
 
-        $this->assertResponseStatusCodeSame(403);
+        // Not a member of the group's space → existence-hidden 404.
+        $this->assertResponseStatusCodeSame(404);
     }
 
     public function testInviteLookupReturnsContextForValidToken(): void
@@ -226,16 +233,18 @@ class UserInviteTest extends ApiTestCase
         $this->assertSame('newcomer@example.com', $first['email']);
     }
 
-    public function testNonOwnerMemberCannotListInvites(): void
+    public function testNonSpaceMemberCannotListInvites(): void
     {
         $owner = $this->createUser('alice@example.com');
-        $member = $this->createUser('bob@example.com');
-        $group = $this->createGroup($owner, 'Shared', [$owner, $member]);
+        // Stranger: not in the group and not a member of its space.
+        $stranger = $this->createUser('stranger@example.com');
+        $group = $this->createGroup($owner, 'Backend', [$owner]);
 
         $client = static::createClient();
-        $client->loginUser($member);
+        $client->loginUser($stranger);
         $client->request('GET', '/groups/' . $group->getId() . '/invites');
-        $this->assertResponseStatusCodeSame(403);
+        // Not a member of the group's space → existence-hidden 404.
+        $this->assertResponseStatusCodeSame(404);
     }
 
     public function testOwnerCanRevokeGroupInvite(): void
@@ -452,8 +461,20 @@ class UserInviteTest extends ApiTestCase
      */
     private function createGroup(User $owner, string $title, array $members): UserGroup
     {
+        // Group is owned by a fresh space with $owner as admin so $owner (the
+        // actor) is a member of the group's space and may manage invites.
+        $space = new Space();
+        $space->setName($title . ' space');
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+        $admin = (new SpaceMembership())
+            ->setUser($owner)
+            ->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($admin);
+        $this->entityManager->persist($admin);
+
         $group = new UserGroup();
-        $group->setOwner($owner);
+        $group->setSpace($space);
         $group->setTitle($title);
         // Direct persist bypasses UserGroupOwnerProcessor, so set a unique
         // slug by hand (the column is NOT NULL + unique). A monotonic

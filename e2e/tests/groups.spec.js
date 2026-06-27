@@ -8,7 +8,6 @@ const {
 } = require("./helpers");
 
 const uniqueEmail = () => shared("groups");
-const PASSWORD = "Password123!@#";
 
 // Create a group through the full-page composer at /groups/new. Optionally
 // seeds invite chips (existing users join immediately; unknown emails get a
@@ -76,7 +75,8 @@ test.describe("Groups", () => {
       ownerPage.locator('[data-testid="group-item"]', { hasText: title }),
     ).toBeVisible();
 
-    // Delete from the detail page — step-up dialog requires the name + password.
+    // Delete from the detail page — type-to-confirm dialog (no step-up now;
+    // any space member can delete a group).
     await ownerPage
       .locator('[data-testid="group-item"]', { hasText: title })
       .getByRole("link", { name: title })
@@ -85,48 +85,12 @@ test.describe("Groups", () => {
     const dialog = ownerPage.getByRole("dialog");
     await expect(dialog.getByText("Delete this group?")).toBeVisible();
     await dialog.locator("#delete-group-name").fill(title);
-    await dialog.locator("#delete-group-credential").fill(PASSWORD);
     await dialog.getByRole("button", { name: /Delete group/ }).click();
 
     await expect(ownerPage).toHaveURL(/\/groups$/);
     await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
 
     await ownerContext.close();
-  });
-
-  test("non-owner members see a read-only detail view", async ({ browser }) => {
-    const ownerEmail = uniqueEmail();
-    const memberEmail = uniqueEmail();
-    const title = `Read-only ${Date.now()}`;
-
-    const memberContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    const memberPage = await memberContext.newPage();
-    await registerAndSignIn(memberPage, memberEmail);
-
-    const ownerContext = await browser.newContext({ ignoreHTTPSErrors: true });
-    const ownerPage = await ownerContext.newPage();
-    await registerAndSignIn(ownerPage, ownerEmail);
-    // Seed the member via invite-on-create (existing user → immediate member).
-    await createGroup(ownerPage, title, { invites: [memberEmail] });
-    await expect(
-      ownerPage.locator('[data-testid="member-row"]', { hasText: memberEmail }),
-    ).toBeVisible();
-    await ownerContext.close();
-
-    // The member sees the group but none of the management affordances.
-    await memberPage.goto(`${BASE_URL}/groups`);
-    const memberItem = memberPage.locator('[data-testid="group-item"]', { hasText: title });
-    await expect(memberItem).toBeVisible();
-
-    await memberItem.getByRole("link", { name: title }).click();
-    await expect(memberPage.getByRole("heading", { name: title })).toBeVisible();
-    await expect(memberPage.getByRole("button", { name: /^Edit$/ })).toHaveCount(0);
-    await expect(memberPage.getByRole("button", { name: /^Delete$/ })).toHaveCount(0);
-    await expect(memberPage.locator('[data-testid="add-member-form"]')).toHaveCount(0);
-    // Members get a Leave control instead of the danger zone.
-    await expect(memberPage.getByRole("button", { name: /Leave group/ })).toBeVisible();
-
-    await memberContext.close();
   });
 
   test("owner can invite an existing user during group creation", async ({ browser }) => {

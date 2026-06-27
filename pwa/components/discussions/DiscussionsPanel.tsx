@@ -1,4 +1,12 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -20,6 +28,7 @@ import { formatRelative } from "@/lib/relativeTime";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import AvatarStack from "@/components/user/AvatarStack";
+import PageHeader from "@/components/common/PageHeader";
 import CategoryBadge, {
   CATEGORY_LABEL,
   CATEGORY_META,
@@ -41,6 +50,11 @@ import {
 import { cn } from "@/lib/utils";
 
 export { CATEGORY_LABEL, type DiscussionCategory };
+
+const FILTERS: { value: DiscussionCategory | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  ...CATEGORY_ORDER.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
+];
 export { formatRelative };
 
 export type Participant = AvatarUser & { "@id"?: string; id: string };
@@ -74,12 +88,13 @@ interface Props {
   isSpaceAdmin: boolean;
   /** Notified with the total thread count after each load (header chip). */
   onCountChange?: (count: number) => void;
+  /** When set, the panel renders a {@link PageHeader} (title + icon +
+   *  description + count + "New discussion" action + search) instead of
+   *  the compact inline toolbar. */
+  title?: ReactNode;
+  description?: ReactNode;
+  icon?: ReactNode;
 }
-
-const FILTERS: { value: DiscussionCategory | "all"; label: string }[] = [
-  { value: "all", label: "All" },
-  ...CATEGORY_ORDER.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
-];
 
 /** Stable, human-ish handle for a thread — there's no server slug. */
 const slugFor = (title: string): string => {
@@ -112,6 +127,9 @@ const DiscussionsPanel = ({
   currentUserIri,
   isSpaceAdmin,
   onCountChange,
+  title,
+  description,
+  icon,
 }: Props) => {
   const queryClient = useQueryClient();
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
@@ -266,67 +284,88 @@ const DiscussionsPanel = ({
 
   const hasAny = discussions.length > 0;
 
+  const searchBox = (
+    <div className="relative w-full sm:flex-1">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        ref={searchRef}
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search discussions…"
+        className="pl-9"
+        data-testid="discussion-search"
+      />
+    </div>
+  );
+
+  const newButton = (
+    <Button
+      type="button"
+      size="sm"
+      onClick={() => setShowComposer((v) => !v)}
+      data-testid="discussion-toggle-composer"
+      className="shrink-0"
+    >
+      {showComposer ? "Cancel" : "New discussion"}
+    </Button>
+  );
+
+  // Category filters — one joined segmented control.
+  const filters = (
+    <div
+      className="inline-flex w-fit overflow-hidden rounded-full border border-input text-xs font-medium"
+      role="tablist"
+      aria-label="Filter by category"
+    >
+      {FILTERS.map((c, i) => {
+        const active = filter === c.value;
+        const dot = c.value === "all" ? null : CATEGORY_META[c.value].dot;
+        return (
+          <button
+            key={c.value}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={() => setFilter(c.value)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1 transition-colors",
+              i > 0 && "border-l border-input",
+              active
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {dot && (
+              <span className={cn("h-1.5 w-1.5 rounded-full", dot)} aria-hidden />
+            )}
+            {c.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div className="space-y-4" data-testid="discussions-panel">
-      {/* Toolbar: search + category filters + new */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-wrap items-center gap-2">
-          <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              ref={searchRef}
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search discussions…"
-              className="pl-9 pr-8"
-              data-testid="discussion-search"
-            />
-            <kbd className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-input bg-muted px-1.5 text-[10px] font-medium text-muted-foreground sm:inline">
-              /
-            </kbd>
-          </div>
-          <div
-            className="flex flex-wrap gap-1"
-            role="tablist"
-            aria-label="Filter by category"
-          >
-            {FILTERS.map((c) => {
-              const active = filter === c.value;
-              const dot =
-                c.value === "all" ? null : CATEGORY_META[c.value].dot;
-              return (
-                <button
-                  key={c.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setFilter(c.value)}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {dot && (
-                    <span className={cn("h-1.5 w-1.5 rounded-full", dot)} aria-hidden />
-                  )}
-                  {c.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setShowComposer((v) => !v)}
-          data-testid="discussion-toggle-composer"
+      {title ? (
+        <PageHeader
+          title={title}
+          icon={icon}
+          subtitle={description}
+          count={discussions.length}
+          actions={newButton}
         >
-          {showComposer ? "Cancel" : "New discussion"}
-        </Button>
-      </div>
+          {searchBox}
+        </PageHeader>
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {searchBox}
+          {newButton}
+        </div>
+      )}
+
+      {filters}
 
       {showComposer && (
         <Card data-testid="discussion-composer">

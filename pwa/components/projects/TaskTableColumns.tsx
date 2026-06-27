@@ -12,11 +12,15 @@ import type { ListColumn } from "@/components/projects/listColumns";
  */
 const TaskTableColumns = ({ columns }: { columns: ListColumn[] }) => (
   <colgroup>
-    <col className="w-8" />
+    {/* Wide enough to indent the checkbox under the section title text, with
+        the section's collapse chevron sitting in the gutter to its left. */}
+    <col className="w-16" />
     {columns.map((column) => (
       <col key={column.key} className={column.widthClass} />
     ))}
-    <col className="w-10" />
+    {/* Trailing column: no width = absorbs the remaining space as an empty
+        area on the right; its header carries the "add field" control. */}
+    <col />
   </colgroup>
 );
 

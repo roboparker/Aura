@@ -57,15 +57,16 @@ class CustomFieldDefinitionActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
+        // Fields are space-owned now; the change log covers the space's fields.
         $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project]);
+            ->findBy(['space' => $project->getSpace()]);
         $currentIds = array_map(
             static fn (CustomFieldDefinition $d): string => (string) $d->getId(),
             $definitions,
         );
 
         // Union current ids with the ids of fields that were deleted from this
-        // project (recovered from the audit log via the versioned `project`).
+        // space (recovered from the audit log via the versioned `space`).
         $objectIds = array_values(array_unique(
             [...$currentIds, ...$this->deletedDefinitionIds($project)],
         ));
@@ -76,20 +77,25 @@ class CustomFieldDefinitionActivityController extends AbstractController
     }
 
     /**
-     * Object ids of custom field definitions that once belonged to this project
-     * but no longer exist — read from the audit log's versioned `project`.
+     * Object ids of custom field definitions that once belonged to this
+     * project's space but no longer exist — read from the audit log's
+     * versioned `space`.
      *
      * @return list<string>
      */
     private function deletedDefinitionIds(Project $project): array
     {
+        $space = $project->getSpace();
+        if (null === $space) {
+            return [];
+        }
         // Gedmo stores the versioned association nested as {"id": "<uuid>"}.
         $rows = $this->em->getConnection()->executeQuery(
             "SELECT DISTINCT object_id FROM ext_log_entries
-             WHERE object_class = :class AND data->'project'->>'id' = :project",
+             WHERE object_class = :class AND data->'space'->>'id' = :space",
             [
                 'class' => CustomFieldDefinition::class,
-                'project' => (string) $project->getId(),
+                'space' => (string) $space->getId(),
             ],
         )->fetchFirstColumn();
 

@@ -6,11 +6,13 @@ use App\Entity\Tag;
 use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpInputHelper;
+use App\Mcp\McpSpaceResolver;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Creates a tag owned by the caller, mirroring the REST `Post` +
- * TagOwnerProcessor (owner is stamped server-side).
+ * Creates a tag in a space (#tags-space). The owner is stamped server-side;
+ * the space defaults to the caller's personal space when no spaceId is given,
+ * mirroring create_page.
  */
 final class CreateTagTool implements McpToolInterface
 {
@@ -18,6 +20,7 @@ final class CreateTagTool implements McpToolInterface
         private EntityManagerInterface $em,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private McpSpaceResolver $spaces,
     ) {
     }
 
@@ -28,7 +31,7 @@ final class CreateTagTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Create a tag owned by the authenticated user. Color is a #RRGGBB hex (defaults to grey).';
+        return 'Create a tag in a space. Pass a spaceId (from list_spaces) for a shared space, or omit it for your personal space. Color is a #RRGGBB hex (defaults to grey).';
     }
 
     public function getInputSchema(): array
@@ -37,6 +40,7 @@ final class CreateTagTool implements McpToolInterface
             'type' => 'object',
             'properties' => [
                 'title' => ['type' => 'string', 'description' => 'Tag label (required).'],
+                'spaceId' => ['type' => 'string', 'description' => 'UUID of a space the user belongs to. Omit for the personal space.'],
                 'color' => ['type' => 'string', 'description' => 'Hex color like #22c55e. Defaults to #6b7280.'],
                 'description' => ['type' => 'string', 'description' => 'Optional note.'],
             ],
@@ -49,6 +53,7 @@ final class CreateTagTool implements McpToolInterface
     {
         $tag = new Tag();
         $tag->setOwner($user);
+        $tag->setSpace($this->spaces->resolveMemberSpace($arguments['spaceId'] ?? null, $user));
         $tag->setTitle($this->input->requireString($arguments, 'title'));
         $color = $this->input->optionalString($arguments, 'color');
         if (null !== $color) {

@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -140,10 +141,26 @@ class Project
     #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, fetch: 'EXTRA_LAZY')]
     private Collection $tasks;
 
+    /**
+     * Custom-field definitions (owned by this project's space) this project
+     * shows on its tasks. Owning side of the M2M (#custom-fields-space);
+     * exposed as IRIs so the project Settings picker can read/set the subset.
+     *
+     * @var Collection<int, CustomFieldDefinition>
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToMany(targetEntity: CustomFieldDefinition::class, inversedBy: 'projects')]
+    #[ORM\JoinTable(name: 'project_custom_field_definition')]
+    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'custom_field_definition_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['project:read', 'project:write'])]
+    private Collection $customFieldDefinitions;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tasks = new ArrayCollection();
+        $this->customFieldDefinitions = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -206,6 +223,28 @@ class Project
     public function getTasks(): Collection
     {
         return $this->tasks;
+    }
+
+    /**
+     * @return Collection<int, CustomFieldDefinition>
+     */
+    public function getCustomFieldDefinitions(): Collection
+    {
+        return $this->customFieldDefinitions;
+    }
+
+    public function addCustomFieldDefinition(CustomFieldDefinition $definition): static
+    {
+        if (!$this->customFieldDefinitions->contains($definition)) {
+            $this->customFieldDefinitions->add($definition);
+        }
+        return $this;
+    }
+
+    public function removeCustomFieldDefinition(CustomFieldDefinition $definition): static
+    {
+        $this->customFieldDefinitions->removeElement($definition);
+        return $this;
     }
 
     /**

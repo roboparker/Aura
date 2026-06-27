@@ -166,43 +166,45 @@ test.describe("Tasks", () => {
     ).toBeVisible();
   });
 
-  test("quick-pick sets a due date and shows today/overdue indicators", async ({
-    page,
-  }) => {
-    // Two tasks: one we mark overdue via the API (yesterday), one we set to
-    // today via the UI quick-pick. Verifies styling + filter chip count.
+  test("due-date today/overdue indicators render", async ({ page }) => {
+    // Two tasks set via the API — one due today, one overdue (yesterday) —
+    // verify the date cell's today/overdue status styling and the overdue
+    // filter chip. (Date entry itself is a calendar now; that interaction is
+    // exercised in the task-drawer specs.)
     await registerAndSignIn(page, uniqueEmail());
     await page.goto(`${BASE_URL}/tasks`);
 
-    const todayTitle = `Today task ${Date.now()}`;
-    await createTaskInline(page, todayTitle);
-
-    // Open the picker on the new "today" task and click the Today quick-pick.
-    const todayItem = page.locator('[data-testid="task-item"]', {
-      hasText: todayTitle,
-    });
-    await todayItem.locator('[data-testid="task-due-date-add"]').click();
-    await page.locator('[data-testid="task-due-date-quick-today"]').click();
-    const todayCell = todayItem.locator('[data-testid="task-due-date"]');
-    await expect(todayCell).toHaveAttribute("data-status", "today");
-
-    // Create an overdue task by patching dueDate to yesterday via the API.
-    const overdueTitle = `Overdue task ${Date.now()}`;
-    const createRes = await page.request.post(`${BASE_URL}/tasks`, {
-      headers: { "Content-Type": "application/ld+json" },
-      data: { title: overdueTitle },
-    });
-    expect(createRes.ok()).toBeTruthy();
-    const created = await createRes.json();
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     yesterday.setHours(0, 0, 0, 0);
-    const patchRes = await page.request.patch(`${BASE_URL}${created["@id"]}`, {
-      headers: { "Content-Type": "application/merge-patch+json" },
-      data: { dueDate: yesterday.toISOString() },
-    });
-    expect(patchRes.ok()).toBeTruthy();
+
+    const todayTitle = `Today task ${Date.now()}`;
+    const overdueTitle = `Overdue task ${Date.now()}`;
+    for (const [taskTitle, due] of [
+      [todayTitle, today],
+      [overdueTitle, yesterday],
+    ]) {
+      const createRes = await page.request.post(`${BASE_URL}/tasks`, {
+        headers: { "Content-Type": "application/ld+json" },
+        data: { title: taskTitle },
+      });
+      expect(createRes.ok()).toBeTruthy();
+      const created = await createRes.json();
+      const patchRes = await page.request.patch(`${BASE_URL}${created["@id"]}`, {
+        headers: { "Content-Type": "application/merge-patch+json" },
+        data: { dueDate: due.toISOString() },
+      });
+      expect(patchRes.ok()).toBeTruthy();
+    }
     await page.reload();
+
+    const todayItem = page.locator('[data-testid="task-item"]', {
+      hasText: todayTitle,
+    });
+    const todayCell = todayItem.locator('[data-testid="task-due-date"]');
+    await expect(todayCell).toHaveAttribute("data-status", "today");
 
     const overdueItem = page.locator('[data-testid="task-item"]', {
       hasText: overdueTitle,

@@ -370,13 +370,6 @@ const SpaceDetail = () => {
       </Head>
       <main className="min-h-screen bg-muted px-4 py-8">
         <div className="max-w-6xl mx-auto">
-          <Link
-            href="/spaces"
-            className="inline-block text-sm text-primary hover:underline mb-3 no-underline"
-          >
-            ← All spaces
-          </Link>
-
           {isLoading || !space ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : (

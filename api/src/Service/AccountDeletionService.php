@@ -14,7 +14,6 @@ use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
-use App\Entity\UserGroup;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -61,7 +60,6 @@ final class AccountDeletionService
             $this->reassign(MediaObject::class, 'owner', $user, $sentinel);
 
             $this->handleSpaces($user, $userId);
-            $this->handleGroups($user, $userId);
 
             $managed = $this->em->find(User::class, $userId);
             if (null !== $managed) {
@@ -123,29 +121,6 @@ final class AccountDeletionService
                 $otherMembers[0]->setRole(Space::ROLE_ADMIN);
             } else {
                 $this->em->remove($space);
-            }
-        }
-    }
-
-    /**
-     * Groups the user owns → ownership handed to the next member, or the group
-     * is deleted if there's no one left.
-     */
-    private function handleGroups(User $user, string $userId): void
-    {
-        $groups = $this->em->getRepository(UserGroup::class)->findBy(['owner' => $user]);
-        foreach ($groups as $group) {
-            $successor = null;
-            foreach ($group->getMembers() as $member) {
-                if ((string) $member->getId() !== $userId) {
-                    $successor = $member;
-                    break;
-                }
-            }
-            if (null !== $successor) {
-                $group->setOwner($successor);
-            } else {
-                $this->em->remove($group);
             }
         }
     }

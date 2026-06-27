@@ -12,8 +12,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Reorder endpoint: `POST /projects/{id}/custom_field_definitions/reorder`.
- * Covers the space-admin gate, the contiguity guard, and the happy-path
- * renumbering that drives column order on the task list.
+ * Covers the space-member gate (#custom-fields-space), the contiguity guard,
+ * and the happy-path renumbering that drives column order on the task list.
  */
 class CustomFieldDefinitionReorderTest extends ApiTestCase
 {
@@ -56,12 +56,12 @@ class CustomFieldDefinitionReorderTest extends ApiTestCase
 
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project], ['position' => 'ASC']);
+            ->findBy(['space' => $project->getSpace()], ['position' => 'ASC']);
         $order = array_map(static fn (CustomFieldDefinition $d): string => $d->getName(), $reloaded);
         $this->assertSame(['Charlie', 'Alpha', 'Bravo'], $order);
     }
 
-    public function testMemberCannotReorder(): void
+    public function testSpaceMemberCanReorder(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
@@ -80,7 +80,29 @@ class CustomFieldDefinitionReorderTest extends ApiTestCase
                 ],
             ],
         ]);
-        // Non-admins (and non-members) get 404 to match the existence-hiding shape.
+        // Any space member can reorder (#custom-fields-space).
+        $this->assertResponseStatusCodeSame(204);
+    }
+
+    public function testNonMemberCannotReorder(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $stranger = $this->createUser('stranger@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $a = $this->seedField($project, 'Alpha', 0);
+        $b = $this->seedField($project, 'Bravo', 1);
+
+        $client = static::createClient();
+        $client->loginUser($stranger);
+        $client->request('POST', '/projects/' . $project->getId() . '/custom_field_definitions/reorder', [
+            'json' => [
+                'order' => [
+                    '/custom_field_definitions/' . $b->getId(),
+                    '/custom_field_definitions/' . $a->getId(),
+                ],
+            ],
+        ]);
+        // Non-members get 404 to match the existence-hiding shape.
         $this->assertResponseStatusCodeSame(404);
     }
 

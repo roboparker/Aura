@@ -7,7 +7,6 @@ use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
@@ -27,7 +26,6 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
 final class ValidCustomFieldValuesValidator extends ConstraintValidator
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
         private readonly CustomFieldTypeRegistry $registry,
     ) {
     }
@@ -67,12 +65,18 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
                 // missing definition separately.
                 continue;
             }
-            $defProject = $definition->getProject();
-            if (
-                null === $project
-                || null === $defProject
-                || (string) $defProject->getId() !== (string) $project->getId()
-            ) {
+            // A value is only legal for a definition the task's project has
+            // opted into (the space-owned field is attached to this project).
+            $attached = false;
+            if (null !== $project) {
+                foreach ($definition->getProjects() as $defProject) {
+                    if ((string) $defProject->getId() === (string) $project->getId()) {
+                        $attached = true;
+                        break;
+                    }
+                }
+            }
+            if (!$attached) {
                 $this->context->buildViolation($constraint->messageWrongProject)
                     ->setParameter('{{ name }}', $definition->getName())
                     ->atPath(sprintf('customFieldValues[%d].definition', $index))
@@ -146,8 +150,11 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         array $providedDefinitionIds,
         ValidCustomFieldValues $constraint,
     ): void {
-        $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project, 'nullable' => false]);
+        // Required = the project's opted-in fields that aren't nullable.
+        $definitions = array_filter(
+            $project->getCustomFieldDefinitions()->toArray(),
+            static fn (CustomFieldDefinition $d): bool => !$d->isNullable(),
+        );
 
         foreach ($definitions as $definition) {
             $defId = (string) $definition->getId();

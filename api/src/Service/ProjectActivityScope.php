@@ -43,10 +43,12 @@ final class ProjectActivityScope
             $project->getTasks()->toArray(),
         );
 
+        // Fields are space-owned but per-project shown; surface the fields this
+        // project has opted into. Per-project deleted-field recovery no longer
+        // applies (field history lives at the space level).
         $cfdIds = array_map(
             static fn (CustomFieldDefinition $d): string => (string) $d->getId(),
-            $this->em->getRepository(CustomFieldDefinition::class)
-                ->findBy(['project' => $project]),
+            $project->getCustomFieldDefinitions()->toArray(),
         );
 
         return [

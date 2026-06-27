@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Lock, MessageSquare, Pencil, Pin, Trash2 } from "lucide-react";
+import { Lock, MessageSquare, Pencil, Pin, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -381,12 +381,6 @@ const DiscussionDetailPage = () => {
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
-          <Button asChild variant="link" size="sm" className="px-0 h-auto">
-            <Link href="/discussions" data-testid="discussion-back-link">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Discussions
-            </Link>
-          </Button>
-
           {notFound ? (
             <Card>
               <CardContent className="pt-6">

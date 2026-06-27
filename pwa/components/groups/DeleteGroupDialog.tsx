@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import type { Group } from "@/lib/groupTypes";
-import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,61 +13,38 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import SpaceTile from "@/components/spaces/SpaceTile";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   group: Group;
-  /** When true the step-up requires a TOTP code; otherwise a password. */
-  twoFactorEnabled: boolean;
   /** Called after a successful delete (e.g. to navigate away). */
   onDeleted: () => void;
 }
 
-const formatDate = (iso: string): string => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-};
-
 /**
- * Type-to-confirm deletion dialog for a group. Group delete is owner-only
- * but not step-up protected (unlike space delete), so the only barrier is
- * typing the group name exactly — matching the server's security rule.
- *
- * The impact summary spells out that deleting the group revokes its
- * members from every attached space, with the caveat that members who
- * also belong to a space directly keep their access there.
+ * Type-to-confirm deletion dialog for a group. Group delete is open to any
+ * member of the group's space (#groups-space) and is not step-up protected
+ * (like tags / custom fields), so the only barrier is typing the group name
+ * exactly. Deleting revokes the access the group grants its members to its
+ * space (members who belong to the space directly keep their access).
  */
-const DeleteGroupDialog = ({
-  open,
-  onOpenChange,
-  group,
-  twoFactorEnabled,
-  onDeleted,
-}: Props) => {
+const DeleteGroupDialog = ({ open, onOpenChange, group, onDeleted }: Props) => {
   const [nameInput, setNameInput] = useState("");
-  const [credential, setCredential] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setNameInput("");
-    setCredential("");
     setError(null);
     setIsDeleting(false);
   }, [open]);
 
   const memberCount = group.memberships.length;
-  const spaces = group.attachedSpaces;
+  const spaceName = group.spaceSummary?.name;
   const nameMatches = nameInput === group.title;
-  const canDelete = nameMatches && credential.trim() !== "" && !isDeleting;
+  const canDelete = nameMatches && !isDeleting;
 
   const handleDelete = async () => {
     if (!canDelete) return;
@@ -78,12 +54,6 @@ const DeleteGroupDialog = ({
       const res = await fetch(`${ENTRYPOINT}${group["@id"]}`, {
         method: "DELETE",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          twoFactorEnabled
-            ? { totpCode: credential.trim() }
-            : { currentPassword: credential },
-        ),
       });
       if (!res.ok && res.status !== 204) {
         const data = await res.json().catch(() => ({}));
@@ -118,53 +88,21 @@ const DeleteGroupDialog = ({
 
         <Alert variant="destructive">
           <AlertDescription>
-            Removing{" "}
-            <span className="font-semibold">{group.title}</span> will revoke{" "}
-            <span className="font-semibold">{memberCount}</span>{" "}
-            {memberCount === 1 ? "member" : "members"} from{" "}
-            <span className="font-semibold">{spaces.length}</span>{" "}
-            {spaces.length === 1 ? "space" : "spaces"}.
+            Removing <span className="font-semibold">{group.title}</span> takes
+            its <span className="font-semibold">{memberCount}</span>{" "}
+            {memberCount === 1 ? "member" : "members"} with it
+            {spaceName ? (
+              <>
+                {" "}
+                — they lose the access this group grants to{" "}
+                <span className="font-semibold">{spaceName}</span> (members who
+                belong to the space directly keep their access).
+              </>
+            ) : (
+              "."
+            )}
           </AlertDescription>
         </Alert>
-
-        {spaces.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Spaces this group is attached to{" "}
-              <span className="text-muted-foreground/70">{spaces.length}</span>
-            </p>
-            <ul className="space-y-2">
-              {spaces.map((s) => (
-                <li
-                  key={s.id}
-                  className="flex items-center gap-3 rounded-md border px-3 py-2"
-                >
-                  <SpaceTile
-                    name={s.name}
-                    color={s.color ?? s.ownerColor ?? "#334155"}
-                    isPersonal={s.isPersonal}
-                    size="sm"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">{s.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      attached as {s.role} · since {formatDate(s.since)}
-                    </p>
-                  </div>
-                  <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs text-destructive">
-                    <ArrowRight className="h-3 w-3" aria-hidden />
-                    {memberCount} {memberCount === 1 ? "member" : "members"} lose
-                    access
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              Members who also belong to those spaces directly keep their access
-              — only access granted through this group is removed.
-            </p>
-          </div>
-        )}
 
         <div className="space-y-1.5">
           <Label htmlFor="delete-group-name">
@@ -190,26 +128,6 @@ const DeleteGroupDialog = ({
           )}
         </div>
 
-        <div className="space-y-1.5">
-          <Label htmlFor="delete-group-credential">
-            {twoFactorEnabled ? "Authentication code" : "Current password"}{" "}
-            <span className="text-muted-foreground font-normal">
-              {twoFactorEnabled
-                ? "From your authenticator app"
-                : "Confirm it's really you"}
-            </span>
-          </Label>
-          <Input
-            id="delete-group-credential"
-            value={credential}
-            onChange={(e) => setCredential(e.target.value)}
-            type={twoFactorEnabled ? "text" : "password"}
-            inputMode={twoFactorEnabled ? "numeric" : undefined}
-            autoComplete={twoFactorEnabled ? "one-time-code" : "current-password"}
-            placeholder={twoFactorEnabled ? "123 456" : undefined}
-          />
-        </div>
-
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>
@@ -228,7 +146,7 @@ const DeleteGroupDialog = ({
           <Button
             type="button"
             variant="destructive"
-            className={cn("gap-1.5")}
+            className="gap-1.5"
             disabled={!canDelete}
             onClick={handleDelete}
           >

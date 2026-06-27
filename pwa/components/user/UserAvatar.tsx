@@ -6,7 +6,6 @@ export interface AvatarUser extends NamedUser {
 }
 
 type Size = "sm" | "md" | "lg";
-type Shape = "circle" | "square";
 
 const SIZE_PX: Record<Size, number> = { sm: 32, md: 40, lg: 96 };
 const SIZE_TEXT: Record<Size, string> = {
@@ -14,33 +13,27 @@ const SIZE_TEXT: Record<Size, string> = {
   md: "text-sm",
   lg: "text-2xl",
 };
-// Square avatars get softly rounded corners that scale with the avatar
-// so the radius stays proportional at every size.
-const SHAPE_RADIUS: Record<Shape, Record<Size, string>> = {
-  circle: { sm: "rounded-full", md: "rounded-full", lg: "rounded-full" },
-  square: { sm: "rounded-md", md: "rounded-lg", lg: "rounded-2xl" },
+// Avatars are rounded squares; the corner radius scales with the avatar so it
+// stays proportional at every size.
+const SIZE_RADIUS: Record<Size, string> = {
+  sm: "rounded-md",
+  md: "rounded-lg",
+  lg: "rounded-2xl",
 };
 
 interface Props {
   user: AvatarUser;
   size?: Size;
-  /** Circle (default) or a square with rounded edges. */
-  shape?: Shape;
   className?: string;
 }
 
-const UserAvatar = ({
-  user,
-  size = "md",
-  shape = "circle",
-  className = "",
-}: Props) => {
+const UserAvatar = ({ user, size = "md", className = "" }: Props) => {
   const px = SIZE_PX[size];
   const useThumb = size !== "lg";
   const src = useThumb ? user.avatarUrls?.thumb : user.avatarUrls?.profile;
 
   const sharedClass =
-    `${SHAPE_RADIUS[shape][size]} overflow-hidden select-none shrink-0 ${className}`.trim();
+    `${SIZE_RADIUS[size]} overflow-hidden select-none shrink-0 ${className}`.trim();
 
   if (src) {
     return (

@@ -12,6 +12,7 @@ import { contentSectionFor } from "@/lib/contentSections";
 import { cn } from "@/lib/utils";
 import { displayName } from "@/lib/userDisplay";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -135,36 +136,36 @@ const PagesIndex = () => {
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-          <header className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <PagesIcon className={cn("h-6 w-6 shrink-0", pagesMeta.iconClass)} />
-                <h1 className="text-2xl font-bold">Pages</h1>
-                {!isLoading && (
-                  <span
-                    className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                    data-testid="pages-count"
-                  >
-                    {pages.length}
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {activeSpace
-                  ? `Long-form documents in ${activeSpace.name}.`
-                  : "Long-form documents in the spaces you belong to."}
-              </p>
-            </div>
-            {activeSpace && (
-              <Button
-                size="sm"
-                onClick={() => setShowComposer((v) => !v)}
-                data-testid="new-page-button"
-              >
-                {showComposer ? "Cancel" : "New page"}
-              </Button>
-            )}
-          </header>
+          <PageHeader
+            title="Pages"
+            icon={<PagesIcon className={cn("h-6 w-6 shrink-0", pagesMeta.iconClass)} />}
+            count={isLoading ? null : pages.length}
+            subtitle={
+              activeSpace
+                ? `Long-form documents in ${activeSpace.name}.`
+                : "Long-form documents in the spaces you belong to."
+            }
+            actions={
+              activeSpace && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowComposer((v) => !v)}
+                  data-testid="new-page-button"
+                >
+                  {showComposer ? "Cancel" : "New page"}
+                </Button>
+              )
+            }
+          >
+            <Input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search pages…"
+              className="w-full"
+              aria-label="Search pages"
+            />
+          </PageHeader>
 
           {showComposer && activeSpace && (
             <Card>
@@ -199,17 +200,6 @@ const PagesIndex = () => {
               </CardContent>
             </Card>
           )}
-
-          <div className="flex items-center gap-2">
-            <Input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search pages…"
-              className="max-w-sm"
-              aria-label="Search pages"
-            />
-          </div>
 
           {error && (
             <Alert variant="destructive">

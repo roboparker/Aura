@@ -8,6 +8,7 @@ use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -72,8 +73,8 @@ class CustomFieldStatsController extends AbstractController
         $rows = $this->em->createQueryBuilder()
             ->select('IDENTITY(cfv.definition) AS did', 'COUNT(cfv.id) AS filled')
             ->from(CustomFieldValue::class, 'cfv')
-            ->join('cfv.definition', 'd')
-            ->where('d.project = :project')
+            ->join('cfv.task', 't')
+            ->where('t.project = :project')
             ->andWhere('cfv.value IS NOT NULL')
             ->setParameter('project', $project)
             ->groupBy('cfv.definition')
@@ -87,8 +88,13 @@ class CustomFieldStatsController extends AbstractController
             $filledByDef[$key] = (int) $row['filled'];
         }
 
-        $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['project' => $project], ['position' => 'ASC']);
+        // The fields this project has opted into, in space order.
+        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        usort(
+            $definitions,
+            static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
+                => $a->getPosition() <=> $b->getPosition(),
+        );
 
         $stats = array_map(function (CustomFieldDefinition $def) use ($filledByDef): array {
             $key = (string) $def->getId();
@@ -116,8 +122,8 @@ class CustomFieldStatsController extends AbstractController
         }
 
         $definition = $this->em->getRepository(CustomFieldDefinition::class)->find($id);
-        $project = $definition?->getProject();
-        if (null === $definition || null === $project || !$this->canRead($project, $user)) {
+        $space = $definition?->getSpace();
+        if (null === $definition || null === $space || !$this->canReadSpace($space, $user)) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
@@ -178,5 +184,13 @@ class CustomFieldStatsController extends AbstractController
             return true;
         }
         return $project->isAccessibleBy($user);
+    }
+
+    private function canReadSpace(Space $space, User $user): bool
+    {
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return true;
+        }
+        return $space->hasMember($user);
     }
 }

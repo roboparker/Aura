@@ -47,7 +47,7 @@ test.describe("Pages", () => {
     ).toBeVisible();
 
     // Back to the list view — the page is now there.
-    await page.click('[data-testid="page-back-link"]');
+    await page.goto(`${BASE_URL}/pages`);
     await expect(page).toHaveURL(/\/pages$/);
     const row = page.locator('[data-testid="page-item"]', { hasText: title });
     await expect(row).toBeVisible();

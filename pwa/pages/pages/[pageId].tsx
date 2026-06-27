@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -399,13 +399,6 @@ const PageDetailView = () => {
       </Head>
       <main className="min-h-screen bg-muted">
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-          <Button asChild variant="link" size="sm" className="px-0 h-auto">
-            <Link href="/pages" data-testid="page-back-link">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-              All pages
-            </Link>
-          </Button>
-
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>

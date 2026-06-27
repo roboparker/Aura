@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -10,7 +12,6 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\UserGroupRepository;
 use App\Service\AvatarColorService;
-use App\State\UserGroupDeleteProcessor;
 use App\State\UserGroupOwnerProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -21,9 +22,11 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Reusable named set of users. The owner has full control: edit metadata,
- * manage membership, transfer ownership, or delete the group. Other members
- * are read-only — they appear in the group's listings but cannot mutate it.
+ * Named set of users owned by a single {@see Space} (#groups-space). Any
+ * member of the group's space can edit metadata, manage membership, or delete
+ * the group — there is no per-group owner. Every member of the group gains
+ * access to the group's space transitively (the group is the access-granting
+ * unit), so a group's reach is always scoped to that one space.
  *
  * Named "UserGroup" rather than "Group" because (a) `group` is a reserved
  * SQL keyword and (b) `Group` clashes with `Symfony\Component\Serializer\
@@ -31,10 +34,9 @@ use Symfony\Component\Validator\Constraints as Assert;
  *
  * Membership is modelled by {@see UserGroupMembership} (one row per user,
  * carrying a `joinedAt`) rather than a plain join table so the detail UI
- * can show when each member joined. Transfer ownership, member removal,
- * and leaving the group all run through dedicated controllers — there is
- * no `group:write` on `owner` or `memberships`, so a stolen cookie can't
- * silently reassign the group via a plain PATCH.
+ * can show when each member joined. Member add/remove and leaving the group
+ * run through dedicated controllers — there is no `group:write` on
+ * `memberships`, so a stolen cookie can't reshape the roster via a plain PATCH.
  */
 #[ApiResource(
     shortName: 'Group',
@@ -44,28 +46,29 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
+            securityPostDenormalize: "is_granted('ROLE_USER') and object.getSpace() !== null and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
             processor: UserGroupOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER')",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
-            securityMessage: 'Only the group owner can edit the group.',
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            securityMessage: "Only members of the group's space can edit the group.",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user)",
-            securityMessage: 'Only the group owner can delete the group.',
-            processor: UserGroupDeleteProcessor::class,
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            securityMessage: "Only members of the group's space can delete the group.",
         ),
     ],
     normalizationContext: ['groups' => ['group:read']],
     denormalizationContext: ['groups' => ['group:write']],
     order: ['createdOn' => 'DESC'],
 )]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact'])]
 #[ORM\Entity(repositoryClass: UserGroupRepository::class)]
 #[ORM\Table(name: 'user_group')]
-#[ORM\Index(columns: ['owner_id'], name: 'idx_user_group_owner')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_user_group_space')]
 #[ORM\UniqueConstraint(name: 'uniq_user_group_slug', columns: ['slug'])]
 class UserGroup
 {
@@ -80,14 +83,14 @@ class UserGroup
     private ?Uuid $id = null;
 
     /**
-     * The user who currently controls the group. Set by
-     * UserGroupOwnerProcessor on create; reassigned via the dedicated,
-     * step-up-protected transfer endpoint (not via PATCH).
+     * The space that owns the group (#groups-space). A group belongs to
+     * exactly one space; every group member gains access to that space.
+     * Set on create from the request payload (immutable after).
      */
-    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'groups')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['group:read'])]
-    private ?User $owner = null;
+    #[Groups(['group:write'])]
+    private ?Space $space = null;
 
     #[ORM\Column(length: self::MAX_TITLE_LENGTH)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -113,8 +116,8 @@ class UserGroup
 
     /**
      * Override color for the group avatar tile. When null the UI falls
-     * back to the owner's `personalizedColor`. Constrained to the same
-     * WCAG-AA palette as user avatars so white initials stay legible.
+     * back to the group's space color (then the avatar palette). Constrained
+     * to the same WCAG-AA palette as user avatars so white initials stay legible.
      */
     #[ORM\Column(length: 7, nullable: true)]
     #[Assert\Choice(
@@ -140,9 +143,8 @@ class UserGroup
     private \DateTimeInterface $updatedAt;
 
     /**
-     * The group's membership roster. The owner is added here automatically
-     * by UserGroupOwnerProcessor so access checks can rely solely on
-     * memberships without a special case for the owner.
+     * The group's membership roster. The creator is added here automatically
+     * by UserGroupOwnerProcessor so a new group always has at least one member.
      *
      * @var Collection<int, UserGroupMembership>
      */
@@ -156,20 +158,6 @@ class UserGroup
     #[Groups(['group:read'])]
     private Collection $memberships;
 
-    /**
-     * Inverse side of the spaces this group is attached to (each row adds
-     * every group member to a space transitively). Read-only; surfaced as
-     * a flattened summary by {@see getAttachedSpaces()}.
-     *
-     * @var Collection<int, SpaceGroupMembership>
-     */
-    #[ORM\OneToMany(
-        mappedBy: 'userGroup',
-        targetEntity: SpaceGroupMembership::class,
-        fetch: 'EXTRA_LAZY',
-    )]
-    private Collection $spaceMemberships;
-
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
@@ -178,7 +166,6 @@ class UserGroup
         // (the column is NOT NULL).
         $this->updatedAt = new \DateTime();
         $this->memberships = new ArrayCollection();
-        $this->spaceMemberships = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -186,14 +173,14 @@ class UserGroup
         return $this->id;
     }
 
-    public function getOwner(): ?User
+    public function getSpace(): ?Space
     {
-        return $this->owner;
+        return $this->space;
     }
 
-    public function setOwner(?User $owner): static
+    public function setSpace(?Space $space): static
     {
-        $this->owner = $owner;
+        $this->space = $space;
         return $this;
     }
 
@@ -332,40 +319,24 @@ class UserGroup
     }
 
     /**
-     * Flattened summary of the spaces this group is attached to, for the
-     * detail page's "Attached to" card. Returned as plain arrays so the
-     * minimal space fields the UI needs don't pull the full Space
-     * serialization graph into the `group:read` context.
+     * Lean summary of the group's owning space, for the detail page's
+     * "Belongs to" card and color fallback. Returned as a plain array so the
+     * minimal fields the UI needs don't pull the full Space serialization
+     * graph into the `group:read` context.
      *
-     * @return list<array{
-     *     id: string,
-     *     name: string,
-     *     color: string|null,
-     *     isPersonal: bool,
-     *     ownerColor: string|null,
-     *     role: string,
-     *     since: string
-     * }>
+     * @return array{id: string, name: string, color: string|null, isPersonal: bool}|null
      */
     #[Groups(['group:read'])]
-    public function getAttachedSpaces(): array
+    public function getSpaceSummary(): ?array
     {
-        $out = [];
-        foreach ($this->spaceMemberships as $membership) {
-            $space = $membership->getSpace();
-            if (null === $space || null === $space->getId()) {
-                continue;
-            }
-            $out[] = [
-                'id' => (string) $space->getId(),
-                'name' => $space->getName(),
-                'color' => $space->getColor(),
-                'isPersonal' => $space->getIsPersonal(),
-                'ownerColor' => $space->getCreatedBy()?->getPersonalizedColor(),
-                'role' => $membership->getRole(),
-                'since' => $membership->getJoinedAt()->format(\DateTimeInterface::ATOM),
-            ];
+        if (null === $this->space || null === $this->space->getId()) {
+            return null;
         }
-        return $out;
+        return [
+            'id' => (string) $this->space->getId(),
+            'name' => $this->space->getName(),
+            'color' => $this->space->getColor(),
+            'isPersonal' => $this->space->getIsPersonal(),
+        ];
     }
 }
