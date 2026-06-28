@@ -10,7 +10,7 @@ import {
   type ButtonHTMLAttributes,
   type RefObject,
 } from "react";
-import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -72,7 +72,6 @@ import {
   type RecurrenceRule,
 } from "@/components/tasks/taskHelpers";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -194,8 +193,8 @@ const ProjectDetail = () => {
   const [activeTab, setActiveTab] = useState("list");
   // Settings sub-section (left menu like the user settings page).
   const [settingsSection, setSettingsSection] = useState<
-    "privacy" | "fields" | "danger"
-  >("privacy");
+    "fields" | "danger"
+  >("fields");
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
@@ -1039,12 +1038,6 @@ const ProjectDetail = () => {
   const space = project
     ? spaces.find((s) => s["@id"] === projectSpaceIri(project))
     : undefined;
-  const spaceId = project
-    ? typeof project.space === "string"
-      ? project.space.split("/").pop()
-      : project.space.id
-    : undefined;
-
   return (
     <>
       <Head>
@@ -1132,7 +1125,6 @@ const ProjectDetail = () => {
                     >
                       {(
                         [
-                          { key: "privacy", label: "Privacy", Icon: Shield },
                           { key: "fields", label: "Custom fields", Icon: Table2 },
                           { key: "danger", label: "Danger zone", Icon: TriangleAlert },
                         ] as const
@@ -1159,58 +1151,6 @@ const ProjectDetail = () => {
                     </nav>
 
                     <div className="min-w-0 flex-1 space-y-6">
-                      {settingsSection === "privacy" && (
-                        <Card>
-                          <CardContent
-                            className="space-y-3 pt-6"
-                            data-testid="project-space-info"
-                          >
-                            {project.description && (
-                              <p className="text-sm text-muted-foreground">
-                                {project.description}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Space</span>
-                              <Badge variant="secondary" className="gap-1">
-                                {space?.isPersonal && (
-                                  <Lock className="h-3 w-3" aria-hidden />
-                                )}
-                                {space?.name ??
-                                  (typeof project.space === "string"
-                                    ? "Unknown space"
-                                    : project.space.name)}
-                              </Badge>
-                              {spaceId && (
-                                <Button
-                                  asChild
-                                  variant="link"
-                                  size="sm"
-                                  className="h-auto p-0"
-                                >
-                                  <Link href={`/spaces/${spaceId}`}>
-                                    Manage members in space
-                                  </Link>
-                                </Button>
-                              )}
-                            </div>
-
-                            {project.members.length > 0 && (
-                              <ul
-                                className="flex flex-wrap items-center gap-1"
-                                data-testid="member-list"
-                              >
-                                {project.members.map((member) => (
-                                  <li key={member["@id"]} data-testid="member-pill">
-                                    <Badge variant="outline">{member.email}</Badge>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </CardContent>
-                        </Card>
-                      )}
-
                       {settingsSection === "fields" && (
                         <ProjectCustomFieldPicker
                           spaceIri={projectSpaceIri(project)}
