@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
@@ -419,8 +420,13 @@ const ProjectDetail = () => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/ld+json" },
-          // Tags are space-scoped: create it in this project's space.
-          body: JSON.stringify({ title, space: projectSpaceIri(project) }),
+          // Tags are space-scoped: create it in this project's space. Give
+          // it a random palette color so inline-created tags aren't all grey.
+          body: JSON.stringify({
+            title,
+            space: projectSpaceIri(project),
+            color: randomPaletteColor(),
+          }),
         });
         if (!res.ok) return null;
         const created = (await res.json()) as TagOption;
