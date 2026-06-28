@@ -10,7 +10,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Check, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { Check, GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import AssigneePlaceholder from "@/components/user/AssigneePlaceholder";
 import { displayName } from "@/lib/userDisplay";
@@ -65,6 +65,8 @@ interface TaskBoardProps {
   assignableUsers: BoardUser[];
   onOpen: (taskIri: string) => void;
   onMove: (taskIri: string, sectionIri: string | null) => void;
+  /** Reorder columns: the dragged column key and the column it was dropped on. */
+  onReorderSections: (activeKey: string, overKey: string) => void;
   onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
   onAddTask: (sectionIri: string | null) => void;
   onAddSection: (title: string) => void;
@@ -72,6 +74,7 @@ interface TaskBoardProps {
 }
 
 const COL_PREFIX = "col:";
+const SECTION_PREFIX = "section:";
 
 const dueLabel = (iso: string): string => {
   const d = new Date(iso);
@@ -311,12 +314,34 @@ const BoardColumnView = ({
   onDeleteSection: (sectionIri: string) => void;
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${column.key}` });
+  // The whole column is draggable (to reorder), but only the header grip
+  // activates the drag — so clicking cards/menu/add-task still works.
+  const {
+    setNodeRef: setDragRef,
+    attributes,
+    listeners,
+    isDragging,
+  } = useDraggable({ id: `${SECTION_PREFIX}${column.key}` });
   return (
     <div
-      className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/40"
+      ref={setDragRef}
+      className={cn(
+        "flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/40",
+        isDragging && "opacity-50",
+      )}
       data-testid="board-column"
     >
       <div className="flex items-center gap-2 border-b bg-card px-3 py-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="-ml-1 cursor-grab touch-none rounded p-0.5 text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          aria-label={`Reorder section "${column.title}"`}
+          data-testid="board-column-drag"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
         <span className="text-base font-bold tracking-tight text-foreground">
           {column.title}
         </span>
@@ -381,6 +406,7 @@ const TaskBoard = ({
   assignableUsers,
   onOpen,
   onMove,
+  onReorderSections,
   onAssign,
   onAddTask,
   onAddSection,
@@ -409,6 +435,10 @@ const TaskBoard = ({
   const draggingTask = draggingId
     ? columns.flatMap((c) => c.tasks).find((t) => t["@id"] === draggingId)
     : null;
+  const draggingSection =
+    draggingId && draggingId.startsWith(SECTION_PREFIX)
+      ? columns.find((c) => `${SECTION_PREFIX}${c.key}` === draggingId)
+      : null;
 
   const handleStart = (event: DragStartEvent) =>
     setDraggingId(String(event.active.id));
@@ -417,15 +447,24 @@ const TaskBoard = ({
     setDraggingId(null);
     const { active, over } = event;
     if (!over) return;
+    const activeId = String(active.id);
     const overId = String(over.id);
     if (!overId.startsWith(COL_PREFIX)) return;
     const colKey = overId.slice(COL_PREFIX.length);
     const target = columns.find((c) => c.key === colKey);
     if (!target) return;
-    const taskIri = String(active.id);
-    const task = columns.flatMap((c) => c.tasks).find((t) => t["@id"] === taskIri);
+
+    // Column reorder: a section header was dragged onto another column.
+    if (activeId.startsWith(SECTION_PREFIX)) {
+      const activeKey = activeId.slice(SECTION_PREFIX.length);
+      if (activeKey !== target.key) onReorderSections(activeKey, target.key);
+      return;
+    }
+
+    // Otherwise a task card was dropped on a column → move it there.
+    const task = columns.flatMap((c) => c.tasks).find((t) => t["@id"] === activeId);
     if (task && task.section !== target.sectionIri) {
-      onMove(taskIri, target.sectionIri);
+      onMove(activeId, target.sectionIri);
     }
   };
 
@@ -484,6 +523,16 @@ const TaskBoard = ({
               assignableUsers={assignableUsers}
               onAssign={onAssign}
             />
+          </div>
+        ) : draggingSection ? (
+          <div className="flex w-80 items-center gap-2 rounded-xl border bg-card px-3 py-2 shadow-lg">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <span className="text-base font-bold tracking-tight text-foreground">
+              {draggingSection.title}
+            </span>
+            <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {draggingSection.tasks.length}
+            </span>
           </div>
         ) : null}
       </DragOverlay>

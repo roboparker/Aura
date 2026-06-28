@@ -1480,7 +1480,7 @@ const ProjectDetail = () => {
                   <TaskBoard
                     definitions={boardDefinitions}
                     assignableUsers={projectAssignableUsers}
-                    columns={sectionGroups.map((group) => ({
+                    columns={orderedSectionGroups.map((group) => ({
                       key: group.key,
                       sectionIri: group.section ? group.section["@id"] : null,
                       title: group.section
@@ -1493,6 +1493,13 @@ const ProjectDetail = () => {
                       if (task) openTaskDetail(task);
                     }}
                     onMove={moveTaskToSection}
+                    onReorderSections={(activeKey, overKey) => {
+                      const from = sectionIds.indexOf(activeKey);
+                      const to = sectionIds.indexOf(overKey);
+                      if (from !== -1 && to !== -1 && from !== to) {
+                        listView.setSectionOrder(arrayMove(sectionIds, from, to));
+                      }
+                    }}
                     onAssign={(taskIri, iris) => {
                       const task = tasks.find((t) => t["@id"] === taskIri);
                       if (task) void patchTask(task, { assignees: iris });
