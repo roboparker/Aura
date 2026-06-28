@@ -313,10 +313,10 @@ const BoardColumnView = ({
   const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${column.key}` });
   return (
     <div
-      className="flex w-80 shrink-0 flex-col rounded-xl bg-muted/40 p-2"
+      className="flex w-80 shrink-0 flex-col rounded-xl border bg-muted/40 p-2"
       data-testid="board-column"
     >
-      <div className="mb-2 flex items-center gap-2 px-1">
+      <div className="mb-2 flex items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 shadow-sm">
         <span className="text-sm font-semibold">{column.title}</span>
         <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
         {column.sectionIri && (
