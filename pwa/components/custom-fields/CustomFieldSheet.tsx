@@ -89,11 +89,6 @@ const FOOTER_LABELS: Record<FooterKind, string> = {
   max: "Max",
 };
 
-const VISIBILITY_OPTIONS: { value: CustomFieldVisibility; label: string }[] = [
-  { value: "list", label: "List view" },
-  { value: "board", label: "Board view" },
-  { value: "both", label: "Both" },
-];
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -576,39 +571,6 @@ const CustomFieldSheet = ({
               onCheckedChange={(checked) => setNullable(!checked)}
               testId="custom-field-required-input"
             />
-
-            <div className="space-y-2">
-              <Label>
-                Visibility{" "}
-                <span className="text-muted-foreground text-xs">
-                  (where the field's value is shown)
-                </span>
-              </Label>
-              <div
-                className="inline-flex rounded-md border p-0.5"
-                data-testid="custom-field-visibility-input"
-              >
-                {VISIBILITY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setVisibility(opt.value)}
-                    className={cn(
-                      "rounded px-3 py-1 text-sm transition-colors",
-                      visibility === opt.value
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                    data-testid={`custom-field-visibility-${opt.value}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-muted-foreground text-xs">
-                The task detail drawer always shows every field.
-              </p>
-            </div>
 
             <div className="space-y-2">
               <Label>
