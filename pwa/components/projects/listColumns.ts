@@ -116,12 +116,16 @@ export const buildColumns = (
     { key: "assignees", label: "Assignees", sortable: true, filter: "assignees", widthClass: "w-40" },
     { key: "tags", label: "Tags", sortable: true, filter: "tags", widthClass: "w-36" },
   ];
+  // Custom-field columns get a comfortable fixed width — wide enough to fit
+  // the header + typical values without truncating (the old w-32 was too
+  // tight), but fixed so they don't balloon to fill the row. The trailing
+  // flex column still absorbs the leftover as an empty gutter on the right.
   const custom: ListColumn[] = definitions.map((def) => ({
     key: cfColumnKey(def),
     label: def.name,
     sortable: SORTABLE_KIND[def.kind],
     filter: FILTER_FOR_KIND[def.kind],
-    widthClass: "w-32",
+    widthClass: "w-44",
     definition: def,
   }));
   return [...builtins, ...custom];
