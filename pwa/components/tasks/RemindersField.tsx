@@ -154,14 +154,15 @@ const RemindersField = ({
           </Button>
         </div>
       ) : (
-        <button
+        <Button
           type="button"
+          size="sm"
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
           data-testid={`${testIdPrefix}-add`}
         >
           <Plus className="h-3.5 w-3.5" /> Add reminder
-        </button>
+        </Button>
       )}
 
       {dueDate === null && reminders.length > 0 && (
