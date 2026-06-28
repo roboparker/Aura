@@ -86,6 +86,9 @@ interface Props {
   spaceIri: string;
   currentUserIri: string | null;
   isSpaceAdmin: boolean;
+  /** Whether the viewer may create a discussion here (#space-roles). Defaults
+   *  to true; the server still enforces. */
+  canCreate?: boolean;
   /** Notified with the total thread count after each load (header chip). */
   onCountChange?: (count: number) => void;
   /** When set, the panel renders a {@link PageHeader} (title + icon +
@@ -126,6 +129,7 @@ const DiscussionsPanel = ({
   spaceIri,
   currentUserIri,
   isSpaceAdmin,
+  canCreate = true,
   onCountChange,
   title,
   description,
@@ -299,7 +303,7 @@ const DiscussionsPanel = ({
     </div>
   );
 
-  const newButton = (
+  const newButton = canCreate ? (
     <Button
       type="button"
       size="sm"
@@ -309,7 +313,7 @@ const DiscussionsPanel = ({
     >
       {showComposer ? "Cancel" : "New discussion"}
     </Button>
-  );
+  ) : null;
 
   // Category filters — one joined segmented control.
   const filters = (
