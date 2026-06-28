@@ -4,7 +4,6 @@ const {
   BASE_URL,
   uniqueEmail: shared,
   registerAndSignIn,
-  openAccountMenu,
 } = require("./helpers");
 
 const uniqueEmail = () => shared("groups");
@@ -45,19 +44,9 @@ test.describe("Groups", () => {
     const ownerPage = await ownerContext.newPage();
     await registerAndSignIn(ownerPage, ownerEmail);
 
-    await ownerPage.goto(`${BASE_URL}/groups`);
-    await expect(ownerPage).toHaveTitle("Groups - Madori");
-    await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
-
-    // Create via the empty-state call to action → /groups/new.
-    await ownerPage.getByRole("link", { name: /Create your first group/ }).click();
-    await expect(ownerPage).toHaveURL(/\/groups\/new/);
-    await ownerPage.fill("#group-title", title);
-    await ownerPage.locator('button[type="submit"]', { hasText: /Create group/ }).click();
-
-    // Lands on the detail page as owner.
-    await expect(ownerPage).toHaveURL(/\/groups\/[\w-]+/);
-    await expect(ownerPage.getByRole("heading", { name: title })).toBeVisible();
+    // Create via the full-page composer (the standalone index was folded into
+    // the space Users page).
+    await createGroup(ownerPage, title);
     await expect(ownerPage.locator('[data-testid="member-row"]')).toContainText(ownerEmail);
 
     // Add a member by email.
@@ -69,26 +58,17 @@ test.describe("Groups", () => {
       ownerPage.locator('[data-testid="member-row"]', { hasText: memberEmail }),
     ).toBeVisible();
 
-    // It shows up on the index.
-    await ownerPage.goto(`${BASE_URL}/groups`);
-    await expect(
-      ownerPage.locator('[data-testid="group-item"]', { hasText: title }),
-    ).toBeVisible();
-
     // Delete from the detail page — type-to-confirm dialog (no step-up now;
     // any space member can delete a group).
-    await ownerPage
-      .locator('[data-testid="group-item"]', { hasText: title })
-      .getByRole("link", { name: title })
-      .click();
     await ownerPage.getByRole("button", { name: /^Delete$/ }).click();
     const dialog = ownerPage.getByRole("dialog");
     await expect(dialog.getByText("Delete this group?")).toBeVisible();
     await dialog.locator("#delete-group-name").fill(title);
     await dialog.getByRole("button", { name: /Delete group/ }).click();
 
-    await expect(ownerPage).toHaveURL(/\/groups$/);
-    await expect(ownerPage.locator("text=No groups yet")).toBeVisible();
+    // Deleting drops us on the space Users page; the group is gone.
+    await expect(ownerPage).toHaveURL(/\/spaces\/[\w-]+\/users/);
+    await expect(ownerPage.locator(`text=${title}`)).toHaveCount(0);
 
     await ownerContext.close();
   });
@@ -128,16 +108,5 @@ test.describe("Groups", () => {
     await expect(
       page.locator('[data-testid="pending-invite-row"]', { hasText: ghost }),
     ).toBeVisible();
-  });
-
-  test("account menu shows Manage Groups link when authenticated", async ({
-    page,
-  }) => {
-    await registerAndSignIn(page, uniqueEmail());
-    await openAccountMenu(page);
-    const groupsItem = page.getByRole("menuitem", { name: "Manage Groups" });
-    await expect(groupsItem).toBeVisible();
-    await groupsItem.click();
-    await expect(page).toHaveURL(/\/groups/);
   });
 });

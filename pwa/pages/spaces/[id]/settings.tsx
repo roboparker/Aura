@@ -2,38 +2,15 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  Download,
-  Lock,
-  LockOpen,
-  Mail,
-  Trash2,
-  UserPlus,
-  X,
-} from "lucide-react";
+import { Download, Lock, LockOpen, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  useActiveSpace,
-  type Space,
-  type SpaceMember,
-} from "@/contexts/ActiveSpaceContext";
+import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { resolveSpaceColor } from "@/lib/avatarPalette";
-import { formatRelative } from "@/lib/relativeTime";
-import { displayName } from "@/lib/userDisplay";
-import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
@@ -42,14 +19,11 @@ import SpaceTile from "@/components/spaces/SpaceTile";
 import SpaceBillingCard from "@/components/spaces/SpaceBillingCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
 // Billing (Stripe) is off until a real payment system is wired up. Flip
 // NEXT_PUBLIC_BILLING_ENABLED=true (and configure the Stripe env) to surface
 // the plan/upgrade card again. Off = the card isn't mounted or fetched.
 const BILLING_ENABLED = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true";
-
-type Role = "admin" | "member";
 
 interface PendingInvite {
   id: string;
@@ -60,51 +34,10 @@ interface PendingInvite {
   expiresAt: string;
 }
 
-const toAvatarUser = (m: SpaceMember): AvatarUser => ({
-  ...m,
-  personalizedColor: m.personalizedColor ?? "#64748b",
-});
-
-/** Compact role picker (Admin / Member) — used per member row and on invite. */
-const RoleSelect = ({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: Role;
-  onChange: (role: Role) => void;
-  disabled?: boolean;
-}) => (
-  <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <button
-        type="button"
-        disabled={disabled}
-        className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium capitalize hover:bg-accent disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
-      >
-        <span
-          className={cn(
-            "h-1.5 w-1.5 rounded-full",
-            value === "admin" ? "bg-violet-500" : "bg-emerald-500",
-          )}
-        />
-        {value}
-        <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
-      </button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="min-w-[120px]">
-      <DropdownMenuItem onSelect={() => onChange("admin")}>Admin</DropdownMenuItem>
-      <DropdownMenuItem onSelect={() => onChange("member")}>Member</DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>
-);
-
 /**
- * Admin-only space settings (`/spaces/{id}/settings`). A single inline
- * form for the space's details, appearance, and members, with a sticky
- * save bar for the metadata fields. Member role changes, removals, and
- * invites apply immediately (they're their own API calls); only name /
- * description / visibility / color are batched behind "Save changes".
+ * Admin-only space settings (`/spaces/{id}/settings`): the space's details and
+ * appearance, plus data export and the danger zone. Member / invite / group
+ * management lives on the Users page (`/spaces/{id}/users`).
  */
 const SpaceSettings = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -114,6 +47,7 @@ const SpaceSettings = () => {
   const spaceId = typeof id === "string" ? id : null;
 
   const [space, setSpace] = useState<Space | null>(null);
+  // Pending-invite count powers the "make private" warning dialog only.
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,15 +63,6 @@ const SpaceSettings = () => {
   });
   const formInitialized = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Invite-by-email.
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<Role>("member");
-  const [isInviting, setIsInviting] = useState(false);
-  const [inviteMessage, setInviteMessage] = useState<{
-    text: string;
-    kind: "success" | "error";
-  } | null>(null);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [visibilityOpen, setVisibilityOpen] = useState(false);
@@ -165,8 +90,8 @@ const SpaceSettings = () => {
       const data: Space = await res.json();
       setSpace(data);
 
-      // Initialise the metadata form once so a background reload (after
-      // a member change) doesn't clobber in-progress edits.
+      // Initialise the metadata form once so a background reload doesn't
+      // clobber in-progress edits.
       if (!formInitialized.current) {
         const snap = {
           name: data.name,
@@ -304,94 +229,6 @@ const SpaceSettings = () => {
     }
   };
 
-  const handleChangeRole = async (membership: { id: string }, role: Role) => {
-    if (!space) return;
-    setError(null);
-    const res = await fetch(
-      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
-      {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
-      },
-    );
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Failed to change role.");
-      return;
-    }
-    await load();
-    await refresh();
-  };
-
-  const handleRemoveMember = async (membership: { id: string }, label: string) => {
-    if (!space) return;
-    if (!window.confirm(`Remove ${label} from this space?`)) return;
-    setError(null);
-    const res = await fetch(
-      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
-      { method: "DELETE", credentials: "include" },
-    );
-    if (!res.ok && res.status !== 204) {
-      const data = await res.json().catch(() => ({}));
-      setError(data.error || "Failed to remove member.");
-      return;
-    }
-    await load();
-    await refresh();
-  };
-
-  const handleInvite = async () => {
-    if (!space || !inviteEmail.trim()) return;
-    setIsInviting(true);
-    setInviteMessage(null);
-    try {
-      const res = await fetch(
-        `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
-        },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed to invite.");
-      setInviteMessage({
-        text:
-          data.status === "added"
-            ? `${data.email} is now a member.`
-            : `Invitation sent to ${data.email}.`,
-        kind: "success",
-      });
-      setInviteEmail("");
-      await load();
-      await refresh();
-    } catch (err) {
-      setInviteMessage({
-        text: err instanceof Error ? err.message : "Failed to invite.",
-        kind: "error",
-      });
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const handleRevokeInvite = async (invite: PendingInvite) => {
-    if (!space) return;
-    if (!window.confirm(`Revoke the invitation for ${invite.email}?`)) return;
-    const res = await fetch(
-      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/invites/${encodeURIComponent(invite.id)}`,
-      { method: "DELETE", credentials: "include" },
-    );
-    if (!res.ok) {
-      setError("Failed to revoke invitation.");
-      return;
-    }
-    setInvites((prev) => prev.filter((i) => i.id !== invite.id));
-  };
-
   const handleSpaceDeleted = async () => {
     setDeleteOpen(false);
     await refresh();
@@ -447,7 +284,15 @@ const SpaceSettings = () => {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Space settings</h1>
           <p className="text-sm text-muted-foreground">
-            Manage the details, appearance, and members of this space.
+            Manage the details and appearance of this space. Members, invites,
+            and groups live on the{" "}
+            <Link
+              href={`/spaces/${space.id}/users`}
+              className="text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              Users page
+            </Link>
+            .
           </p>
         </div>
 
@@ -516,164 +361,6 @@ const SpaceSettings = () => {
             </div>
           </CardContent>
         </Card>
-
-        {/* Member management only applies to shared spaces. */}
-        {space.visibility === "shared" && (
-          <>
-        {/* Members */}
-        <Card className="mb-6">
-          <CardContent className="pt-6 space-y-4">
-            <h2 className="font-semibold">
-              Members{" "}
-              <span className="text-muted-foreground font-normal">
-                {space.userMemberships.length}
-              </span>
-            </h2>
-
-            <form
-              className="flex flex-wrap items-center gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleInvite();
-              }}
-            >
-              <div className="relative flex-1 min-w-[180px]">
-                <Mail
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="Invite by email…"
-                  aria-label="Invite by email"
-                  className="pl-8"
-                />
-              </div>
-              <RoleSelect value={inviteRole} onChange={setInviteRole} />
-              <Button
-                type="submit"
-                size="sm"
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-                disabled={isInviting || !inviteEmail.trim()}
-              >
-                <UserPlus className="h-4 w-4" aria-hidden />
-                {isInviting ? "Adding…" : "Add"}
-              </Button>
-            </form>
-            {inviteMessage && (
-              <p
-                role="alert"
-                className={cn(
-                  "text-sm",
-                  inviteMessage.kind === "success"
-                    ? "text-muted-foreground"
-                    : "text-destructive",
-                )}
-              >
-                {inviteMessage.text}
-              </p>
-            )}
-
-            <ul className="divide-y divide-border rounded-md border">
-              {space.userMemberships.map((m) => {
-                const isSelf = m.user.id === user.id;
-                const label = displayName(m.user);
-                return (
-                  <li
-                    key={m["@id"]}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                  >
-                    <UserAvatar user={toAvatarUser(m.user)} size="sm" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium truncate">{label}</span>
-                        {isSelf && (
-                          <span className="text-xs text-muted-foreground">you</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {m.user.email}
-                      </p>
-                    </div>
-                    <RoleSelect
-                      value={m.role}
-                      onChange={(role) => void handleChangeRole(m, role)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => void handleRemoveMember(m, label)}
-                      aria-label={`Remove ${label}`}
-                      className="text-muted-foreground hover:text-destructive p-1"
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Pending invites */}
-        <Card className="mb-6">
-          <CardContent className="pt-6 space-y-3">
-            <h2 className="font-semibold">
-              Pending invites{" "}
-              <span className="text-muted-foreground font-normal">
-                {invites.length}
-              </span>
-            </h2>
-            {invites.length === 0 ? (
-              <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-                No pending invitations — invited teammates will appear here until
-                they accept.
-              </div>
-            ) : (
-              <ul className="divide-y divide-border rounded-md border">
-                {invites.map((invite) => (
-                  <li
-                    key={invite.id}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                  >
-                    <Mail
-                      className="h-4 w-4 text-muted-foreground shrink-0"
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{invite.email}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        invited by {invite.invitedBy} · expires{" "}
-                        {formatRelative(invite.expiresAt)}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={invite.role === "admin" ? "secondary" : "outline"}
-                      className="shrink-0 capitalize"
-                    >
-                      {invite.role}
-                    </Badge>
-                    <Badge variant="outline" className="shrink-0">
-                      Sent
-                    </Badge>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => void handleRevokeInvite(invite)}
-                    >
-                      Revoke
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-          </>
-        )}
 
         {/* Plan & billing — personal spaces are never billable, and the whole
             surface is gated off until Stripe is wired up (BILLING_ENABLED). */}
@@ -817,12 +504,7 @@ const SpaceSettings = () => {
             {isDirty ? "Unsaved changes" : "All changes saved"}
           </span>
           <div className="flex items-center gap-2">
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              disabled={isSaving}
-            >
+            <Button asChild variant="outline" size="sm" disabled={isSaving}>
               <Link href={`/spaces/${space.id}`}>Cancel</Link>
             </Button>
             <Button
