@@ -70,39 +70,9 @@ export type Reminder =
   | { type: "relative"; value: number; unit: ReminderUnit; repeat: boolean }
   | { type: "absolute"; at: string; repeat: boolean };
 
-// Quick presets surfaced as checkboxes in the simple list due-date popover.
-// The rich per-reminder editor lives in the task drawer.
-export interface ReminderPreset {
-  /** Short, stable id for test selectors / DOM keys. */
-  id: string;
-  key: string;
-  label: string;
-  reminder: Reminder;
-}
-export const REMINDER_PRESETS: ReminderPreset[] = [
-  {
-    id: "15m",
-    key: "rel:15:minutes",
-    label: "15 minutes before",
-    reminder: { type: "relative", value: 15, unit: "minutes", repeat: false },
-  },
-  {
-    id: "1h",
-    key: "rel:1:hours",
-    label: "1 hour before",
-    reminder: { type: "relative", value: 1, unit: "hours", repeat: false },
-  },
-  {
-    id: "1d",
-    key: "rel:1:days",
-    label: "1 day before",
-    reminder: { type: "relative", value: 1, unit: "days", repeat: false },
-  },
-];
-
 // Canonical key for a reminder — mirrors ReminderScheduler::canonicalKey on
-// the API so the UI can dedup / toggle presets consistently. Ignores the
-// `repeat` flag (same as the server) so a preset matches regardless.
+// the API so the UI can dedup reminders consistently. Ignores the `repeat`
+// flag (same as the server) so two reminders match regardless.
 export const reminderKey = (r: Reminder): string =>
   r.type === "relative"
     ? `rel:${r.value}:${r.unit}`
