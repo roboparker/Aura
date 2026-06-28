@@ -54,6 +54,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "code-theme-switcher", name: "CodeThemeSwitcher", category: "Editor", description: "Dropdown to pick the Prism palette for code fences; persisted to localStorage." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
   { slug: "avatar-stack", name: "AvatarStack", category: "User", description: "Overlapping avatar cluster with a +N overflow chip." },
+  { slug: "assignee-placeholder", name: "AssigneePlaceholder", category: "User", description: "Anonymous 'no one assigned' placeholder avatar (dashed square + UserPlus) for empty assignee affordances." },
   { slug: "page-header", name: "PageHeader", category: "Layout", description: "Shared top-of-page header: optional icon + title + count badge, subtitle, right-aligned actions, a search/filter toolbar slot, and a divider." },
   { slug: "impersonation-banner", name: "ImpersonationBanner", category: "Layout", description: "Amber bar shown while an admin impersonates another user; one-click stop. Renders nothing otherwise." },
   { slug: "layout", name: "Layout", category: "Layout", description: "App-shell wrapper: providers + persistent Sidebar, Navbar, and Footer." },

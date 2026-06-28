@@ -10,8 +10,9 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Check, MoreHorizontal, Plus, Trash2, UserPlus } from "lucide-react";
+import { Check, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import AssigneePlaceholder from "@/components/user/AssigneePlaceholder";
 import { displayName } from "@/lib/userDisplay";
 import { Badge } from "@/components/ui/badge";
 import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
@@ -166,9 +167,7 @@ const AssignMenu = ({
               ))}
             </span>
           ) : (
-            <span className="flex h-6 w-6 items-center justify-center rounded-md border border-dashed border-muted-foreground/40 text-muted-foreground transition hover:border-foreground/40 hover:text-foreground">
-              <UserPlus className="h-3.5 w-3.5" />
-            </span>
+            <AssigneePlaceholder className="hover:border-foreground/40 hover:text-foreground" />
           )}
         </button>
       </DropdownMenuTrigger>
