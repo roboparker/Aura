@@ -251,16 +251,19 @@ test.describe("Tasks", () => {
     const item = page.locator('[data-testid="task-item"]', { hasText: title });
     await expect(item).toBeVisible();
 
-    // Open the date popover and tick "1 hour before". The reminder section
-    // sits below the calendar + recurrence picker, so on a 720px viewport
-    // it scrolls within the popover (PopoverContent caps its own height
-    // and lets overflow scroll internally).
+    // Open the date popover and add a "1 hour before" reminder. The reminder
+    // section sits below the calendar + recurrence picker, so on a 720px
+    // viewport it scrolls within the popover (PopoverContent caps its own
+    // height and lets overflow scroll internally).
     await item.locator('[data-testid="task-due-date"]').click();
-    const reminderCheckbox = page.locator(
-      '[data-testid="task-due-date-reminder-1h"]',
-    );
-    await reminderCheckbox.scrollIntoViewIfNeeded();
-    await reminderCheckbox.check();
+    const addReminder = page.locator('[data-testid="task-due-date-reminder-add"]');
+    await addReminder.scrollIntoViewIfNeeded();
+    await addReminder.click();
+    await page.locator('[data-testid="task-due-date-reminder-value"]').fill("1");
+    await page
+      .locator('[data-testid="task-due-date-reminder-unit"]')
+      .selectOption("hours");
+    await page.locator('[data-testid="task-due-date-reminder-add-confirm"]').click();
     await page.keyboard.press("Escape");
 
     // Bell icon appears next to the date now that a reminder is set.
