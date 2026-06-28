@@ -660,8 +660,9 @@ const ProjectDetail = () => {
     [project],
   );
 
-  const createSection = async () => {
+  const createSection = async (title = "New section") => {
     if (!project) return;
+    const trimmed = title.trim() || "New section";
     try {
       const res = await fetch(`${ENTRYPOINT}/task_sections`, {
         method: "POST",
@@ -669,7 +670,7 @@ const ProjectDetail = () => {
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
           project: project["@id"],
-          title: "New section",
+          title: trimmed,
           position: sections.length,
         }),
       });
@@ -1502,7 +1503,7 @@ const ProjectDetail = () => {
                       setActiveTab("list");
                       focusDefaultAddRow();
                     }}
-                    onAddSection={() => void createSection()}
+                    onAddSection={(title) => void createSection(title)}
                     onDeleteSection={(sectionIri) => {
                       const section = sections.find(
                         (s) => s["@id"] === sectionIri,

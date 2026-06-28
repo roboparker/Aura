@@ -67,7 +67,7 @@ interface TaskBoardProps {
   onMove: (taskIri: string, sectionIri: string | null) => void;
   onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
   onAddTask: (sectionIri: string | null) => void;
-  onAddSection: () => void;
+  onAddSection: (title: string) => void;
   onDeleteSection: (sectionIri: string) => void;
 }
 
@@ -387,9 +387,24 @@ const TaskBoard = ({
   onDeleteSection,
 }: TaskBoardProps) => {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [addingSection, setAddingSection] = useState(false);
+  const [newSectionTitle, setNewSectionTitle] = useState("");
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+
+  // Enter commits (create with the typed title); Escape / blur discards. The
+  // section is only created on an explicit Enter, never on blur.
+  const commitSection = () => {
+    const title = newSectionTitle.trim();
+    if (title) onAddSection(title);
+    setNewSectionTitle("");
+    setAddingSection(false);
+  };
+  const cancelSection = () => {
+    setNewSectionTitle("");
+    setAddingSection(false);
+  };
 
   const draggingTask = draggingId
     ? columns.flatMap((c) => c.tasks).find((t) => t["@id"] === draggingId)
@@ -429,14 +444,34 @@ const TaskBoard = ({
             onDeleteSection={onDeleteSection}
           />
         ))}
-        <button
-          type="button"
-          onClick={onAddSection}
-          className="flex h-9 w-80 shrink-0 items-center gap-1 rounded-lg border border-dashed px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-          data-testid="board-add-section"
-        >
-          <Plus className="h-4 w-4" /> Add section
-        </button>
+        {addingSection ? (
+          <input
+            autoFocus
+            value={newSectionTitle}
+            onChange={(e) => setNewSectionTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitSection();
+              } else if (e.key === "Escape") {
+                cancelSection();
+              }
+            }}
+            onBlur={cancelSection}
+            placeholder="Section name…"
+            className="h-9 w-80 shrink-0 rounded-lg border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            data-testid="board-add-section-input"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAddingSection(true)}
+            className="flex h-9 w-80 shrink-0 items-center gap-1 rounded-lg border border-dashed px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-testid="board-add-section"
+          >
+            <Plus className="h-4 w-4" /> Add section
+          </button>
+        )}
       </div>
       <DragOverlay>
         {draggingTask ? (
