@@ -5,7 +5,8 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import type { CustomFieldDefinition } from "./types";
+import VisibilityToggles from "./VisibilityToggles";
+import type { CustomFieldDefinition, CustomFieldVisibility } from "./types";
 
 interface Collection<T> {
   member?: T[];
@@ -19,6 +20,8 @@ interface Props {
   projectIri: string;
   /** IRIs of the fields currently shown on this project. */
   attachedIris: string[];
+  /** Per-project visibility for attached fields, keyed by definition IRI. */
+  projectVisibility: Record<string, CustomFieldVisibility>;
   /** Space admins can define new fields / edit definitions. */
   isSpaceAdmin: boolean;
   /** Open the field editor to create a new (space) field. */
@@ -48,6 +51,7 @@ const ProjectCustomFieldPicker = ({
   spaceIri,
   projectIri,
   attachedIris,
+  projectVisibility,
   isSpaceAdmin,
   onCreate,
   onEdit,
@@ -82,6 +86,34 @@ const ProjectCustomFieldPicker = ({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const setVisibility = async (
+    defIri: string,
+    visibility: CustomFieldVisibility,
+  ) => {
+    const projectId = projectIri.split("/").pop();
+    const defId = defIri.split("/").pop();
+    setBusy(defIri);
+    try {
+      const res = await fetch(
+        `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${defId}/visibility`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visibility }),
+        },
+      );
+      if (!res.ok) throw new Error("Failed to update visibility.");
+      onChanged();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to update visibility.",
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const toggle = async (iri: string, checked: boolean) => {
     const next = checked
@@ -160,6 +192,13 @@ const ProjectCustomFieldPicker = ({
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {KIND_LABEL[def.kind] ?? def.kind}
                 </span>
+                {checked && (
+                  <VisibilityToggles
+                    visibility={projectVisibility[def["@id"]] ?? "both"}
+                    editable={!busy}
+                    onChange={(v) => void setVisibility(def["@id"], v)}
+                  />
+                )}
                 {isSpaceAdmin && (
                   <button
                     type="button"

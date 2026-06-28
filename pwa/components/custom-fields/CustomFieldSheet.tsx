@@ -45,7 +45,6 @@ import type {
   CustomFieldDefinition,
   CustomFieldKind,
   CustomFieldSubtype,
-  CustomFieldVisibility,
   FooterDescriptor,
   FooterKind,
   OptionStatsResponse,
@@ -163,7 +162,6 @@ const CustomFieldSheet = ({
   );
   const [nullable, setNullable] = useState(true);
   const [footer, setFooter] = useState<FooterDescriptor | null>(null);
-  const [visibility, setVisibility] = useState<CustomFieldVisibility>("both");
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,9 +185,9 @@ const CustomFieldSheet = ({
       footer,
       nullable,
       position: 0,
-      visibility,
+      visibility: "both",
     }),
-    [name, kind, subtype, config, footer, nullable, visibility],
+    [name, kind, subtype, config, footer, nullable],
   );
   const [previewValue, setPreviewValue] = useState<unknown>(() =>
     sampleValueFor(kind, subtype, config),
@@ -211,7 +209,6 @@ const CustomFieldSheet = ({
       setConfig(initial.config);
       setNullable(initial.nullable);
       setFooter(initial.footer);
-      setVisibility(initial.visibility ?? "both");
     } else {
       const k = initialKind ?? "text";
       const s = initialSubtype ?? fallbackSubtypeFor(k);
@@ -221,7 +218,6 @@ const CustomFieldSheet = ({
       setConfig(defaultConfigFor(k, s));
       setNullable(true);
       setFooter(null);
-      setVisibility("both");
     }
   }, [open, initial, initialKind, initialSubtype]);
 
@@ -303,7 +299,6 @@ const CustomFieldSheet = ({
       config,
       nullable,
       footer,
-      visibility,
     };
     if (isEdit && initial) {
       const url = `${ENTRYPOINT}${initial["@id"]}${

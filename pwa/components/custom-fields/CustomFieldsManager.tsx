@@ -31,11 +31,7 @@ import CustomFieldChangeLog from "./CustomFieldChangeLog";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import { fieldHandle } from "./handle";
 import { KIND_BADGE, kindLabelFor, subtypeLabelFor } from "./kind-editors";
-import type {
-  CustomFieldDefinition,
-  CustomFieldVisibility,
-  FieldStatsResponse,
-} from "./types";
+import type { CustomFieldDefinition, FieldStatsResponse } from "./types";
 
 /**
  * Schema editor for a project's custom field catalogue. Renders the
@@ -67,63 +63,6 @@ interface Props {
 }
 
 const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
-
-/**
- * Per-field List + Board visibility toggles. The model is a single enum
- * (list | board | both), so these two toggles can't both be off — the last
- * active one is disabled to keep the field visible somewhere (the task detail
- * drawer always shows every field regardless).
- */
-const VisibilityToggles = ({
-  visibility,
-  editable,
-  onChange,
-}: {
-  visibility: CustomFieldVisibility;
-  editable: boolean;
-  onChange: (visibility: CustomFieldVisibility) => void;
-}) => {
-  const showList = visibility !== "board";
-  const showBoard = visibility !== "list";
-  const apply = (nextList: boolean, nextBoard: boolean) => {
-    if (!nextList && !nextBoard) return;
-    onChange(nextList && nextBoard ? "both" : nextList ? "list" : "board");
-  };
-  const chipClass = (active: boolean, disabled: boolean) =>
-    cn(
-      "rounded-full border px-2.5 py-0.5 text-xs font-medium transition",
-      active
-        ? "border-primary bg-primary text-primary-foreground"
-        : "border-input bg-muted/40 text-muted-foreground hover:text-foreground",
-      disabled && "cursor-not-allowed opacity-60 hover:text-muted-foreground",
-    );
-  const listLocked = !editable || (showList && !showBoard);
-  const boardLocked = !editable || (showBoard && !showList);
-  return (
-    <div className="flex gap-1" data-testid="custom-field-visibility">
-      <button
-        type="button"
-        aria-pressed={showList}
-        disabled={listLocked}
-        onClick={() => apply(!showList, showBoard)}
-        className={chipClass(showList, listLocked)}
-        data-testid="custom-field-visibility-list"
-      >
-        List
-      </button>
-      <button
-        type="button"
-        aria-pressed={showBoard}
-        disabled={boardLocked}
-        onClick={() => apply(showList, !showBoard)}
-        className={chipClass(showBoard, boardLocked)}
-        data-testid="custom-field-visibility-board"
-      >
-        Board
-      </button>
-    </div>
-  );
-};
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -257,44 +196,6 @@ const CustomFieldsManager = ({
     if (!res.ok) throw new Error(await errorMessage(res));
     handleDeleted(def);
   };
-
-  // Per-field List/Board visibility toggles (replaces the old editor option).
-  // Optimistic; reverts on failure.
-  const setVisibility = useCallback(
-    async (def: CustomFieldDefinition, visibility: CustomFieldVisibility) => {
-      setDefs((prev) =>
-        prev.map((d) => (d["@id"] === def["@id"] ? { ...d, visibility } : d)),
-      );
-      try {
-        const res = await fetch(`${ENTRYPOINT}${def["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify({ visibility }),
-        });
-        if (!res.ok) throw new Error(await errorMessage(res));
-        const saved: CustomFieldDefinition = await res.json();
-        setDefs((prev) =>
-          sortByPosition(
-            prev.map((d) => (d["@id"] === saved["@id"] ? saved : d)),
-          ),
-        );
-        onDefinitionsChanged?.();
-      } catch (err) {
-        setDefs((prev) =>
-          prev.map((d) =>
-            d["@id"] === def["@id"]
-              ? { ...d, visibility: def.visibility }
-              : d,
-          ),
-        );
-        setLoadError(
-          err instanceof Error ? err.message : "Failed to update visibility.",
-        );
-      }
-    },
-    [onDefinitionsChanged],
-  );
 
   // Client-side duplicate — there's no copy endpoint, so we POST a fresh
   // definition mirroring the source's kind/subtype/config/footer/nullable
@@ -444,7 +345,6 @@ const CustomFieldsManager = ({
                 <TableHead>Name</TableHead>
                 <TableHead>Kind</TableHead>
                 <TableHead>Required</TableHead>
-                <TableHead>Visibility</TableHead>
                 <TableHead>Footer</TableHead>
                 <TableHead className="text-right">Filled</TableHead>
                 {isSpaceAdmin && (
@@ -473,7 +373,6 @@ const CustomFieldsManager = ({
                       onEdit={() => openEdit(def)}
                       onDuplicate={() => void handleDuplicate(def)}
                       onDelete={() => setDeleteTarget(def)}
-                      onSetVisibility={(v) => void setVisibility(def, v)}
                     />
                   ))}
                 </SortableContext>
@@ -552,7 +451,6 @@ const FieldRow = ({
   onEdit,
   onDuplicate,
   onDelete,
-  onSetVisibility,
 }: {
   def: CustomFieldDefinition;
   total: number;
@@ -562,7 +460,6 @@ const FieldRow = ({
   onEdit: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
-  onSetVisibility: (visibility: CustomFieldVisibility) => void;
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: def["@id"], disabled: !draggable });
@@ -622,13 +519,6 @@ const FieldRow = ({
             Required
           </span>
         )}
-      </TableCell>
-      <TableCell>
-        <VisibilityToggles
-          visibility={def.visibility ?? "both"}
-          editable={isSpaceAdmin}
-          onChange={onSetVisibility}
-        />
       </TableCell>
       <TableCell>
         {def.footer ? (

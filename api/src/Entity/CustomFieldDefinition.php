@@ -15,6 +15,7 @@ use ApiPlatform\Metadata\Post;
 use App\CustomField\CustomFieldKind;
 use App\Repository\CustomFieldDefinitionRepository;
 use App\State\CustomFieldDefinitionUpdateProcessor;
+use App\State\CustomFieldVisibilityProvider;
 use App\Validator\ValidCustomFieldDefinition;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -53,6 +54,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            provider: CustomFieldVisibilityProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -216,9 +218,15 @@ class CustomFieldDefinition
     private int $position = 0;
 
     /**
-     * Where the field is shown to readers: in the project task list
-     * (`list`), the Kanban board cards (`board`), or both (default).
-     * The task detail drawer always shows every field regardless.
+     * Default visibility — where the field is shown to readers: the project
+     * task list (`list`), the Kanban board cards (`board`), or both. Visibility
+     * is a PER-PROJECT choice now (#custom-fields-project): a {@see
+     * ProjectFieldVisibility} row overrides this default for a given project,
+     * and {@see \App\State\CustomFieldVisibilityProvider} injects the effective
+     * value into the read when the field is fetched in a project context
+     * (`?projects={iri}`). This column is the fallback when no override exists.
+     * Read-only over the API — set per-project, not on the definition. The task
+     * detail drawer always shows every field regardless.
      */
     #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_BOTH])]
     #[Assert\Choice(
@@ -226,7 +234,7 @@ class CustomFieldDefinition
         message: 'Visibility must be one of: {{ choices }}.',
     )]
     #[Gedmo\Versioned]
-    #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
+    #[Groups(['custom_field_definition:read'])]
     private string $visibility = self::VISIBILITY_BOTH;
 
     /**

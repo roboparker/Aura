@@ -1156,6 +1156,12 @@ const ProjectDetail = () => {
                           spaceIri={projectSpaceIri(project)}
                           projectIri={project["@id"]}
                           attachedIris={definitions.map((d) => d["@id"])}
+                          projectVisibility={Object.fromEntries(
+                            definitions.map((d) => [
+                              d["@id"],
+                              d.visibility ?? "both",
+                            ]),
+                          )}
                           isSpaceAdmin
                           onCreate={() =>
                             setNewFieldType({ kind: "text", subtype: "text" })

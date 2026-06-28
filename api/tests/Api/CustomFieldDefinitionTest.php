@@ -127,47 +127,61 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertJsonContains(['visibility' => 'both']);
     }
 
-    public function testVisibilityCanBeSetToBoard(): void
+    public function testProjectVisibilityOverrideAppliesInProjectContext(): void
     {
         $alice = $this->createUser('alice@example.com');
         $project = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($project, 'Severity', 'text');
+        $projectIri = '/projects/' . $project->getId();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/custom_field_definitions', [
-            'json' => [
-                'space' => $this->spaceIri($project),
-                'name' => 'Severity',
-                'kind' => 'text',
-                'subtype' => 'text',
-                'config' => ['multi' => false],
-                'visibility' => 'board',
-            ],
-            'headers' => ['Content-Type' => 'application/ld+json'],
+
+        // Defaults to 'both' when no per-project override exists.
+        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'both']]]);
+
+        // Set this project's visibility to board only.
+        $client->request('PUT', $projectIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+            'json' => ['visibility' => 'board'],
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseStatusCodeSame(201);
-        $this->assertJsonContains(['visibility' => 'board']);
+        $this->assertResponseStatusCodeSame(200);
+
+        // The project-context read now reports the override.
+        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'board']]]);
     }
 
-    public function testInvalidVisibilityIsRejected(): void
+    public function testInvalidProjectVisibilityIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
         $project = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($project, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/custom_field_definitions', [
-            'json' => [
-                'space' => $this->spaceIri($project),
-                'name' => 'Severity',
-                'kind' => 'text',
-                'subtype' => 'text',
-                'config' => ['multi' => false],
-                'visibility' => 'sidebar',
-            ],
-            'headers' => ['Content-Type' => 'application/ld+json'],
+        $client->request('PUT', '/projects/' . $project->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+            'json' => ['visibility' => 'sidebar'],
+            'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseStatusCodeSame(422);
+        $this->assertResponseStatusCodeSame(400);
+    }
+
+    public function testStrangerCannotSetProjectVisibility(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($project, 'Severity', 'text');
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('PUT', '/projects/' . $project->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+            'json' => ['visibility' => 'board'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(404);
     }
 
     public function testStrangerCannotEvenSeeSpaceFields(): void
