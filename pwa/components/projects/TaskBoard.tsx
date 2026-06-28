@@ -431,7 +431,9 @@ const TaskBoard = ({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-2" data-testid="task-board">
+      {/* px/pt give focus rings room — overflow-x-auto also clips vertically,
+          so a ring on the section-name input or a card would be cut off. */}
+      <div className="flex gap-4 overflow-x-auto px-0.5 pt-1 pb-2" data-testid="task-board">
         {columns.map((column) => (
           <BoardColumnView
             key={column.key}
