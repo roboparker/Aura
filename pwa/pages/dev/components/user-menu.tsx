@@ -4,7 +4,7 @@ import ComponentDoc from "@/components/dev/ComponentDoc";
 const UserMenuPage = () => (
   <ComponentDoc
     name="UserMenu"
-    description="Top-bar account menu. A square avatar + chevron button opens a dropdown headed by the signed-in user's name and email, followed by the personal links (My Tasks, Manage Groups, Settings) and Sign Out. Reads from AuthContext and renders nothing until a user is signed in."
+    description="Top-bar account menu. A square avatar + chevron button opens a dropdown headed by the signed-in user's name and email, followed by the personal links (My Tasks, Feedback, Settings) and Sign Out. Reads from AuthContext and renders nothing until a user is signed in."
     importPath={`import UserMenu from "@/components/common/UserMenu";`}
     examples={[
       {
