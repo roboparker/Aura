@@ -8,13 +8,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import RecurrencePicker from "@/components/tasks/RecurrencePicker";
+import RemindersField from "@/components/tasks/RemindersField";
 import {
-  REMINDER_PRESETS,
   formatDueDate,
   formatRecurrenceSummary,
   isoToLocalDate,
   localDateToIso,
-  reminderKey,
   type DueDateStatus,
   type RecurrenceRule,
   type Reminder,
@@ -85,16 +84,6 @@ const DueDateCell = ({
     status === "overdue" && "text-destructive font-medium",
     status === "today" && "text-amber-600 dark:text-amber-400 font-medium",
   );
-
-  const togglePreset = (preset: (typeof REMINDER_PRESETS)[number]) => {
-    if (!onRemindersChange) return;
-    const current = remindersValue ?? [];
-    const has = current.some((r) => reminderKey(r) === preset.key);
-    const next = has
-      ? current.filter((r) => reminderKey(r) !== preset.key)
-      : [...current, preset.reminder];
-    void onRemindersChange(next.length === 0 ? null : next);
-  };
 
   return (
     <div className="group/due relative flex h-full w-full items-center">
@@ -173,32 +162,18 @@ const DueDateCell = ({
         )}
         {onRemindersChange && value && (
           <div
-            className="border-t p-2 space-y-1 min-w-56"
+            className="border-t p-2 space-y-1.5 min-w-56"
             data-testid={`${testIdPrefix}-reminders`}
           >
             <p className="text-xs font-medium text-muted-foreground px-1">
               Remind me
             </p>
-            {REMINDER_PRESETS.map((preset) => {
-              const checked = (remindersValue ?? []).some(
-                (r) => reminderKey(r) === preset.key,
-              );
-              return (
-                <label
-                  key={preset.id}
-                  className="flex items-center gap-2 px-1 py-1 text-sm cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => togglePreset(preset)}
-                    className="h-3.5 w-3.5"
-                    data-testid={`${testIdPrefix}-reminder-${preset.id}`}
-                  />
-                  {preset.label}
-                </label>
-              );
-            })}
+            <RemindersField
+              value={remindersValue}
+              dueDate={value}
+              onChange={onRemindersChange}
+              testIdPrefix={`${testIdPrefix}-reminder`}
+            />
           </div>
         )}
         {value && (
