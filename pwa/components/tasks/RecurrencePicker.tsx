@@ -189,47 +189,49 @@ const RecurrencePicker = ({
             </select>
           </div>
 
-          {/* Weekly: pick weekdays */}
-          {frequency === "weekly" && (
-            <div className="flex gap-1">
-              {WEEKDAYS.map((day) => (
-                <button
-                  key={day}
-                  type="button"
-                  onClick={() => toggleDay(day)}
-                  aria-pressed={byDay.includes(day)}
-                  aria-label={WEEKDAY_LABELS[day]}
-                  className={cn(
-                    "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition",
-                    byDay.includes(day)
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-input text-muted-foreground hover:text-foreground",
-                  )}
-                  data-testid={`${testIdPrefix}-day-${day}`}
-                >
-                  {WEEKDAY_INITIALS[day]}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* Frequency-specific control sits in a fixed-height slot so the
+              popover doesn't resize when switching daily/weekly/monthly/yearly. */}
+          <div className="flex min-h-8 items-center">
+            {frequency === "weekly" && (
+              <div className="flex gap-1">
+                {WEEKDAYS.map((day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleDay(day)}
+                    aria-pressed={byDay.includes(day)}
+                    aria-label={WEEKDAY_LABELS[day]}
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition",
+                      byDay.includes(day)
+                        ? "bg-primary text-primary-foreground"
+                        : "border border-input text-muted-foreground hover:text-foreground",
+                    )}
+                    data-testid={`${testIdPrefix}-day-${day}`}
+                  >
+                    {WEEKDAY_INITIALS[day]}
+                  </button>
+                ))}
+              </div>
+            )}
 
-          {/* Monthly: on day N vs on the Nth weekday */}
-          {frequency === "monthly" && (
-            <select
-              value={monthlyMode}
-              onChange={(e) =>
-                emit({ monthlyMode: e.target.value as "day" | "weekday" })
-              }
-              className={cn(selectClass, "w-full")}
-              aria-label="Monthly pattern"
-              data-testid={`${testIdPrefix}-monthly`}
-            >
-              <option value="day">On day {dayOfMonth}</option>
-              <option value="weekday">
-                On the {ordinalLabel(nth)} {WEEKDAY_LABELS[dueWeekday]}
-              </option>
-            </select>
-          )}
+            {frequency === "monthly" && (
+              <select
+                value={monthlyMode}
+                onChange={(e) =>
+                  emit({ monthlyMode: e.target.value as "day" | "weekday" })
+                }
+                className={cn(selectClass, "w-full")}
+                aria-label="Monthly pattern"
+                data-testid={`${testIdPrefix}-monthly`}
+              >
+                <option value="day">On day {dayOfMonth}</option>
+                <option value="weekday">
+                  On the {ordinalLabel(nth)} {WEEKDAY_LABELS[dueWeekday]}
+                </option>
+              </select>
+            )}
+          </div>
 
           {/* Ends */}
           <div className="flex items-center gap-2 text-sm">
