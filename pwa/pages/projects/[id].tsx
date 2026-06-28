@@ -1478,6 +1478,7 @@ const ProjectDetail = () => {
                 <TabsContent value="board" className="mt-4">
                   <TaskBoard
                     definitions={boardDefinitions}
+                    assignableUsers={projectAssignableUsers}
                     columns={sectionGroups.map((group) => ({
                       key: group.key,
                       sectionIri: group.section ? group.section["@id"] : null,
@@ -1491,6 +1492,10 @@ const ProjectDetail = () => {
                       if (task) openTaskDetail(task);
                     }}
                     onMove={moveTaskToSection}
+                    onAssign={(taskIri, iris) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) void patchTask(task, { assignees: iris });
+                    }}
                     onAddTask={() => {
                       // Every section has a persistent add row now; just jump
                       // to the list and focus the default one.
