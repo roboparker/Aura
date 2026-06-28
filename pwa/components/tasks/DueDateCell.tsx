@@ -57,9 +57,15 @@ const DueDateCell = ({
   const reminderCount = remindersValue?.length ?? 0;
 
   const handleSelect = (date: Date | undefined) => {
-    setOpen(false);
     const next = date ? localDateToIso(date) : null;
-    if (next === value) return;
+    if (next === value) {
+      setOpen(false);
+      return;
+    }
+    // Keep the popover open the first time a date is set so the user can go
+    // straight to recurrence / reminders (which only appear once a date
+    // exists). Re-picking an existing date closes as before.
+    if (value !== null) setOpen(false);
     void onChange(next);
   };
 
@@ -140,10 +146,11 @@ const DueDateCell = ({
       <PopoverContent
         // Cap the popover height and let it scroll internally — calendar +
         // recurrence picker + reminders + clear stack tall enough to spill
-        // off short viewports otherwise. Radix exposes its own
-        // `--radix-popover-content-available-height` so the cap also
-        // tracks the actual gap between trigger and viewport edge.
-        className="w-auto p-0 max-h-[min(560px,var(--radix-popover-content-available-height))] overflow-y-auto"
+        // off short viewports otherwise. Cap only to the actual gap between
+        // trigger and viewport edge (Radix's own variable) — no fixed px
+        // cap, so a normal-height screen fits the whole thing without a
+        // scrollbar; overflow scroll stays as a fallback for tiny viewports.
+        className="w-auto p-0 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto"
         align="start"
         data-testid={`${testIdPrefix}-popover`}
       >
@@ -156,6 +163,7 @@ const DueDateCell = ({
         {onRecurrenceChange && value && (
           <RecurrencePicker
             value={recurrenceValue}
+            dueDate={value}
             onChange={onRecurrenceChange}
             testIdPrefix={`${testIdPrefix}-recurrence`}
           />
