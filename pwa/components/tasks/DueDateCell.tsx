@@ -156,6 +156,7 @@ const DueDateCell = ({
         {onRecurrenceChange && value && (
           <RecurrencePicker
             value={recurrenceValue}
+            dueDate={value}
             onChange={onRecurrenceChange}
             testIdPrefix={`${testIdPrefix}-recurrence`}
           />

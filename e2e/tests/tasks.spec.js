@@ -133,8 +133,9 @@ test.describe("Tasks", () => {
     const item = page.locator('[data-testid="task-item"]', { hasText: title });
     await expect(item).toBeVisible();
 
-    // Open picker, set weekly recurrence with interval 2
+    // Open picker, flip the Repeat toggle, set weekly recurrence interval 2.
     await item.locator('[data-testid="task-due-date"]').click();
+    await page.locator('[data-testid="task-due-date-recurrence-toggle"]').click();
     await page
       .locator('[data-testid="task-due-date-recurrence-frequency"]')
       .selectOption("weekly");
