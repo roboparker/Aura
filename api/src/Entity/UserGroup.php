@@ -46,18 +46,18 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and object.getSpace() !== null and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and object.getSpace() !== null and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.groups.create', object)))",
             processor: UserGroupOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.groups.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.groups.update', object)))",
             securityMessage: "Only members of the group's space can edit the group.",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.groups.delete', object)))",
             securityMessage: "Only members of the group's space can delete the group.",
         ),
     ],

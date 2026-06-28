@@ -37,21 +37,21 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user) and is_granted('space.discussions.create', object)))",
             processor: DiscussionAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.discussions.read', object)))",
             provider: DiscussionAggregateProvider::class,
         ),
         new Patch(
             // Edit: author only. Pin/lock ride the same Patch — a
             // future DiscussionUpdateProcessor will enforce
             // "only space admins flip isPinned/isLocked".
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.discussions.update', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.discussions.delete', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['discussion:read']],

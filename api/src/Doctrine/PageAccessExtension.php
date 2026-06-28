@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\Page;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Scopes Page queries to spaces the current user belongs to (#183). See
@@ -24,5 +25,10 @@ final class PageAccessExtension extends AbstractSpaceAccessExtension
     protected function getImpersonationItemType(): string
     {
         return 'page';
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        return SpacePermission::PAGES;
     }
 }

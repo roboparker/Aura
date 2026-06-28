@@ -6,6 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\Project;
+use App\Entity\SpaceRole;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -276,9 +277,12 @@ class CommentTest extends ApiTestCase
 
     public function testProjectMemberWhoIsntOwnerCannotDeleteOthersComment(): void
     {
+        // #space-roles: a member with no role has full access, so restriction
+        // is via a role that lacks comments.delete.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $this->restrictComments($project, $bob, ['comments' => ['read' => true]]);
         $task = $this->createTaskInProject($alice, $project, 'Task');
         $aliceComment = $this->seedComment($alice, $task, 'Owner note');
 
@@ -287,6 +291,28 @@ class CommentTest extends ApiTestCase
         $client->request('DELETE', '/comments/' . $aliceComment->getId());
 
         $this->assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $permissions
+     */
+    private function restrictComments(Project $project, User $user, array $permissions): void
+    {
+        $space = $project->getSpace();
+        if (null === $space) {
+            return;
+        }
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions($permissions);
+        $this->entityManager->persist($role);
+        foreach ($space->getUserMemberships() as $membership) {
+            if ($membership->getUser() === $user) {
+                $membership->addRole($role);
+            }
+        }
+        $this->entityManager->flush();
     }
 
     public function testCannotReadCommentOnInaccessibleTask(): void

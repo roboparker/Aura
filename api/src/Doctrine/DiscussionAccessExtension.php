@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\Discussion;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Scopes Discussion queries to spaces the current user belongs to (#185).
@@ -25,5 +26,10 @@ final class DiscussionAccessExtension extends AbstractSpaceAccessExtension
     protected function getImpersonationItemType(): string
     {
         return 'discussion';
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        return SpacePermission::DISCUSSIONS;
     }
 }

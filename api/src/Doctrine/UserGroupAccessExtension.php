@@ -8,6 +8,8 @@ use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
 use App\Entity\UserGroup;
+use App\Security\Permission\SpacePermission;
+use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -23,8 +25,10 @@ use Symfony\Bundle\SecurityBundle\Security;
  */
 final class UserGroupAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
-    public function __construct(private Security $security)
-    {
+    public function __construct(
+        private Security $security,
+        private SpacePermissionResolver $spacePermissions,
+    ) {
     }
 
     public function applyToCollection(
@@ -35,6 +39,21 @@ final class UserGroupAccessExtension implements QueryCollectionExtensionInterfac
         array $context = [],
     ): void {
         $this->applyFilter($queryBuilder, $resourceClass);
+
+        // Drop groups in spaces where the user's roles deny reading groups
+        // (#space-roles). No-op for unrestricted users.
+        if (UserGroup::class === $resourceClass) {
+            $user = $this->security->getUser();
+            if ($user instanceof User) {
+                $denied = $this->spacePermissions->readDeniedSpaceIds($user, SpacePermission::GROUPS);
+                if (count($denied) > 0) {
+                    $rootAlias = $queryBuilder->getRootAliases()[0];
+                    $queryBuilder
+                        ->andWhere(sprintf('IDENTITY(%s.space) NOT IN (:ug_read_denied)', $rootAlias))
+                        ->setParameter('ug_read_denied', $denied);
+                }
+            }
+        }
     }
 
     public function applyToItem(

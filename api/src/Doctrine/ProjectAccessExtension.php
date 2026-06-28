@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\Project;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Filters Project queries so non-admin users only see projects in spaces
@@ -24,5 +25,10 @@ final class ProjectAccessExtension extends AbstractSpaceAccessExtension
     protected function getImpersonationItemType(): string
     {
         return 'project';
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        return SpacePermission::PROJECTS;
     }
 }

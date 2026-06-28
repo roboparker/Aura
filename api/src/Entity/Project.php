@@ -51,18 +51,18 @@ use Symfony\Component\Validator\Constraints as Assert;
             // the caller's personal space (where they're admin) before
             // persist. When the client DOES pick a space, they must be a
             // member of it.
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace() === null or object.isAccessibleBy(user))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace() === null or (object.isAccessibleBy(user) and is_granted('space.projects.create', object)))",
             securityPostDenormalizeMessage: 'You can only create projects in a space you belong to.',
             processor: ProjectOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.projects.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.projects.update', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user) or (object.isAccessibleBy(user) and is_granted('space.projects.delete', object)))",
             securityMessage: 'Only the project creator or a space admin can delete a project.',
         ),
     ],

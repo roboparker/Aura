@@ -6,6 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Page;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -146,12 +147,15 @@ class PageTest extends ApiTestCase
         $this->assertNotNull($reloaded->getUpdatedAt());
     }
 
-    public function testNonAuthorMemberCannotEdit(): void
+    public function testMemberWithoutPageUpdateRoleCannotEdit(): void
     {
+        // #space-roles: a member with no role has full access, so restriction
+        // is via a role that lacks pages.update.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $space = $this->createSpace($alice);
-        $this->ensureSpaceMembership($space, $bob);
+        $membership = $this->ensureSpaceMembership($space, $bob);
+        $this->assignRole($space, $membership, ['pages' => ['read' => true]]);
         $aliceArticle = $this->seedPage($alice, $space, 'Alice authored');
 
         $client = static::createClient();
@@ -194,18 +198,34 @@ class PageTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(204);
     }
 
-    public function testNonAuthorMemberCannotDelete(): void
+    public function testMemberWithoutPageDeleteRoleCannotDelete(): void
     {
+        // #space-roles: restriction is via a role that lacks pages.delete.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $space = $this->createSpace($alice);
-        $this->ensureSpaceMembership($space, $bob);
+        $membership = $this->ensureSpaceMembership($space, $bob);
+        $this->assignRole($space, $membership, ['pages' => ['read' => true]]);
         $alicePage = $this->seedPage($alice, $space, 'Keep me');
 
         $client = static::createClient();
         $client->loginUser($bob);
         $client->request('DELETE', '/pages/' . $alicePage->getId());
         $this->assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * @param array<string, array<string, bool>> $permissions
+     */
+    private function assignRole(Space $space, SpaceMembership $membership, array $permissions): void
+    {
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions($permissions);
+        $this->entityManager->persist($role);
+        $membership->addRole($role);
+        $this->entityManager->flush();
     }
 
     public function testParentMustBelongToSameSpaceContextLoadsViaAccess(): void

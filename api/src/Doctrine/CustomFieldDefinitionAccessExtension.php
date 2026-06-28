@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\CustomFieldDefinition;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Scopes CustomFieldDefinition queries to spaces the current user belongs
@@ -27,5 +28,10 @@ final class CustomFieldDefinitionAccessExtension extends AbstractSpaceAccessExte
         // CFDs follow their project's space + the 'projects' category default;
         // they aren't individually addressable for per-item overrides.
         return null;
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        return SpacePermission::CUSTOM_FIELDS;
     }
 }

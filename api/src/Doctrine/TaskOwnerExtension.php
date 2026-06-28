@@ -10,6 +10,8 @@ use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Security\Permission\SpacePermission;
+use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -29,6 +31,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
     public function __construct(
         private Security $security,
         private AccessPolicyItemScope $accessPolicyItemScope,
+        private SpacePermissionResolver $spacePermissions,
     ) {
     }
 
@@ -50,7 +53,33 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
                 'task',
                 'task_access_imp',
             );
+            $this->applyReadScope($queryBuilder);
         }
+    }
+
+    /**
+     * Drop project tasks in spaces where the user's roles deny reading tasks
+     * (#space-roles), keeping the caller's own tasks. No-op for unrestricted
+     * users. Relies on the `tp_access` (project) join added by applyFilter and
+     * its `:currentUser` parameter.
+     */
+    private function applyReadScope(QueryBuilder $queryBuilder): void
+    {
+        $user = $this->security->getUser();
+        if (!$user instanceof User) {
+            return;
+        }
+        $denied = $this->spacePermissions->readDeniedSpaceIds($user, SpacePermission::TASKS);
+        if (0 === count($denied)) {
+            return;
+        }
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+        $queryBuilder
+            ->andWhere(sprintf(
+                '(IDENTITY(tp_access.space) NOT IN (:task_read_denied) OR %s.owner = :currentUser)',
+                $rootAlias,
+            ))
+            ->setParameter('task_read_denied', $denied);
     }
 
     public function applyToItem(
