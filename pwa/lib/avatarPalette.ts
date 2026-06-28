@@ -41,6 +41,12 @@ export function deterministicPaletteColor(seed: string): string {
   return AVATAR_PALETTE[h];
 }
 
+/** A random color from the WCAG-AA palette — used when creating something
+ *  inline (e.g. a tag) without an explicit color, so it isn't always grey. */
+export function randomPaletteColor(): string {
+  return AVATAR_PALETTE[Math.floor(Math.random() * AVATAR_PALETTE.length)];
+}
+
 /**
  * Resolve the color to render for a Space's avatar tile, following the
  * spec: explicit `space.color` wins; otherwise inherit the creator's
