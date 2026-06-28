@@ -94,6 +94,24 @@ final class SpacePermissionResolver
         return $this->readDeniedMemo[$key] = $denied;
     }
 
+    /**
+     * The user's full effective permission matrix for a space — every category
+     * × action resolved through {@see can()}. Backs the PWA's UI gating.
+     *
+     * @return array<string, array<string, bool>>
+     */
+    public function effectiveMatrix(User $user, Space $space): array
+    {
+        $matrix = [];
+        foreach (SpacePermission::CATEGORIES as $category) {
+            foreach (SpacePermission::ACTIONS as $action) {
+                $matrix[$category][$action] = $this->can($user, $space, $category, $action);
+            }
+        }
+
+        return $matrix;
+    }
+
     private function directMembership(Space $space, User $user): ?SpaceMembership
     {
         if (null === $space->getId() || null === $user->getId()) {
