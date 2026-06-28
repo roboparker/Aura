@@ -6,7 +6,6 @@ import {
   LogOut,
   MessagesSquare,
   Settings,
-  Users,
   VenetianMask,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,7 +25,6 @@ import { cn } from "@/lib/utils";
 // action below the divider.
 const USER_MENU_LINKS = [
   { href: "/my-tasks", label: "My Tasks", icon: ListChecks },
-  { href: "/groups", label: "Manage Groups", icon: Users },
   { href: "/feedback", label: "Feedback", icon: MessagesSquare },
   { href: "/settings/profile", label: "Settings", icon: Settings },
 ];

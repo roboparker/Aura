@@ -81,7 +81,7 @@ async function createTaskInline(page, title, options = {}) {
 
 /**
  * Open the user account menu in the sidebar header (#nav-refresh).
- * The personal links (My Tasks, Manage Groups, Settings) and Sign Out
+ * The personal links (My Tasks, Feedback, Settings) and Sign Out
  * now live in a dropdown opened by the avatar/chevron trigger rather
  * than as always-visible sidebar links. Callers can read menu items
  * (role="menuitem") once this resolves.

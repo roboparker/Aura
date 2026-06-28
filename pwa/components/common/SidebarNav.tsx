@@ -348,8 +348,9 @@ const SettingsSection = ({
     });
 
   const links = [
-    // "General" edits the active space's metadata; the target page is
-    // admin-gated, so only surface it to space admins.
+    // "General" + "Users" edit the active space; both target admin-gated
+    // pages, so only surface them to space admins. Users holds members,
+    // invites, and groups.
     ...(activeSpace && isActiveSpaceAdmin
       ? [
           {
@@ -357,11 +358,15 @@ const SettingsSection = ({
             label: "General",
             match: "/spaces/[id]/settings",
           },
+          {
+            href: `/spaces/${activeSpace.id}/users`,
+            label: "Users",
+            match: "/spaces/[id]/users",
+          },
         ]
       : []),
     { href: "/tags", label: "Tags", match: "/tags" },
     { href: "/custom-fields", label: "Custom fields", match: "/custom-fields" },
-    { href: "/groups", label: "Groups", match: "/groups" },
   ];
 
   return (
