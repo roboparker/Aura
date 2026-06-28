@@ -108,7 +108,7 @@ class SpaceRole
      * @var array<string, mixed>
      */
     #[ORM\Column(type: 'json', options: ['default' => '{}'])]
-    #[Groups(['space_role:read', 'space_role:write', 'space:read'])]
+    #[Groups(['space_role:read', 'space_role:write'])]
     private array $permissions = [];
 
     #[ORM\Column(type: 'datetime_immutable')]

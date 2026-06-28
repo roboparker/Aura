@@ -26,6 +26,8 @@ export interface SpaceMembershipRow {
   id: string;
   user: SpaceMember;
   role: "admin" | "member";
+  /** Custom roles assigned to this member (#space-roles); empty = unrestricted. */
+  roles?: { "@id": string; id: string; name: string; color: string | null }[];
 }
 
 export interface SpaceAttachment {
