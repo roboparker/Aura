@@ -384,7 +384,7 @@ const FeedbackDetailPage = () => {
                   className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
                   data-testid="feedback-manage"
                 >
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Manage
                   </span>
                   {canEdit && (

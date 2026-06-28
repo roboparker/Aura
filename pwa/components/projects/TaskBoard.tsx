@@ -108,14 +108,14 @@ const CardCustomFields = ({
       {chips.map(({ def, value }) => (
         <span
           key={def["@id"]}
-          className="inline-flex items-center gap-1 rounded border bg-muted/40 px-1.5 py-0.5 text-[10px]"
+          className="inline-flex items-center gap-1 rounded border bg-muted/40 px-1.5 py-0.5 text-xs"
           data-testid="board-card-field"
         >
           <span className="text-muted-foreground">{def.name}</span>
           <CustomFieldValueCell
             definition={def}
             value={value}
-            className="text-[10px] font-medium"
+            className="text-xs font-medium"
           />
         </span>
       ))}
@@ -227,7 +227,7 @@ const CardBody = ({
     <CardCustomFields task={task} definitions={definitions} />
     <div className="flex flex-wrap items-center gap-1">
       {task.dueDate && (
-        <Badge variant="secondary" className="px-1.5 py-0 text-[10px] font-normal">
+        <Badge variant="secondary" className="px-1.5 py-0 text-xs font-normal">
           {dueLabel(task.dueDate)}
         </Badge>
       )}
@@ -235,7 +235,7 @@ const CardBody = ({
         <Badge
           key={tag["@id"]}
           variant="outline"
-          className="px-1.5 py-0 text-[10px] font-normal"
+          className="px-1.5 py-0 text-xs font-normal"
         >
           {tag.title}
         </Badge>

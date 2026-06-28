@@ -89,7 +89,7 @@ const AddFieldMenu = ({ hiddenFields, onEnable, onCreate }: AddFieldMenuProps) =
         <div className="max-h-72 overflow-y-auto">
           {hidden.length > 0 && (
             <div className="mb-1">
-              <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Hidden fields
               </p>
               {hidden.map((f) => (
@@ -109,7 +109,7 @@ const AddFieldMenu = ({ hiddenFields, onEnable, onCreate }: AddFieldMenuProps) =
               ))}
             </div>
           )}
-          <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             New field
           </p>
           {types.map((t) => (

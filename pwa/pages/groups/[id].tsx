@@ -455,7 +455,7 @@ const GroupDetail = () => {
                     </p>
 
                     <div className="overflow-hidden rounded-md border">
-                      <div className="hidden sm:grid grid-cols-[1fr_120px_40px] gap-3 border-b bg-muted/40 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <div className="hidden sm:grid grid-cols-[1fr_120px_40px] gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         <span>Member</span>
                         <span>Joined</span>
                         <span className="sr-only">Actions</span>
@@ -480,7 +480,7 @@ const GroupDetail = () => {
                                       {displayName(m.user)}
                                     </span>
                                     {isSelf && (
-                                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
                                         you
                                       </span>
                                     )}

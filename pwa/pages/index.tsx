@@ -213,7 +213,7 @@ const SpaceChip = ({
 }) => (
   <div className="flex items-center gap-1.5">
     <span
-      className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] text-[10px] font-bold text-primary-foreground"
+      className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] text-xs font-bold text-primary-foreground"
       style={{ background: `oklch(0.7 0.16 ${hue})` }}
     >
       {letter}
@@ -231,7 +231,7 @@ const HeroAppMock = () => (
       <span className="flex-1" />
       <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted px-2 py-1 text-muted-foreground">
         <Search className="h-3 w-3" />
-        <span className="font-mono text-[10px]">⌘K</span>
+        <span className="font-mono text-xs">⌘K</span>
       </span>
       <MiniStack people={[M.maya]} size={20} ring="ring-background" />
     </div>
@@ -366,7 +366,7 @@ const SpaceTile = ({
       <Icon className="h-3.5 w-3.5 text-primary" />
       <span className="text-[11.5px] font-semibold text-foreground">{label}</span>
       <span className="flex-1" />
-      <span className="font-mono text-[10px] text-muted-foreground">{count}</span>
+      <span className="font-mono text-xs text-muted-foreground">{count}</span>
     </div>
     <div className="flex flex-col gap-1.5">{children}</div>
   </div>
@@ -536,7 +536,7 @@ const STEPS = [
 ];
 
 const Eyebrow = ({ children }: { children: ReactNode }) => (
-  <div className="font-mono text-[11px] font-medium uppercase tracking-wider text-primary">
+  <div className="font-mono text-xs font-medium uppercase tracking-wider text-primary">
     {children}
   </div>
 );

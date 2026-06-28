@@ -158,7 +158,7 @@ const CustomFieldFooterRow = ({
             >
               {row && (
                 <div className="flex flex-col leading-tight">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {row.label ?? row.kind}
                   </span>
                   <span className="truncate tabular-nums font-semibold">

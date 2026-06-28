@@ -523,7 +523,7 @@ const CustomFieldSheet = ({
 
             {kind !== "boolean" && (
               <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {configSectionLabel(kind, subtype)}
                 </p>
                 <CustomFieldConfigEditor
@@ -725,7 +725,7 @@ const CustomFieldSheet = ({
                   {kindLabelFor(kind).toLowerCase()} ·{" "}
                   {subtypeLabelFor(kind, subtype).toLowerCase()}
                 </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                   nullable = {String(nullable)}
                 </span>
               </div>

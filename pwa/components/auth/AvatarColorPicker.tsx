@@ -58,7 +58,7 @@ const AvatarColorPicker = ({ initials, selected, onChange }: Props) => {
           );
         })}
       </div>
-      <p className="text-[10px] text-muted-foreground text-center">
+      <p className="text-xs text-muted-foreground text-center">
         All swatches pass WCAG AA against white text.
       </p>
     </div>

@@ -114,7 +114,7 @@ const CalloutBadge = ({
       aria-hidden
       className={cn(
         "mx-auto flex items-center justify-center rounded-md border",
-        shape === "icon" ? "h-12 w-12" : "h-10 px-3 text-[10px] font-semibold uppercase tracking-wider",
+        shape === "icon" ? "h-12 w-12" : "h-10 px-3 text-xs font-semibold uppercase tracking-wider",
         t.border,
         t.text,
         className,

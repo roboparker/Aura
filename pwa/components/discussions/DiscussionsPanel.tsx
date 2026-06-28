@@ -521,7 +521,7 @@ const Section = ({
     </div>
     <div className="overflow-hidden rounded-lg border border-border">
       {/* Column header — desktop only */}
-      <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_90px_120px_40px] gap-3 border-b border-border bg-muted/40 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:grid">
+      <div className="hidden grid-cols-[minmax(0,1fr)_150px_170px_90px_120px_40px] gap-3 border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid">
         <span>Thread</span>
         <span>Category</span>
         <span>Author</span>
@@ -612,7 +612,7 @@ const DiscussionRow = ({
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-            <span className="font-mono text-[11px] text-muted-foreground/80">
+            <span className="font-mono text-xs text-muted-foreground/80">
               {slugFor(discussion.title)}
             </span>
             {discussion.participants.length > 0 && (
@@ -657,7 +657,7 @@ const DiscussionRow = ({
             {displayName(discussion.author)}
           </span>
           {isAuthor && (
-            <span className="rounded bg-muted px-1 text-[10px] font-medium uppercase text-muted-foreground">
+            <span className="rounded bg-muted px-1 text-xs font-medium uppercase text-muted-foreground">
               you
             </span>
           )}
