@@ -65,10 +65,47 @@ final class SpacePermission
      */
     public static function emptyMatrix(): array
     {
+        return self::matrixOf(false);
+    }
+
+    /**
+     * A fully-true matrix (everything allowed) — the seeded default for the
+     * built-in "Member" role, so a space behaves as before until an admin
+     * tightens it.
+     *
+     * @return array<string, array<string, bool>>
+     */
+    public static function fullMatrix(): array
+    {
+        return self::matrixOf(true);
+    }
+
+    /**
+     * The built-in "Guest" preset: read every content category + create
+     * comments, nothing else.
+     *
+     * @return array<string, array<string, bool>>
+     */
+    public static function guestMatrix(): array
+    {
+        $matrix = self::emptyMatrix();
+        foreach (self::CATEGORIES as $category) {
+            $matrix[$category][self::READ] = true;
+        }
+        $matrix[self::COMMENTS][self::CREATE] = true;
+
+        return $matrix;
+    }
+
+    /**
+     * @return array<string, array<string, bool>>
+     */
+    private static function matrixOf(bool $granted): array
+    {
         $matrix = [];
         foreach (self::CATEGORIES as $category) {
             foreach (self::ACTIONS as $action) {
-                $matrix[$category][$action] = false;
+                $matrix[$category][$action] = $granted;
             }
         }
 

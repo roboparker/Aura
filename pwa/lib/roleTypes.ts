@@ -55,8 +55,14 @@ export interface SpaceRole {
   name: string;
   color: string | null;
   permissions: PermissionMatrix;
+  /** 'member' | 'guest' for built-in roles (non-deletable); null for custom. */
+  builtinKey: string | null;
   createdAt?: string;
 }
+
+/** The built-in "Member" role is the default for members with no assigned role. */
+export const isDefaultMemberRole = (role: SpaceRole): boolean =>
+  role.builtinKey === "member";
 
 /** The embedded role summary on a SpaceMembership (`space:read`). */
 export interface SpaceRoleRef {

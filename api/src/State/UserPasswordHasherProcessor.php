@@ -10,6 +10,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
+use App\Service\SpaceRoleSeeder;
 use App\Service\WaitlistJoinedMailer;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,6 +43,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         #[Autowire(service: 'limiter.signup_ip')]
         private RateLimiterFactoryInterface $signupLimiter,
         private RequestStack $requestStack,
+        private SpaceRoleSeeder $roleSeeder,
     ) {
     }
 
@@ -174,6 +176,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         $space->addUserMembership($membership);
 
         $this->em->persist($space);
+        $this->roleSeeder->seed($space);
         $this->em->flush();
     }
 

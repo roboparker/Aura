@@ -6,6 +6,7 @@ namespace App\Security\Permission;
 
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -25,6 +26,8 @@ final class SpacePermissionResolver
 {
     /** @var array<string, list<string>> memo: "userId|category" => denied space UUIDs */
     private array $readDeniedMemo = [];
+    /** @var array<string, ?SpaceRole> memo: spaceId => built-in Member role */
+    private array $memberRoleMemo = [];
 
     public function __construct(private readonly EntityManagerInterface $em)
     {
@@ -37,17 +40,15 @@ final class SpacePermissionResolver
         }
 
         $membership = $this->directMembership($space, $user);
-        if (null === $membership) {
-            // No direct membership: either group-inherited (unrestricted in v1)
-            // or not a member at all (denied — the access layer 404s them too).
-            return $space->hasMember($user);
-        }
-        if (Space::ROLE_ADMIN === $membership->getRole()) {
+        if (null !== $membership && Space::ROLE_ADMIN === $membership->getRole()) {
             return true;
         }
-        $roles = $membership->getRoles();
-        if ($roles->isEmpty()) {
-            return true;
+
+        $roles = $this->effectiveRoles($space, $membership);
+        if (null === $roles) {
+            // No explicit roles AND no seeded Member role (legacy/test space) →
+            // unrestricted, but only for an actual member of the space.
+            return null !== $membership || $space->hasMember($user);
         }
         foreach ($roles as $role) {
             if ($role->allows($category, $action)) {
@@ -59,10 +60,40 @@ final class SpacePermissionResolver
     }
 
     /**
+     * The roles that decide a (non-admin) member's access in a space: their
+     * explicitly-assigned roles, or the space's built-in Member role when none
+     * are assigned (incl. group-only access). Null = no roles + no Member role.
+     *
+     * @return list<SpaceRole>|null
+     */
+    private function effectiveRoles(Space $space, ?SpaceMembership $membership): ?array
+    {
+        if (null !== $membership && !$membership->getRoles()->isEmpty()) {
+            return array_values($membership->getRoles()->toArray());
+        }
+        $member = $this->memberRole($space);
+
+        return null === $member ? null : [$member];
+    }
+
+    private function memberRole(Space $space): ?SpaceRole
+    {
+        $id = (string) $space->getId();
+        if (array_key_exists($id, $this->memberRoleMemo)) {
+            return $this->memberRoleMemo[$id];
+        }
+
+        return $this->memberRoleMemo[$id] = $this->em->getRepository(SpaceRole::class)
+            ->findOneBy(['space' => $space, 'builtinKey' => SpaceRole::BUILTIN_MEMBER]);
+    }
+
+    /**
      * Space UUIDs where the user is DENIED read for a category — used by the
-     * access extensions to drop unreadable rows. Empty for unrestricted users
-     * (admins / zero-role / group-only), so the common case adds no DQL and
-     * today's behaviour is unchanged.
+     * access extensions to drop unreadable rows. Walks the user's direct
+     * memberships, using each membership's explicit roles or the space's Member
+     * default. Empty when nothing restricts read (e.g. a full Member role), so
+     * the common case adds no DQL and behaviour is unchanged. (Group-only
+     * spaces aren't collection-filtered in v1; item access is still gated.)
      *
      * @return list<string>
      */
@@ -74,13 +105,20 @@ final class SpacePermissionResolver
         }
 
         $denied = [];
-        foreach ($this->restrictedMemberships($user) as $membership) {
+        foreach ($this->em->getRepository(SpaceMembership::class)->findBy(['user' => $user]) as $membership) {
+            if (Space::ROLE_ADMIN === $membership->getRole()) {
+                continue;
+            }
             $space = $membership->getSpace();
             if (null === $space || null === $space->getId()) {
                 continue;
             }
+            $roles = $this->effectiveRoles($space, $membership);
+            if (null === $roles) {
+                continue; // no roles + no Member role → unrestricted
+            }
             $allowed = false;
-            foreach ($membership->getRoles() as $role) {
+            foreach ($roles as $role) {
                 if ($role->allows($category, SpacePermission::READ)) {
                     $allowed = true;
                     break;
@@ -120,27 +158,5 @@ final class SpacePermissionResolver
 
         return $this->em->getRepository(SpaceMembership::class)
             ->findOneBy(['space' => $space, 'user' => $user]);
-    }
-
-    /**
-     * The user's direct memberships that could be restricted — non-admin and
-     * carrying at least one role.
-     *
-     * @return list<SpaceMembership>
-     */
-    private function restrictedMemberships(User $user): array
-    {
-        $out = [];
-        foreach ($this->em->getRepository(SpaceMembership::class)->findBy(['user' => $user]) as $membership) {
-            if (Space::ROLE_ADMIN === $membership->getRole()) {
-                continue;
-            }
-            if ($membership->getRoles()->isEmpty()) {
-                continue;
-            }
-            $out[] = $membership;
-        }
-
-        return $out;
     }
 }

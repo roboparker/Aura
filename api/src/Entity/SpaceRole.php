@@ -48,7 +48,8 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user))",
+            // Built-in roles (Member/Guest) are non-deletable.
+            security: "is_granted('ROLE_USER') and object.getBuiltinKey() === null and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user))",
         ),
     ],
     normalizationContext: ['groups' => ['space_role:read']],
@@ -60,8 +61,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'space_role')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_space_role_space')]
 #[ORM\UniqueConstraint(name: 'uniq_space_role_name', columns: ['space_id', 'name'])]
+#[ORM\UniqueConstraint(name: 'uniq_space_role_builtin', columns: ['space_id', 'builtin_key'])]
 class SpaceRole
 {
+    /** The built-in "Member" role = the default for members with no assigned role. */
+    public const BUILTIN_MEMBER = 'member';
+    /** The built-in "Guest" role = read content + comment. */
+    public const BUILTIN_GUEST = 'guest';
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -114,6 +121,15 @@ class SpaceRole
     #[ORM\Column(type: 'datetime_immutable')]
     #[Groups(['space_role:read'])]
     private \DateTimeImmutable $createdAt;
+
+    /**
+     * Non-null for seeded built-in roles ({@see BUILTIN_MEMBER}/{@see
+     * BUILTIN_GUEST}): non-deletable, name fixed, permissions editable.
+     * 'member' is the implicit default for members with no assigned role.
+     */
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['space_role:read', 'space:read'])]
+    private ?string $builtinKey = null;
 
     public function __construct()
     {
@@ -182,6 +198,18 @@ class SpaceRole
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getBuiltinKey(): ?string
+    {
+        return $this->builtinKey;
+    }
+
+    public function setBuiltinKey(?string $builtinKey): static
+    {
+        $this->builtinKey = $builtinKey;
+
+        return $this;
     }
 
     /** Whether this role grants (category, action). Defensive against malformed JSON. */

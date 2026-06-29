@@ -10,11 +10,13 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import {
   emptyMatrix,
+  isDefaultMemberRole,
   type PermissionMatrix,
   type SpaceRole,
   type SpaceRoleCollection,
 } from "@/lib/roleTypes";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -180,6 +182,13 @@ const SpaceRoles = () => {
       (m.roles ?? []).some((r) => r.id === role.id),
     ).length ?? 0;
 
+  // Built-ins first (Member, then Guest), then custom roles by name.
+  const builtinRank = (r: SpaceRole): number =>
+    r.builtinKey === "member" ? 0 : r.builtinKey === "guest" ? 1 : 2;
+  const orderedRoles = [...roles].sort(
+    (a, b) => builtinRank(a) - builtinRank(b) || a.name.localeCompare(b.name),
+  );
+
   if (authLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -247,9 +256,10 @@ const SpaceRoles = () => {
           >
             Users
           </Link>{" "}
-          page. A member with no role assigned has full access; assigning roles
-          restricts them to the union of those roles. Admins always have full
-          access.
+          page. A member with no role assigned gets the <strong>Member</strong>{" "}
+          role; assigning roles restricts them to the union of those roles.
+          Admins always have full access. The built-in Member and Guest roles
+          can be edited but not deleted.
         </p>
 
         <Card>
@@ -260,7 +270,7 @@ const SpaceRoles = () => {
               </div>
             ) : (
               <ul className="divide-y divide-border rounded-md border">
-                {roles.map((role) => (
+                {orderedRoles.map((role) => (
                   <li
                     key={role["@id"]}
                     className="flex items-center gap-3 px-3 py-2.5"
@@ -272,7 +282,19 @@ const SpaceRoles = () => {
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{role.name}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-medium truncate">{role.name}</p>
+                        {isDefaultMemberRole(role) && (
+                          <Badge variant="secondary" className="shrink-0">
+                            Default
+                          </Badge>
+                        )}
+                        {role.builtinKey === "guest" && (
+                          <Badge variant="outline" className="shrink-0">
+                            Built-in
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {memberCount(role)}{" "}
                         {memberCount(role) === 1 ? "member" : "members"}
@@ -286,14 +308,16 @@ const SpaceRoles = () => {
                     >
                       <Pencil className="h-4 w-4" aria-hidden />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(role)}
-                      aria-label={`Delete ${role.name}`}
-                      className="rounded p-1 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </button>
+                    {role.builtinKey === null && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(role)}
+                        aria-label={`Delete ${role.name}`}
+                        className="rounded p-1 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -316,7 +340,14 @@ const SpaceRoles = () => {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Editor, Viewer, Reviewer"
                 maxLength={80}
+                disabled={editing?.builtinKey != null}
               />
+              {editing?.builtinKey != null && (
+                <p className="text-xs text-muted-foreground">
+                  This is a built-in role — its name is fixed, but you can change
+                  what it can do.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Color</Label>
@@ -364,7 +395,7 @@ const SpaceRoles = () => {
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={`Delete “${deleteTarget?.name}”?`}
-        description="Members assigned only this role will return to full access. This cannot be undone."
+        description="Members assigned only this role will fall back to the Member role. This cannot be undone."
         confirmLabel="Delete"
         destructive
         onConfirm={async () => {

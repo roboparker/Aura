@@ -124,6 +124,35 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
     }
 
+    public function testMemberDefaultRoleRestrictsUnassignedMember(): void
+    {
+        // #space-roles: with a built-in Member role seeded, an unassigned member
+        // is governed by it (here read-only) instead of being unrestricted.
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSpace($admin, $member);
+        $project = $this->createProject($admin, $space, 'Backend');
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Member')
+            ->setBuiltinKey(SpaceRole::BUILTIN_MEMBER)
+            ->setPermissions(['projects' => ['read' => true]]);
+        $this->entityManager->persist($role);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($member);
+
+        $client->request('GET', '/projects/' . $project->getId());
+        $this->assertResponseStatusCodeSame(200);
+
+        $client->request('PATCH', '/projects/' . $project->getId(), [
+            'json' => ['title' => 'Nope'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(403);
+    }
+
     public function testRoleCanGrantBeyondBaseline(): void
     {
         // A role with projects.delete lets a non-creator member delete a

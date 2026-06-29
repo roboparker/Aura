@@ -125,13 +125,16 @@ const MemberRoles = ({
           {disabled
             ? "Full access"
             : assigned.length === 0
-              ? "No roles"
+              ? "Member (default)"
               : `${assigned.length} role${assigned.length === 1 ? "" : "s"}`}
           <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[200px]">
-        {allRoles.map((role) => (
+        {/* The built-in Member role is the implicit default — not assigned. */}
+        {allRoles
+          .filter((role) => role.builtinKey !== "member")
+          .map((role) => (
           <DropdownMenuItem
             key={role["@id"]}
             onSelect={(e) => {
