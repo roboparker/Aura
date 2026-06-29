@@ -5,6 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Project;
 use App\Entity\Space;
+use App\Entity\SpaceRole;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -189,12 +190,24 @@ class ProjectTest extends ApiTestCase
 
     public function testRegularMemberCannotDeleteProject(): void
     {
-        // Per #185: delete requires the project creator OR a space
-        // admin. Bob is just a regular space member here, so he gets
-        // 403.
+        // Delete requires the creator, a space admin, OR a role granting
+        // projects.delete (#space-roles). Bob has a role without it, so 403.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $space = $project->getSpace();
+        self::assertNotNull($space);
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions(['projects' => ['read' => true, 'update' => true]]);
+        $this->entityManager->persist($role);
+        foreach ($space->getUserMemberships() as $membership) {
+            if ($membership->getUser() === $bob) {
+                $membership->addRole($role);
+            }
+        }
+        $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($bob);
