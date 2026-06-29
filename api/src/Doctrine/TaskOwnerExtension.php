@@ -10,6 +10,7 @@ use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Security\Permission\ActorContext;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\QueryBuilder;
@@ -32,6 +33,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         private Security $security,
         private AccessPolicyItemScope $accessPolicyItemScope,
         private SpacePermissionResolver $spacePermissions,
+        private ActorContext $actor,
     ) {
     }
 
@@ -66,7 +68,8 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
     private function applyReadScope(QueryBuilder $queryBuilder): void
     {
         $user = $this->security->getUser();
-        if (!$user instanceof User) {
+        // Scoped keys are confined by applyFilter + gated by the listener.
+        if (!$user instanceof User || null !== $this->actor->scopedKey()) {
             return;
         }
         $denied = $this->spacePermissions->readDeniedSpaceIds($user, SpacePermission::TASKS);
@@ -99,12 +102,25 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
             return;
         }
 
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+
+        // Space-scoped API key: only tasks of projects in the key's space
+        // (standalone tasks have no space and are never reachable by a key).
+        $key = $this->actor->scopedKey();
+        if (null !== $key) {
+            $space = $key->getSpace();
+            $queryBuilder
+                ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
+                ->andWhere('IDENTITY(tp_access.space) = :task_key_space')
+                ->setParameter('task_key_space', null === $space ? null : (string) $space->getId());
+
+            return;
+        }
+
         $user = $this->security->getUser();
         if (!$user instanceof User) {
             return;
         }
-
-        $rootAlias = $queryBuilder->getRootAliases()[0];
         // The task is visible when ANY of:
         //  - the caller owns it (covers personal/standalone tasks),
         //  - the caller is a direct member of the parent project's space,

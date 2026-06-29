@@ -10,6 +10,7 @@ use App\Entity\Comment;
 use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
+use App\Security\Permission\ActorContext;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -34,8 +35,10 @@ use Symfony\Bundle\SecurityBundle\Security;
  */
 final class CommentAccessExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
-    public function __construct(private Security $security)
-    {
+    public function __construct(
+        private Security $security,
+        private ActorContext $actor,
+    ) {
     }
 
     public function applyToCollection(
@@ -70,6 +73,26 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
+
+        // Space-scoped API key: confine to comments whose parent lives in the
+        // key's space (feedback comments — no space — are excluded).
+        $key = $this->actor->scopedKey();
+        if (null !== $key) {
+            $space = $key->getSpace();
+            $queryBuilder
+                ->leftJoin(sprintf('%s.task', $rootAlias), 'ck_task')
+                ->leftJoin('ck_task.project', 'ck_project')
+                ->leftJoin(sprintf('%s.page', $rootAlias), 'ck_page')
+                ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ck_discussion')
+                ->andWhere(
+                    'IDENTITY(ck_project.space) = :comment_key_space'
+                    . ' OR IDENTITY(ck_page.space) = :comment_key_space'
+                    . ' OR IDENTITY(ck_discussion.space) = :comment_key_space',
+                )
+                ->setParameter('comment_key_space', null === $space ? null : (string) $space->getId());
+
+            return;
+        }
 
         // Task branch: comment is on a task whose owner is the caller
         // OR whose project space contains the caller (direct or via

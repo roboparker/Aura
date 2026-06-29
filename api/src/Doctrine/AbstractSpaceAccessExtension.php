@@ -7,6 +7,7 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
+use App\Security\Permission\ActorContext;
 use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -38,6 +39,7 @@ abstract class AbstractSpaceAccessExtension implements
         protected Security $security,
         protected AccessPolicyItemScope $accessPolicyItemScope,
         protected SpacePermissionResolver $spacePermissions,
+        protected ActorContext $actor,
     ) {
     }
 
@@ -97,7 +99,9 @@ abstract class AbstractSpaceAccessExtension implements
     {
         $category = $this->getPermissionCategory();
         $user = $this->security->getUser();
-        if (null === $category || !$user instanceof User) {
+        // Scoped keys are confined + gated by the listener, not the member
+        // read deny-list.
+        if (null === $category || !$user instanceof User || null !== $this->actor->scopedKey()) {
             return;
         }
         $denied = $this->spacePermissions->readDeniedSpaceIds($user, $category);
@@ -127,12 +131,29 @@ abstract class AbstractSpaceAccessExtension implements
         if ($this->getResourceClass() !== $resourceClass) {
             return;
         }
+
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+
+        // Space-scoped API key: confine strictly to the key's space, ignoring
+        // the creator's broader memberships (#space-roles).
+        $key = $this->actor->scopedKey();
+        if (null !== $key) {
+            $space = $key->getSpace();
+            $queryBuilder
+                ->andWhere(sprintf('IDENTITY(%s.space) = :%s_key_space', $rootAlias, $this->getAliasPrefix()))
+                ->setParameter(
+                    $this->getAliasPrefix() . '_key_space',
+                    null === $space ? null : (string) $space->getId(),
+                );
+
+            return;
+        }
+
         $user = $this->security->getUser();
         if (!$user instanceof User) {
             return;
         }
 
-        $rootAlias = $queryBuilder->getRootAliases()[0];
         $queryBuilder
             ->andWhere(SpaceMembershipDql::userBelongsToProjectSpace(
                 $rootAlias,

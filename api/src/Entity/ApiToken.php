@@ -12,6 +12,8 @@ use App\Repository\ApiTokenRepository;
 use App\Security\Access\AccessPolicy;
 use App\State\ApiTokenCreateProcessor;
 use App\State\ApiTokenDeleteProcessor;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -136,6 +138,28 @@ class ApiToken
     private \DateTimeImmutable $createdAt;
 
     /**
+     * Non-null for a SPACE-SCOPED key (#space-roles): the key is confined to
+     * this space and its permissions come from {@see $roles} (not
+     * accessPolicy / not the creator's full access). Null = a personal token
+     * (acts as its owner, narrowed by accessPolicy) — the legacy behaviour.
+     */
+    #[ORM\ManyToOne(targetEntity: Space::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['api_token:read'])]
+    private ?Space $space = null;
+
+    /**
+     * Roles granted to a space-scoped key — its effective permissions are the
+     * union (no roles ⇒ the key can do nothing). Ignored for personal tokens.
+     *
+     * @var Collection<int, SpaceRole>
+     */
+    #[ORM\ManyToMany(targetEntity: SpaceRole::class)]
+    #[ORM\JoinTable(name: 'api_token_role')]
+    #[Groups(['api_token:read'])]
+    private Collection $roles;
+
+    /**
      * Transient. Populated by the create processor with the plaintext
      * bearer (`madori_pat_…`) so it can be returned exactly once in the
      * POST response. Never persisted, never read from a fresh entity.
@@ -146,6 +170,41 @@ class ApiToken
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->roles = new ArrayCollection();
+    }
+
+    public function getSpace(): ?Space
+    {
+        return $this->space;
+    }
+
+    public function setSpace(?Space $space): static
+    {
+        $this->space = $space;
+
+        return $this;
+    }
+
+    public function isScoped(): bool
+    {
+        return null !== $this->space;
+    }
+
+    /**
+     * @return Collection<int, SpaceRole>
+     */
+    public function getRoles(): Collection
+    {
+        return $this->roles;
+    }
+
+    public function addRole(SpaceRole $role): static
+    {
+        if (!$this->roles->contains($role)) {
+            $this->roles->add($role);
+        }
+
+        return $this;
     }
 
     public function getPlainToken(): ?string

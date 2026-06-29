@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Security\Permission;
 
+use App\Entity\ApiToken;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\SpaceRole;
@@ -29,12 +30,21 @@ final class SpacePermissionResolver
     /** @var array<string, ?SpaceRole> memo: spaceId => built-in Member role */
     private array $memberRoleMemo = [];
 
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly ActorContext $actor,
+    ) {
     }
 
     public function can(User $user, ?Space $space, string $category, string $action): bool
     {
+        // A space-scoped API key ignores the creator's own access entirely:
+        // confined to its space + the union of its roles (no role ⇒ nothing).
+        $key = $this->actor->scopedKey();
+        if (null !== $key) {
+            return $this->keyAllows($key, $space, $category, $action);
+        }
+
         if (null === $space) {
             return true;
         }
@@ -51,6 +61,39 @@ final class SpacePermissionResolver
             return null !== $membership || $space->hasMember($user);
         }
         foreach ($roles as $role) {
+            if ($role->allows($category, $action)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A space-scoped key may act on a subject only when the subject is in the
+     * key's space (confinement) AND one of the key's roles grants the action.
+     */
+    public function keyAllows(ApiToken $key, ?Space $space, string $category, string $action): bool
+    {
+        $keySpace = $key->getSpace();
+        if (null === $keySpace || null === $space || null === $space->getId()) {
+            return false;
+        }
+        if ((string) $space->getId() !== (string) $keySpace->getId()) {
+            return false;
+        }
+
+        return $this->keyAllowsCategory($key, $category, $action);
+    }
+
+    /**
+     * Whether any of the key's roles grants (category, action) — the space-less
+     * check used by the request listener (confinement is enforced separately by
+     * the access extensions).
+     */
+    public function keyAllowsCategory(ApiToken $key, string $category, string $action): bool
+    {
+        foreach ($key->getRoles() as $role) {
             if ($role->allows($category, $action)) {
                 return true;
             }
