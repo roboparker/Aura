@@ -68,13 +68,17 @@ final class CustomFieldVisibilityController extends AbstractController
         }
 
         $payload = $request->toArray();
-        $visibility = $payload['visibility'] ?? null;
-        if (!is_string($visibility) || !in_array($visibility, CustomFieldDefinition::VISIBILITIES, true)) {
+        $raw = $payload['visibility'] ?? null;
+        // Accept a comma-joined SET of surfaces (list/board/calendar) or the
+        // legacy single value; normalise to a deduped, ordered surface string.
+        $surfaces = is_string($raw) ? CustomFieldDefinition::visibilitySurfaces($raw) : [];
+        if ([] === $surfaces) {
             return new JsonResponse(
-                ['error' => 'visibility must be one of: ' . implode(', ', CustomFieldDefinition::VISIBILITIES) . '.'],
+                ['error' => 'visibility must list one or more of: ' . implode(', ', CustomFieldDefinition::SURFACES) . '.'],
                 400,
             );
         }
+        $visibility = implode(',', array_values(array_unique($surfaces)));
 
         $row = $this->overrides->findOneFor($project, $definition);
         if (null === $row) {

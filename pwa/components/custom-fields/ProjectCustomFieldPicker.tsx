@@ -5,7 +5,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import type { CustomFieldDefinition } from "./types";
+import { visibilitySurfaces, type CustomFieldDefinition } from "./types";
 
 interface Collection<T> {
   member?: T[];
@@ -96,22 +96,30 @@ const ProjectCustomFieldPicker = ({
     if (!res.ok) throw new Error("Failed to update fields.");
   };
 
-  // The List + Board toggles drive both attachment and visibility: a field is
-  // on the project when either is on. Turning the last one off detaches it;
-  // turning one on (re)attaches and sets the per-project visibility.
-  const updateField = async (iri: string, nextList: boolean, nextBoard: boolean) => {
+  // The List / Board / Calendar toggles drive both attachment and visibility:
+  // a field is on the project when any is on. Turning the last one off detaches
+  // it; turning one on (re)attaches and sets the per-project surface set.
+  const updateField = async (
+    iri: string,
+    nextList: boolean,
+    nextBoard: boolean,
+    nextCalendar: boolean,
+  ) => {
     const wasAttached = attachedIris.includes(iri);
     const projectId = projectIri.split("/").pop();
     const defId = iri.split("/").pop();
     setBusy(iri);
     try {
-      if (!nextList && !nextBoard) {
+      if (!nextList && !nextBoard && !nextCalendar) {
         if (wasAttached) {
           await patchAttached(attachedIris.filter((i) => i !== iri));
         }
       } else {
-        const visibility =
-          nextList && nextBoard ? "both" : nextList ? "list" : "board";
+        const surfaces = [
+          nextList ? "list" : null,
+          nextBoard ? "board" : null,
+          nextCalendar ? "calendar" : null,
+        ].filter(Boolean);
         if (!wasAttached) {
           await patchAttached([...attachedIris, iri]);
         }
@@ -121,7 +129,7 @@ const ProjectCustomFieldPicker = ({
             method: "PUT",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ visibility }),
+            body: JSON.stringify({ visibility: surfaces.join(",") }),
           },
         );
         if (!res.ok) throw new Error("Failed to update visibility.");
@@ -141,8 +149,8 @@ const ProjectCustomFieldPicker = ({
           <h3 className="text-sm font-medium">Custom fields</h3>
           <p className="text-xs text-muted-foreground">
             Toggle where each of the space&apos;s fields shows on this
-            project — the task list, the board, or both (off both = not on this
-            project). Define and order fields in{" "}
+            project — the task list, the board, and/or the calendar (all off =
+            not on this project). Define and order fields in{" "}
             <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
               space settings
             </Link>
@@ -173,9 +181,12 @@ const ProjectCustomFieldPicker = ({
         <ul className="divide-y rounded-md border">
           {spaceFields.map((def) => {
             const checked = attachedIris.includes(def["@id"]);
-            const vis = checked ? projectVisibility[def["@id"]] ?? "both" : null;
-            const showList = vis === "both" || vis === "list";
-            const showBoard = vis === "both" || vis === "board";
+            const surfaces = checked
+              ? visibilitySurfaces(projectVisibility[def["@id"]] ?? "both")
+              : [];
+            const showList = surfaces.includes("list");
+            const showBoard = surfaces.includes("board");
+            const showCalendar = surfaces.includes("calendar");
             const isBusy = busy === def["@id"];
             return (
               <li
@@ -193,7 +204,7 @@ const ProjectCustomFieldPicker = ({
                     checked={showList}
                     disabled={isBusy}
                     onCheckedChange={(v) =>
-                      void updateField(def["@id"], v, showBoard)
+                      void updateField(def["@id"], v, showBoard, showCalendar)
                     }
                     aria-label={`Show ${def.name} on the task list`}
                   />
@@ -204,11 +215,22 @@ const ProjectCustomFieldPicker = ({
                     checked={showBoard}
                     disabled={isBusy}
                     onCheckedChange={(v) =>
-                      void updateField(def["@id"], showList, v)
+                      void updateField(def["@id"], showList, v, showCalendar)
                     }
                     aria-label={`Show ${def.name} on the board`}
                   />
                   Board
+                </label>
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Switch
+                    checked={showCalendar}
+                    disabled={isBusy}
+                    onCheckedChange={(v) =>
+                      void updateField(def["@id"], showList, showBoard, v)
+                    }
+                    aria-label={`Show ${def.name} on the calendar`}
+                  />
+                  Calendar
                 </label>
                 {isSpaceAdmin && (
                   <button

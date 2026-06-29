@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AssignMenu, { type AssignableUser } from "@/components/tasks/AssignMenu";
+import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
+import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import type { CustomFieldValuePair } from "@/components/tasks/CustomFieldValueList";
 import { isoToLocalDate } from "@/components/tasks/taskHelpers";
 import { cn } from "@/lib/utils";
 
@@ -13,15 +16,24 @@ export interface CalendarTask {
   dueDate: string | null;
   completedOn: string | null;
   assignees: AssignableUser[];
+  customFieldValues: CustomFieldValuePair[];
 }
 
 interface TaskCalendarProps {
   tasks: CalendarTask[];
+  /** Custom fields to surface on calendar chips (filtered to calendar visibility). */
+  definitions: CustomFieldDefinition[];
   /** Everyone assignable on this project, for the per-task assign menu. */
   assignableUsers: AssignableUser[];
   onOpen: (taskIri: string) => void;
   onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
 }
+
+const isEmptyValue = (v: unknown): boolean =>
+  v === null ||
+  v === undefined ||
+  v === "" ||
+  (Array.isArray(v) && v.length === 0);
 
 type View = "month" | "week";
 
@@ -42,44 +54,74 @@ const startOfWeek = (d: Date): Date => addDays(d, -d.getDay());
 
 const TaskChip = ({
   task,
+  definitions,
   assignableUsers,
   onOpen,
   onAssign,
 }: {
   task: CalendarTask;
+  definitions: CustomFieldDefinition[];
   assignableUsers: AssignableUser[];
   onOpen: (iri: string) => void;
   onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
-}) => (
-  // A div (not a button) so the nested assign menu's button is valid markup
-  // and its clicks don't bubble up to open the drawer.
-  <div
-    role="button"
-    tabIndex={0}
-    onClick={() => onOpen(task["@id"])}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        onOpen(task["@id"]);
-      }
-    }}
-    className={cn(
-      "flex w-full cursor-pointer items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-left text-xs hover:border-foreground/30",
-      task.completedOn && "opacity-60",
-    )}
-    title={task.title}
-    data-testid="calendar-task"
-  >
-    <span className={cn("min-w-0 flex-1 truncate", task.completedOn && "line-through")}>
-      {task.title}
-    </span>
-    <AssignMenu
-      assignees={task.assignees}
-      assignableUsers={assignableUsers}
-      onAssign={(iris) => onAssign(task["@id"], iris)}
-    />
-  </div>
-);
+}) => {
+  const fields = definitions
+    .map((def) => ({
+      def,
+      value: task.customFieldValues.find((v) => v.definition === def["@id"])
+        ?.value,
+    }))
+    .filter(({ value }) => !isEmptyValue(value));
+  return (
+    // A div (not a button) so the nested assign menu's button is valid markup
+    // and its clicks don't bubble up to open the drawer.
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(task["@id"])}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(task["@id"]);
+        }
+      }}
+      className={cn(
+        "w-full cursor-pointer space-y-1 rounded-md border bg-card px-2 py-1.5 text-left text-xs hover:border-foreground/30",
+        task.completedOn && "opacity-60",
+      )}
+      title={task.title}
+      data-testid="calendar-task"
+    >
+      <div className="flex items-center gap-2">
+        <span className={cn("min-w-0 flex-1 truncate", task.completedOn && "line-through")}>
+          {task.title}
+        </span>
+        <AssignMenu
+          assignees={task.assignees}
+          assignableUsers={assignableUsers}
+          onAssign={(iris) => onAssign(task["@id"], iris)}
+        />
+      </div>
+      {fields.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {fields.map(({ def, value }) => (
+            <span
+              key={def["@id"]}
+              className="inline-flex items-center gap-1 rounded border bg-muted/40 px-1 py-0.5 text-xs"
+            >
+              <span className="text-muted-foreground">{def.name}</span>
+              <CustomFieldValueCell
+                definition={def}
+                value={value}
+                className="font-medium"
+              />
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 /**
  * Month / week calendar of a project's tasks, bucketed by due date with
@@ -88,6 +130,7 @@ const TaskChip = ({
  */
 const TaskCalendar = ({
   tasks,
+  definitions,
   assignableUsers,
   onOpen,
   onAssign,
@@ -241,6 +284,7 @@ const TaskCalendar = ({
                   <TaskChip
                     key={task["@id"]}
                     task={task}
+                    definitions={definitions}
                     assignableUsers={assignableUsers}
                     onOpen={onOpen}
                     onAssign={onAssign}
@@ -267,6 +311,7 @@ const TaskCalendar = ({
               <div key={task["@id"]} className="max-w-56">
                 <TaskChip
                   task={task}
+                  definitions={definitions}
                   assignableUsers={assignableUsers}
                   onOpen={onOpen}
                   onAssign={onAssign}

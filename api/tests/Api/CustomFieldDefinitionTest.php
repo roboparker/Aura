@@ -153,6 +153,27 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'board']]]);
     }
 
+    public function testProjectVisibilityAcceptsSurfaceSet(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($project, 'Severity', 'text');
+        $projectIri = '/projects/' . $project->getId();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        // A comma-joined set including the calendar surface round-trips.
+        $client->request('PUT', $projectIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+            'json' => ['visibility' => 'board,calendar'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+
+        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'board,calendar']]]);
+    }
+
     public function testInvalidProjectVisibilityIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
