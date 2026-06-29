@@ -143,6 +143,46 @@ class SpaceApiKeyTest extends ApiTestCase
         $this->assertStringStartsWith(ApiToken::PLAINTEXT_PREFIX, $token);
     }
 
+    public function testAdminListsAndRevokesKey(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSpace($admin);
+        $role = $this->seedRole($space, ['tasks' => ['read' => true]]);
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('POST', '/spaces/' . $space->getId() . '/api-keys', [
+            'json' => ['name' => 'Bot', 'roles' => ['/space_roles/' . $role->getId()]],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $created = $client->getResponse();
+        self::assertNotNull($created);
+        $keyId = $created->toArray()['id'] ?? '';
+        $this->assertIsString($keyId);
+
+        $client->request('GET', '/spaces/' . $space->getId() . '/api-keys');
+        $this->assertResponseStatusCodeSame(200);
+        $listed = $client->getResponse();
+        self::assertNotNull($listed);
+        $keys = $listed->toArray()['keys'] ?? [];
+        $this->assertIsArray($keys);
+        $this->assertCount(1, $keys);
+        $first = $keys[0];
+        $this->assertIsArray($first);
+        $this->assertSame('Bot', $first['name'] ?? null);
+
+        $client->request('DELETE', '/spaces/' . $space->getId() . '/api-keys/' . $keyId);
+        $this->assertResponseStatusCodeSame(204);
+
+        $client->request('GET', '/spaces/' . $space->getId() . '/api-keys');
+        $afterDelete = $client->getResponse();
+        self::assertNotNull($afterDelete);
+        $remaining = $afterDelete->toArray()['keys'] ?? [];
+        $this->assertIsArray($remaining);
+        $this->assertCount(0, $remaining);
+    }
+
     /**
      * Build: admin + space + project + task + a scoped key (with the given
      * permissions) and return [plaintext, admin, task].

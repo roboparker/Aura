@@ -153,6 +153,53 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(403);
     }
 
+    public function testMyPermissionsReflectsRoles(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSpace($admin, $member);
+        $this->assignRole($space, $member, ['tasks' => ['read' => true]]);
+
+        $client = static::createClient();
+        $client->loginUser($member);
+        $client->request('GET', '/spaces/' . $space->getId() . '/my-permissions');
+        $this->assertResponseStatusCodeSame(200);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $perms = $response->toArray()['permissions'] ?? [];
+        $this->assertIsArray($perms);
+        $this->assertSame(['create' => false, 'read' => true, 'update' => false, 'delete' => false], $perms['tasks'] ?? null);
+        $this->assertFalse(is_array($perms['projects'] ?? null) ? $perms['projects']['read'] : null);
+    }
+
+    public function testAdminMyPermissionsAllTrue(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSpace($admin);
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('GET', '/spaces/' . $space->getId() . '/my-permissions');
+        $this->assertResponseStatusCodeSame(200);
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $perms = $response->toArray()['permissions'] ?? [];
+        $this->assertIsArray($perms);
+        $this->assertTrue(is_array($perms['projects'] ?? null) ? $perms['projects']['delete'] : null);
+    }
+
+    public function testNonMemberMyPermissionsIsNotFound(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $stranger = $this->createUser('stranger@example.com');
+        $space = $this->createSpace($admin);
+
+        $client = static::createClient();
+        $client->loginUser($stranger);
+        $client->request('GET', '/spaces/' . $space->getId() . '/my-permissions');
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testRoleCanGrantBeyondBaseline(): void
     {
         // A role with projects.delete lets a non-creator member delete a
