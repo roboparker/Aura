@@ -6,6 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Discussion;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -173,12 +174,21 @@ class DiscussionTest extends ApiTestCase
         $this->assertNotNull($reloaded->getUpdatedAt());
     }
 
-    public function testNonAuthorMemberCannotEdit(): void
+    public function testMemberWithoutDiscussionUpdateRoleCannotEdit(): void
     {
+        // #space-roles: a member with no role has full access, so restriction
+        // is via a role that lacks discussions.update.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $space = $this->createSpace($alice, 'Backend');
-        $this->ensureSpaceMembership($space, $bob);
+        $membership = $this->ensureSpaceMembership($space, $bob);
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions(['discussions' => ['read' => true]]);
+        $this->entityManager->persist($role);
+        $membership->addRole($role);
+        $this->entityManager->flush();
         $aliceDiscussion = $this->seed($alice, $space, 'Original');
 
         $client = static::createClient();

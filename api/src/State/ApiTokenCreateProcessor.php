@@ -60,9 +60,10 @@ final class ApiTokenCreateProcessor implements ProcessorInterface
     /**
      * 32 random bytes encoded as URL-safe base64 without padding. The
      * resulting string is 43 chars long, alphanumeric plus `-_`, which
-     * survives any header transport without escaping.
+     * survives any header transport without escaping. Public so the
+     * space-key controller can mint scoped keys the same way.
      */
-    private static function generateSecret(): string
+    public static function generateSecret(): string
     {
         return rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
     }

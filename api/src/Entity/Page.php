@@ -49,17 +49,17 @@ use Symfony\Component\Validator\Constraints as Assert;
             // Space membership is checked here rather than relying on
             // `Get` because the client supplies the space IRI in the
             // payload — denormalisation has run by the time this fires.
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user) and is_granted('space.pages.create', object)))",
             processor: PageAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.pages.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getCreatedBy() == user or object.getSpace().isAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getCreatedBy() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.pages.update', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getCreatedBy() == user or object.getSpace().isAdmin(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getCreatedBy() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.pages.delete', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['page:read']],

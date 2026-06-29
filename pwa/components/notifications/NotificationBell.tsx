@@ -153,7 +153,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span
-              className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground"
+              className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs font-semibold leading-none text-destructive-foreground"
               data-testid="notification-bell-count"
             >
               {countLabel}
@@ -170,7 +170,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium">Notifications</p>
             {unreadCount > 0 && (
-              <span className="rounded-full bg-emerald-500/15 px-1.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="rounded-full bg-emerald-500/15 px-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                 {unreadCount} new
               </span>
             )}
@@ -213,7 +213,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
           ) : (
             grouped.map(({ group, rows }) => (
               <div key={group}>
-                <p className="bg-muted/40 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="bg-muted/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {group}
                 </p>
                 <ul className="divide-y">
@@ -241,7 +241,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
                         onClick={() => openTarget(n)}
                         className="min-w-0 flex-1 text-left"
                       >
-                        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           {n.contextLabel && (
                             <>
                               <span className="truncate font-mono">{n.contextLabel}</span>
@@ -256,7 +256,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
                         {n.body && (
                           <p className="line-clamp-1 text-xs text-muted-foreground">{n.body}</p>
                         )}
-                        <span className="text-[10px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {formatRelative(n.createdAt)}
                         </span>
                       </button>
@@ -264,7 +264,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
                         <button
                           type="button"
                           onClick={() => void markRead(n)}
-                          className="shrink-0 self-center text-[11px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          className="shrink-0 self-center text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
                           data-testid="notification-mark-read"
                         >
                           Mark read

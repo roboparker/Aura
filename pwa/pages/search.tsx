@@ -507,12 +507,12 @@ const KindTabs = ({
         >
           {KIND_LABEL[k]}
           {counts[k] !== null && (
-            <span className="rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground">{counts[k]}</span>
+            <span className="rounded-full bg-muted px-1.5 text-xs text-muted-foreground">{counts[k]}</span>
           )}
         </button>
       ))}
-      <span className="ml-auto hidden items-center gap-1 text-[11px] text-muted-foreground sm:flex">
-        <kbd className="rounded border border-input bg-muted px-1.5 text-[10px]">tab</kbd> switch
+      <span className="ml-auto hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+        <kbd className="rounded border border-input bg-muted px-1.5 text-xs">tab</kbd> switch
       </span>
     </div>
   );
@@ -794,12 +794,12 @@ const TaskResults = ({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 {t.project && projectName.get(t.project) && (
-                  <p className="font-mono text-[11px] text-muted-foreground">{projectName.get(t.project)}</p>
+                  <p className="font-mono text-xs text-muted-foreground">{projectName.get(t.project)}</p>
                 )}
                 <p className="text-sm font-medium text-foreground">
                   {highlightMatches(t.title, filters.q)}
                   {t.tags?.map((tag) => (
-                    <Badge key={tag["@id"]} variant="outline" className="ml-1.5 align-middle text-[10px]">
+                    <Badge key={tag["@id"]} variant="outline" className="ml-1.5 align-middle text-xs">
                       {tag.title}
                     </Badge>
                   ))}
@@ -816,7 +816,7 @@ const TaskResults = ({
                   </p>
                 ))}
               </div>
-              <div className="shrink-0 text-right text-[11px] text-muted-foreground">
+              <div className="shrink-0 text-right text-xs text-muted-foreground">
                 {t.dueDate && <div>Due {new Date(t.dueDate).toLocaleDateString()}</div>}
                 <div>{t.completedOn ? "completed" : "open"}</div>
               </div>
@@ -883,7 +883,7 @@ const DiscussionResults = ({
                   <CategoryBadge category={d.category} />
                 </div>
                 <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{highlightMatches(snippet(d.body), filters.q)}</p>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                   <span>{displayName(d.author)}</span>
                   <span aria-hidden>·</span>
                   <span className="inline-flex items-center gap-1">
@@ -893,7 +893,7 @@ const DiscussionResults = ({
                   <span aria-hidden>·</span>
                   <span>{formatRelative(d.createdAt)}</span>
                   {currentUserIri === d.author["@id"] && (
-                    <span className="rounded bg-muted px-1 text-[10px] uppercase">you</span>
+                    <span className="rounded bg-muted px-1 text-xs uppercase">you</span>
                   )}
                 </div>
               </div>
@@ -950,7 +950,7 @@ const EmptyState = ({
 
       {activeFilters.length > 0 && (
         <div className="mx-auto mt-5 max-w-sm text-left">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Try removing a filter</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Try removing a filter</p>
           <div className="mt-1.5 space-y-1">
             {activeFilters.map((f) => (
               <button
@@ -969,7 +969,7 @@ const EmptyState = ({
 
       {filters.scope === "active" && (
         <div className="mx-auto mt-5 max-w-sm text-left">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Or widen the scope</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Or widen the scope</p>
           <button
             type="button"
             onClick={() => onScope("all")}

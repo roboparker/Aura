@@ -14,6 +14,7 @@ import {
   useComboboxAnchor,
 } from "@/components/ui/combobox";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import AssigneePlaceholder from "@/components/user/AssigneePlaceholder";
 import { displayName } from "@/lib/userDisplay";
 import type { Elevation } from "@/lib/elevation";
 
@@ -93,6 +94,9 @@ const AssigneesCombobox = ({
               : undefined
           }
         >
+          {value.length === 0 && (
+            <AssigneePlaceholder size="xs" className="group-hover/field:border-foreground/40 group-hover/field:text-foreground" />
+          )}
           <ComboboxValue>
             {value.map((u) => (
               <ComboboxChip

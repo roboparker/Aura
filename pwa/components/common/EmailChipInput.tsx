@@ -148,7 +148,7 @@ const EmailChipInput = ({
         >
           <span
             aria-hidden
-            className="inline-flex items-center justify-center h-5 w-5 rounded text-[10px] font-semibold text-white"
+            className="inline-flex items-center justify-center h-5 w-5 rounded text-xs font-semibold text-white"
             style={{ backgroundColor: deterministicPaletteColor(email) }}
           >
             {(email[0] ?? "?").toUpperCase()}

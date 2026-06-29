@@ -194,7 +194,7 @@ const FeedbackBoardPage = () => {
                         >
                           {ticket.score}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {Math.abs(ticket.score) === 1 ? "vote" : "votes"}
                         </span>
                       </div>

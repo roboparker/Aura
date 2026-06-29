@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use App\Service\SpaceMemberAdder;
 use App\Service\UsageLimiter;
@@ -145,29 +146,76 @@ class SpaceMemberController extends AbstractController
         }
 
         $payload = $request->toArray();
-        $role = is_string($payload['role'] ?? null) ? $payload['role'] : '';
-        if (!in_array($role, Space::ALLOWED_ROLES, true)) {
-            return $this->json(['error' => 'Role must be one of: admin, member.'], 422);
+
+        // `role` (admin/member) and `roles` (custom space-role IRIs) are both
+        // optional — a PATCH may change either or both.
+        if (array_key_exists('role', $payload)) {
+            $role = is_string($payload['role'] ?? null) ? $payload['role'] : '';
+            if (!in_array($role, Space::ALLOWED_ROLES, true)) {
+                return $this->json(['error' => 'Role must be one of: admin, member.'], 422);
+            }
+
+            // Never let the last admin be demoted — a space must always
+            // have someone who can manage it.
+            if (
+                Space::ROLE_MEMBER === $role
+                && Space::ROLE_ADMIN === $membership->getRole()
+                && $this->adminCount($space) <= 1
+            ) {
+                return $this->json(['error' => 'A space must keep at least one admin.'], 409);
+            }
+
+            $membership->setRole($role);
         }
 
-        // Never let the last admin be demoted — a space must always
-        // have someone who can manage it.
-        if (
-            Space::ROLE_MEMBER === $role
-            && Space::ROLE_ADMIN === $membership->getRole()
-            && $this->adminCount($space) <= 1
-        ) {
-            return $this->json(['error' => 'A space must keep at least one admin.'], 409);
+        if (array_key_exists('roles', $payload)) {
+            $resolved = $this->resolveRoles($space, $payload['roles']);
+            if ($resolved instanceof JsonResponse) {
+                return $resolved;
+            }
+            $membership->clearRoles();
+            foreach ($resolved as $spaceRole) {
+                $membership->addRole($spaceRole);
+            }
         }
 
-        $membership->setRole($role);
         $this->em->flush();
 
         return $this->json([
             'status' => 'updated',
             'id' => (string) $membership->getId(),
-            'role' => $role,
+            'role' => $membership->getRole(),
         ], 200);
+    }
+
+    /**
+     * Resolve an array of SpaceRole IRIs/UUIDs to entities that belong to this
+     * space, or a JsonResponse error to return.
+     *
+     * @return list<SpaceRole>|JsonResponse
+     */
+    private function resolveRoles(Space $space, mixed $raw): array|JsonResponse
+    {
+        if (!is_array($raw)) {
+            return $this->json(['error' => 'roles must be an array of role IRIs.'], 422);
+        }
+        $roles = [];
+        foreach ($raw as $entry) {
+            if (!is_string($entry)) {
+                return $this->json(['error' => 'Each role must be an IRI string.'], 422);
+            }
+            $uuid = substr($entry, (int) strrpos($entry, '/') + 1);
+            if (!Uuid::isValid($uuid)) {
+                return $this->json(['error' => sprintf('Invalid role IRI: %s', $entry)], 422);
+            }
+            $role = $this->em->getRepository(SpaceRole::class)->find($uuid);
+            if (null === $role || true !== $role->getSpace()?->getId()?->equals($space->getId())) {
+                return $this->json(['error' => 'Role does not belong to this space.'], 422);
+            }
+            $roles[] = $role;
+        }
+
+        return $roles;
     }
 
     #[Route('/spaces/{id}/members/{membershipId}', name: 'space_member_remove', methods: ['DELETE'])]

@@ -51,7 +51,7 @@ const CustomFieldValueFields = ({
             )}
           </label>
           {!compact && (
-            <Badge variant="outline" className="shrink-0 text-[10px] uppercase">
+            <Badge variant="outline" className="shrink-0 text-xs uppercase">
               {subtypeLabelFor(def.kind, def.subtype)}
             </Badge>
           )}

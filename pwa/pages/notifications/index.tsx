@@ -250,7 +250,7 @@ const NotificationsPage = () => {
             <div className="overflow-hidden rounded-lg border border-border bg-background">
               {grouped.map(({ group, rows }) => (
                 <div key={group}>
-                  <p className="border-b border-border bg-muted/40 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <p className="border-b border-border bg-muted/40 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {group}
                   </p>
                   <ul className="divide-y divide-border">

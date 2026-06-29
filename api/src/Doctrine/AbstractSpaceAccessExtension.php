@@ -7,6 +7,8 @@ use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
+use App\Security\Permission\ActorContext;
+use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\QueryBuilder;
 use Symfony\Bundle\SecurityBundle\Security;
 
@@ -36,6 +38,8 @@ abstract class AbstractSpaceAccessExtension implements
     public function __construct(
         protected Security $security,
         protected AccessPolicyItemScope $accessPolicyItemScope,
+        protected SpacePermissionResolver $spacePermissions,
+        protected ActorContext $actor,
     ) {
     }
 
@@ -51,6 +55,17 @@ abstract class AbstractSpaceAccessExtension implements
      * (CustomFieldDefinition). Drives AccessPolicyItemScope filtering.
      */
     abstract protected function getImpersonationItemType(): ?string;
+
+    /**
+     * The space-role permission category this resource belongs to (e.g.
+     * 'projects'), or null when it isn't role-gated. Drives collection
+     * read-filtering (#space-roles): rows in spaces where the user lacks read
+     * for this category are dropped.
+     */
+    protected function getPermissionCategory(): ?string
+    {
+        return null;
+    }
 
     public function applyToCollection(
         QueryBuilder $queryBuilder,
@@ -72,6 +87,32 @@ abstract class AbstractSpaceAccessExtension implements
                 $this->getAliasPrefix() . '_imp',
             );
         }
+
+        // Drop rows in spaces where the user's roles deny reading this category
+        // (#space-roles). No-op (empty deny-list) for unrestricted users.
+        if ($this->getResourceClass() === $resourceClass) {
+            $this->applyReadScope($queryBuilder);
+        }
+    }
+
+    private function applyReadScope(QueryBuilder $queryBuilder): void
+    {
+        $category = $this->getPermissionCategory();
+        $user = $this->security->getUser();
+        // Scoped keys are confined + gated by the listener, not the member
+        // read deny-list.
+        if (null === $category || !$user instanceof User || null !== $this->actor->scopedKey()) {
+            return;
+        }
+        $denied = $this->spacePermissions->readDeniedSpaceIds($user, $category);
+        if (0 === count($denied)) {
+            return;
+        }
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+        $param = $this->getAliasPrefix() . '_read_denied';
+        $queryBuilder
+            ->andWhere(sprintf('IDENTITY(%s.space) NOT IN (:%s)', $rootAlias, $param))
+            ->setParameter($param, $denied);
     }
 
     public function applyToItem(
@@ -90,12 +131,29 @@ abstract class AbstractSpaceAccessExtension implements
         if ($this->getResourceClass() !== $resourceClass) {
             return;
         }
+
+        $rootAlias = $queryBuilder->getRootAliases()[0];
+
+        // Space-scoped API key: confine strictly to the key's space, ignoring
+        // the creator's broader memberships (#space-roles).
+        $key = $this->actor->scopedKey();
+        if (null !== $key) {
+            $space = $key->getSpace();
+            $queryBuilder
+                ->andWhere(sprintf('IDENTITY(%s.space) = :%s_key_space', $rootAlias, $this->getAliasPrefix()))
+                ->setParameter(
+                    $this->getAliasPrefix() . '_key_space',
+                    null === $space ? null : (string) $space->getId(),
+                );
+
+            return;
+        }
+
         $user = $this->security->getUser();
         if (!$user instanceof User) {
             return;
         }
 
-        $rootAlias = $queryBuilder->getRootAliases()[0];
         $queryBuilder
             ->andWhere(SpaceMembershipDql::userBelongsToProjectSpace(
                 $rootAlias,

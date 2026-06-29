@@ -45,7 +45,6 @@ import type {
   CustomFieldDefinition,
   CustomFieldKind,
   CustomFieldSubtype,
-  CustomFieldVisibility,
   FooterDescriptor,
   FooterKind,
   OptionStatsResponse,
@@ -89,11 +88,6 @@ const FOOTER_LABELS: Record<FooterKind, string> = {
   max: "Max",
 };
 
-const VISIBILITY_OPTIONS: { value: CustomFieldVisibility; label: string }[] = [
-  { value: "list", label: "List view" },
-  { value: "board", label: "Board view" },
-  { value: "both", label: "Both" },
-];
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -168,7 +162,6 @@ const CustomFieldSheet = ({
   );
   const [nullable, setNullable] = useState(true);
   const [footer, setFooter] = useState<FooterDescriptor | null>(null);
-  const [visibility, setVisibility] = useState<CustomFieldVisibility>("both");
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -192,9 +185,9 @@ const CustomFieldSheet = ({
       footer,
       nullable,
       position: 0,
-      visibility,
+      visibility: "both",
     }),
-    [name, kind, subtype, config, footer, nullable, visibility],
+    [name, kind, subtype, config, footer, nullable],
   );
   const [previewValue, setPreviewValue] = useState<unknown>(() =>
     sampleValueFor(kind, subtype, config),
@@ -216,7 +209,6 @@ const CustomFieldSheet = ({
       setConfig(initial.config);
       setNullable(initial.nullable);
       setFooter(initial.footer);
-      setVisibility(initial.visibility ?? "both");
     } else {
       const k = initialKind ?? "text";
       const s = initialSubtype ?? fallbackSubtypeFor(k);
@@ -226,7 +218,6 @@ const CustomFieldSheet = ({
       setConfig(defaultConfigFor(k, s));
       setNullable(true);
       setFooter(null);
-      setVisibility("both");
     }
   }, [open, initial, initialKind, initialSubtype]);
 
@@ -308,7 +299,6 @@ const CustomFieldSheet = ({
       config,
       nullable,
       footer,
-      visibility,
     };
     if (isEdit && initial) {
       const url = `${ENTRYPOINT}${initial["@id"]}${
@@ -523,7 +513,7 @@ const CustomFieldSheet = ({
 
             {kind !== "boolean" && (
               <div className="space-y-2">
-                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {configSectionLabel(kind, subtype)}
                 </p>
                 <CustomFieldConfigEditor
@@ -576,39 +566,6 @@ const CustomFieldSheet = ({
               onCheckedChange={(checked) => setNullable(!checked)}
               testId="custom-field-required-input"
             />
-
-            <div className="space-y-2">
-              <Label>
-                Visibility{" "}
-                <span className="text-muted-foreground text-xs">
-                  (where the field's value is shown)
-                </span>
-              </Label>
-              <div
-                className="inline-flex rounded-md border p-0.5"
-                data-testid="custom-field-visibility-input"
-              >
-                {VISIBILITY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setVisibility(opt.value)}
-                    className={cn(
-                      "rounded px-3 py-1 text-sm transition-colors",
-                      visibility === opt.value
-                        ? "bg-muted font-medium text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                    data-testid={`custom-field-visibility-${opt.value}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-muted-foreground text-xs">
-                The task detail drawer always shows every field.
-              </p>
-            </div>
 
             <div className="space-y-2">
               <Label>
@@ -725,7 +682,7 @@ const CustomFieldSheet = ({
                   {kindLabelFor(kind).toLowerCase()} ·{" "}
                   {subtypeLabelFor(kind, subtype).toLowerCase()}
                 </span>
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
                   nullable = {String(nullable)}
                 </span>
               </div>

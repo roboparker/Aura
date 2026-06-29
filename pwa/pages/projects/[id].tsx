@@ -10,13 +10,15 @@ import {
   type ButtonHTMLAttributes,
   type RefObject,
 } from "react";
-import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Shield, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Table2, Trash2, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
+import TaskCalendar from "@/components/projects/TaskCalendar";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
 import {
@@ -66,12 +68,15 @@ import type {
   CustomFieldSubtype,
 } from "@/components/custom-fields/types";
 import {
+  showsOnSurface,
+  visibilitySurfaces,
+} from "@/components/custom-fields/types";
+import {
   dueDateStatus,
   type Reminder,
   type RecurrenceRule,
 } from "@/components/tasks/taskHelpers";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -193,8 +198,8 @@ const ProjectDetail = () => {
   const [activeTab, setActiveTab] = useState("list");
   // Settings sub-section (left menu like the user settings page).
   const [settingsSection, setSettingsSection] = useState<
-    "privacy" | "fields" | "danger"
-  >("privacy");
+    "fields" | "danger"
+  >("fields");
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
@@ -385,29 +390,37 @@ const ProjectDetail = () => {
     [project, definitions],
   );
 
-  // Fields that exist on the project but are hidden from the list view
-  // (visibility "board") — offered in the add-column menu to re-show.
+  // Fields on the project but hidden from the list view — offered in the
+  // add-column menu to re-show.
   const hiddenListFields = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") === "board"),
+    () => definitions.filter((d) => !showsOnSurface(d.visibility, "list")),
     [definitions],
   );
 
-  // Reveal a hidden field in the list view by widening its visibility.
+  // Reveal a hidden field in the list view by adding `list` to its per-project
+  // surface set.
   const enableListField = useCallback(
     async (def: CustomFieldDefinition) => {
+      if (!projectId) return;
+      const surfaces = [
+        ...new Set([...visibilitySurfaces(def.visibility), "list"]),
+      ].join(",");
       try {
-        const res = await fetch(`${ENTRYPOINT}${def["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify({ visibility: "both" }),
-        });
+        const res = await fetch(
+          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${def.id}/visibility`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ visibility: surfaces }),
+          },
+        );
         if (res.ok) void reloadDefinitions();
       } catch {
         /* transient — leave the field hidden */
       }
     },
-    [reloadDefinitions],
+    [projectId, reloadDefinitions],
   );
 
   // Create a tag from free text typed into a tags field (Enter / comma).
@@ -419,8 +432,13 @@ const ProjectDetail = () => {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/ld+json" },
-          // Tags are space-scoped: create it in this project's space.
-          body: JSON.stringify({ title, space: projectSpaceIri(project) }),
+          // Tags are space-scoped: create it in this project's space. Give
+          // it a random palette color so inline-created tags aren't all grey.
+          body: JSON.stringify({
+            title,
+            space: projectSpaceIri(project),
+            color: randomPaletteColor(),
+          }),
         });
         if (!res.ok) return null;
         const created = (await res.json()) as TagOption;
@@ -490,14 +508,18 @@ const ProjectDetail = () => {
     [definitions, patchTask],
   );
 
-  // Definitions surfaced per view. The drawer always shows every field; the
-  // list and board honour each field's `visibility` setting (default "both").
+  // Definitions surfaced per view. The drawer always shows every field; list /
+  // board / calendar each honour the field's visibility surface set.
   const listDefinitions = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") !== "board"),
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "list")),
     [definitions],
   );
   const boardDefinitions = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") !== "list"),
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "board")),
+    [definitions],
+  );
+  const calendarDefinitions = useMemo(
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "calendar")),
     [definitions],
   );
 
@@ -654,8 +676,9 @@ const ProjectDetail = () => {
     [project],
   );
 
-  const createSection = async () => {
+  const createSection = async (title = "New section") => {
     if (!project) return;
+    const trimmed = title.trim() || "New section";
     try {
       const res = await fetch(`${ENTRYPOINT}/task_sections`, {
         method: "POST",
@@ -663,7 +686,7 @@ const ProjectDetail = () => {
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
           project: project["@id"],
-          title: "New section",
+          title: trimmed,
           position: sections.length,
         }),
       });
@@ -1032,12 +1055,6 @@ const ProjectDetail = () => {
   const space = project
     ? spaces.find((s) => s["@id"] === projectSpaceIri(project))
     : undefined;
-  const spaceId = project
-    ? typeof project.space === "string"
-      ? project.space.split("/").pop()
-      : project.space.id
-    : undefined;
-
   return (
     <>
       <Head>
@@ -1102,6 +1119,7 @@ const ProjectDetail = () => {
                   <TabsList variant="line">
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
+                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="settings" data-testid="project-settings-tab">
                       Settings
@@ -1125,7 +1143,6 @@ const ProjectDetail = () => {
                     >
                       {(
                         [
-                          { key: "privacy", label: "Privacy", Icon: Shield },
                           { key: "fields", label: "Custom fields", Icon: Table2 },
                           { key: "danger", label: "Danger zone", Icon: TriangleAlert },
                         ] as const
@@ -1152,63 +1169,17 @@ const ProjectDetail = () => {
                     </nav>
 
                     <div className="min-w-0 flex-1 space-y-6">
-                      {settingsSection === "privacy" && (
-                        <Card>
-                          <CardContent
-                            className="space-y-3 pt-6"
-                            data-testid="project-space-info"
-                          >
-                            {project.description && (
-                              <p className="text-sm text-muted-foreground">
-                                {project.description}
-                              </p>
-                            )}
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-muted-foreground">Space</span>
-                              <Badge variant="secondary" className="gap-1">
-                                {space?.isPersonal && (
-                                  <Lock className="h-3 w-3" aria-hidden />
-                                )}
-                                {space?.name ??
-                                  (typeof project.space === "string"
-                                    ? "Unknown space"
-                                    : project.space.name)}
-                              </Badge>
-                              {spaceId && (
-                                <Button
-                                  asChild
-                                  variant="link"
-                                  size="sm"
-                                  className="h-auto p-0"
-                                >
-                                  <Link href={`/spaces/${spaceId}`}>
-                                    Manage members in space
-                                  </Link>
-                                </Button>
-                              )}
-                            </div>
-
-                            {project.members.length > 0 && (
-                              <ul
-                                className="flex flex-wrap items-center gap-1"
-                                data-testid="member-list"
-                              >
-                                {project.members.map((member) => (
-                                  <li key={member["@id"]} data-testid="member-pill">
-                                    <Badge variant="outline">{member.email}</Badge>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </CardContent>
-                        </Card>
-                      )}
-
                       {settingsSection === "fields" && (
                         <ProjectCustomFieldPicker
                           spaceIri={projectSpaceIri(project)}
                           projectIri={project["@id"]}
                           attachedIris={definitions.map((d) => d["@id"])}
+                          projectVisibility={Object.fromEntries(
+                            definitions.map((d) => [
+                              d["@id"],
+                              d.visibility ?? "both",
+                            ]),
+                          )}
                           isSpaceAdmin
                           onCreate={() =>
                             setNewFieldType({ kind: "text", subtype: "text" })
@@ -1472,7 +1443,8 @@ const ProjectDetail = () => {
                 <TabsContent value="board" className="mt-4">
                   <TaskBoard
                     definitions={boardDefinitions}
-                    columns={sectionGroups.map((group) => ({
+                    assignableUsers={projectAssignableUsers}
+                    columns={orderedSectionGroups.map((group) => ({
                       key: group.key,
                       sectionIri: group.section ? group.section["@id"] : null,
                       title: group.section
@@ -1485,18 +1457,45 @@ const ProjectDetail = () => {
                       if (task) openTaskDetail(task);
                     }}
                     onMove={moveTaskToSection}
+                    onReorderSections={(activeKey, overKey) => {
+                      const from = sectionIds.indexOf(activeKey);
+                      const to = sectionIds.indexOf(overKey);
+                      if (from !== -1 && to !== -1 && from !== to) {
+                        listView.setSectionOrder(arrayMove(sectionIds, from, to));
+                      }
+                    }}
+                    onAssign={(taskIri, iris) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) void patchTask(task, { assignees: iris });
+                    }}
                     onAddTask={() => {
                       // Every section has a persistent add row now; just jump
                       // to the list and focus the default one.
                       setActiveTab("list");
                       focusDefaultAddRow();
                     }}
-                    onAddSection={() => void createSection()}
+                    onAddSection={(title) => void createSection(title)}
                     onDeleteSection={(sectionIri) => {
                       const section = sections.find(
                         (s) => s["@id"] === sectionIri,
                       );
                       if (section) void deleteSection(section);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="calendar" className="mt-4">
+                  <TaskCalendar
+                    tasks={tasks}
+                    definitions={calendarDefinitions}
+                    assignableUsers={projectAssignableUsers}
+                    onOpen={(taskIri) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) openTaskDetail(task);
+                    }}
+                    onAssign={(taskIri, iris) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) void patchTask(task, { assignees: iris });
                     }}
                   />
                 </TabsContent>

@@ -56,7 +56,7 @@ const formatRelative = (iso: string): string => {
 
 const PagesIndex = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { activeSpace } = useActiveSpace();
+  const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -146,7 +146,7 @@ const PagesIndex = () => {
                 : "Long-form documents in the spaces you belong to."
             }
             actions={
-              activeSpace && (
+              activeSpace && can("pages", "create") ? (
                 <Button
                   size="sm"
                   onClick={() => setShowComposer((v) => !v)}
@@ -154,7 +154,7 @@ const PagesIndex = () => {
                 >
                   {showComposer ? "Cancel" : "New page"}
                 </Button>
-              )
+              ) : undefined
             }
           >
             <Input

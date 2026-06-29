@@ -55,7 +55,7 @@ const PasswordStrengthMeter = ({ password }: Props) => {
       </div>
       <p
         className={[
-          "text-[10px] font-semibold uppercase tracking-wider tabular-nums min-h-[14px]",
+          "text-xs font-semibold uppercase tracking-wider tabular-nums min-h-[14px]",
           empty
             ? "text-muted-foreground"
             : passes

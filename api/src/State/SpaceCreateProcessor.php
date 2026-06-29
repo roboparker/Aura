@@ -9,6 +9,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Security\AuthenticatedUserResolver;
 use App\Service\SpaceMemberAdder;
+use App\Service\SpaceRoleSeeder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -41,6 +42,7 @@ final class SpaceCreateProcessor implements ProcessorInterface
         private AuthenticatedUserResolver $auth,
         private EntityManagerInterface $em,
         private SpaceMemberAdder $memberAdder,
+        private SpaceRoleSeeder $roleSeeder,
     ) {
     }
 
@@ -63,6 +65,9 @@ final class SpaceCreateProcessor implements ProcessorInterface
         // Empty list before persist so an accidental serialization
         // doesn't echo the transient field back on the response.
         $data->setInvites([]);
+
+        // Seed the built-in Member/Guest roles in the same flush as the space.
+        $this->roleSeeder->seed($data);
 
         /** @var Space $space */
         $space = $this->persistProcessor->process($data, $operation, $uriVariables, $context);

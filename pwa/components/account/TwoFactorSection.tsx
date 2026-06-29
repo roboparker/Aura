@@ -570,7 +570,7 @@ const RecoveryCodeList = ({ codes }: RecoveryCodeListProps) => {
             </span>
             <code aria-hidden={entry.code === null}>{label}</code>
             {consumed && (
-              <span className="text-[10px] uppercase tracking-wider">used</span>
+              <span className="text-xs uppercase tracking-wider">used</span>
             )}
           </li>
         );

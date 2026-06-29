@@ -18,7 +18,7 @@ const SearchOverlayPage = () => (
             The overlay is a navbar singleton that depends on auth + active-space
             context and registers a global ⌘K listener, so it isn&apos;t mounted
             live here. Press
-            <kbd className="mx-1 rounded border border-input bg-muted px-1.5 text-[10px]">⌘K</kbd>
+            <kbd className="mx-1 rounded border border-input bg-muted px-1.5 text-xs">⌘K</kbd>
             anywhere in the app to open it.
           </p>
         ),

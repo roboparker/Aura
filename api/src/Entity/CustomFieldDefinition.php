@@ -15,6 +15,7 @@ use ApiPlatform\Metadata\Post;
 use App\CustomField\CustomFieldKind;
 use App\Repository\CustomFieldDefinitionRepository;
 use App\State\CustomFieldDefinitionUpdateProcessor;
+use App\State\CustomFieldVisibilityProvider;
 use App\Validator\ValidCustomFieldDefinition;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -53,20 +54,21 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            provider: CustomFieldVisibilityProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user) and is_granted('space.custom_fields.create', object)))",
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.custom_fields.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.custom_fields.update', object)))",
             processor: CustomFieldDefinitionUpdateProcessor::class,
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.custom_fields.delete', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['custom_field_definition:read']],
@@ -106,6 +108,8 @@ class CustomFieldDefinition
 
     public const VISIBILITY_LIST = 'list';
     public const VISIBILITY_BOARD = 'board';
+    public const VISIBILITY_CALENDAR = 'calendar';
+    /** Legacy single-value default meaning list + board (still accepted on read). */
     public const VISIBILITY_BOTH = 'both';
 
     /** @var list<string> */
@@ -114,6 +118,40 @@ class CustomFieldDefinition
         self::VISIBILITY_BOARD,
         self::VISIBILITY_BOTH,
     ];
+
+    /**
+     * The independent surfaces a field's value can show on. Per-project
+     * visibility (#custom-fields-project) is a comma-joined SET of these.
+     *
+     * @var list<string>
+     */
+    public const SURFACES = [
+        self::VISIBILITY_LIST,
+        self::VISIBILITY_BOARD,
+        self::VISIBILITY_CALENDAR,
+    ];
+
+    /**
+     * Parse a stored visibility value — legacy `both`, a single surface, or a
+     * comma-joined set — into the list of surfaces it shows on.
+     *
+     * @return list<string>
+     */
+    public static function visibilitySurfaces(string $visibility): array
+    {
+        if (self::VISIBILITY_BOTH === $visibility) {
+            return [self::VISIBILITY_LIST, self::VISIBILITY_BOARD];
+        }
+        $out = [];
+        foreach (explode(',', $visibility) as $surface) {
+            $surface = trim($surface);
+            if ('' !== $surface && in_array($surface, self::SURFACES, true)) {
+                $out[] = $surface;
+            }
+        }
+
+        return $out;
+    }
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -216,9 +254,15 @@ class CustomFieldDefinition
     private int $position = 0;
 
     /**
-     * Where the field is shown to readers: in the project task list
-     * (`list`), the Kanban board cards (`board`), or both (default).
-     * The task detail drawer always shows every field regardless.
+     * Default visibility — where the field is shown to readers: the project
+     * task list (`list`), the Kanban board cards (`board`), or both. Visibility
+     * is a PER-PROJECT choice now (#custom-fields-project): a {@see
+     * ProjectFieldVisibility} row overrides this default for a given project,
+     * and {@see \App\State\CustomFieldVisibilityProvider} injects the effective
+     * value into the read when the field is fetched in a project context
+     * (`?projects={iri}`). This column is the fallback when no override exists.
+     * Read-only over the API — set per-project, not on the definition. The task
+     * detail drawer always shows every field regardless.
      */
     #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_BOTH])]
     #[Assert\Choice(
@@ -226,7 +270,7 @@ class CustomFieldDefinition
         message: 'Visibility must be one of: {{ choices }}.',
     )]
     #[Gedmo\Versioned]
-    #[Groups(['custom_field_definition:read', 'custom_field_definition:write'])]
+    #[Groups(['custom_field_definition:read'])]
     private string $visibility = self::VISIBILITY_BOTH;
 
     /**

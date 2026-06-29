@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
  */
 const CustomFields = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { activeSpace } = useActiveSpace();
+  const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
 
   useEffect(() => {
@@ -59,7 +59,7 @@ const CustomFields = () => {
               spaceIri={activeSpace["@id"]}
               projectTitle={activeSpace.name}
               spaceName={activeSpace.name}
-              isSpaceAdmin
+              isSpaceAdmin={can("custom_fields", "update")}
             />
           ) : (
             <Card>
