@@ -70,8 +70,34 @@ export interface FooterDescriptor {
   label?: string;
 }
 
-/** Where a field's value is surfaced to readers (the task drawer always shows all). */
-export type CustomFieldVisibility = "list" | "board" | "both";
+/** The independent surfaces a field's value can show on (task drawer always shows all). */
+export type CustomFieldSurface = "list" | "board" | "calendar";
+export const CUSTOM_FIELD_SURFACES: CustomFieldSurface[] = ["list", "board", "calendar"];
+
+/**
+ * Stored visibility is a comma-joined SET of surfaces, with legacy single
+ * values still accepted ("both" = list + board). Kept as a string on the wire.
+ */
+export type CustomFieldVisibility = string;
+
+/** Parse a stored visibility value into its surfaces (handles legacy "both"). */
+export const visibilitySurfaces = (
+  visibility: string | null | undefined,
+): CustomFieldSurface[] => {
+  if (!visibility || visibility === "both") return ["list", "board"];
+  return visibility
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s): s is CustomFieldSurface =>
+      (CUSTOM_FIELD_SURFACES as string[]).includes(s),
+    );
+};
+
+/** Whether a stored visibility includes a given surface. */
+export const showsOnSurface = (
+  visibility: string | null | undefined,
+  surface: CustomFieldSurface,
+): boolean => visibilitySurfaces(visibility).includes(surface);
 
 export interface CustomFieldDefinition {
   "@id": string;

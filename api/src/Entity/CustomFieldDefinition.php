@@ -108,6 +108,8 @@ class CustomFieldDefinition
 
     public const VISIBILITY_LIST = 'list';
     public const VISIBILITY_BOARD = 'board';
+    public const VISIBILITY_CALENDAR = 'calendar';
+    /** Legacy single-value default meaning list + board (still accepted on read). */
     public const VISIBILITY_BOTH = 'both';
 
     /** @var list<string> */
@@ -116,6 +118,40 @@ class CustomFieldDefinition
         self::VISIBILITY_BOARD,
         self::VISIBILITY_BOTH,
     ];
+
+    /**
+     * The independent surfaces a field's value can show on. Per-project
+     * visibility (#custom-fields-project) is a comma-joined SET of these.
+     *
+     * @var list<string>
+     */
+    public const SURFACES = [
+        self::VISIBILITY_LIST,
+        self::VISIBILITY_BOARD,
+        self::VISIBILITY_CALENDAR,
+    ];
+
+    /**
+     * Parse a stored visibility value — legacy `both`, a single surface, or a
+     * comma-joined set — into the list of surfaces it shows on.
+     *
+     * @return list<string>
+     */
+    public static function visibilitySurfaces(string $visibility): array
+    {
+        if (self::VISIBILITY_BOTH === $visibility) {
+            return [self::VISIBILITY_LIST, self::VISIBILITY_BOARD];
+        }
+        $out = [];
+        foreach (explode(',', $visibility) as $surface) {
+            $surface = trim($surface);
+            if ('' !== $surface && in_array($surface, self::SURFACES, true)) {
+                $out[] = $surface;
+            }
+        }
+
+        return $out;
+    }
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]

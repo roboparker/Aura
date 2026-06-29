@@ -18,6 +18,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
+import TaskCalendar from "@/components/projects/TaskCalendar";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
 import {
@@ -65,6 +66,10 @@ import type {
   CustomFieldDefinition,
   CustomFieldKind,
   CustomFieldSubtype,
+} from "@/components/custom-fields/types";
+import {
+  showsOnSurface,
+  visibilitySurfaces,
 } from "@/components/custom-fields/types";
 import {
   dueDateStatus,
@@ -385,29 +390,37 @@ const ProjectDetail = () => {
     [project, definitions],
   );
 
-  // Fields that exist on the project but are hidden from the list view
-  // (visibility "board") — offered in the add-column menu to re-show.
+  // Fields on the project but hidden from the list view — offered in the
+  // add-column menu to re-show.
   const hiddenListFields = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") === "board"),
+    () => definitions.filter((d) => !showsOnSurface(d.visibility, "list")),
     [definitions],
   );
 
-  // Reveal a hidden field in the list view by widening its visibility.
+  // Reveal a hidden field in the list view by adding `list` to its per-project
+  // surface set.
   const enableListField = useCallback(
     async (def: CustomFieldDefinition) => {
+      if (!projectId) return;
+      const surfaces = [
+        ...new Set([...visibilitySurfaces(def.visibility), "list"]),
+      ].join(",");
       try {
-        const res = await fetch(`${ENTRYPOINT}${def["@id"]}`, {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify({ visibility: "both" }),
-        });
+        const res = await fetch(
+          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${def.id}/visibility`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ visibility: surfaces }),
+          },
+        );
         if (res.ok) void reloadDefinitions();
       } catch {
         /* transient — leave the field hidden */
       }
     },
-    [reloadDefinitions],
+    [projectId, reloadDefinitions],
   );
 
   // Create a tag from free text typed into a tags field (Enter / comma).
@@ -495,14 +508,18 @@ const ProjectDetail = () => {
     [definitions, patchTask],
   );
 
-  // Definitions surfaced per view. The drawer always shows every field; the
-  // list and board honour each field's `visibility` setting (default "both").
+  // Definitions surfaced per view. The drawer always shows every field; list /
+  // board / calendar each honour the field's visibility surface set.
   const listDefinitions = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") !== "board"),
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "list")),
     [definitions],
   );
   const boardDefinitions = useMemo(
-    () => definitions.filter((d) => (d.visibility ?? "both") !== "list"),
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "board")),
+    [definitions],
+  );
+  const calendarDefinitions = useMemo(
+    () => definitions.filter((d) => showsOnSurface(d.visibility, "calendar")),
     [definitions],
   );
 
@@ -1102,6 +1119,7 @@ const ProjectDetail = () => {
                   <TabsList variant="line">
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
+                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="settings" data-testid="project-settings-tab">
                       Settings
@@ -1462,6 +1480,22 @@ const ProjectDetail = () => {
                         (s) => s["@id"] === sectionIri,
                       );
                       if (section) void deleteSection(section);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="calendar" className="mt-4">
+                  <TaskCalendar
+                    tasks={tasks}
+                    definitions={calendarDefinitions}
+                    assignableUsers={projectAssignableUsers}
+                    onOpen={(taskIri) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) openTaskDetail(task);
+                    }}
+                    onAssign={(taskIri, iris) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) void patchTask(task, { assignees: iris });
                     }}
                   />
                 </TabsContent>

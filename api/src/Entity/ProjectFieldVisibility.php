@@ -7,7 +7,6 @@ namespace App\Entity;
 use App\Repository\ProjectFieldVisibilityRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Per-project visibility override for a custom field (#custom-fields-project).
@@ -42,11 +41,9 @@ class ProjectFieldVisibility
     #[ORM\JoinColumn(name: 'definition_id', nullable: false, onDelete: 'CASCADE')]
     private ?CustomFieldDefinition $definition = null;
 
-    #[ORM\Column(length: 16, options: ['default' => CustomFieldDefinition::VISIBILITY_BOTH])]
-    #[Assert\Choice(
-        choices: CustomFieldDefinition::VISIBILITIES,
-        message: 'Visibility must be one of: {{ choices }}.',
-    )]
+    // A comma-joined SET of surfaces (list/board/calendar); 32 chars holds all
+    // three. Validated in the visibility controller, so no Assert\Choice here.
+    #[ORM\Column(length: 32, options: ['default' => CustomFieldDefinition::VISIBILITY_BOTH])]
     private string $visibility = CustomFieldDefinition::VISIBILITY_BOTH;
 
     public function getId(): ?Uuid
