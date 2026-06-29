@@ -1471,9 +1471,14 @@ const ProjectDetail = () => {
                 <TabsContent value="calendar" className="mt-4">
                   <TaskCalendar
                     tasks={tasks}
+                    assignableUsers={projectAssignableUsers}
                     onOpen={(taskIri) => {
                       const task = tasks.find((t) => t["@id"] === taskIri);
                       if (task) openTaskDetail(task);
+                    }}
+                    onAssign={(taskIri, iris) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) void patchTask(task, { assignees: iris });
                     }}
                   />
                 </TabsContent>

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import AssignMenu, { type AssignableUser } from "@/components/tasks/AssignMenu";
 import { isoToLocalDate } from "@/components/tasks/taskHelpers";
 import { cn } from "@/lib/utils";
 
@@ -12,12 +12,15 @@ export interface CalendarTask {
   title: string;
   dueDate: string | null;
   completedOn: string | null;
-  assignees: AvatarUser[];
+  assignees: AssignableUser[];
 }
 
 interface TaskCalendarProps {
   tasks: CalendarTask[];
+  /** Everyone assignable on this project, for the per-task assign menu. */
+  assignableUsers: AssignableUser[];
   onOpen: (taskIri: string) => void;
+  onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
 }
 
 type View = "month" | "week";
@@ -37,34 +40,31 @@ const addDays = (d: Date, n: number): Date => {
 /** Sunday that starts the week containing `d`. */
 const startOfWeek = (d: Date): Date => addDays(d, -d.getDay());
 
-const AssigneeStack = ({ users }: { users: AvatarUser[] }) => {
-  if (users.length === 0) return null;
-  return (
-    <span className="flex -space-x-1">
-      {users.slice(0, 3).map((u, i) => (
-        <UserAvatar key={i} user={u} size="sm" className="h-4 w-4 ring-1 ring-card" />
-      ))}
-      {users.length > 3 && (
-        <span className="flex h-4 items-center rounded-full bg-muted px-1 text-xs text-muted-foreground">
-          +{users.length - 3}
-        </span>
-      )}
-    </span>
-  );
-};
-
 const TaskChip = ({
   task,
+  assignableUsers,
   onOpen,
+  onAssign,
 }: {
   task: CalendarTask;
+  assignableUsers: AssignableUser[];
   onOpen: (iri: string) => void;
+  onAssign: (taskIri: string, userIris: string[]) => void | Promise<void>;
 }) => (
-  <button
-    type="button"
+  // A div (not a button) so the nested assign menu's button is valid markup
+  // and its clicks don't bubble up to open the drawer.
+  <div
+    role="button"
+    tabIndex={0}
     onClick={() => onOpen(task["@id"])}
+    onKeyDown={(e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onOpen(task["@id"]);
+      }
+    }}
     className={cn(
-      "flex w-full items-center gap-1 rounded border bg-card px-1.5 py-0.5 text-left text-xs hover:border-foreground/30",
+      "flex w-full cursor-pointer items-center gap-2 rounded-md border bg-card px-2 py-1.5 text-left text-xs hover:border-foreground/30",
       task.completedOn && "opacity-60",
     )}
     title={task.title}
@@ -73,8 +73,12 @@ const TaskChip = ({
     <span className={cn("min-w-0 flex-1 truncate", task.completedOn && "line-through")}>
       {task.title}
     </span>
-    <AssigneeStack users={task.assignees} />
-  </button>
+    <AssignMenu
+      assignees={task.assignees}
+      assignableUsers={assignableUsers}
+      onAssign={(iris) => onAssign(task["@id"], iris)}
+    />
+  </div>
 );
 
 /**
@@ -82,7 +86,12 @@ const TaskChip = ({
  * assignee avatars. Clicking a task opens the detail drawer. Tasks with no
  * due date are surfaced in a small footer so they aren't lost.
  */
-const TaskCalendar = ({ tasks, onOpen }: TaskCalendarProps) => {
+const TaskCalendar = ({
+  tasks,
+  assignableUsers,
+  onOpen,
+  onAssign,
+}: TaskCalendarProps) => {
   const [view, setView] = useState<View>("month");
   // Anchor day — drives which month/week is shown. Local "today" at mount.
   const [anchorKey, setAnchorKey] = useState<string>(() => dayKey(new Date()));
@@ -229,7 +238,13 @@ const TaskCalendar = ({ tasks, onOpen }: TaskCalendarProps) => {
               </div>
               <div className="space-y-1">
                 {visible.map((task) => (
-                  <TaskChip key={task["@id"]} task={task} onOpen={onOpen} />
+                  <TaskChip
+                    key={task["@id"]}
+                    task={task}
+                    assignableUsers={assignableUsers}
+                    onOpen={onOpen}
+                    onAssign={onAssign}
+                  />
                 ))}
                 {view === "month" && dayTasks.length > visible.length && (
                   <span className="px-0.5 text-xs text-muted-foreground">
@@ -250,7 +265,12 @@ const TaskCalendar = ({ tasks, onOpen }: TaskCalendarProps) => {
           <div className="flex flex-wrap gap-1">
             {undated.map((task) => (
               <div key={task["@id"]} className="max-w-56">
-                <TaskChip task={task} onOpen={onOpen} />
+                <TaskChip
+                  task={task}
+                  assignableUsers={assignableUsers}
+                  onOpen={onOpen}
+                  onAssign={onAssign}
+                />
               </div>
             ))}
           </div>
