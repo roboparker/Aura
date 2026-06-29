@@ -18,6 +18,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
+import TaskCalendar from "@/components/projects/TaskCalendar";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
 import {
@@ -1102,6 +1103,7 @@ const ProjectDetail = () => {
                   <TabsList variant="line">
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
+                    <TabsTrigger value="calendar">Calendar</TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="settings" data-testid="project-settings-tab">
                       Settings
@@ -1462,6 +1464,16 @@ const ProjectDetail = () => {
                         (s) => s["@id"] === sectionIri,
                       );
                       if (section) void deleteSection(section);
+                    }}
+                  />
+                </TabsContent>
+
+                <TabsContent value="calendar" className="mt-4">
+                  <TaskCalendar
+                    tasks={tasks}
+                    onOpen={(taskIri) => {
+                      const task = tasks.find((t) => t["@id"] === taskIri);
+                      if (task) openTaskDetail(task);
                     }}
                   />
                 </TabsContent>
