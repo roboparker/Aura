@@ -28,13 +28,13 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and object.getSource() !== null and object.getTarget() !== null and (is_granted('ROLE_ADMIN') or (object.getSource().isAccessibleBy(user) and object.getTarget().isAccessibleBy(user)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and object.getSource() !== null and object.getTarget() !== null and (is_granted('ROLE_ADMIN') or (object.getSource().isAccessibleBy(user) and object.getTarget().isAccessibleBy(user) and is_granted('space.tasks.update', object)))",
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSource().isAccessibleBy(user) or object.getTarget().isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or ((object.getSource().isAccessibleBy(user) or object.getTarget().isAccessibleBy(user)) and is_granted('space.tasks.read', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSource().isAccessibleBy(user) or object.getTarget().isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or ((object.getSource().isAccessibleBy(user) or object.getTarget().isAccessibleBy(user)) and is_granted('space.tasks.update', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['task_relationship:read']],

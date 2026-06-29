@@ -59,8 +59,11 @@ final class ApiTokenAccessExtension implements QueryCollectionExtensionInterface
         }
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
+        // Personal tokens only — space-scoped keys (#space-roles) are managed
+        // through the space's API-keys endpoint, not here.
         $queryBuilder
             ->andWhere(sprintf('%s.user = :currentUser', $rootAlias))
+            ->andWhere(sprintf('%s.space IS NULL', $rootAlias))
             ->setParameter('currentUser', $user);
     }
 }

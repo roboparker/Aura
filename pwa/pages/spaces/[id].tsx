@@ -697,7 +697,7 @@ const SpaceDetail = () => {
                                   key={a["@id"]}
                                   className="flex items-center gap-2.5"
                                 >
-                                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-[10px] font-semibold text-muted-foreground">
+                                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded bg-muted text-xs font-semibold text-muted-foreground">
                                     {fileLabel(a.originalName, a.mimeType)}
                                   </span>
                                   <div className="min-w-0 flex-1">

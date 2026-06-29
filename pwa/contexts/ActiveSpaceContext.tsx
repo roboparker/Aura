@@ -9,6 +9,11 @@ import {
 import { useRouter } from "next/router";
 import { ENTRYPOINT } from "../config/entrypoint";
 import { useAuth } from "./AuthContext";
+import type {
+  PermissionAction,
+  PermissionCategory,
+  PermissionMatrix,
+} from "../lib/roleTypes";
 
 export interface SpaceMember {
   "@id": string;
@@ -26,6 +31,8 @@ export interface SpaceMembershipRow {
   id: string;
   user: SpaceMember;
   role: "admin" | "member";
+  /** Custom roles assigned to this member (#space-roles); empty = unrestricted. */
+  roles?: { "@id": string; id: string; name: string; color: string | null }[];
 }
 
 export interface SpaceAttachment {
@@ -94,6 +101,12 @@ interface ActiveSpaceContextType {
   refresh: () => Promise<void>;
   /** Convenience: is the current user a direct admin in the active space? */
   isActiveSpaceAdmin: boolean;
+  /**
+   * Whether the current user may do (category, action) in the active space
+   * (#space-roles). Optimistic-true until permissions load; the server is the
+   * source of truth, this only gates UI.
+   */
+  can: (category: PermissionCategory, action: PermissionAction) => boolean;
   isLoading: boolean;
   error: string | null;
 }
@@ -293,6 +306,47 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
     )
   );
 
+  // The current user's effective permission matrix for the active space, for
+  // UI gating (#space-roles). Refetched whenever the active space changes.
+  const [permissions, setPermissions] = useState<PermissionMatrix | null>(null);
+  const permSpaceId = activeSpace?.id ?? null;
+  useEffect(() => {
+    if (!permSpaceId) {
+      setPermissions(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `${ENTRYPOINT}/spaces/${encodeURIComponent(permSpaceId)}/my-permissions`,
+          { credentials: "include", headers: { Accept: "application/json" } },
+        );
+        if (!res.ok) {
+          if (!cancelled) setPermissions(null);
+          return;
+        }
+        const data: { permissions?: PermissionMatrix } = await res.json();
+        if (!cancelled) setPermissions(data.permissions ?? null);
+      } catch {
+        if (!cancelled) setPermissions(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [permSpaceId]);
+
+  const can = useCallback(
+    (category: PermissionCategory, action: PermissionAction): boolean => {
+      if (isActiveSpaceAdmin) return true;
+      // Optimistic until the matrix loads — the server still enforces.
+      if (!permissions) return true;
+      return permissions[category]?.[action] === true;
+    },
+    [permissions, isActiveSpaceAdmin],
+  );
+
   return (
     <ActiveSpaceContext.Provider
       value={{
@@ -302,6 +356,7 @@ export function ActiveSpaceProvider({ children }: { children: ReactNode }) {
         setActiveSpace,
         refresh: fetchSpaces,
         isActiveSpaceAdmin,
+        can,
         isLoading,
         error,
       }}

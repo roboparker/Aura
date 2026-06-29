@@ -14,7 +14,7 @@ export const NotificationTypeBadge = ({ type }: { type: string }) => {
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide border",
+        "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide border",
         meta.badge,
       )}
     >
@@ -108,7 +108,7 @@ const NotificationRow = ({
         className="min-w-0 flex-1 text-left"
         data-testid="notification-open"
       >
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {notification.contextLabel && (
             <>
               <span className="truncate font-mono">{notification.contextLabel}</span>
@@ -129,7 +129,7 @@ const NotificationRow = ({
 
       {/* Time + hover quick actions */}
       <div className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-xs text-muted-foreground">
           {formatRelative(notification.createdAt)}
         </span>
         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">

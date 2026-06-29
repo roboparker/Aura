@@ -26,7 +26,7 @@ const AvatarStack = ({ users, total, size = "sm", className }: Props) => {
 
   const shown = total ?? users.length;
   const overflow = Math.max(0, shown - users.length);
-  const chipSize = size === "sm" ? "h-8 w-8 text-[11px]" : "h-10 w-10 text-xs";
+  const chipSize = size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-xs";
 
   return (
     <div

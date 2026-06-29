@@ -41,7 +41,7 @@ const errorMessage = (err: unknown, fallback: string): string =>
 
 const Projects = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { activeSpace } = useActiveSpace();
+  const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -204,13 +204,15 @@ const Projects = () => {
             }
             count={projectsQuery.isLoading ? null : projects.length}
             actions={
-              <Button
-                size="sm"
-                onClick={() => setShowComposer((v) => !v)}
-                data-testid="new-project-button"
-              >
-                {showComposer ? "Cancel" : "New project"}
-              </Button>
+              can("projects", "create") ? (
+                <Button
+                  size="sm"
+                  onClick={() => setShowComposer((v) => !v)}
+                  data-testid="new-project-button"
+                >
+                  {showComposer ? "Cancel" : "New project"}
+                </Button>
+              ) : undefined
             }
           />
 

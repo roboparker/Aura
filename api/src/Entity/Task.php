@@ -49,17 +49,20 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
+            // A standalone task (no project) has no space → the voter allows it
+            // (it's the caller's own). A project task is gated by tasks.create.
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or is_granted('space.tasks.create', object))",
             processor: TaskOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.isAccessibleBy(user) and is_granted('space.tasks.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.isAccessibleBy(user) and is_granted('space.tasks.update', object)))",
             processor: TaskUpdateProcessor::class,
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.isAccessibleBy(user) and is_granted('space.tasks.delete', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['task:read']],

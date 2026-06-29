@@ -4,10 +4,12 @@ namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Project;
+use App\Entity\ProjectFieldVisibility;
 use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Repository\ProjectFieldVisibilityRepository;
 use App\Service\CopyTitleSuffixer;
 use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
@@ -53,6 +55,7 @@ class ProjectCopyController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
+        private ProjectFieldVisibilityRepository $fieldVisibility,
     ) {
     }
 
@@ -112,17 +115,25 @@ class ProjectCopyController extends AbstractController
         // space-owned now (#custom-fields-space): a same-space copy opts into
         // the same definitions; a cross-space copy reuses a same-named field in
         // the target space or clones it there.
+        // Per-project visibility (#custom-fields-project) carries over too: the
+        // clone keeps the source's per-project visibility for each field.
+        $sourceVisibility = $this->fieldVisibility->visibilityMapForProject($source);
         foreach ($source->getCustomFieldDefinitions() as $sourceDefinition) {
+            $effective = $sourceVisibility[(string) $sourceDefinition->getId()]
+                ?? $sourceDefinition->getVisibility();
+
             $sameSpace = (string) $target->getId()
                 === (string) $sourceDefinition->getSpace()?->getId();
             if ($sameSpace) {
                 $copy->addCustomFieldDefinition($sourceDefinition);
+                $this->copyFieldVisibility($copy, $sourceDefinition, $effective);
                 continue;
             }
             $existing = $this->em->getRepository(CustomFieldDefinition::class)
                 ->findOneBy(['space' => $target, 'name' => $sourceDefinition->getName()]);
             if (null !== $existing) {
                 $copy->addCustomFieldDefinition($existing);
+                $this->copyFieldVisibility($copy, $existing, $effective);
                 continue;
             }
             $clone = (new CustomFieldDefinition())
@@ -134,9 +145,10 @@ class ProjectCopyController extends AbstractController
                 ->setFooter($sourceDefinition->getFooter())
                 ->setPosition($sourceDefinition->getPosition())
                 ->setNullable($sourceDefinition->isNullable())
-                ->setVisibility($sourceDefinition->getVisibility());
+                ->setVisibility($effective);
             $this->em->persist($clone);
             $copy->addCustomFieldDefinition($clone);
+            $this->copyFieldVisibility($copy, $clone, $effective);
         }
 
         // Optional task clone (#182 deep-copy). Opt-in via
@@ -184,6 +196,18 @@ class ProjectCopyController extends AbstractController
             'space' => '/spaces/' . $target->getId(),
             'tasksCloned' => $tasksCloned,
         ], 201);
+    }
+
+    private function copyFieldVisibility(
+        Project $project,
+        CustomFieldDefinition $definition,
+        string $visibility,
+    ): void {
+        $row = (new ProjectFieldVisibility())
+            ->setProject($project)
+            ->setDefinition($definition)
+            ->setVisibility($visibility);
+        $this->em->persist($row);
     }
 
     /** Project's `title` column width — the clone must fit it after suffixing. */

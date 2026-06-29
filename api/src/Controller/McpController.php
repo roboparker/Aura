@@ -223,6 +223,12 @@ class McpController extends AbstractController
         // category/action must be permitted by the policy.
         $apiToken = $request->attributes->get(ApiTokenAuthenticator::TOKEN_ATTR);
         if ($apiToken instanceof ApiToken) {
+            // Space-scoped keys (#space-roles) authenticate as their creator and
+            // are role/space-confined on REST; MCP tools query outside that
+            // enforcement path, so scoped keys aren't supported over MCP yet.
+            if ($apiToken->isScoped()) {
+                throw McpException::forbidden('Space-scoped API keys cannot be used over MCP. Use a personal token.');
+            }
             $policy = $apiToken->toAccessPolicy();
             if (null !== $policy && !McpToolPolicy::allows($policy, $name)) {
                 throw McpException::forbidden(sprintf('Tool "%s" is outside this token\'s access scope.', $name));

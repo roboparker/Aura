@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Mail, Plus, UserPlus, Users, X } from "lucide-react";
+import { Check, ChevronDown, Mail, Plus, UserPlus, Users, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useActiveSpace,
@@ -15,6 +15,11 @@ import { formatRelative } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
 import { resolveGroupColor } from "@/lib/avatarPalette";
 import { type Group } from "@/lib/groupTypes";
+import {
+  type SpaceRole,
+  type SpaceRoleCollection,
+  type SpaceRoleRef,
+} from "@/lib/roleTypes";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +92,74 @@ const RoleSelect = ({
 );
 
 /**
+ * Per-member custom-role assignment (#space-roles): a checkbox dropdown over
+ * the space's roles. No roles = full access. Disabled for admins (they always
+ * have everything, so roles don't apply).
+ */
+const MemberRoles = ({
+  allRoles,
+  assigned,
+  disabled,
+  onChange,
+}: {
+  allRoles: SpaceRole[];
+  assigned: SpaceRoleRef[];
+  disabled?: boolean;
+  onChange: (iris: string[]) => void;
+}) => {
+  const assignedIds = new Set(assigned.map((r) => r.id));
+  const toggle = (role: SpaceRole) => {
+    const next = assignedIds.has(role.id)
+      ? assigned.filter((r) => r.id !== role.id).map((r) => r["@id"])
+      : [...assigned.map((r) => r["@id"]), role["@id"]];
+    onChange(next);
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {disabled
+            ? "Full access"
+            : assigned.length === 0
+              ? "Member (default)"
+              : `${assigned.length} role${assigned.length === 1 ? "" : "s"}`}
+          <ChevronDown className="h-3 w-3 text-muted-foreground" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-[200px]">
+        {/* The built-in Member role is the implicit default — not assigned. */}
+        {allRoles
+          .filter((role) => role.builtinKey !== "member")
+          .map((role) => (
+          <DropdownMenuItem
+            key={role["@id"]}
+            onSelect={(e) => {
+              e.preventDefault();
+              toggle(role);
+            }}
+            className="gap-2"
+          >
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: role.color ?? "#6b7280" }}
+              aria-hidden
+            />
+            <span className="min-w-0 flex-1 truncate">{role.name}</span>
+            {assignedIds.has(role.id) && (
+              <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+/**
  * Admin-only "people" surface for a space (`/spaces/{id}/users`): direct
  * members, pending invites, and the space's groups — moved out of the general
  * settings page so member/invite/group management lives in one place.
@@ -101,6 +174,7 @@ const SpaceUsers = () => {
   const [space, setSpace] = useState<Space | null>(null);
   const [invites, setInvites] = useState<PendingInvite[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [roles, setRoles] = useState<SpaceRole[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -150,6 +224,15 @@ const SpaceUsers = () => {
         const groupData: GroupCollection = await groupsRes.json();
         setGroups(groupData.member ?? groupData["hydra:member"] ?? []);
       }
+
+      const rolesRes = await fetch(
+        `${ENTRYPOINT}/space_roles?space=${encodeURIComponent(data["@id"])}`,
+        { credentials: "include", headers: { Accept: "application/ld+json" } },
+      );
+      if (rolesRes.ok) {
+        const roleData: SpaceRoleCollection = await rolesRes.json();
+        setRoles(roleData.member ?? roleData["hydra:member"] ?? []);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load space.");
     }
@@ -196,6 +279,30 @@ const SpaceUsers = () => {
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       setError(data.error || "Failed to change role.");
+      return;
+    }
+    await load();
+    await refresh();
+  };
+
+  const handleSetMemberRoles = async (
+    membership: { id: string },
+    iris: string[],
+  ) => {
+    if (!space) return;
+    setError(null);
+    const res = await fetch(
+      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ roles: iris }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to update roles.");
       return;
     }
     await load();
@@ -405,6 +512,14 @@ const SpaceUsers = () => {
                           value={m.role}
                           onChange={(role) => void handleChangeRole(m, role)}
                         />
+                        {roles.length > 0 && (
+                          <MemberRoles
+                            allRoles={roles}
+                            assigned={m.roles ?? []}
+                            disabled={m.role === "admin"}
+                            onChange={(iris) => void handleSetMemberRoles(m, iris)}
+                          />
+                        )}
                         <button
                           type="button"
                           onClick={() => void handleRemoveMember(m, label)}

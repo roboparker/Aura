@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
@@ -50,9 +52,22 @@ class SpaceMembership
     #[Groups(['space:read'])]
     private \DateTimeImmutable $joinedAt;
 
+    /**
+     * Custom roles assigned to this member (#space-roles). Effective
+     * permissions are the union of these; an empty set = unrestricted
+     * (back-compat). Admins are never restricted regardless.
+     *
+     * @var Collection<int, SpaceRole>
+     */
+    #[ORM\ManyToMany(targetEntity: SpaceRole::class)]
+    #[ORM\JoinTable(name: 'space_membership_role')]
+    #[Groups(['space:read'])]
+    private Collection $roles;
+
     public function __construct()
     {
         $this->joinedAt = new \DateTimeImmutable();
+        $this->roles = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -96,5 +111,36 @@ class SpaceMembership
     public function getJoinedAt(): \DateTimeImmutable
     {
         return $this->joinedAt;
+    }
+
+    /**
+     * @return Collection<int, SpaceRole>
+     */
+    public function getRoles(): Collection
+    {
+        return $this->roles;
+    }
+
+    public function addRole(SpaceRole $role): static
+    {
+        if (!$this->roles->contains($role)) {
+            $this->roles->add($role);
+        }
+
+        return $this;
+    }
+
+    public function removeRole(SpaceRole $role): static
+    {
+        $this->roles->removeElement($role);
+
+        return $this;
+    }
+
+    public function clearRoles(): static
+    {
+        $this->roles->clear();
+
+        return $this;
     }
 }

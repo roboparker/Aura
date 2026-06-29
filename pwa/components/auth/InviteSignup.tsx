@@ -576,7 +576,7 @@ const InviterBox = ({ chip }: { chip: InviterChip }) => (
       {chip.initials}
     </span>
     <div className="min-w-0 flex-1">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Invited by
       </p>
       <p className="text-sm font-semibold truncate">{chip.name}</p>
@@ -663,13 +663,13 @@ const MismatchRow = ({
   chip: InviterChip | null;
 }) => (
   <div className="space-y-0.5">
-    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
       {label}
     </p>
     <div className="flex items-center gap-2 font-mono text-sm">
       {chip && (
         <span
-          className="flex h-5 w-5 items-center justify-center rounded-sm text-[10px] font-semibold text-white"
+          className="flex h-5 w-5 items-center justify-center rounded-sm text-xs font-semibold text-white"
           style={{ backgroundColor: chip.color }}
           aria-hidden
         >

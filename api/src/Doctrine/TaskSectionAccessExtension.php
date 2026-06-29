@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\TaskSection;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Scopes TaskSection queries to spaces the current user belongs to. Uses the
@@ -27,5 +28,11 @@ final class TaskSectionAccessExtension extends AbstractSpaceAccessExtension
         // Sections follow their project's space + the 'projects' category
         // default; they aren't individually addressable for per-item overrides.
         return null;
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        // Sections ride the projects category.
+        return SpacePermission::PROJECTS;
     }
 }

@@ -58,18 +58,20 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.comments.create', object)))",
             processor: CommentAuthorProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAccessibleBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.comments.read', object)))",
         ),
         new Patch(
+            // Edit stays author-only (even admins/roles can't rewrite someone
+            // else's words); create/read/delete are role-gated below.
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user)",
             processor: CommentUpdateProcessor::class,
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.isDeletableBy(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getAuthor() == user or object.isDeletableBy(user) or (object.isAccessibleBy(user) and is_granted('space.comments.delete', object)))",
             processor: CommentDeleteProcessor::class,
         ),
     ],

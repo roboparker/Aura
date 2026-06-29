@@ -10,7 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const AllDiscussionsPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
+  const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
   const router = useRouter();
 
   useEffect(() => {
@@ -39,6 +39,7 @@ const AllDiscussionsPage = () => {
               spaceIri={activeSpace["@id"]}
               currentUserIri={`/users/${user.id}`}
               isSpaceAdmin={isActiveSpaceAdmin}
+              canCreate={can("discussions", "create")}
               title="Discussions"
               description="Space-level threads — announcements, ideas, Q&A, and anything that doesn’t belong inside a project."
               icon={

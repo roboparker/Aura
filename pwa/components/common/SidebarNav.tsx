@@ -363,6 +363,16 @@ const SettingsSection = ({
             label: "Users",
             match: "/spaces/[id]/users",
           },
+          {
+            href: `/spaces/${activeSpace.id}/roles`,
+            label: "Permissions",
+            match: "/spaces/[id]/roles",
+          },
+          {
+            href: `/spaces/${activeSpace.id}/api-keys`,
+            label: "API keys",
+            match: "/spaces/[id]/api-keys",
+          },
         ]
       : []),
     { href: "/tags", label: "Tags", match: "/tags" },

@@ -19,7 +19,7 @@ const TaskTableColumns = ({ columns }: { columns: ListColumn[] }) => (
       <col key={column.key} className={column.widthClass} />
     ))}
     {/* Trailing column: no width = absorbs the remaining space as an empty
-        area on the right; its header carries the "add field" control. */}
+        gutter on the right; its header carries the "add field" control. */}
     <col />
   </colgroup>
 );

@@ -12,6 +12,7 @@ use App\Entity\Page;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -389,8 +390,16 @@ class McpTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $space = $this->makeSpace($alice);
-        // Bob is a plain member of Alice's space.
-        $this->ensureSpaceMembership($space, $bob, Space::ROLE_MEMBER);
+        // Bob is a member with a role that lacks pages.update (#space-roles) —
+        // a plain no-role member would have full access.
+        $membership = $this->ensureSpaceMembership($space, $bob, Space::ROLE_MEMBER);
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions(['pages' => ['read' => true]]);
+        $this->entityManager->persist($role);
+        $membership->addRole($role);
+        $this->entityManager->flush();
         $page = $this->makePage($alice, $space, 'Alice doc');
         $plain = $this->mintToken($bob, 'CLI');
 

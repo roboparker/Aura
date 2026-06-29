@@ -8,6 +8,7 @@ use App\Entity\Discussion;
 use App\Entity\Notification;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -169,10 +170,19 @@ class DiscussionCommentTest extends ApiTestCase
 
     public function testNonAdminMemberCannotDeleteAnothersDiscussionComment(): void
     {
+        // #space-roles: a member with no role has full access, so restriction
+        // is via a role that lacks comments.delete.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $space = $this->createSpace($alice, 'Marketing');
-        $this->ensureSpaceMembership($space, $bob);
+        $membership = $this->ensureSpaceMembership($space, $bob);
+        $role = (new SpaceRole())
+            ->setSpace($space)
+            ->setName('Restricted')
+            ->setPermissions(['comments' => ['read' => true]]);
+        $this->entityManager->persist($role);
+        $membership->addRole($role);
+        $this->entityManager->flush();
         $discussion = $this->seedDiscussion($alice, $space, 'Thread');
         $aliceComment = $this->seedComment($alice, $discussion, 'Admin note.');
 

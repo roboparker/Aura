@@ -34,7 +34,7 @@ const errorMessage = (err: unknown, fallback: string): string =>
 
 const Tags = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  const { activeSpace } = useActiveSpace();
+  const { activeSpace, can } = useActiveSpace();
   const spaceIri = activeSpace?.["@id"] ?? null;
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -214,14 +214,16 @@ const Tags = () => {
               </>
             }
             actions={
-              <Button
-                type="button"
-                size="sm"
-                onClick={startCreate}
-                disabled={creating || !spaceIri}
-              >
-                <Plus className="mr-1 h-3.5 w-3.5" /> Add tag
-              </Button>
+              can("tags", "create") ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={startCreate}
+                  disabled={creating || !spaceIri}
+                >
+                  <Plus className="mr-1 h-3.5 w-3.5" /> Add tag
+                </Button>
+              ) : undefined
             }
           />
 

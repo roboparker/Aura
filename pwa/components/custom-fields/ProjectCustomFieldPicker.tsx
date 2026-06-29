@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Plus, Settings2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import type { CustomFieldDefinition } from "./types";
 
@@ -19,6 +19,8 @@ interface Props {
   projectIri: string;
   /** IRIs of the fields currently shown on this project. */
   attachedIris: string[];
+  /** Per-project visibility ('list'|'board'|'both') for attached fields, keyed by definition IRI. */
+  projectVisibility: Record<string, string>;
   /** Space admins can define new fields / edit definitions. */
   isSpaceAdmin: boolean;
   /** Open the field editor to create a new (space) field. */
@@ -48,6 +50,7 @@ const ProjectCustomFieldPicker = ({
   spaceIri,
   projectIri,
   attachedIris,
+  projectVisibility,
   isSpaceAdmin,
   onCreate,
   onEdit,
@@ -83,19 +86,46 @@ const ProjectCustomFieldPicker = ({
     void load();
   }, [load]);
 
-  const toggle = async (iri: string, checked: boolean) => {
-    const next = checked
-      ? [...attachedIris, iri]
-      : attachedIris.filter((i) => i !== iri);
+  const patchAttached = async (iris: string[]): Promise<void> => {
+    const res = await fetch(`${ENTRYPOINT}${projectIri}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/merge-patch+json" },
+      body: JSON.stringify({ customFieldDefinitions: iris }),
+    });
+    if (!res.ok) throw new Error("Failed to update fields.");
+  };
+
+  // The List + Board toggles drive both attachment and visibility: a field is
+  // on the project when either is on. Turning the last one off detaches it;
+  // turning one on (re)attaches and sets the per-project visibility.
+  const updateField = async (iri: string, nextList: boolean, nextBoard: boolean) => {
+    const wasAttached = attachedIris.includes(iri);
+    const projectId = projectIri.split("/").pop();
+    const defId = iri.split("/").pop();
     setBusy(iri);
     try {
-      const res = await fetch(`${ENTRYPOINT}${projectIri}`, {
-        method: "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/merge-patch+json" },
-        body: JSON.stringify({ customFieldDefinitions: next }),
-      });
-      if (!res.ok) throw new Error("Failed to update fields.");
+      if (!nextList && !nextBoard) {
+        if (wasAttached) {
+          await patchAttached(attachedIris.filter((i) => i !== iri));
+        }
+      } else {
+        const visibility =
+          nextList && nextBoard ? "both" : nextList ? "list" : "board";
+        if (!wasAttached) {
+          await patchAttached([...attachedIris, iri]);
+        }
+        const res = await fetch(
+          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${defId}/visibility`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ visibility }),
+          },
+        );
+        if (!res.ok) throw new Error("Failed to update visibility.");
+      }
       onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update fields.");
@@ -110,8 +140,9 @@ const ProjectCustomFieldPicker = ({
         <div className="space-y-1">
           <h3 className="text-sm font-medium">Custom fields</h3>
           <p className="text-xs text-muted-foreground">
-            Tick the space&apos;s fields to show them on this project&apos;s
-            tasks. Define and order fields in{" "}
+            Toggle where each of the space&apos;s fields shows on this
+            project — the task list, the board, or both (off both = not on this
+            project). Define and order fields in{" "}
             <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
               space settings
             </Link>
@@ -142,24 +173,43 @@ const ProjectCustomFieldPicker = ({
         <ul className="divide-y rounded-md border">
           {spaceFields.map((def) => {
             const checked = attachedIris.includes(def["@id"]);
+            const vis = checked ? projectVisibility[def["@id"]] ?? "both" : null;
+            const showList = vis === "both" || vis === "list";
+            const showBoard = vis === "both" || vis === "board";
+            const isBusy = busy === def["@id"];
             return (
               <li
                 key={def["@id"]}
                 className="flex items-center gap-3 px-3 py-2 text-sm"
               >
-                <Checkbox
-                  checked={checked}
-                  disabled={busy === def["@id"]}
-                  onCheckedChange={(v) => void toggle(def["@id"], v === true)}
-                  aria-label={`Show ${def.name} on this project`}
-                  className="size-4"
-                />
                 <span className={cn("min-w-0 flex-1 truncate", !checked && "text-muted-foreground")}>
                   {def.name}
                 </span>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {KIND_LABEL[def.kind] ?? def.kind}
                 </span>
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Switch
+                    checked={showList}
+                    disabled={isBusy}
+                    onCheckedChange={(v) =>
+                      void updateField(def["@id"], v, showBoard)
+                    }
+                    aria-label={`Show ${def.name} on the task list`}
+                  />
+                  List
+                </label>
+                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Switch
+                    checked={showBoard}
+                    disabled={isBusy}
+                    onCheckedChange={(v) =>
+                      void updateField(def["@id"], showList, v)
+                    }
+                    aria-label={`Show ${def.name} on the board`}
+                  />
+                  Board
+                </label>
                 {isSpaceAdmin && (
                   <button
                     type="button"

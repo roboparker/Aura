@@ -3,6 +3,7 @@
 namespace App\Doctrine;
 
 use App\Entity\Tag;
+use App\Security\Permission\SpacePermission;
 
 /**
  * Scopes Tag queries to spaces the current user belongs to (#tags). Tags are
@@ -27,5 +28,10 @@ final class TagAccessExtension extends AbstractSpaceAccessExtension
     protected function getImpersonationItemType(): ?string
     {
         return null;
+    }
+
+    protected function getPermissionCategory(): string
+    {
+        return SpacePermission::TAGS;
     }
 }
