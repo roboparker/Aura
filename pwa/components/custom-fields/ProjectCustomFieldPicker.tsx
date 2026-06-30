@@ -124,7 +124,7 @@ const ProjectCustomFieldPicker = ({
           await patchAttached([...attachedIris, iri]);
         }
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${defId}/visibility`,
+          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId ?? "")}/custom_field_definitions/${encodeURIComponent(defId ?? "")}/visibility`,
           {
             method: "PUT",
             credentials: "include",
