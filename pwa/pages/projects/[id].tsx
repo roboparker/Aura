@@ -407,7 +407,7 @@ const ProjectDetail = () => {
       ].join(",");
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/${def.id}/visibility`,
+          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}/custom_field_definitions/${encodeURIComponent(def.id)}/visibility`,
           {
             method: "PUT",
             credentials: "include",
