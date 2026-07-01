@@ -196,7 +196,7 @@ const Projects = () => {
         <title>Projects - Madori</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-5xl mx-auto">
           <PageHeader
             title="Projects"
             icon={

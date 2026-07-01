@@ -210,7 +210,7 @@ const AdminSegments: NextPage = () => {
         <title>Segments - Madori Admin</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
-        <div className="max-w-3xl mx-auto space-y-6">
+        <div className="max-w-5xl mx-auto space-y-6">
           <header className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold">Segments</h1>

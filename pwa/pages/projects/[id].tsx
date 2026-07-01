@@ -1396,7 +1396,7 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="fields" className="mt-4">
-                  <div className="max-w-2xl">
+                  <div className="max-w-5xl">
                     <ProjectCustomFieldPicker
                       spaceIri={projectSpaceIri(project)}
                       projectIri={project["@id"]}

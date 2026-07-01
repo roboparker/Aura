@@ -210,7 +210,7 @@ const SpaceApiKeys = () => {
       <Head>
         <title>API keys · {space.name}</title>
       </Head>
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader
           title="API keys"
           icon={<KeyRound className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}

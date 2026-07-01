@@ -278,19 +278,6 @@ const CustomFieldsManager = ({
 
   return (
     <div className="space-y-6" data-testid="custom-fields-manager">
-      <div className="flex justify-end">
-        {isSpaceAdmin && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={openCreate}
-            data-testid="custom-field-add"
-          >
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
-          </Button>
-        )}
-      </div>
-
       {loadError && (
         <Alert variant="destructive">
           <AlertDescription>{loadError}</AlertDescription>
@@ -313,13 +300,14 @@ const CustomFieldsManager = ({
               size="sm"
               className="mt-3"
               onClick={openCreate}
+              data-testid="custom-field-add"
             >
               <Plus className="mr-1 h-3.5 w-3.5" /> Add field
             </Button>
           )}
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="overflow-hidden rounded-lg border bg-card">
           {/* Change log is project-scoped activity; only shown in a
               project context (not on the space-level manager). */}
           {projectId && (
