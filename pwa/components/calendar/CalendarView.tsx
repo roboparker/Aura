@@ -1,92 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Filter } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { dayKeyDiff, parseDayKey } from "@/lib/calendarDates";
+import { displayName } from "@/lib/userDisplay";
 import WorkspaceCalendar, {
   type CalendarEntry,
   type RescheduleScope,
 } from "@/components/calendar/WorkspaceCalendar";
 import { type AssignableUser } from "@/components/tasks/AssignMenu";
+import FilterMultiSelect from "@/components/common/FilterMultiSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
-
-/**
- * Multi-select filter dropdown mirroring the project list view's column
- * filters — a button (with an active count) that opens a checkbox list.
- */
-const MultiFilter = ({
-  label,
-  options,
-  selected,
-  onChange,
-  testId,
-}: {
-  label: string;
-  options: [value: string, label: string][];
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
-  testId?: string;
-}) => {
-  const [open, setOpen] = useState(false);
-  const count = selected.size;
-  const toggle = (value: string, checked: boolean) => {
-    const next = new Set(selected);
-    if (checked) next.add(value);
-    else next.delete(value);
-    onChange(next);
-  };
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className={cn("h-8 gap-1", count > 0 && "border-primary/60 text-foreground")}
-          data-testid={testId}
-        >
-          <Filter className="h-3.5 w-3.5" />
-          {label}
-          {count > 0 && <span className="text-muted-foreground">({count})</span>}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="max-h-72 w-56 overflow-y-auto p-1">
-        {options.length === 0 ? (
-          <p className="px-2 py-1.5 text-xs text-muted-foreground">No options</p>
-        ) : (
-          options.map(([value, optionLabel]) => (
-            <label
-              key={value}
-              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
-            >
-              <Checkbox
-                checked={selected.has(value)}
-                onCheckedChange={(c) => toggle(value, c === true)}
-              />
-              <span className="truncate">{optionLabel}</span>
-            </label>
-          ))
-        )}
-        {count > 0 && (
-          <button
-            type="button"
-            onClick={() => onChange(new Set())}
-            className="mt-1 w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            Clear
-          </button>
-        )}
-      </PopoverContent>
-    </Popover>
-  );
-};
 
 interface CalendarViewProps {
   /** Space whose tasks the calendar projects (`/spaces/{id}` IRI). */
@@ -236,12 +158,12 @@ const CalendarView = ({
     const seen = new Map<string, string>();
     for (const e of entries) {
       for (const a of e.assignees) {
-        const name =
-          a.nickname || `${a.givenName ?? ""} ${a.familyName ?? ""}`.trim() || a["@id"];
-        seen.set(a["@id"], name);
+        seen.set(a["@id"], displayName(a) || a["@id"]);
       }
     }
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    return [...seen.entries()].sort((a, b) =>
+      a[1].localeCompare(b[1], undefined, { sensitivity: "base" }),
+    );
   }, [entries]);
 
   const visibleEntries = useMemo(
@@ -260,7 +182,7 @@ const CalendarView = ({
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {!projectIri && (
-          <MultiFilter
+          <FilterMultiSelect
             label="Projects"
             options={projectOptions}
             selected={projectFilter}
@@ -268,7 +190,7 @@ const CalendarView = ({
             testId="calendar-project-filter"
           />
         )}
-        <MultiFilter
+        <FilterMultiSelect
           label="Assignees"
           options={assigneeOptions}
           selected={assigneeFilter}

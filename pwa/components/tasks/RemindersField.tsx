@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { BellPlus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -157,11 +157,12 @@ const RemindersField = ({
         <Button
           type="button"
           size="sm"
+          variant="outline"
           onClick={() => setAdding(true)}
-          className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+          className="gap-1.5"
           data-testid={`${testIdPrefix}-add`}
         >
-          <Plus className="h-3.5 w-3.5" /> Add reminder
+          <BellPlus className="h-3.5 w-3.5" /> Add reminder
         </Button>
       )}
 

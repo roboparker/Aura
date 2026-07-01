@@ -35,6 +35,9 @@ interface AssigneesComboboxProps {
   onAvatarClick?: (assignee: AssigneeOption) => void;
   /** Surface elevation; 0 = inline (flush in a table cell). */
   elevation?: Elevation;
+  /** Extra classes on the chips container — e.g. `flex-col` to stack the
+   *  assignees as a vertical list (used in the task detail drawer). */
+  chipsClassName?: string;
 }
 
 const AssigneesCombobox = ({
@@ -45,6 +48,7 @@ const AssigneesCombobox = ({
   className,
   onAvatarClick,
   elevation = 1,
+  chipsClassName,
 }: AssigneesComboboxProps) => {
   const handleChange = (next: AssigneeOption[]) => {
     void onChange(next.map((u) => u["@id"]));
@@ -88,11 +92,10 @@ const AssigneesCombobox = ({
           // In the list view (inline elevation) keep the chip + search input on
           // one line so the assignee stays vertically centered in the row;
           // wrapping pushed the chip onto a top line and inflated the row.
-          className={
-            elevation === 0
-              ? "flex-nowrap group-hover/field:border-input"
-              : undefined
-          }
+          className={cn(
+            elevation === 0 && "flex-nowrap group-hover/field:border-input",
+            chipsClassName,
+          )}
         >
           {value.length === 0 && (
             <AssigneePlaceholder className="group-hover/field:border-foreground/40 group-hover/field:text-foreground" />

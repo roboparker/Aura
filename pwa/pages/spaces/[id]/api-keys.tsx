@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
 import { Check, Copy, KeyRound, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { type Space } from "@/contexts/ActiveSpaceContext";
+import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
@@ -16,7 +16,6 @@ import { formatRelative } from "@/lib/relativeTime";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -42,6 +41,7 @@ interface SpaceApiKey {
 
 const SpaceApiKeys = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { can } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const spaceId = typeof id === "string" ? id : null;
@@ -119,11 +119,19 @@ const SpaceApiKeys = () => {
       (m) => m.user.id === user.id && m.role === "admin",
     );
 
+  // Managing keys needs the `api_keys` permission — space admins have it by
+  // default; a member can be granted it through a role. (Server enforces; this
+  // just gates the UI. `can` reflects the active space, which equals this one
+  // in the normal Settings navigation flow.)
+  const canManageKeys = isAdmin || can("api_keys", "read");
+  const canCreateKeys = isAdmin || can("api_keys", "create");
+  const canDeleteKeys = isAdmin || can("api_keys", "delete");
+
   useEffect(() => {
-    if (space && user && !isAdmin && spaceId) {
+    if (space && user && !canManageKeys && spaceId) {
       router.replace(`/spaces/${spaceId}`);
     }
-  }, [space, user, isAdmin, spaceId, router]);
+  }, [space, user, canManageKeys, spaceId, router]);
 
   const openCreate = () => {
     setName("");
@@ -203,7 +211,7 @@ const SpaceApiKeys = () => {
     );
   }
 
-  if (!isAdmin) return null;
+  if (!canManageKeys) return null;
 
   return (
     <>
@@ -215,16 +223,7 @@ const SpaceApiKeys = () => {
           title="API keys"
           icon={<KeyRound className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
           subtitle={`Programmatic Bearer keys confined to “${space.name}”, with the roles you assign deciding what they can do.`}
-        >
-          <Button
-            type="button"
-            size="sm"
-            className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-            onClick={openCreate}
-          >
-            <KeyRound className="h-4 w-4" aria-hidden /> New key
-          </Button>
-        </PageHeader>
+        />
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -244,51 +243,60 @@ const SpaceApiKeys = () => {
           — a key with no roles can do nothing.
         </p>
 
-        <Card>
-          <CardContent className="pt-6">
-            {keys.length === 0 ? (
-              <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+        <div className="overflow-hidden rounded-md border bg-card">
+          <ul className="divide-y divide-border">
+            {keys.length === 0 && (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 No API keys yet.
-              </div>
-            ) : (
-              <ul className="divide-y divide-border rounded-md border">
-                {keys.map((key) => (
-                  <li
-                    key={key.id}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                    data-testid="space-api-key-row"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{key.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {key.roles.length === 0
-                          ? "No roles — inert"
-                          : key.roles.map((r) => r.name).join(", ")}
-                        {" · "}
-                        {key.lastUsedAt
-                          ? `used ${formatRelative(key.lastUsedAt)}`
-                          : "never used"}
-                      </p>
-                    </div>
-                    {key.expiresAt && (
-                      <Badge variant="outline" className="shrink-0">
-                        expires {formatRelative(key.expiresAt)}
-                      </Badge>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(key)}
-                      aria-label={`Revoke ${key.name}`}
-                      className="rounded p-1 text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden />
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              </li>
             )}
-          </CardContent>
-        </Card>
+            {keys.map((key) => (
+              <li
+                key={key.id}
+                className="flex items-center gap-3 px-3 py-2.5"
+                data-testid="space-api-key-row"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium truncate">{key.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {key.roles.length === 0
+                      ? "No roles — inert"
+                      : key.roles.map((r) => r.name).join(", ")}
+                    {" · "}
+                    {key.lastUsedAt
+                      ? `used ${formatRelative(key.lastUsedAt)}`
+                      : "never used"}
+                  </p>
+                </div>
+                {key.expiresAt && (
+                  <Badge variant="outline" className="shrink-0">
+                    expires {formatRelative(key.expiresAt)}
+                  </Badge>
+                )}
+                {canDeleteKeys && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(key)}
+                    aria-label={`Revoke ${key.name}`}
+                    className="rounded p-1 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {canCreateKeys && (
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex w-full items-center gap-1 border-t px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              data-testid="space-api-key-add"
+            >
+              <KeyRound className="h-3.5 w-3.5" aria-hidden /> New key
+            </button>
+          )}
+        </div>
       </main>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -348,7 +356,7 @@ const SpaceApiKeys = () => {
                   <Label>Roles</Label>
                   {roles.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
-                      No roles defined yet — create one on the Permissions page
+                      No roles defined yet — create one on the Roles page
                       first.
                     </p>
                   ) : (

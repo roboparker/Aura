@@ -236,14 +236,16 @@ const TaskRelationshipsPanel = ({ taskIri }: TaskRelationshipsPanelProps) => {
           </div>
         </div>
       ) : (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setAdding(true)}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+          className="gap-1.5"
           data-testid="relationship-add"
         >
           <Plus className="h-3.5 w-3.5" /> Add relationship
-        </button>
+        </Button>
       )}
     </div>
   );
