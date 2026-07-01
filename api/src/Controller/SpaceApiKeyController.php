@@ -8,6 +8,8 @@ use App\Entity\ApiToken;
 use App\Entity\Space;
 use App\Entity\SpaceRole;
 use App\Entity\User;
+use App\Security\Permission\SpacePermission;
+use App\Security\Permission\SpacePermissionResolver;
 use App\State\ApiTokenCreateProcessor;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,19 +22,22 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Space-scoped API keys (#space-roles). A key is a programmatic Bearer
  * credential confined to one space, with assigned {@see SpaceRole}s deciding
- * what it can do. Space-admin only. The plaintext is shown exactly once at
- * creation (only the sha256 hash is stored).
+ * what it can do. Managing keys requires the `api_keys` permission — held by
+ * space admins by default, or granted to a member through a custom role. The
+ * plaintext is shown exactly once at creation (only the sha256 hash is stored).
  */
 final class SpaceApiKeyController extends AbstractController
 {
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly SpacePermissionResolver $permissions,
+    ) {
     }
 
     #[Route('/spaces/{id}/api-keys', name: 'space_api_keys_list', methods: ['GET'])]
     public function list(string $id, #[CurrentUser] ?User $user): JsonResponse
     {
-        $space = $this->adminSpaceOr($id, $user);
+        $space = $this->permittedSpaceOr($id, $user, SpacePermission::READ);
         if ($space instanceof JsonResponse) {
             return $space;
         }
@@ -46,7 +51,7 @@ final class SpaceApiKeyController extends AbstractController
     #[Route('/spaces/{id}/api-keys', name: 'space_api_keys_create', methods: ['POST'])]
     public function create(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
-        $space = $this->adminSpaceOr($id, $user);
+        $space = $this->permittedSpaceOr($id, $user, SpacePermission::CREATE);
         if ($space instanceof JsonResponse) {
             return $space;
         }
@@ -95,7 +100,7 @@ final class SpaceApiKeyController extends AbstractController
     #[Route('/spaces/{id}/api-keys/{keyId}', name: 'space_api_keys_delete', methods: ['DELETE'])]
     public function delete(string $id, string $keyId, #[CurrentUser] ?User $user): JsonResponse
     {
-        $space = $this->adminSpaceOr($id, $user);
+        $space = $this->permittedSpaceOr($id, $user, SpacePermission::DELETE);
         if ($space instanceof JsonResponse) {
             return $space;
         }
@@ -164,7 +169,13 @@ final class SpaceApiKeyController extends AbstractController
         ];
     }
 
-    private function adminSpaceOr(string $id, ?User $user): Space|JsonResponse
+    /**
+     * Resolve the space and authorize the caller for the given api-key action.
+     * Access = platform admin, OR the `api_keys` permission for this space
+     * (space admins by default; members via a role that grants it). Non-members
+     * get a 404 to keep the space's existence hidden.
+     */
+    private function permittedSpaceOr(string $id, ?User $user, string $action): Space|JsonResponse
     {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
@@ -176,11 +187,14 @@ final class SpaceApiKeyController extends AbstractController
         if (null === $space) {
             return $this->json(['error' => 'Space not found.'], 404);
         }
-        if (!$this->isGranted('ROLE_ADMIN') && !$space->isAdmin($user)) {
-            if (!$space->hasMember($user)) {
-                return $this->json(['error' => 'Space not found.'], 404);
-            }
-            return $this->json(['error' => 'Only space admins can manage API keys.'], 403);
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return $space;
+        }
+        if (!$space->hasMember($user)) {
+            return $this->json(['error' => 'Space not found.'], 404);
+        }
+        if (!$this->permissions->canByExplicitGrant($user, $space, SpacePermission::API_KEYS, $action)) {
+            return $this->json(['error' => 'You do not have permission to manage API keys.'], 403);
         }
 
         return $space;
