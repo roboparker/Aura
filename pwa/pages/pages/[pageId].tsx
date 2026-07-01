@@ -398,7 +398,7 @@ const PageDetailView = () => {
         <title>{page ? `${page.title} - Madori` : "Page - Madori"}</title>
       </Head>
       <main className="min-h-screen bg-background">
-        <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
