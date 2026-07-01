@@ -47,8 +47,9 @@ interface Collection<T> {
 }
 
 interface Props {
-  /** Space that owns the fields (#custom-fields-space). Drives load + create. */
-  spaceIri: string;
+  /** Space that owns the fields (#custom-fields-space). Drives load + create.
+   *  Omitted for the instance-wide global manager (#global-custom-fields). */
+  spaceIri?: string;
   /** Header `slug · N fields` badge label (space or project title). */
   projectTitle: string;
   /** When mounted in a project's Settings tab, enables drag-reorder (via the
@@ -57,6 +58,10 @@ interface Props {
   /** Active space name, surfaced in the admin notice + reference scope note. */
   spaceName?: string;
   isSpaceAdmin: boolean;
+  /** Collection endpoint for the definitions — the space `/custom_field_definitions`
+   *  by default, or `/global_custom_field_definitions` for the admin global
+   *  manager. `def["@id"]` already carries the right base for item routes. */
+  collectionPath?: string;
   /** Fired after any definition mutation (create/edit/delete/reorder) so a
    *  host that also renders the definitions (e.g. task columns) can re-sync. */
   onDefinitionsChanged?: () => void;
@@ -87,6 +92,7 @@ const CustomFieldsManager = ({
   projectIri,
   spaceName,
   isSpaceAdmin,
+  collectionPath = "/custom_field_definitions",
   onDefinitionsChanged,
 }: Props) => {
   const projectId = projectIri ? projectIdFromIri(projectIri) : null;
@@ -113,7 +119,10 @@ const CustomFieldsManager = ({
     setIsLoading(true);
     setLoadError(null);
     try {
-      const url = `${ENTRYPOINT}/custom_field_definitions?space=${encodeURIComponent(spaceIri)}`;
+      const query = spaceIri
+        ? `?space=${encodeURIComponent(spaceIri)}`
+        : "";
+      const url = `${ENTRYPOINT}${collectionPath}${query}`;
       const res = await fetch(url, {
         credentials: "include",
         headers: { Accept: "application/ld+json" },
@@ -128,7 +137,7 @@ const CustomFieldsManager = ({
     } finally {
       setIsLoading(false);
     }
-  }, [spaceIri]);
+  }, [spaceIri, collectionPath]);
 
   const loadStats = useCallback(async () => {
     if (null === projectId) return;
@@ -202,7 +211,7 @@ const CustomFieldsManager = ({
     async (def: CustomFieldDefinition) => {
       setLoadError(null);
       try {
-        const res = await fetch(`${ENTRYPOINT}/custom_field_definitions`, {
+        const res = await fetch(`${ENTRYPOINT}${collectionPath}`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/ld+json" },
@@ -214,7 +223,7 @@ const CustomFieldsManager = ({
             nullable: def.nullable,
             footer: def.footer,
             visibility: def.visibility,
-            space: spaceIri,
+            ...(spaceIri ? { space: spaceIri } : {}),
             position: nextPosition,
           }),
         });
@@ -227,7 +236,7 @@ const CustomFieldsManager = ({
         );
       }
     },
-    [spaceIri, nextPosition],
+    [spaceIri, nextPosition, collectionPath],
   );
 
   const persistOrder = useCallback(
@@ -386,6 +395,7 @@ const CustomFieldsManager = ({
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         spaceIri={spaceIri}
+        collectionPath={collectionPath}
         projectIri={projectIri}
         spaceName={spaceName}
         initial={editing ?? undefined}

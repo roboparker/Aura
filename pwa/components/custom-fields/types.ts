@@ -112,6 +112,20 @@ export interface CustomFieldDefinition {
   visibility: CustomFieldVisibility;
 }
 
+/**
+ * Whether a definition (or bare IRI) is an instance-wide GLOBAL field rather
+ * than a space-owned one (#global-custom-fields). Global fields live at
+ * `/global_custom_field_definitions/...`; a task value keys them on
+ * `globalDefinition` instead of `definition`, and per-project attach /
+ * visibility use the parallel `global_custom_field_definitions` routes.
+ */
+export const isGlobalDefinition = (
+  defOrIri: string | { "@id": string },
+): boolean => {
+  const iri = typeof defOrIri === "string" ? defOrIri : defOrIri["@id"];
+  return iri.includes("/global_custom_field_definitions/");
+};
+
 export interface FooterRow {
   definition: string;
   name: string;

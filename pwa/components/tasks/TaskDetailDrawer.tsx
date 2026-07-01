@@ -175,9 +175,13 @@ const TaskDetailDrawer = ({
     let cancelled = false;
     void (async () => {
       try {
-        const [defsRes, projRes] = await Promise.all([
+        const [defsRes, globalDefsRes, projRes] = await Promise.all([
           fetch(
             `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(projectIri)}`,
+            { credentials: "include", headers: { Accept: "application/ld+json" } },
+          ),
+          fetch(
+            `${ENTRYPOINT}/global_custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
             { credentials: "include", headers: { Accept: "application/ld+json" } },
           ),
           fetch(`${ENTRYPOINT}${projectIri}`, {
@@ -185,10 +189,17 @@ const TaskDetailDrawer = ({
             headers: { Accept: "application/ld+json" },
           }),
         ]);
-        if (defsRes.ok && !cancelled) {
-          const data: Collection<CustomFieldDefinition> = await defsRes.json();
+        if (!cancelled && (defsRes.ok || globalDefsRes.ok)) {
+          // Effective field set = the project's space fields ∪ its opted-in
+          // global fields (#global-custom-fields).
+          const spaceDefs: CustomFieldDefinition[] = defsRes.ok
+            ? membersOf(await defsRes.json())
+            : [];
+          const globalDefs: CustomFieldDefinition[] = globalDefsRes.ok
+            ? membersOf(await globalDefsRes.json())
+            : [];
           setDefinitions(
-            membersOf(data).sort((a, b) => a.position - b.position),
+            [...spaceDefs, ...globalDefs].sort((a, b) => a.position - b.position),
           );
         }
         if (projRes.ok && !cancelled) {

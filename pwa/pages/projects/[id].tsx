@@ -72,9 +72,15 @@ import type {
   CustomFieldSubtype,
 } from "@/components/custom-fields/types";
 import {
+  isGlobalDefinition,
   showsOnSurface,
   visibilitySurfaces,
 } from "@/components/custom-fields/types";
+import {
+  makeValuePair,
+  valuePairDefinitionIri,
+  type CustomFieldValuePair,
+} from "@/components/tasks/CustomFieldValueList";
 import {
   dueDateStatus,
   type Reminder,
@@ -119,11 +125,6 @@ interface Project {
   owner: Member;
   members: Member[];
   space: string | SpaceRef;
-}
-
-interface CustomFieldValuePair {
-  definition: string;
-  value: unknown;
 }
 
 interface ProjectTask {
@@ -344,31 +345,40 @@ const ProjectDetail = () => {
       setProject(projectData);
 
       const projectIri = projectData["@id"];
-      const [tasksRes, defsRes, sectionsRes, usersRes, tagsRes] = await Promise.all([
-        fetch(`${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectIri)}`, init),
-        fetch(
-          `${ENTRYPOINT}/custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
-          init,
-        ),
-        fetch(
-          `${ENTRYPOINT}/task_sections?project=${encodeURIComponent(projectIri)}`,
-          init,
-        ),
-        fetch(`${ENTRYPOINT}/me/assignable-users`, init),
-        fetch(
-          `${ENTRYPOINT}/tags?space=${encodeURIComponent(projectSpaceIri(projectData))}`,
-          init,
-        ),
-      ]);
+      const [tasksRes, defsRes, globalDefsRes, sectionsRes, usersRes, tagsRes] =
+        await Promise.all([
+          fetch(`${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectIri)}`, init),
+          fetch(
+            `${ENTRYPOINT}/custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
+            init,
+          ),
+          fetch(
+            `${ENTRYPOINT}/global_custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
+            init,
+          ),
+          fetch(
+            `${ENTRYPOINT}/task_sections?project=${encodeURIComponent(projectIri)}`,
+            init,
+          ),
+          fetch(`${ENTRYPOINT}/me/assignable-users`, init),
+          fetch(
+            `${ENTRYPOINT}/tags?space=${encodeURIComponent(projectSpaceIri(projectData))}`,
+            init,
+          ),
+        ]);
       if (!tasksRes.ok) throw new Error("Failed to load tasks.");
       setTasks(membersOf<ProjectTask>(await tasksRes.json()));
-      if (defsRes.ok) {
-        setDefinitions(
-          membersOf<CustomFieldDefinition>(await defsRes.json()).sort(
-            (a, b) => a.position - b.position,
-          ),
-        );
-      }
+      // A project's effective field set is the union of its space fields and
+      // the instance-wide global fields it opts into (#global-custom-fields).
+      const spaceDefs = defsRes.ok
+        ? membersOf<CustomFieldDefinition>(await defsRes.json())
+        : [];
+      const globalDefs = globalDefsRes.ok
+        ? membersOf<CustomFieldDefinition>(await globalDefsRes.json())
+        : [];
+      setDefinitions(
+        [...spaceDefs, ...globalDefs].sort((a, b) => a.position - b.position),
+      );
       if (sectionsRes.ok) {
         setSections(
           membersOf<TaskSection>(await sectionsRes.json()).sort(
@@ -400,15 +410,24 @@ const ProjectDetail = () => {
   const reloadDefinitions = useCallback(async () => {
     if (!project) return;
     try {
-      const res = await fetch(
-        `${ENTRYPOINT}/custom_field_definitions?projects=${encodeURIComponent(project["@id"])}`,
-        { credentials: "include" },
-      );
-      if (res.ok) {
+      const iri = encodeURIComponent(project["@id"]);
+      const [spaceRes, globalRes] = await Promise.all([
+        fetch(`${ENTRYPOINT}/custom_field_definitions?projects=${iri}`, {
+          credentials: "include",
+        }),
+        fetch(`${ENTRYPOINT}/global_custom_field_definitions?projects=${iri}`, {
+          credentials: "include",
+        }),
+      ]);
+      const spaceDefs = spaceRes.ok
+        ? membersOf<CustomFieldDefinition>(await spaceRes.json())
+        : [];
+      const globalDefs = globalRes.ok
+        ? membersOf<CustomFieldDefinition>(await globalRes.json())
+        : [];
+      if (spaceRes.ok || globalRes.ok) {
         setDefinitions(
-          membersOf<CustomFieldDefinition>(await res.json()).sort(
-            (a, b) => a.position - b.position,
-          ),
+          [...spaceDefs, ...globalDefs].sort((a, b) => a.position - b.position),
         );
       }
     } catch {
@@ -416,18 +435,26 @@ const ProjectDetail = () => {
     }
   }, [project]);
 
-  // Attach a space-owned field to this project (per-project selection M2M).
+  // Attach a field to this project (per-project selection M2M). Space and
+  // global fields live in separate join tables, so PATCH the matching key
+  // with the full current set of that source plus the new IRI.
   const attachFieldToProject = useCallback(
     async (defIri: string) => {
       if (!project) return;
-      const current = definitions.map((d) => d["@id"]);
-      if (current.includes(defIri)) return;
+      if (definitions.some((d) => d["@id"] === defIri)) return;
+      const global = isGlobalDefinition(defIri);
+      const currentOfSource = definitions
+        .filter((d) => isGlobalDefinition(d) === global)
+        .map((d) => d["@id"]);
+      const key = global
+        ? "globalCustomFieldDefinitions"
+        : "customFieldDefinitions";
       try {
         await fetch(`${ENTRYPOINT}${project["@id"]}`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify({ customFieldDefinitions: [...current, defIri] }),
+          body: JSON.stringify({ [key]: [...currentOfSource, defIri] }),
         });
       } catch {
         /* transient — the field just won't show until retried */
@@ -451,9 +478,12 @@ const ProjectDetail = () => {
       const surfaces = [
         ...new Set([...visibilitySurfaces(def.visibility), "list"]),
       ].join(",");
+      const base = isGlobalDefinition(def)
+        ? "global_custom_field_definitions"
+        : "custom_field_definitions";
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}/custom_field_definitions/${encodeURIComponent(def.id)}/visibility`,
+          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}/${base}/${encodeURIComponent(def.id)}/visibility`,
           {
             method: "PUT",
             credentials: "include",
@@ -541,12 +571,12 @@ const ProjectDetail = () => {
       const next = definitions
         .map((def) => {
           const existing = task.customFieldValues.find(
-            (v) => v.definition === def["@id"],
+            (v) => valuePairDefinitionIri(v) === def["@id"],
           );
-          return {
-            definition: def["@id"],
-            value: def["@id"] === defIri ? value : existing?.value,
-          };
+          return makeValuePair(
+            def,
+            def["@id"] === defIri ? value : existing?.value,
+          );
         })
         .filter((p) => !isEmptyFieldValue(p.value));
       void patchTask(task, { customFieldValues: next });
@@ -1433,7 +1463,12 @@ const ProjectDetail = () => {
                     <ProjectCustomFieldPicker
                       spaceIri={projectSpaceIri(project)}
                       projectIri={project["@id"]}
-                      attachedIris={definitions.map((d) => d["@id"])}
+                      attachedIris={definitions
+                        .filter((d) => !isGlobalDefinition(d))
+                        .map((d) => d["@id"])}
+                      attachedGlobalIris={definitions
+                        .filter((d) => isGlobalDefinition(d))
+                        .map((d) => d["@id"])}
                       projectVisibility={Object.fromEntries(
                         definitions.map((d) => [d["@id"], d.visibility ?? "both"]),
                       )}
@@ -2556,8 +2591,9 @@ const ProjectCustomFieldCell = ({
   ) => void;
 }) => {
   const serverValue =
-    task.customFieldValues.find((v) => v.definition === definition["@id"])
-      ?.value ?? null;
+    task.customFieldValues.find(
+      (v) => valuePairDefinitionIri(v) === definition["@id"],
+    )?.value ?? null;
   const serverKey = JSON.stringify(serverValue);
   const [value, setValue] = useState<unknown>(() => JSON.parse(serverKey));
   const dirty = useRef(false);

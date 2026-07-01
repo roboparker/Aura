@@ -59,8 +59,13 @@ import type {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Space that owns the field (#custom-fields-space) — set on create. */
-  spaceIri: string;
+  /** Space that owns the field (#custom-fields-space) — set on create. Omitted
+   *  for the instance-wide global manager (#global-custom-fields). */
+  spaceIri?: string;
+  /** Collection endpoint for create (POST). Defaults to the space
+   *  `/custom_field_definitions`; the global admin manager passes
+   *  `/global_custom_field_definitions`. */
+  collectionPath?: string;
   /** Optional project context, used to scope reference-field option lists. */
   projectIri?: string;
   spaceName?: string;
@@ -139,6 +144,7 @@ const CustomFieldSheet = ({
   open,
   onOpenChange,
   spaceIri,
+  collectionPath = "/custom_field_definitions",
   projectIri,
   spaceName,
   initial,
@@ -314,11 +320,15 @@ const CustomFieldSheet = ({
         body: JSON.stringify(body),
       });
     }
-    return fetch(`${ENTRYPOINT}/custom_field_definitions`, {
+    return fetch(`${ENTRYPOINT}${collectionPath}`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/ld+json" },
-      body: JSON.stringify({ ...body, space: spaceIri, position: initialPosition }),
+      body: JSON.stringify({
+        ...body,
+        ...(spaceIri ? { space: spaceIri } : {}),
+        position: initialPosition,
+      }),
     });
   };
 
