@@ -99,6 +99,7 @@ const CalendarPage = () => {
               spaceIri={activeSpace["@id"]}
               onOpen={openTaskDetail}
               refreshSignal={refreshKey}
+              assignableUsers={assignableUsers}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Loading space…</p>

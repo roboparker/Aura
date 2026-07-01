@@ -20,7 +20,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import { type AvatarUser } from "@/components/user/UserAvatar";
+import AssignMenu, { type AssignableUser } from "@/components/tasks/AssignMenu";
 import { cn } from "@/lib/utils";
 import {
   WEEKDAYS,
@@ -70,6 +71,10 @@ interface WorkspaceCalendarProps {
     targetKey: string,
     scope: RescheduleScope,
   ) => void | Promise<void>;
+  /** Everyone assignable (for the per-card assign menu). */
+  assignableUsers: AssignableUser[];
+  /** Set a task's assignees from a card's assign menu. */
+  onAssign: (taskId: string, userIris: string[]) => void | Promise<void>;
 }
 
 const dragId = (entry: CalendarEntry): string =>
@@ -78,10 +83,14 @@ const dragId = (entry: CalendarEntry): string =>
 const EntryCard = ({
   entry,
   onOpen,
+  assignableUsers = [],
+  onAssign,
   overlay = false,
 }: {
   entry: CalendarEntry;
   onOpen?: (taskId: string) => void;
+  assignableUsers?: AssignableUser[];
+  onAssign?: (taskId: string, userIris: string[]) => void | Promise<void>;
   overlay?: boolean;
 }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -110,19 +119,20 @@ const EntryCard = ({
       title={entry.title}
       data-testid="calendar-entry"
     >
-      <div className="mb-2 flex items-center gap-1">
+      <div className="mb-3 flex items-center gap-1">
         {entry.recurring && (
           <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Repeats" />
         )}
         <span className="min-w-0 flex-1 truncate font-medium">{entry.title}</span>
       </div>
-      {entry.assignees.length > 0 && (
-        <span className="flex -space-x-1.5">
-          {entry.assignees.slice(0, 3).map((a) => (
-            <UserAvatar key={a["@id"]} user={a} size="sm" className="h-5 w-5 ring-2 ring-card" />
-          ))}
-        </span>
-      )}
+      {/* Assignee row — shows avatars, or the dashed placeholder + assign
+          picker when no one is assigned (matches the board/list). */}
+      <AssignMenu
+        assignees={entry.assignees}
+        assignableUsers={assignableUsers}
+        onAssign={(iris) => onAssign?.(entry.taskId, iris)}
+        align="start"
+      />
     </div>
   );
 };
@@ -133,6 +143,8 @@ const DayCell = ({
   inMonth,
   isToday,
   onOpen,
+  assignableUsers,
+  onAssign,
   tall,
 }: {
   day: Date;
@@ -140,6 +152,8 @@ const DayCell = ({
   inMonth: boolean;
   isToday: boolean;
   onOpen: (taskId: string) => void;
+  assignableUsers: AssignableUser[];
+  onAssign: (taskId: string, userIris: string[]) => void | Promise<void>;
   tall: boolean;
 }) => {
   const key = dayKey(day);
@@ -169,7 +183,13 @@ const DayCell = ({
       </div>
       <div className="space-y-1">
         {entries.map((entry) => (
-          <EntryCard key={dragId(entry)} entry={entry} onOpen={onOpen} />
+          <EntryCard
+            key={dragId(entry)}
+            entry={entry}
+            onOpen={onOpen}
+            assignableUsers={assignableUsers}
+            onAssign={onAssign}
+          />
         ))}
       </div>
     </div>
@@ -182,6 +202,8 @@ const WorkspaceCalendar = ({
   onRangeChange,
   onOpen,
   onReschedule,
+  assignableUsers,
+  onAssign,
 }: WorkspaceCalendarProps) => {
   const [view, setView] = useState<View>("month");
   const [anchorKey, setAnchorKey] = useState<string>(() => dayKey(new Date()));
@@ -343,6 +365,8 @@ const WorkspaceCalendar = ({
                 inMonth={inMonth}
                 isToday={key === todayKey}
                 onOpen={onOpen}
+                assignableUsers={assignableUsers}
+                onAssign={onAssign}
                 tall={tall}
               />
             );

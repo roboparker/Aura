@@ -1608,6 +1608,7 @@ const ProjectDetail = () => {
                     onOpen={openTaskById}
                     onTasksChanged={() => void load()}
                     refreshSignal={calendarRefresh}
+                    assignableUsers={projectAssignableUsers}
                   />
                 </TabsContent>
 

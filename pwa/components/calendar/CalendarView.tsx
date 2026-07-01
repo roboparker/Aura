@@ -6,6 +6,7 @@ import WorkspaceCalendar, {
   type CalendarEntry,
   type RescheduleScope,
 } from "@/components/calendar/WorkspaceCalendar";
+import { type AssignableUser } from "@/components/tasks/AssignMenu";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -99,6 +100,8 @@ interface CalendarViewProps {
   onTasksChanged?: () => void;
   /** Bump to force a re-fetch (e.g. after the host's drawer edits a task). */
   refreshSignal?: number;
+  /** Everyone assignable, for the per-card assign menu. */
+  assignableUsers?: AssignableUser[];
 }
 
 /**
@@ -114,6 +117,7 @@ const CalendarView = ({
   onOpen,
   onTasksChanged,
   refreshSignal,
+  assignableUsers = [],
 }: CalendarViewProps) => {
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
@@ -201,6 +205,25 @@ const CalendarView = ({
     [loadEntries, onTasksChanged],
   );
 
+  const assign = useCallback(
+    async (taskId: string, userIris: string[]) => {
+      try {
+        const res = await fetch(`${ENTRYPOINT}/tasks/${encodeURIComponent(taskId)}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/merge-patch+json" },
+          body: JSON.stringify({ assignees: userIris }),
+        });
+        if (!res.ok) throw new Error("Failed to update assignees.");
+        await loadEntries();
+        onTasksChanged?.();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update assignees.");
+      }
+    },
+    [loadEntries, onTasksChanged],
+  );
+
   const projectOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const e of entries) {
@@ -266,6 +289,8 @@ const CalendarView = ({
         onRangeChange={onRangeChange}
         onOpen={onOpen}
         onReschedule={reschedule}
+        assignableUsers={assignableUsers}
+        onAssign={assign}
       />
     </div>
   );
