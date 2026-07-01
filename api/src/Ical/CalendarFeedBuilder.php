@@ -5,6 +5,7 @@ namespace App\Ical;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Service\RecurrenceCalculator;
+use App\Service\ReminderScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -33,6 +34,7 @@ final class CalendarFeedBuilder
         private readonly VTimezoneBuilder $vtimezone,
         private readonly RecurrenceCalculator $recurrence,
         private readonly RecurrenceRuleToRrule $rrule,
+        private readonly ReminderScheduler $reminders,
     ) {
     }
 
@@ -170,9 +172,95 @@ final class CalendarFeedBuilder
             }
         }
 
+        $lines = array_merge($lines, $this->valarms($task));
+
         $lines[] = 'END:VEVENT';
 
         return $lines;
+    }
+
+    /**
+     * VALARM sub-components for a task's reminders. Relative reminders map to
+     * a DTSTART-relative TRIGGER (`-PT15M`), which iCal applies to each
+     * recurrence; absolute reminders map to a fixed UTC DATE-TIME trigger.
+     * "Repeat daily until done" is an Aura-server concept with no iCal
+     * equivalent, so only the base trigger is emitted.
+     *
+     * @return list<string>
+     */
+    private function valarms(Task $task): array
+    {
+        $reminders = $task->getReminders();
+        if (null === $reminders) {
+            return [];
+        }
+
+        $lines = [];
+        foreach ($reminders as $reminder) {
+            if (!is_array($reminder) || !$this->reminders->isValidShape($reminder)) {
+                continue;
+            }
+            $trigger = $this->triggerLine($reminder);
+            if (null === $trigger) {
+                continue;
+            }
+            $lines[] = 'BEGIN:VALARM';
+            $lines[] = 'ACTION:DISPLAY';
+            $lines[] = $this->writer->line('DESCRIPTION', $this->writer->escapeText($task->getTitle()));
+            $lines[] = $trigger;
+            $lines[] = 'END:VALARM';
+        }
+
+        return $lines;
+    }
+
+    /**
+     * The TRIGGER content line for one reminder, or null when it can't be
+     * expressed (e.g. an unparseable absolute time).
+     *
+     * @param array<array-key, mixed> $reminder
+     */
+    private function triggerLine(array $reminder): ?string
+    {
+        $type = $reminder['type'] ?? null;
+
+        if ('relative' === $type) {
+            $value = is_int($reminder['value'] ?? null) ? $reminder['value'] : 0;
+            $unit = is_string($reminder['unit'] ?? null) ? $reminder['unit'] : 'minutes';
+
+            return $this->writer->line('TRIGGER', $this->relativeDuration($value, $unit));
+        }
+
+        if ('absolute' === $type) {
+            $at = is_string($reminder['at'] ?? null) ? $reminder['at'] : '';
+            try {
+                $when = new \DateTimeImmutable($at);
+            } catch (\Exception) {
+                return null;
+            }
+
+            return $this->writer->line(
+                'TRIGGER',
+                $this->writer->formatUtc($when),
+                ['VALUE' => 'DATE-TIME'],
+            );
+        }
+
+        return null;
+    }
+
+    /** A negative ISO-8601 duration relative to the event start ("before due"). */
+    private function relativeDuration(int $value, string $unit): string
+    {
+        if (0 === $value) {
+            return '-PT0M';
+        }
+
+        return match ($unit) {
+            'hours' => '-PT' . $value . 'H',
+            'days' => '-P' . $value . 'D',
+            default => '-PT' . $value . 'M',
+        };
     }
 
     /**
