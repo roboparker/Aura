@@ -10,10 +10,11 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Seed the four out-of-the-box global custom fields (#global-custom-fields):
  *
- *   - Effort — numeric.int
- *   - Cost   — numeric.money (USD)
- *   - Time   — numeric.float (hours)
- *   - Status — select.single (Backlog / To do / In progress / Review / Ready / Done)
+ *   - Effort — numeric.int             · footer SUM
+ *   - Cost   — numeric.money (USD)      · footer SUM
+ *   - Time   — numeric.float (hours)    · footer SUM
+ *   - Status — select.single (Backlog / To do / In progress / Review / Ready /
+ *              Done) · footer BREAKDOWN (per-option counts)
  *
  * These land unattached — every project can opt into them via its field
  * picker. They stay fully admin-editable / removable afterwards; this only
@@ -39,21 +40,25 @@ final class Version20260701210000 extends AbstractMigration
             ['key' => 'done', 'label' => 'Done'],
         ];
 
+        $sum = ['kind' => 'sum'];
+        $breakdown = ['kind' => 'breakdown'];
+
         $fields = [
-            ['name' => 'Effort', 'kind' => 'numeric', 'subtype' => 'int', 'config' => []],
-            ['name' => 'Cost', 'kind' => 'numeric', 'subtype' => 'money', 'config' => ['currency' => 'USD']],
-            ['name' => 'Time', 'kind' => 'numeric', 'subtype' => 'float', 'config' => []],
-            ['name' => 'Status', 'kind' => 'select', 'subtype' => 'single', 'config' => ['multi' => false, 'options' => $statusOptions]],
+            ['name' => 'Effort', 'kind' => 'numeric', 'subtype' => 'int', 'config' => [], 'footer' => $sum],
+            ['name' => 'Cost', 'kind' => 'numeric', 'subtype' => 'money', 'config' => ['currency' => 'USD'], 'footer' => $sum],
+            ['name' => 'Time', 'kind' => 'numeric', 'subtype' => 'float', 'config' => [], 'footer' => $sum],
+            ['name' => 'Status', 'kind' => 'select', 'subtype' => 'single', 'config' => ['multi' => false, 'options' => $statusOptions], 'footer' => $breakdown],
         ];
 
         $position = 0;
         foreach ($fields as $field) {
             $config = json_encode($field['config'], JSON_THROW_ON_ERROR);
+            $footer = json_encode($field['footer'], JSON_THROW_ON_ERROR);
             $this->addSql(
                 <<<'SQL'
                     INSERT INTO global_custom_field_definition
                         (id, name, kind, subtype, config, footer, nullable, position, visibility, created_at)
-                    SELECT gen_random_uuid(), :name, :kind, :subtype, CAST(:config AS JSON), NULL, true, :position, 'both', now()
+                    SELECT gen_random_uuid(), :name, :kind, :subtype, CAST(:config AS JSON), CAST(:footer AS JSON), true, :position, 'both', now()
                     WHERE NOT EXISTS (
                         SELECT 1 FROM global_custom_field_definition WHERE name = :name
                     )
@@ -63,6 +68,7 @@ final class Version20260701210000 extends AbstractMigration
                     'kind' => $field['kind'],
                     'subtype' => $field['subtype'],
                     'config' => $config,
+                    'footer' => $footer,
                     'position' => $position,
                 ],
             );

@@ -99,6 +99,43 @@ class GlobalCustomFieldDefinitionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testSelectAcceptsBreakdownFooterButNumericRejectsIt(): void
+    {
+        $admin = $this->makeUser('admin@example.com', ['ROLE_ADMIN']);
+        $client = static::createClient();
+        $client->loginUser($admin);
+
+        // A select field may declare the per-option `breakdown` footer.
+        $client->request('POST', '/global_custom_field_definitions', [
+            'json' => [
+                'name' => 'Status',
+                'kind' => 'select',
+                'subtype' => 'single',
+                'config' => ['multi' => false, 'options' => [
+                    ['key' => 'backlog', 'label' => 'Backlog'],
+                    ['key' => 'done', 'label' => 'Done'],
+                ]],
+                'footer' => ['kind' => 'breakdown'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        // Breakdown is meaningless on a numeric field — the strategy doesn't
+        // advertise it, so the footer validator rejects it.
+        $client->request('POST', '/global_custom_field_definitions', [
+            'json' => [
+                'name' => 'Effort',
+                'kind' => 'numeric',
+                'subtype' => 'int',
+                'config' => [],
+                'footer' => ['kind' => 'breakdown'],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testDuplicateNameRejected(): void
     {
         $this->seedGlobal('Effort', 'numeric', 'int');

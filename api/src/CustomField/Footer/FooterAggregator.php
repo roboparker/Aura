@@ -96,6 +96,12 @@ final class FooterAggregator
      */
     private function compute(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
+        // Per-option breakdown (select only). Handled first so it also renders
+        // a complete zero-filled list when no tasks are in scope.
+        if (FooterKind::BREAKDOWN->value === $aggKind) {
+            return $this->aggregateBreakdown($definition, $taskIds);
+        }
+
         // No tasks in scope — every aggregate is either null or 0.
         if ([] === $taskIds) {
             return FooterKind::COUNT->value === $aggKind ? 0 : null;
@@ -259,6 +265,67 @@ final class FooterAggregator
             array_merge([$definitionId], $params),
         )->fetchOne();
         return is_string($raw) && '' !== $raw ? $raw : null;
+    }
+
+    /**
+     * Per-option counts for a select field: one `{key, label, count}` row per
+     * configured option, in option order, including zero-count options so the
+     * breakdown is stable. Counts occurrences across the scoped tasks —
+     * single-select stores the bare key, multi-select a JSON array of keys
+     * (unrolled here). No DB round-trip when the scope is empty.
+     *
+     * @param list<string> $taskIds
+     * @return list<array{key: string, label: string, count: int}>
+     */
+    private function aggregateBreakdown(CustomFieldDefinitionInterface $definition, array $taskIds): array
+    {
+        $config = $definition->getConfig();
+        $rawOptions = $config['options'] ?? null;
+        $options = is_array($rawOptions) ? $rawOptions : [];
+
+        $counts = [];
+        $definitionId = $definition->getId()?->toRfc4122();
+        if ([] !== $taskIds && null !== $definitionId) {
+            $isMulti = true === ($config['multi'] ?? false);
+            // Single-select stores the bare key (`value #>> '{}'`); multi-select
+            // stores a JSON array — unroll each element to a text key.
+            $keyExpr = $isMulti
+                ? 'jsonb_array_elements_text(value::jsonb)'
+                : "value #>> '{}'";
+            [$placeholders, $params] = $this->bindUuids($taskIds);
+            $sql = sprintf(
+                'SELECT k, COUNT(*) AS c
+                 FROM (
+                     SELECT %s AS k
+                     FROM custom_field_value
+                     WHERE %s = ?
+                       AND task_id IN (%s)
+                       AND value IS NOT NULL
+                 ) keys
+                 GROUP BY k',
+                $keyExpr,
+                $this->definitionColumn($definition),
+                $placeholders,
+            );
+            /** @var list<array{k: mixed, c: mixed}> $rows */
+            $rows = $this->connection->executeQuery($sql, array_merge([$definitionId], $params))->fetchAllAssociative();
+            foreach ($rows as $row) {
+                if (is_string($row['k'])) {
+                    $counts[$row['k']] = is_numeric($row['c']) ? (int) $row['c'] : 0;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($options as $option) {
+            if (!is_array($option) || !is_string($key = $option['key'] ?? null)) {
+                continue;
+            }
+            $label = is_string($option['label'] ?? null) ? $option['label'] : $key;
+            $result[] = ['key' => $key, 'label' => $label, 'count' => $counts[$key] ?? 0];
+        }
+
+        return $result;
     }
 
     /**

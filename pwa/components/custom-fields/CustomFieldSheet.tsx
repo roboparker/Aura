@@ -91,6 +91,7 @@ const FOOTER_LABELS: Record<FooterKind, string> = {
   avg: "Avg",
   min: "Min",
   max: "Max",
+  breakdown: "Breakdown",
 };
 
 

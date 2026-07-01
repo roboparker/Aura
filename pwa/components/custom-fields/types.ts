@@ -37,7 +37,14 @@ export type CustomFieldSubtype =
   | "page"
   | "discussion";
 
-export type FooterKind = "sum" | "avg" | "min" | "max" | "count";
+export type FooterKind = "sum" | "avg" | "min" | "max" | "count" | "breakdown";
+
+/** One entry of a select field's per-option `breakdown` footer value. */
+export interface FooterBreakdownEntry {
+  key: string;
+  label: string;
+  count: number;
+}
 
 export interface SelectOption {
   key: string;
