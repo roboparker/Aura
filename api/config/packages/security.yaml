@@ -114,6 +114,11 @@ security:
         # User segments (A/B tests, beta gating, rollouts) — platform admins
         # only. Covers the ApiResource CRUD and the member/preview controller.
         - { path: ^/segments, roles: ROLE_ADMIN }
+        # Global custom fields (#global-custom-fields) — instance-wide,
+        # admin-managed. Only create/edit/delete is platform-admin; reads stay
+        # open to any authenticated user (ROLE_USER, enforced on the entity) so
+        # global fields render in the per-project field picker and on task values.
+        - { path: ^/global_custom_field_definitions, methods: [POST, PUT, PATCH, DELETE], roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
