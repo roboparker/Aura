@@ -27,7 +27,6 @@ import { displayName } from "@/lib/userDisplay";
 import { formatRelative } from "@/lib/relativeTime";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
-import AvatarStack from "@/components/user/AvatarStack";
 import PageHeader from "@/components/common/PageHeader";
 import CategoryBadge, {
   CATEGORY_LABEL,
@@ -619,13 +618,9 @@ const DiscussionRow = ({
             <span className="font-mono text-xs text-muted-foreground/80">
               {slugFor(discussion.title)}
             </span>
-            {discussion.participants.length > 0 && (
+            {discussion.participantCount > 0 && (
               <>
                 <span aria-hidden>·</span>
-                <AvatarStack
-                  users={discussion.participants}
-                  total={discussion.participantCount}
-                />
                 <span>
                   {discussion.participantCount}{" "}
                   {discussion.participantCount === 1 ? "participant" : "participants"}

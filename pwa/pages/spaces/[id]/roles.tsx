@@ -199,7 +199,7 @@ const SpaceRoles = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-muted px-4 py-12">
+      <main className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <Button asChild variant="outline">

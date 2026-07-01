@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { Lock, MessageSquare, Pencil, Pin, Trash2 } from "lucide-react";
+import { Lock, LockOpen, MessageSquare, Pencil, Pin, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -18,14 +18,13 @@ import CategoryBadge from "@/components/discussions/CategoryBadge";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import UserAvatar from "@/components/user/UserAvatar";
-import AvatarStack from "@/components/user/AvatarStack";
 import CommentsPanel, {
   type Comment as DiscussionCommentRow,
 } from "@/components/common/CommentsPanel";
 import { useCommentLiveUpdates } from "@/lib/useCommentLiveUpdates";
 import { displayName } from "@/lib/userDisplay";
+import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -67,15 +66,6 @@ const DiscussionDetailPage = () => {
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  // Move / Copy — to any space the caller belongs to.
-  const [moveTargetIri, setMoveTargetIri] = useState("");
-  const [isMoving, setIsMoving] = useState(false);
-  const [isCopying, setIsCopying] = useState(false);
-  const [moveMessage, setMoveMessage] = useState<{
-    text: string;
-    kind: "success" | "error";
-  } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -278,78 +268,6 @@ const DiscussionDetailPage = () => {
     });
   });
 
-  const handleMove = async () => {
-    if (!discussion || !moveTargetIri) return;
-    setIsMoving(true);
-    setMoveMessage(null);
-    try {
-      const res = await fetch(
-        `${ENTRYPOINT}/discussions/${encodeURIComponent(discussion.id)}/move`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ space: moveTargetIri }),
-        },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          data.detail || data.error || data["hydra:description"] || "Failed to move discussion.",
-        );
-      }
-      const target = findSpace(spaces, moveTargetIri);
-      setMoveMessage({
-        text: data.moved
-          ? `Moved to "${target?.name ?? "the selected space"}".`
-          : "Already in that space.",
-        kind: "success",
-      });
-      await load();
-    } catch (err) {
-      setMoveMessage({
-        text: err instanceof Error ? err.message : "Failed to move discussion.",
-        kind: "error",
-      });
-    } finally {
-      setIsMoving(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    if (!discussion) return;
-    setIsCopying(true);
-    setMoveMessage(null);
-    try {
-      const body = moveTargetIri ? { space: moveTargetIri } : {};
-      const res = await fetch(
-        `${ENTRYPOINT}/discussions/${encodeURIComponent(discussion.id)}/copy`,
-        {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          data.detail || data.error || data["hydra:description"] || "Failed to copy discussion.",
-        );
-      }
-      if (data.id) {
-        await router.push(`/discussions/${data.id}`);
-      }
-    } catch (err) {
-      setMoveMessage({
-        text: err instanceof Error ? err.message : "Failed to copy discussion.",
-        kind: "error",
-      });
-    } finally {
-      setIsCopying(false);
-    }
-  };
-
   if (authLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted">
@@ -367,10 +285,6 @@ const DiscussionDetailPage = () => {
   const canEdit = isAuthor;
   const canDelete = isAuthor || isSpaceAdmin;
   const canModerate = isSpaceAdmin;
-  const canMove = isAuthor || isSpaceAdmin;
-  const otherSpaces = discussion
-    ? spaces.filter((s) => s["@id"] !== spaceIriOf(discussion))
-    : [];
 
   return (
     <>
@@ -379,8 +293,8 @@ const DiscussionDetailPage = () => {
           {discussion ? `${discussion.title} - Madori` : "Discussion - Madori"}
         </title>
       </Head>
-      <main className="min-h-screen bg-muted">
-        <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
+      <main className="min-h-screen bg-background">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
           {notFound ? (
             <Card>
               <CardContent className="pt-6">
@@ -400,24 +314,6 @@ const DiscussionDetailPage = () => {
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <CategoryBadge category={discussion.category} />
-                  {discussion.isPinned && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Pin className="h-3 w-3" /> Pinned
-                    </Badge>
-                  )}
-                  {discussion.isLocked && (
-                    <Badge variant="secondary" className="gap-1">
-                      <Lock className="h-3 w-3" /> Locked
-                    </Badge>
-                  )}
-                  {space && (
-                    <Link
-                      href={`/spaces/${space.id}`}
-                      className="text-xs text-muted-foreground hover:underline"
-                    >
-                      in {space.name}
-                    </Link>
-                  )}
                 </div>
 
                 <h1
@@ -427,6 +323,68 @@ const DiscussionDetailPage = () => {
                   {discussion.title}
                 </h1>
 
+                {/* Pin + lock toggles under the title (moderators); static
+                    indicators for everyone else when pinned / locked. */}
+                {(canModerate || discussion.isPinned || discussion.isLocked) && (
+                  <div className="flex items-center gap-1">
+                    {canModerate ? (
+                      <button
+                        type="button"
+                        onClick={() => void togglePin()}
+                        disabled={busy}
+                        aria-label={discussion.isPinned ? "Unpin discussion" : "Pin discussion"}
+                        title={discussion.isPinned ? "Unpin" : "Pin"}
+                        className={cn(
+                          "inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-muted",
+                          discussion.isPinned
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        data-testid="discussion-toggle-pin"
+                      >
+                        <Pin className={cn("h-4 w-4", discussion.isPinned && "fill-current")} />
+                      </button>
+                    ) : (
+                      discussion.isPinned && (
+                        <Pin
+                          className="h-4 w-4 fill-current text-emerald-600 dark:text-emerald-400"
+                          aria-label="Pinned"
+                        />
+                      )
+                    )}
+                    {canModerate ? (
+                      <button
+                        type="button"
+                        onClick={() => void toggleLock()}
+                        disabled={busy}
+                        aria-label={discussion.isLocked ? "Unlock discussion" : "Lock discussion"}
+                        title={discussion.isLocked ? "Unlock" : "Lock"}
+                        className={cn(
+                          "inline-flex h-7 w-7 items-center justify-center rounded-md transition hover:bg-muted",
+                          discussion.isLocked
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        data-testid="discussion-toggle-lock"
+                      >
+                        {discussion.isLocked ? (
+                          <Lock className="h-4 w-4" />
+                        ) : (
+                          <LockOpen className="h-4 w-4" />
+                        )}
+                      </button>
+                    ) : (
+                      discussion.isLocked && (
+                        <Lock
+                          className="h-4 w-4 text-amber-600 dark:text-amber-400"
+                          aria-label="Locked"
+                        />
+                      )
+                    )}
+                  </div>
+                )}
+
+                {/* Who posted — under the title. */}
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                   <span className="flex items-center gap-2">
                     <UserAvatar user={discussion.author} size="sm" />
@@ -438,21 +396,11 @@ const DiscussionDetailPage = () => {
                   {discussion.updatedAt && (
                     <span className="italic">· edited {formatRelative(discussion.updatedAt)}</span>
                   )}
-                  <span className="flex items-center gap-1">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    {comments.length} {comments.length === 1 ? "reply" : "replies"}
-                  </span>
-                  {discussion.participants.length > 0 && (
-                    <AvatarStack
-                      users={discussion.participants}
-                      total={discussion.participantCount}
-                    />
-                  )}
                 </div>
               </div>
 
               {/* Body / edit */}
-              <Card>
+              <Card className="bg-muted/40">
                 <CardContent className="pt-6 space-y-4">
                   {!editing ? (
                     <MarkdownView source={discussion.body} className="text-sm" />
@@ -521,6 +469,45 @@ const DiscussionDetailPage = () => {
                     </div>
                   )}
                 </CardContent>
+
+                {/* Manage toolbar — attached to the post as a bottom strip so
+                    there's no gap between the post and its controls. */}
+                {!editing && (canEdit || canDelete) && (
+                  <div
+                    className="flex flex-wrap items-center gap-2 border-t px-3 py-2"
+                    data-testid="discussion-manage"
+                  >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Manage
+                  </span>
+                  {canEdit && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={startEdit}
+                      disabled={busy}
+                      className="bg-muted"
+                      data-testid="discussion-edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void remove()}
+                      disabled={busy}
+                      className="bg-muted border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      data-testid="discussion-delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                    </Button>
+                  )}
+                  </div>
+                )}
               </Card>
 
               {error && (
@@ -529,132 +516,14 @@ const DiscussionDetailPage = () => {
                 </Alert>
               )}
 
-              {/* Manage toolbar */}
-              {!editing && (canEdit || canDelete || canModerate || canMove) && (
-                <div
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-background px-3 py-2"
-                  data-testid="discussion-manage"
-                >
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Manage
-                  </span>
-                  {canEdit && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={startEdit}
-                      disabled={busy}
-                      data-testid="discussion-edit"
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                    </Button>
-                  )}
-                  {canModerate && (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void togglePin()}
-                        disabled={busy}
-                        data-testid="discussion-toggle-pin"
-                      >
-                        <Pin className="h-3.5 w-3.5 mr-1" />
-                        {discussion.isPinned ? "Unpin" : "Pin"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void toggleLock()}
-                        disabled={busy}
-                        data-testid="discussion-toggle-lock"
-                      >
-                        <Lock className="h-3.5 w-3.5 mr-1" />
-                        {discussion.isLocked ? "Unlock" : "Lock"}
-                      </Button>
-                    </>
-                  )}
-                  {canMove && (
-                    <>
-                      <select
-                        id="discussion-move-target"
-                        value={moveTargetIri}
-                        onChange={(e) => setMoveTargetIri(e.target.value)}
-                        className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                        data-testid="discussion-move-select"
-                        aria-label="Move or copy to space"
-                      >
-                        <option value="">Move/copy to…</option>
-                        {otherSpaces.map((s) => (
-                          <option key={s["@id"]} value={s["@id"]}>
-                            {s.name}
-                            {s.isPersonal ? " (Private)" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleMove()}
-                        disabled={!moveTargetIri || isMoving || isCopying}
-                        data-testid="discussion-move-submit"
-                      >
-                        {isMoving ? "Moving…" : "Move"}
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void handleCopy()}
-                        disabled={isMoving || isCopying}
-                        data-testid="discussion-copy-submit"
-                        title={
-                          moveTargetIri
-                            ? "Copy this discussion into the selected space"
-                            : "Copy this discussion into the current space"
-                        }
-                      >
-                        {isCopying ? "Copying…" : "Copy"}
-                      </Button>
-                    </>
-                  )}
-                  {canDelete && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void remove()}
-                      disabled={busy}
-                      className="ml-auto text-destructive hover:text-destructive"
-                      data-testid="discussion-delete"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                    </Button>
-                  )}
-                  {moveMessage && (
-                    <span
-                      role="alert"
-                      className={
-                        "w-full text-xs " +
-                        (moveMessage.kind === "success"
-                          ? "text-muted-foreground"
-                          : "text-destructive")
-                      }
-                    >
-                      {moveMessage.text}
-                    </span>
-                  )}
-                </div>
-              )}
-
               {/* Replies */}
               <section className="space-y-3 pt-2">
-                <h2 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <MessageSquare className="h-3.5 w-3.5" />
-                  {comments.length} {comments.length === 1 ? "reply" : "replies"}
+                <h2 className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    {comments.length} {comments.length === 1 ? "reply" : "replies"}
+                  </span>
+                  <span className="h-px flex-1 bg-border" aria-hidden />
                 </h2>
                 <CommentsPanel
                   parentLabel={discussion.title}

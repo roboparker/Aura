@@ -40,7 +40,7 @@ const CustomFields = () => {
       <Head>
         <title>Custom fields - Madori</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-8">
+      <div className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-4xl">
           <PageHeader
             title="Custom fields"

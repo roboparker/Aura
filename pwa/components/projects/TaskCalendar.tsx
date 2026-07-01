@@ -93,9 +93,7 @@ const TaskChip = ({
       data-testid="calendar-task"
     >
       <div className="flex items-center gap-2">
-        <span className={cn("min-w-0 flex-1 truncate", task.completedOn && "line-through")}>
-          {task.title}
-        </span>
+        <span className="min-w-0 flex-1 truncate">{task.title}</span>
         <AssignMenu
           assignees={task.assignees}
           assignableUsers={assignableUsers}
@@ -193,7 +191,12 @@ const TaskCalendar = ({
   };
 
   return (
-    <div data-testid="task-calendar">
+    // Full-height minimum so the grid fills the viewport (matches the board);
+    // the day grid below flexes to take all the remaining space.
+    <div
+      className="flex min-h-[calc(100vh-16rem)] flex-col"
+      data-testid="task-calendar"
+    >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1">
           <Button
@@ -254,6 +257,12 @@ const TaskCalendar = ({
             {d}
           </div>
         ))}
+      </div>
+
+      {/* Day cells in their own grid so they flex to fill the remaining height
+          (auto-rows-fr → every week row shares the space equally) while the
+          weekday header above stays compact. */}
+      <div className="grid flex-1 auto-rows-fr grid-cols-7 border-l">
         {days.map((day) => {
           const key = dayKey(day);
           const dayTasks = byDay.get(key) ?? [];
@@ -267,13 +276,17 @@ const TaskCalendar = ({
                 "border-b border-r p-1 align-top",
                 view === "week" ? "min-h-48" : "min-h-24",
                 !inMonth && "bg-muted/20 text-muted-foreground",
+                // Mark today with a green outline around the whole day cell
+                // (inset ring so it doesn't shift the grid) instead of a pill
+                // on the date number.
+                isToday && "ring-2 ring-inset ring-emerald-500",
               )}
             >
               <div className="mb-1 flex items-center justify-between px-0.5">
                 <span
                   className={cn(
                     "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs",
-                    isToday && "bg-primary font-semibold text-primary-foreground",
+                    isToday && "font-semibold text-emerald-600 dark:text-emerald-400",
                   )}
                 >
                   {day.getDate()}

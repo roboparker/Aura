@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { visibilitySurfaces, type CustomFieldDefinition } from "./types";
@@ -21,10 +20,8 @@ interface Props {
   attachedIris: string[];
   /** Per-project visibility ('list'|'board'|'both') for attached fields, keyed by definition IRI. */
   projectVisibility: Record<string, string>;
-  /** Space admins can define new fields / edit definitions. */
+  /** Space admins can edit definitions inline (creation lives in space settings). */
   isSpaceAdmin: boolean;
-  /** Open the field editor to create a new (space) field. */
-  onCreate: () => void;
   /** Open the field editor for an existing definition. */
   onEdit: (def: CustomFieldDefinition) => void;
   /** Re-sync after attach/detach so the task columns update. */
@@ -52,7 +49,6 @@ const ProjectCustomFieldPicker = ({
   attachedIris,
   projectVisibility,
   isSpaceAdmin,
-  onCreate,
   onEdit,
   onChanged,
 }: Props) => {
@@ -144,24 +140,18 @@ const ProjectCustomFieldPicker = ({
 
   return (
     <div className="space-y-4" data-testid="project-custom-field-picker">
-      <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="text-sm font-medium">Custom fields</h3>
-          <p className="text-xs text-muted-foreground">
-            Toggle where each of the space&apos;s fields shows on this
-            project — the task list, the board, and/or the calendar (all off =
-            not on this project). Define and order fields in{" "}
-            <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
-              space settings
-            </Link>
-            .
-          </p>
-        </div>
-        {isSpaceAdmin && (
-          <Button type="button" size="sm" variant="outline" onClick={onCreate}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> New field
-          </Button>
-        )}
+      <div className="space-y-1">
+        <h3 className="text-sm font-medium">Custom fields</h3>
+        <p className="text-xs text-muted-foreground">
+          Toggle where each of the space&apos;s fields shows on this
+          project — the task list, the board, and/or the calendar (all off =
+          not on this project). Custom fields are defined and ordered at the
+          space level in{" "}
+          <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+            space settings
+          </Link>
+          .
+        </p>
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -170,12 +160,11 @@ const ProjectCustomFieldPicker = ({
         <p className="text-sm text-muted-foreground">Loading fields…</p>
       ) : spaceFields.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          This space has no custom fields yet.{" "}
-          {isSpaceAdmin && (
-            <button type="button" onClick={onCreate} className="text-cyan-700 hover:underline dark:text-cyan-400">
-              Create one
-            </button>
-          )}
+          This space has no custom fields yet. Define them in{" "}
+          <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+            space settings
+          </Link>
+          .
         </p>
       ) : (
         <ul className="divide-y rounded-md border">

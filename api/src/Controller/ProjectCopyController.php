@@ -43,8 +43,7 @@ use Symfony\Component\Uid\Uuid;
  *    user-specific state, and CFV would need an old-CFD→new-CFD
  *    mapping that's a heavier slice on its own.
  *  - Discussions live at the space level — not project — so they're
- *    never carried along on a project copy. Use
- *    {@see DiscussionCopyController} to clone a thread independently.
+ *    never carried along on a project copy.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults

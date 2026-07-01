@@ -123,7 +123,7 @@ const CommentsPanel = ({
           No comments yet — start the discussion.
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="divide-y divide-border">
           {comments.map((c) => (
             <CommentItem
               key={c["@id"]}
@@ -139,24 +139,25 @@ const CommentsPanel = ({
       )}
 
       {canCompose ? (
-        <div className="space-y-2" data-testid="comments-composer">
+        <div className="pb-4" data-testid="comments-composer">
           <MarkdownEditor
             key={draftKey}
             value={draft}
             onChange={setDraft}
             ariaLabel={`Comment on "${parentLabel}"`}
+            minHeightClass="min-h-40"
+            footer={
+              <Button
+                type="button"
+                size="sm"
+                disabled={submitting || !draft.trim()}
+                onClick={() => void submit()}
+                data-testid="comment-submit"
+              >
+                {submitting ? "Posting…" : "Post comment"}
+              </Button>
+            }
           />
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              disabled={submitting || !draft.trim()}
-              onClick={() => void submit()}
-              data-testid="comment-submit"
-            >
-              {submitting ? "Posting…" : "Post comment"}
-            </Button>
-          </div>
         </div>
       ) : (
         composerNotice ?? null
@@ -221,18 +222,52 @@ const CommentItem = ({
   };
 
   return (
-    <li data-testid="comment-item" className="flex gap-3">
+    <li data-testid="comment-item" className="flex gap-3 py-4">
       <UserAvatar user={comment.author} size="sm" />
       <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-baseline gap-2 text-xs text-muted-foreground">
-          <span className="font-medium text-foreground" data-testid="comment-author">
-            {displayName(comment.author)}
-          </span>
-          <span title={new Date(comment.createdAt).toLocaleString()}>
-            {formatRelative(comment.createdAt)}
-          </span>
-          {comment.updatedAt && (
-            <span className="italic">(edited)</span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-baseline gap-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground" data-testid="comment-author">
+              {displayName(comment.author)}
+            </span>
+            <span title={new Date(comment.createdAt).toLocaleString()}>
+              {formatRelative(comment.createdAt)}
+            </span>
+            {comment.updatedAt && (
+              <span className="italic">(edited)</span>
+            )}
+          </div>
+          {!editing && (canEdit || canDelete) && (
+            <div className="flex shrink-0 items-center gap-1">
+              {canEdit && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setEditing(true)}
+                  disabled={busy}
+                  aria-label="Edit comment"
+                  className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                  data-testid="comment-edit"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              {canDelete && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => void remove()}
+                  disabled={busy}
+                  aria-label="Delete comment"
+                  className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  data-testid="comment-delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
           )}
         </div>
         {editing ? (
@@ -282,35 +317,6 @@ const CommentItem = ({
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
-            )}
-            {(canEdit || canDelete) && (
-              <div className="flex gap-2">
-                {canEdit && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setEditing(true)}
-                    disabled={busy}
-                    data-testid="comment-edit"
-                  >
-                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                  </Button>
-                )}
-                {canDelete && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => void remove()}
-                    disabled={busy}
-                    className="text-destructive hover:text-destructive"
-                    data-testid="comment-delete"
-                  >
-                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                  </Button>
-                )}
-              </div>
             )}
           </>
         )}

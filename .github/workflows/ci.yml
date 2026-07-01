@@ -134,9 +134,11 @@ jobs:
         name: Enforce coverage floor
         # Fails the build when line coverage of api/src drops below the floor
         # (DataFixtures are excluded from coverage — see phpunit.xml.dist).
-        # The floor is a *minimum* regression guard (measured ~85%), not a
-        # target — ratchet the trailing floor argument up as coverage climbs.
-        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 84
+        # The floor is a *minimum* regression guard, not a target — ratchet the
+        # trailing floor argument up as coverage climbs. Nudged to 83.5 after
+        # removing the discussion move/copy controllers (fully covered code +
+        # their tests), which shaved the api/src average a hair under 84.
+        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 83.5
 
   phpstan:
     name: PHPStan

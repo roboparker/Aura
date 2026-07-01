@@ -10,7 +10,7 @@ import {
   type ButtonHTMLAttributes,
   type RefObject,
 } from "react";
-import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Table2, Trash2, TriangleAlert } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, Lock, MoreHorizontal, PanelRight, Plus, Rows3, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -20,6 +20,7 @@ import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
 import TaskCalendar from "@/components/projects/TaskCalendar";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
+import { computeColumnWidths } from "@/components/projects/columnWidths";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
 import {
   applyView,
@@ -58,6 +59,7 @@ import AddFieldMenu from "@/components/projects/AddFieldMenu";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
+import AssignMenu from "@/components/tasks/AssignMenu";
 import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
@@ -89,6 +91,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
@@ -196,12 +199,33 @@ const ProjectDetail = () => {
   // Which detail tab is active (list | board | activity | settings) —
   // controlled so the header's "New task" button shows on the List tab only.
   const [activeTab, setActiveTab] = useState("list");
-  // Settings sub-section (left menu like the user settings page).
-  const [settingsSection, setSettingsSection] = useState<
-    "fields" | "danger"
-  >("fields");
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
+
+  // Editable project name + description (Settings tab → Project details).
+  const [nameDraft, setNameDraft] = useState("");
+  const [descDraft, setDescDraft] = useState("");
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [detailsMessage, setDetailsMessage] = useState<{
+    text: string;
+    kind: "success" | "error";
+  } | null>(null);
+
+  // Seed the editable name/description drafts when a (different) project loads.
+  // Keyed on the id so a background reload after save doesn't clobber edits.
+  useEffect(() => {
+    if (project) {
+      setNameDraft(project.title);
+      setDescDraft(project.description ?? "");
+      setDetailsMessage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id]);
+
+  const detailsDirty =
+    !!project &&
+    (nameDraft.trim() !== project.title ||
+      (descDraft.trim() || "") !== (project.description ?? ""));
 
   // Each section shows a collapsed "+ Add task" trigger that expands into a
   // full draft row (managed locally by AddTaskRow). The top "New task" button
@@ -555,6 +579,28 @@ const ProjectDetail = () => {
   // checkbox + each data column + trailing actions.
   const fullColSpan = columns.length + 2;
   const columnKeys = columns.map((c) => c.key);
+
+  // Content-aware column widths, shared across the list's separate tables so
+  // they stay aligned. We track the list container's width (it remounts with
+  // the List tab, so a callback ref wires the observer on mount) and feed it to
+  // the calculator, which grows columns to fit their content up to that width.
+  const [listWidth, setListWidth] = useState(0);
+  const listResizeObserver = useRef<ResizeObserver | null>(null);
+  const listContainerRef = useCallback((node: HTMLDivElement | null) => {
+    listResizeObserver.current?.disconnect();
+    if (node && typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver((entries) => {
+        setListWidth(entries[0]?.contentRect.width ?? 0);
+      });
+      ro.observe(node);
+      listResizeObserver.current = ro;
+      setListWidth(node.clientWidth);
+    }
+  }, []);
+  const colWidths = useMemo(
+    () => computeColumnWidths(columns, tasks, listWidth),
+    [columns, tasks, listWidth],
+  );
   const listSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
@@ -749,6 +795,38 @@ const ProjectDetail = () => {
       prev.map((t) => (t["@id"] === taskIri ? { ...t, section: sectionIri } : t)),
     );
     void patchTask(task, { section: sectionIri });
+  };
+
+  const handleSaveDetails = async () => {
+    if (!project || !nameDraft.trim()) return;
+    setIsSavingDetails(true);
+    setDetailsMessage(null);
+    try {
+      const res = await fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({
+          title: nameDraft.trim(),
+          description: descDraft.trim() || null,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.detail || data.error || data["hydra:description"] || "Failed to save changes.",
+        );
+      }
+      setProject((prev) => (prev ? { ...prev, ...data } : prev));
+      setDetailsMessage({ text: "Saved.", kind: "success" });
+    } catch (err) {
+      setDetailsMessage({
+        text: err instanceof Error ? err.message : "Failed to save changes.",
+        kind: "error",
+      });
+    } finally {
+      setIsSavingDetails(false);
+    }
   };
 
   const handleMove = async () => {
@@ -1036,7 +1114,7 @@ const ProjectDetail = () => {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-muted px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Project not found</h1>
@@ -1060,7 +1138,7 @@ const ProjectDetail = () => {
       <Head>
         <title>{project ? `${project.title} - Madori` : "Project - Madori"}</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-8">
+      <div className="min-h-screen bg-background px-4 py-8">
         <div className="w-full">
           {isLoading || !project ? (
             <p className="text-muted-foreground">Loading project...</p>
@@ -1070,7 +1148,7 @@ const ProjectDetail = () => {
                 {/* Project title + tabs stick together on scroll. */}
                 <div
                   ref={stickyHeaderRef}
-                  className="sticky top-14 z-30 bg-muted pt-2"
+                  className="sticky top-14 z-30 bg-background pt-2"
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
@@ -1120,6 +1198,9 @@ const ProjectDetail = () => {
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
                     <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                    <TabsTrigger value="fields" data-testid="project-fields-tab">
+                      Custom fields
+                    </TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="settings" data-testid="project-settings-tab">
                       Settings
@@ -1134,63 +1215,69 @@ const ProjectDetail = () => {
                 )}
 
                 <TabsContent value="settings" className="mt-4">
-                  <div className="flex flex-col gap-6 sm:flex-row">
-                    {/* Left menu, mirroring the user settings nav. */}
-                    <nav
-                      className="flex shrink-0 gap-1 overflow-x-auto sm:w-44 sm:flex-col"
-                      aria-label="Project settings sections"
-                      data-testid="project-settings-nav"
-                    >
-                      {(
-                        [
-                          { key: "fields", label: "Custom fields", Icon: Table2 },
-                          { key: "danger", label: "Danger zone", Icon: TriangleAlert },
-                        ] as const
-                      ).map(({ key, label, Icon }) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setSettingsSection(key)}
-                          aria-current={settingsSection === key ? "page" : undefined}
-                          className={cn(
-                            "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm whitespace-nowrap transition-colors",
-                            settingsSection === key
-                              ? "bg-muted font-medium text-foreground"
-                              : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-                            key === "danger" &&
-                              settingsSection !== key &&
-                              "text-destructive/80 hover:text-destructive",
+                  <div className="mx-auto max-w-4xl space-y-6">
+                    {/* Project name + description. */}
+                    <Card>
+                      <CardContent className="space-y-4 pt-6">
+                        <div>
+                          <h3 className="text-sm font-medium">Project details</h3>
+                          <p className="text-xs text-muted-foreground">
+                            The project&apos;s name and description.
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="project-name">Name</Label>
+                          <Input
+                            id="project-name"
+                            type="text"
+                            value={nameDraft}
+                            onChange={(e) => setNameDraft(e.target.value)}
+                            maxLength={255}
+                            data-testid="project-name-input"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="project-description">
+                            Description{" "}
+                            <span className="font-normal text-muted-foreground">
+                              (optional)
+                            </span>
+                          </Label>
+                          <MarkdownEditor
+                            id="project-description"
+                            ariaLabel="Project description"
+                            value={descDraft}
+                            onChange={setDescDraft}
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleSaveDetails}
+                            disabled={isSavingDetails || !nameDraft.trim() || !detailsDirty}
+                            data-testid="project-details-save"
+                          >
+                            {isSavingDetails ? "Saving…" : "Save changes"}
+                          </Button>
+                          {detailsMessage && (
+                            <span
+                              role="alert"
+                              className={cn(
+                                "text-xs",
+                                detailsMessage.kind === "success"
+                                  ? "text-muted-foreground"
+                                  : "text-destructive",
+                              )}
+                            >
+                              {detailsMessage.text}
+                            </span>
                           )}
-                          data-testid={`project-settings-${key}`}
-                        >
-                          <Icon className="h-4 w-4 shrink-0" /> {label}
-                        </button>
-                      ))}
-                    </nav>
+                        </div>
+                      </CardContent>
+                    </Card>
 
-                    <div className="min-w-0 flex-1 space-y-6">
-                      {settingsSection === "fields" && (
-                        <ProjectCustomFieldPicker
-                          spaceIri={projectSpaceIri(project)}
-                          projectIri={project["@id"]}
-                          attachedIris={definitions.map((d) => d["@id"])}
-                          projectVisibility={Object.fromEntries(
-                            definitions.map((d) => [
-                              d["@id"],
-                              d.visibility ?? "both",
-                            ]),
-                          )}
-                          isSpaceAdmin
-                          onCreate={() =>
-                            setNewFieldType({ kind: "text", subtype: "text" })
-                          }
-                          onEdit={(def) => setEditFieldDef(def)}
-                          onChanged={() => void reloadDefinitions()}
-                        />
-                      )}
-
-                      {settingsSection === "danger" && (
-                        <div className="space-y-6">
+                    <div className="space-y-6">
                           <Card>
                             <CardContent className="space-y-3 pt-6">
                               <div>
@@ -1295,8 +1382,6 @@ const ProjectDetail = () => {
                               </Button>
                             </CardContent>
                           </Card>
-                        </div>
-                      )}
                     </div>
                   </div>
 
@@ -1310,6 +1395,22 @@ const ProjectDetail = () => {
                   />
                 </TabsContent>
 
+                <TabsContent value="fields" className="mt-4">
+                  <div className="max-w-2xl">
+                    <ProjectCustomFieldPicker
+                      spaceIri={projectSpaceIri(project)}
+                      projectIri={project["@id"]}
+                      attachedIris={definitions.map((d) => d["@id"])}
+                      projectVisibility={Object.fromEntries(
+                        definitions.map((d) => [d["@id"], d.visibility ?? "both"]),
+                      )}
+                      isSpaceAdmin
+                      onEdit={(def) => setEditFieldDef(def)}
+                      onChanged={() => void reloadDefinitions()}
+                    />
+                  </div>
+                </TabsContent>
+
                 <TabsContent value="list" className="mt-4">
                   {/* The column header lives in its own table outside the section
                       tables, so one header spans them all and sticks to the page
@@ -1317,7 +1418,7 @@ const ProjectDetail = () => {
                       in a sortable element, so a dragged section animates as a
                       single block. Every table shares the same fixed colgroup, so
                       columns stay aligned across the header + all sections. */}
-                  <div data-testid="project-task-list">
+                  <div ref={listContainerRef} data-testid="project-task-list">
                     {/* Column header — its own horizontal DnD context for column
                         reorder, wrapping the table (not nested inside it) so the
                         context's injected a11y nodes stay valid DOM. */}
@@ -1331,7 +1432,7 @@ const ProjectDetail = () => {
                         style={{ top: columnHeaderTop }}
                       >
                         <table className="w-full table-fixed text-sm">
-                          <TaskTableColumns columns={columns} />
+                          <TaskTableColumns columns={columns} widths={colWidths} />
                           <thead>
                             <tr className="text-xs uppercase tracking-wide text-muted-foreground">
                               <th className="px-3 py-2" />
@@ -1393,6 +1494,7 @@ const ProjectDetail = () => {
                             section={group.section}
                             tasks={group.tasks}
                             columns={columns}
+                            colWidths={colWidths}
                             fullColSpan={fullColSpan}
                             projectId={project.id}
                             projectIri={project["@id"]}
@@ -1424,7 +1526,7 @@ const ProjectDetail = () => {
                     {sectionGroups.length > 1 && (
                       <div className="mt-8 overflow-hidden rounded-md">
                         <table className="w-full table-fixed text-sm">
-                          <TaskTableColumns columns={columns} />
+                          <TaskTableColumns columns={columns} widths={colWidths} />
                           <tbody>
                             <CustomFieldFooterRow
                               projectId={project.id}
@@ -1586,6 +1688,8 @@ interface SectionRowsProps {
   sortId: string;
   tasks: ProjectTask[];
   columns: ListColumn[];
+  /** Shared content-aware col widths (keeps every section aligned). */
+  colWidths?: Record<string, string>;
   fullColSpan: number;
   projectId: string;
   projectIri: string;
@@ -1619,6 +1723,7 @@ const SectionRows = ({
   section,
   tasks,
   columns,
+  colWidths,
   fullColSpan,
   projectId,
   projectIri,
@@ -1671,7 +1776,7 @@ const SectionRows = ({
       )}
     >
       <table className="w-full table-fixed text-sm">
-        <TaskTableColumns columns={columns} />
+        <TaskTableColumns columns={columns} widths={colWidths} />
         <tbody>
           <SectionTitleRow
             section={section}
@@ -2125,7 +2230,7 @@ const InlineTaskTitle = ({
         onClick={() => setEditing(true)}
         className={cn(
           "max-w-full shrink truncate px-2 text-left font-medium",
-          task.completedOn && "text-muted-foreground line-through",
+          task.completedOn && "text-muted-foreground",
         )}
         data-testid="project-task-title"
       >
@@ -2216,13 +2321,16 @@ const ProjectTaskRow = ({
         );
       case "assignees":
         return (
-          <AssigneesCombobox
-            value={task.assignees}
-            options={assignableUsers}
-            onChange={(iris) => void patchTask(task, { assignees: iris })}
-            subjectLabel={task.title}
-            elevation={0}
-          />
+          // Stacked, name-less avatars + a picker (matches the board, calendar,
+          // and the discussions participant stack).
+          <div className="flex h-full min-h-11 items-center px-2">
+            <AssignMenu
+              assignees={task.assignees}
+              assignableUsers={assignableUsers}
+              onAssign={(iris) => void patchTask(task, { assignees: iris })}
+              align="start"
+            />
+          </div>
         );
       case "tags":
         return (
@@ -2260,6 +2368,9 @@ const ProjectTaskRow = ({
         "group border-b last:border-0 hover:bg-accent/40",
         dueStatus === "today" && "text-amber-600 dark:text-amber-400",
         dueStatus === "overdue" && "text-destructive",
+        // Completed tasks read as a uniformly muted row (no strikethrough);
+        // last so it wins over any residual due tint.
+        task.completedOn && "text-muted-foreground",
         isDragging && "relative z-10 bg-background opacity-80",
       )}
       data-testid="project-task-item"
