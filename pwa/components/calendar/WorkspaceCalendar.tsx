@@ -116,11 +116,6 @@ const EntryCard = ({
         )}
         <span className="min-w-0 flex-1 truncate font-medium">{entry.title}</span>
       </div>
-      {entry.project && (
-        <span className="block truncate text-[11px] text-muted-foreground">
-          {entry.project.title}
-        </span>
-      )}
       {entry.assignees.length > 0 && (
         <span className="flex -space-x-1.5">
           {entry.assignees.slice(0, 3).map((a) => (
