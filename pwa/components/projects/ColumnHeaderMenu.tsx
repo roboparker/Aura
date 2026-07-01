@@ -148,6 +148,57 @@ const CheckRow = ({
   </label>
 );
 
+/**
+ * A checkbox list with a type-to-filter box (shown only when the list is long
+ * enough to warrant it). `leading` renders a fixed row (e.g. "Unassigned")
+ * above the searchable options.
+ */
+const SearchableCheckList = ({
+  items,
+  isChecked,
+  onToggle,
+  leading,
+}: {
+  items: { value: string; label: string }[];
+  isChecked: (value: string) => boolean;
+  onToggle: (value: string, checked: boolean) => void;
+  leading?: React.ReactNode;
+}) => {
+  const [q, setQ] = useState("");
+  const ql = q.trim().toLowerCase();
+  const filtered = ql
+    ? items.filter((i) => i.label.toLowerCase().includes(ql))
+    : items;
+  return (
+    <div className="flex flex-col gap-1">
+      {items.length > 6 && (
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search…"
+          className="h-7 text-sm"
+          aria-label="Search options"
+        />
+      )}
+      <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+        {leading}
+        {filtered.length === 0 && (
+          <p className="px-2 py-1 text-xs text-muted-foreground">No matches</p>
+        )}
+        {filtered.map((i) => (
+          <CheckRow
+            key={i.value}
+            checked={isChecked(i.value)}
+            onChange={(v) => onToggle(i.value, v)}
+          >
+            {i.label}
+          </CheckRow>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const ColumnHeaderMenu = ({
   column,
   sort,
@@ -408,26 +459,22 @@ const FilterControls = ({
         set(isAssigneesActive(next) ? next : null);
       };
       return (
-        <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-          <CheckRow
-            checked={current.unassigned}
-            onChange={(v) => {
-              const next = { kind: "assignees" as const, iris: current.iris, unassigned: v };
-              set(isAssigneesActive(next) ? next : null);
-            }}
-          >
-            <span className="text-muted-foreground">Unassigned</span>
-          </CheckRow>
-          {assignableUsers.map((u) => (
+        <SearchableCheckList
+          items={assignableUsers.map((u) => ({ value: u["@id"], label: displayName(u) }))}
+          isChecked={(v) => current.iris.includes(v)}
+          onToggle={toggleIri}
+          leading={
             <CheckRow
-              key={u["@id"]}
-              checked={current.iris.includes(u["@id"])}
-              onChange={(v) => toggleIri(u["@id"], v)}
+              checked={current.unassigned}
+              onChange={(v) => {
+                const next = { kind: "assignees" as const, iris: current.iris, unassigned: v };
+                set(isAssigneesActive(next) ? next : null);
+              }}
             >
-              {displayName(u)}
+              <span className="text-muted-foreground">Unassigned</span>
             </CheckRow>
-          ))}
-        </div>
+          }
+        />
       );
     }
     case "tags": {
@@ -443,26 +490,22 @@ const FilterControls = ({
         set(next.iris.length > 0 || next.untagged ? next : null);
       };
       return (
-        <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-          <CheckRow
-            checked={current.untagged}
-            onChange={(v) => {
-              const next = { kind: "tags" as const, iris: current.iris, untagged: v };
-              set(next.iris.length > 0 || next.untagged ? next : null);
-            }}
-          >
-            <span className="text-muted-foreground">Untagged</span>
-          </CheckRow>
-          {allTags.map((t) => (
+        <SearchableCheckList
+          items={allTags.map((t) => ({ value: t["@id"], label: t.title }))}
+          isChecked={(v) => current.iris.includes(v)}
+          onToggle={toggleIri}
+          leading={
             <CheckRow
-              key={t["@id"]}
-              checked={current.iris.includes(t["@id"])}
-              onChange={(v) => toggleIri(t["@id"], v)}
+              checked={current.untagged}
+              onChange={(v) => {
+                const next = { kind: "tags" as const, iris: current.iris, untagged: v };
+                set(next.iris.length > 0 || next.untagged ? next : null);
+              }}
             >
-              {t.title}
+              <span className="text-muted-foreground">Untagged</span>
             </CheckRow>
-          ))}
-        </div>
+          }
+        />
       );
     }
     case "select": {
@@ -479,26 +522,22 @@ const FilterControls = ({
         set(next.keys.length > 0 || next.empty ? next : null);
       };
       return (
-        <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
-          <CheckRow
-            checked={current.empty}
-            onChange={(v) => {
-              const next = { kind: "select" as const, keys: current.keys, empty: v };
-              set(next.keys.length > 0 || next.empty ? next : null);
-            }}
-          >
-            <span className="text-muted-foreground">Empty</span>
-          </CheckRow>
-          {options.map((o) => (
+        <SearchableCheckList
+          items={options.map((o) => ({ value: o.key, label: o.label }))}
+          isChecked={(v) => current.keys.includes(v)}
+          onToggle={toggleKey}
+          leading={
             <CheckRow
-              key={o.key}
-              checked={current.keys.includes(o.key)}
-              onChange={(v) => toggleKey(o.key, v)}
+              checked={current.empty}
+              onChange={(v) => {
+                const next = { kind: "select" as const, keys: current.keys, empty: v };
+                set(next.keys.length > 0 || next.empty ? next : null);
+              }}
             >
-              {o.label}
+              <span className="text-muted-foreground">Empty</span>
             </CheckRow>
-          ))}
-        </div>
+          }
+        />
       );
     }
   }

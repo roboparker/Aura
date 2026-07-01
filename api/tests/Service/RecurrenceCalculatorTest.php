@@ -146,4 +146,73 @@ class RecurrenceCalculatorTest extends TestCase
             )?->format('Y-m-d'),
         );
     }
+
+    /**
+     * @param list<\DateTimeImmutable> $dates
+     *
+     * @return list<string>
+     */
+    private function ymd(array $dates): array
+    {
+        return array_map(fn (\DateTimeImmutable $d) => $d->format('Y-m-d'), $dates);
+    }
+
+    public function testOccurrencesInRangeIncludesAnchor(): void
+    {
+        $dates = $this->calc->occurrencesInRange(
+            new \DateTimeImmutable('2026-06-10T09:00:00+00:00'),
+            ['frequency' => 'daily', 'interval' => 3],
+            new \DateTimeImmutable('2026-06-01T00:00:00+00:00'),
+            new \DateTimeImmutable('2026-06-20T23:59:59+00:00'),
+        );
+        // Anchor (06-10) is the first occurrence; then every 3rd day.
+        $this->assertSame(['2026-06-10', '2026-06-13', '2026-06-16', '2026-06-19'], $this->ymd($dates));
+    }
+
+    public function testOccurrencesInRangeSkipsBeforeStart(): void
+    {
+        $dates = $this->calc->occurrencesInRange(
+            new \DateTimeImmutable('2026-06-01T09:00:00+00:00'),
+            ['frequency' => 'daily', 'interval' => 1],
+            new \DateTimeImmutable('2026-06-05T00:00:00+00:00'),
+            new \DateTimeImmutable('2026-06-07T23:59:59+00:00'),
+        );
+        $this->assertSame(['2026-06-05', '2026-06-06', '2026-06-07'], $this->ymd($dates));
+    }
+
+    public function testOccurrencesInRangeHonoursCount(): void
+    {
+        // count=3 total (anchor + 2); the window is wide but the series ends.
+        $dates = $this->calc->occurrencesInRange(
+            new \DateTimeImmutable('2026-06-01T09:00:00+00:00'),
+            ['frequency' => 'daily', 'interval' => 1, 'ends' => ['type' => 'count', 'count' => 3]],
+            new \DateTimeImmutable('2026-06-01T00:00:00+00:00'),
+            new \DateTimeImmutable('2026-06-30T23:59:59+00:00'),
+        );
+        $this->assertSame(['2026-06-01', '2026-06-02', '2026-06-03'], $this->ymd($dates));
+    }
+
+    public function testOccurrencesInRangeHonoursUntil(): void
+    {
+        $dates = $this->calc->occurrencesInRange(
+            new \DateTimeImmutable('2026-06-01T09:00:00+00:00'),
+            ['frequency' => 'daily', 'interval' => 1, 'ends' => ['type' => 'until', 'until' => '2026-06-03']],
+            new \DateTimeImmutable('2026-06-01T00:00:00+00:00'),
+            new \DateTimeImmutable('2026-06-30T23:59:59+00:00'),
+        );
+        $this->assertSame(['2026-06-01', '2026-06-02', '2026-06-03'], $this->ymd($dates));
+    }
+
+    public function testOccurrencesInRangeExcludesExceptions(): void
+    {
+        // Exceptions drop the date from output but still consume a count slot.
+        $dates = $this->calc->occurrencesInRange(
+            new \DateTimeImmutable('2026-06-01T09:00:00+00:00'),
+            ['frequency' => 'daily', 'interval' => 1],
+            new \DateTimeImmutable('2026-06-01T00:00:00+00:00'),
+            new \DateTimeImmutable('2026-06-04T23:59:59+00:00'),
+            ['2026-06-02', '2026-06-03'],
+        );
+        $this->assertSame(['2026-06-01', '2026-06-04'], $this->ymd($dates));
+    }
 }

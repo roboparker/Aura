@@ -174,8 +174,12 @@ const AuthCard = ({ defaultTab }: Props) => {
     }
   }, [isLoading, isAuthenticated, next, router, inviteToken, user?.preferences]);
 
+  // Gate on `router.isReady` so the server and first client render agree: the
+  // query isn't populated during SSR, so reading it unconditionally would make
+  // the toggle link's href differ between server/client (hydration mismatch).
   const queryIndex = router.asPath.indexOf("?");
-  const search = queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
+  const search =
+    router.isReady && queryIndex >= 0 ? router.asPath.slice(queryIndex) : "";
 
   const initials = useMemo(() => {
     if (!signupPayload) return "";

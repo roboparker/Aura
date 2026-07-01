@@ -18,7 +18,6 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -199,7 +198,7 @@ const SpaceRoles = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-muted px-4 py-12">
+      <main className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <Button asChild variant="outline">
@@ -223,24 +222,14 @@ const SpaceRoles = () => {
   return (
     <>
       <Head>
-        <title>Permissions · {space.name}</title>
+        <title>Roles · {space.name}</title>
       </Head>
-      <main className="mx-auto max-w-3xl px-4 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader
-          title="Permissions"
+          title="Roles"
           icon={<ShieldCheck className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
           subtitle={`Roles control what members can do in “${space.name}”.`}
-        >
-          <Button
-            type="button"
-            size="sm"
-            className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
-            onClick={openCreate}
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            New role
-          </Button>
-        </PageHeader>
+        />
 
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -262,68 +251,68 @@ const SpaceRoles = () => {
           can be edited but not deleted.
         </p>
 
-        <Card>
-          <CardContent className="pt-6">
-            {roles.length === 0 ? (
-              <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+        <div className="overflow-hidden rounded-md border bg-card">
+          <ul className="divide-y divide-border">
+            {orderedRoles.length === 0 && (
+              <li className="px-4 py-8 text-center text-sm text-muted-foreground">
                 No roles yet. Create one to start restricting members.
-              </div>
-            ) : (
-              <ul className="divide-y divide-border rounded-md border">
-                {orderedRoles.map((role) => (
-                  <li
-                    key={role["@id"]}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                    data-testid="space-role-row"
-                  >
-                    <span
-                      className="h-3 w-3 shrink-0 rounded-full"
-                      style={{ backgroundColor: role.color ?? "#6b7280" }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <p className="font-medium truncate">{role.name}</p>
-                        {isDefaultMemberRole(role) && (
-                          <Badge variant="secondary" className="shrink-0">
-                            Default
-                          </Badge>
-                        )}
-                        {role.builtinKey === "guest" && (
-                          <Badge variant="outline" className="shrink-0">
-                            Built-in
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {memberCount(role)}{" "}
-                        {memberCount(role) === 1 ? "member" : "members"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openEdit(role)}
-                      aria-label={`Edit ${role.name}`}
-                      className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden />
-                    </button>
-                    {role.builtinKey === null && (
-                      <button
-                        type="button"
-                        onClick={() => setDeleteTarget(role)}
-                        aria-label={`Delete ${role.name}`}
-                        className="rounded p-1 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden />
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              </li>
             )}
-          </CardContent>
-        </Card>
+            {orderedRoles.map((role) => (
+              <li
+                key={role["@id"]}
+                className="flex items-center gap-3 px-3 py-2.5"
+                data-testid="space-role-row"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium truncate">{role.name}</p>
+                    {isDefaultMemberRole(role) && (
+                      <Badge variant="secondary" className="shrink-0">
+                        Default
+                      </Badge>
+                    )}
+                    {role.builtinKey === "guest" && (
+                      <Badge variant="outline" className="shrink-0">
+                        Built-in
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {memberCount(role)}{" "}
+                    {memberCount(role) === 1 ? "member" : "members"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openEdit(role)}
+                  aria-label={`Edit ${role.name}`}
+                  className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Pencil className="h-4 w-4" aria-hidden />
+                </button>
+                {role.builtinKey === null && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(role)}
+                    aria-label={`Delete ${role.name}`}
+                    className="rounded p-1 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={openCreate}
+            className="flex w-full items-center gap-1 border-t px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            data-testid="space-role-add"
+          >
+            <Plus className="h-3.5 w-3.5" aria-hidden /> New role
+          </button>
+        </div>
       </main>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

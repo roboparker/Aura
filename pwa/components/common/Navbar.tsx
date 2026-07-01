@@ -17,7 +17,6 @@ import SearchOverlay from "@/components/search/SearchOverlay";
 import Breadcrumbs from "./Breadcrumbs";
 import SearchBar from "./SearchBar";
 import SidebarNav from "./SidebarNav";
-import SpaceSwitcher from "./SpaceSwitcher";
 import UserMenu from "./UserMenu";
 
 const Navbar = () => {
@@ -27,28 +26,20 @@ const Navbar = () => {
   return (
     <nav className="h-14 w-full border-b bg-background">
       <div className="flex h-full items-center gap-3 px-4">
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Signed-out viewers get the Madori wordmark as the home
-              anchor; signed-in viewers get the active-space switcher
-              here on the left (md+) plus the Breadcrumbs trail below
-              (with its own Home icon), so the wordmark would be
-              redundant. Developer-facing doc links (API reference,
-              component library, guides) live in the page Footer to
-              keep the navbar focused on the active session. */}
-          {!isAuthenticated && (
+        {/* Signed-out viewers get the Madori wordmark as the home anchor.
+            Signed-in viewers get the active-space switcher at the top of the
+            left sidebar (see SidebarNav) plus the Breadcrumbs trail below,
+            so the wordmark would be redundant here. */}
+        {!isAuthenticated && (
+          <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/"
               className="font-bold text-lg no-underline text-foreground mr-2"
             >
               Madori
             </Link>
-          )}
-          {isAuthenticated && (
-            <div className="hidden md:block w-44 lg:w-52">
-              <SpaceSwitcher />
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* When signed in, the breadcrumb trail sits left of the
             search bar and replaces the wordmark as the home anchor.

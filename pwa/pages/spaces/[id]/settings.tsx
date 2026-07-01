@@ -251,7 +251,7 @@ const SpaceSettings = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-muted px-4 py-12">
+      <main className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <p className="text-muted-foreground mb-4">
@@ -280,7 +280,7 @@ const SpaceSettings = () => {
       <Head>
         <title>Space settings · {space.name}</title>
       </Head>
-      <main className="mx-auto max-w-3xl px-4 py-8 pb-24">
+      <main className="mx-auto max-w-5xl px-4 py-8 pb-24">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Space settings</h1>
           <p className="text-sm text-muted-foreground">
@@ -499,7 +499,7 @@ const SpaceSettings = () => {
 
       {/* Sticky save bar for the metadata form. */}
       <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto max-w-3xl px-4 py-3 flex items-center justify-between gap-3">
+        <div className="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between gap-3">
           <span className="text-sm text-muted-foreground">
             {isDirty ? "Unsaved changes" : "All changes saved"}
           </span>

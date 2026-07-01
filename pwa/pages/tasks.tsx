@@ -18,6 +18,9 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import CalendarView from "@/components/calendar/CalendarView";
+import TasksProjectBoard from "@/components/tasks/TasksProjectBoard";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { trackEvent } from "@/lib/analytics";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
@@ -71,8 +74,11 @@ import { cn } from "@/lib/utils";
 
 interface ProjectMembership {
   "@id": string;
+  title: string;
   members: Array<{ "@id": string }>;
 }
+
+type TaskView = "list" | "board" | "calendar";
 
 interface Collection<T> {
   // API Platform 4 emits JSON-LD 1.1 (`member`); older versions use `hydra:member`.
@@ -87,8 +93,30 @@ type AssigneeFilter = "all" | "me" | string;
 
 const Tasks = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
   const router = useRouter();
   const currentUserIri = user ? `/users/${user.id}` : null;
+
+  // List / Board / Calendar view, mirrored in the URL (`?view=`) so it's
+  // shareable and survives refresh. Anything unrecognised falls back to list.
+  const view: TaskView =
+    router.query.view === "board" || router.query.view === "calendar"
+      ? router.query.view
+      : "list";
+  const setView = useCallback(
+    (next: TaskView) => {
+      const query = { ...router.query };
+      if (next === "list") delete query.view;
+      else query.view = next;
+      void router.push({ pathname: router.pathname, query }, undefined, {
+        shallow: true,
+      });
+    },
+    [router],
+  );
+  // Bumped on drawer edits so the Calendar view (which fetches its own data)
+  // re-syncs after a reschedule/complete.
+  const [calendarRefresh, setCalendarRefresh] = useState(0);
 
   // Deep-linkable task detail: the open task lives in the URL (`?task={id}`)
   // so the drawer survives refresh/share. Shallow routing keeps the list
@@ -116,6 +144,17 @@ const Tasks = () => {
     },
     [router],
   );
+  // The Calendar view hands back a bare task id; open the drawer the same way.
+  const openTaskById = useCallback(
+    (taskId: string) => {
+      void router.push(
+        { pathname: router.pathname, query: { ...router.query, task: taskId } },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router],
+  );
   // Both `/tasks` and `/my-tasks` mount this component. The latter pins the
   // assignee filter to the logged-in user and hides the picker, so the page
   // is effectively a fixed "everything assigned to me" view.
@@ -123,15 +162,6 @@ const Tasks = () => {
   const pageTitle = isMyTasksPage ? "My Tasks" : "Tasks";
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  // DEBUG(#193): mirror tasks state through a useEffect for diagnostic
-  // logging. Removed once the race is stable.
-  useEffect(() => {
-    console.warn(
-      "[tasks:state]",
-      tasks.length,
-      tasks.map((t) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
-    );
-  }, [tasks]);
   // Mirror of `tasks` for handlers that need the latest committed
   // state without relying on closure-captured props. Used by
   // `handleToggle` to determine the toggle direction from the
@@ -149,6 +179,9 @@ const Tasks = () => {
   // picker per task (project tasks accept only that project's members; the
   // server-side validator enforces the same rule).
   const [projectMembers, setProjectMembers] = useState<Map<string, Set<string>>>(
+    new Map(),
+  );
+  const [projectTitles, setProjectTitles] = useState<Map<string, string>>(
     new Map(),
   );
   const [isLoading, setIsLoading] = useState(true);
@@ -253,37 +286,31 @@ const Tasks = () => {
       // the JSON parses and the setStates: if the signal aborted while
       // we were parsing, drop the responses on the floor.
       if (signal?.aborted) {
-        console.warn("[loadData:aborted-after-parse]");
         return;
       }
       // Identity guard — see comment at the top of this callback. If a
-      // local mutation slipped in while we were waiting, dropping our
-      // tasks-stomp is the right move; the tag / assignable-user /
-      // project-member lists below are still safe to refresh since
-      // none of them carry optimistic UI state.
-      if (tasksRef.current !== tasksSnapshot) {
-        console.warn("[loadData:stale-snapshot-skipped-setTasks]");
-      } else {
-        const _loaded = tasksData.member ?? tasksData["hydra:member"] ?? [];
-        console.warn(
-          "[loadData:setTasks]",
-          _loaded.map((t: Task) => `${t.title}=${t.completedOn ? "DONE" : "OPEN"}`).join(","),
-        );
-        setTasks(_loaded);
+      // local mutation slipped in while we were waiting, skip stomping the
+      // tasks list; the tag / assignable-user / project-member lists below
+      // are still safe to refresh since none carry optimistic UI state.
+      if (tasksRef.current === tasksSnapshot) {
+        setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
       }
       setAllTags(tagsData.member ?? tagsData["hydra:member"] ?? []);
       setAssignableUsers(
         assignablesData.member ?? assignablesData["hydra:member"] ?? [],
       );
       const projectMap = new Map<string, Set<string>>();
+      const titleMap = new Map<string, string>();
       const projects = projectsData.member ?? projectsData["hydra:member"] ?? [];
       for (const project of projects) {
         projectMap.set(
           project["@id"],
           new Set(project.members.map((m) => m["@id"])),
         );
+        titleMap.set(project["@id"], project.title);
       }
       setProjectMembers(projectMap);
+      setProjectTitles(titleMap);
     } catch (err) {
       // AbortError is a normal control-flow signal here, not a failure —
       // the caller cancelled because the effect is being torn down.
@@ -317,10 +344,8 @@ const Tasks = () => {
     setAssigneeFilter(isMyTasksPage ? "me" : "all");
     if (isAuthenticated) {
       const ctl = new AbortController();
-      console.warn("[loadData:effect-mount]");
       void loadData(ctl.signal);
       return () => {
-        console.warn("[loadData:effect-cleanup]");
         ctl.abort();
       };
     }
@@ -1058,11 +1083,33 @@ const Tasks = () => {
       <Head>
         <title>{pageTitle} - Madori</title>
       </Head>
-      <div className="min-h-screen bg-muted px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6 gap-3 flex-wrap">
             <h1 className="text-2xl font-bold">{pageTitle}</h1>
             <div className="flex items-center gap-2 flex-wrap">
+              <div
+                className="inline-flex rounded-md border p-0.5"
+                data-testid="tasks-view-switcher"
+              >
+                {(["list", "board", "calendar"] as TaskView[]).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setView(v)}
+                    aria-pressed={view === v}
+                    className={cn(
+                      "rounded px-2.5 py-1 text-sm capitalize transition",
+                      view === v
+                        ? "bg-accent text-accent-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                    data-testid={`tasks-view-${v}`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
               {/* Overdue chip is always available — it's useful on /my-tasks
                   even though the assignee dropdown is hidden there. The chip
                   is disabled when there's nothing overdue so users still see
@@ -1159,7 +1206,7 @@ const Tasks = () => {
             </Alert>
           )}
 
-          {!reorderable && (
+          {view === "list" && !reorderable && (
             <p
               className="mb-2 text-xs text-muted-foreground"
               data-testid="reorder-disabled-hint"
@@ -1172,6 +1219,23 @@ const Tasks = () => {
 
           {isLoading ? (
             <p className="text-muted-foreground">Loading tasks...</p>
+          ) : view === "calendar" ? (
+            activeSpace ? (
+              <CalendarView
+                spaceIri={activeSpace["@id"]}
+                onOpen={openTaskById}
+                refreshSignal={calendarRefresh}
+                assignableUsers={assignableUsers}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">Loading space…</p>
+            )
+          ) : view === "board" ? (
+            <TasksProjectBoard
+              tasks={filteredTasks}
+              projectTitles={projectTitles}
+              onOpen={openTaskDetail}
+            />
           ) : (
             <Card>
               <CardContent className="p-0">
@@ -1268,7 +1332,7 @@ const Tasks = () => {
         currentUserIri={currentUserIri}
         assignableUsers={assignableUsers}
         allTags={allTags}
-        onTaskChanged={(updated) =>
+        onTaskChanged={(updated) => {
           setTasks((current) =>
             current.map((t) =>
               t["@id"] === updated["@id"]
@@ -1284,11 +1348,13 @@ const Tasks = () => {
                   }
                 : t,
             ),
-          )
-        }
-        onTaskDeleted={(iri) =>
-          setTasks((current) => current.filter((t) => t["@id"] !== iri))
-        }
+          );
+          setCalendarRefresh((k) => k + 1);
+        }}
+        onTaskDeleted={(iri) => {
+          setTasks((current) => current.filter((t) => t["@id"] !== iri));
+          setCalendarRefresh((k) => k + 1);
+        }}
       />
     </>
   );

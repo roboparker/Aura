@@ -291,7 +291,7 @@ const GroupDetail = () => {
 
   if (notFound) {
     return (
-      <main className="px-4 py-12 max-w-2xl mx-auto">
+      <main className="px-4 py-12 max-w-5xl mx-auto">
         <Card>
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Group not found</h1>

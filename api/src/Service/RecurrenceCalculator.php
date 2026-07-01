@@ -50,22 +50,13 @@ final class RecurrenceCalculator
         if ($limit < 1) {
             return [];
         }
-        $frequency = is_string($rule['frequency'] ?? null) ? $rule['frequency'] : '';
-        $interval = max(1, is_int($rule['interval'] ?? null) ? $rule['interval'] : 1);
         $until = $this->parseUntil($rule);
-
-        $out = [];
-        $generator = match ($frequency) {
-            'daily' => $this->dailyDates($after, $interval),
-            'weekly' => $this->weeklyDates($after, $interval, $this->byDayNumbers($rule)),
-            'monthly' => $this->monthlyDates($after, $interval, $rule),
-            'yearly' => $this->yearlyDates($after, $interval),
-            default => null,
-        };
+        $generator = $this->pickGenerator($after, $rule);
         if (null === $generator) {
             return [];
         }
 
+        $out = [];
         foreach ($generator as $date) {
             if (null !== $until && $date > $until) {
                 break;
@@ -77,6 +68,108 @@ final class RecurrenceCalculator
         }
 
         return $out;
+    }
+
+    /**
+     * Every occurrence date within `[$rangeStart, $rangeEnd]` (inclusive) for a
+     * task whose first instance is `$anchor`. Unlike {@see nextOccurrences}
+     * this INCLUDES the anchor itself (the series' first occurrence), applies
+     * both `until` AND `count` end bounds, and drops any date whose `Y-m-d`
+     * appears in `$exceptions` (iCalendar EXDATE semantics — excluded dates
+     * still consume a `count` slot). Ascending order.
+     *
+     * Pass `$rangeStart` at the start of its day and `$rangeEnd` at end-of-day
+     * so occurrences anywhere on the boundary days are included.
+     *
+     * @param array<array-key, mixed> $rule
+     * @param list<string>            $exceptions Y-m-d dates to skip
+     *
+     * @return list<\DateTimeImmutable>
+     */
+    public function occurrencesInRange(
+        \DateTimeImmutable $anchor,
+        array $rule,
+        \DateTimeImmutable $rangeStart,
+        \DateTimeImmutable $rangeEnd,
+        array $exceptions = [],
+    ): array {
+        $until = $this->parseUntil($rule);
+        $count = $this->parseCount($rule);
+        $excluded = [];
+        foreach ($exceptions as $ex) {
+            $excluded[$ex] = true;
+        }
+
+        // Collect the anchor + generated dates up to just past the window; the
+        // generators are ascending and self-capping, so nothing later matters.
+        $dates = [$anchor];
+        $generator = $this->pickGenerator($anchor, $rule);
+        if (null !== $generator) {
+            foreach ($generator as $date) {
+                $dates[] = $date;
+                if ($date > $rangeEnd) {
+                    break;
+                }
+            }
+        }
+
+        $out = [];
+        $produced = 0;
+        foreach ($dates as $date) {
+            if (null !== $until && $date > $until) {
+                break;
+            }
+            ++$produced;
+            if (null !== $count && $produced > $count) {
+                break;
+            }
+            if ($date > $rangeEnd) {
+                break;
+            }
+            if ($date >= $rangeStart && !isset($excluded[$date->format('Y-m-d')])) {
+                $out[] = $date;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Select the ascending occurrence generator for a rule (strictly after
+     * `$after`); null for an unrecognised frequency.
+     *
+     * @param array<array-key, mixed> $rule
+     *
+     * @return \Generator<int, \DateTimeImmutable>|null
+     */
+    private function pickGenerator(\DateTimeImmutable $after, array $rule): ?\Generator
+    {
+        $frequency = is_string($rule['frequency'] ?? null) ? $rule['frequency'] : '';
+        $interval = max(1, is_int($rule['interval'] ?? null) ? $rule['interval'] : 1);
+
+        return match ($frequency) {
+            'daily' => $this->dailyDates($after, $interval),
+            'weekly' => $this->weeklyDates($after, $interval, $this->byDayNumbers($rule)),
+            'monthly' => $this->monthlyDates($after, $interval, $rule),
+            'yearly' => $this->yearlyDates($after, $interval),
+            default => null,
+        };
+    }
+
+    /**
+     * The total-occurrence cap from a `count`-type end, or null.
+     *
+     * @param array<array-key, mixed> $rule
+     */
+    private function parseCount(array $rule): ?int
+    {
+        $ends = $rule['ends'] ?? null;
+        if (!is_array($ends) || ($ends['type'] ?? null) !== 'count') {
+            return null;
+        }
+        $count = $ends['count'] ?? null;
+
+        return is_int($count) && $count >= 1 ? $count : null;
     }
 
     /**

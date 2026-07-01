@@ -49,17 +49,22 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     // mobile Sheet handles the small-screen sidebar case. The Sidebar
     // renders nothing for unauthenticated visitors so the marketing/auth
     // screens keep their original full-width layout.
-    <div className="flex min-h-screen flex-col">
-      {/* Above the page's sticky layers (project title/tabs bar = z-30, column
-          header = z-20) so a short page scrolling up can't push them over the
-          navbar. Stays below portalled popovers/menus (z-50). */}
-      <div className="sticky top-0 z-40">
-        <ImpersonationBanner />
-        <Navbar />
-      </div>
-      <div className="flex flex-1 min-h-0">
-        <Sidebar />
-        <div className="flex-1 min-w-0 flex flex-col">
+    // Full-height left sidebar (`md:` and up) pinned to the viewport edge;
+    // the header (ImpersonationBanner + Navbar) and page content live in the
+    // column to its right. The navbar's mobile Sheet handles the small-screen
+    // sidebar case. The Sidebar renders nothing for unauthenticated visitors
+    // so the marketing/auth screens keep their original full-width layout.
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <div className="flex flex-1 min-w-0 flex-col">
+        {/* Above the page's sticky layers (project title/tabs bar = z-30,
+            column header = z-20) so a short page scrolling up can't push them
+            over the navbar. Stays below portalled popovers/menus (z-50). */}
+        <div className="sticky top-0 z-40">
+          <ImpersonationBanner />
+          <Navbar />
+        </div>
+        <div className="flex flex-1 min-h-0 flex-col">
           <div className="flex-1">{children}</div>
           <Footer />
         </div>

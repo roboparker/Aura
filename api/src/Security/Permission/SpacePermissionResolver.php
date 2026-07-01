@@ -70,6 +70,34 @@ final class SpacePermissionResolver
     }
 
     /**
+     * Stricter sibling of {@see can()} for admin-reserved capabilities (e.g.
+     * api-key management) that must NOT be swept in by the "member with no
+     * roles is unrestricted" back-compat rule. Granted only to space admins
+     * and to direct members whose EXPLICITLY-assigned roles grant it — the
+     * built-in Member default and group-only access never confer it.
+     */
+    public function canByExplicitGrant(User $user, ?Space $space, string $category, string $action): bool
+    {
+        if (null === $space) {
+            return false;
+        }
+        $membership = $this->directMembership($space, $user);
+        if (null === $membership) {
+            return false;
+        }
+        if (Space::ROLE_ADMIN === $membership->getRole()) {
+            return true;
+        }
+        foreach ($membership->getRoles() as $role) {
+            if ($role->allows($category, $action)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * A space-scoped key may act on a subject only when the subject is in the
      * key's space (confinement) AND one of the key's roles grants the action.
      */

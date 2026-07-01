@@ -3,13 +3,21 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  closestCenter,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Check, GripVertical, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import AssigneePlaceholder from "@/components/user/AssigneePlaceholder";
@@ -75,6 +83,25 @@ interface TaskBoardProps {
 
 const COL_PREFIX = "col:";
 const SECTION_PREFIX = "section:";
+
+/**
+ * Restrict collisions by drag kind: a column drag (`section:`) only sees the
+ * other columns' sortable nodes (so they shift to open the placeholder gap and
+ * reorder resolves), while a card drag only sees the columns' card-drop areas
+ * (`col:`) so the drop-target highlight and move still work.
+ */
+const boardCollision: CollisionDetection = (args) => {
+  const wantSection = String(args.active.id).startsWith(SECTION_PREFIX);
+  return closestCenter({
+    ...args,
+    droppableContainers: args.droppableContainers.filter((c) => {
+      const id = String(c.id);
+      return wantSection
+        ? id.startsWith(SECTION_PREFIX)
+        : id.startsWith(COL_PREFIX);
+    }),
+  });
+};
 
 const dueLabel = (iso: string): string => {
   const d = new Date(iso);
@@ -219,7 +246,7 @@ const CardBody = ({
     <p
       className={cn(
         "text-sm leading-snug",
-        task.completedOn && "text-muted-foreground line-through",
+        task.completedOn && "text-muted-foreground",
       )}
     >
       {task.title}
@@ -314,21 +341,42 @@ const BoardColumnView = ({
   onDeleteSection: (sectionIri: string) => void;
 }) => {
   const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${column.key}` });
-  // The whole column is draggable (to reorder), but only the header grip
-  // activates the drag — so clicking cards/menu/add-task still works.
+  // Columns are sortable (so the others shift to open a placeholder gap as one
+  // is dragged, like the list view), but only the header grip activates the
+  // drag — clicking cards / the menu / add-task still works. The card-drop area
+  // keeps its own droppable ref (above).
   const {
-    setNodeRef: setDragRef,
+    setNodeRef: setSortableRef,
     attributes,
     listeners,
+    transform,
+    transition,
     isDragging,
-  } = useDraggable({ id: `${SECTION_PREFIX}${column.key}` });
+  } = useSortable({ id: `${SECTION_PREFIX}${column.key}` });
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  // While dragging, the column's slot becomes a dashed placeholder that the
+  // sibling columns push around — the floating column itself is the DragOverlay.
+  if (isDragging) {
+    return (
+      <div
+        ref={setSortableRef}
+        style={sortableStyle}
+        className="w-80 shrink-0 rounded-xl border-2 border-dashed border-foreground/25 bg-muted/30"
+        data-testid="board-column-placeholder"
+        aria-hidden
+      />
+    );
+  }
+
   return (
     <div
-      ref={setDragRef}
-      className={cn(
-        "flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/40",
-        isDragging && "opacity-50",
-      )}
+      ref={setSortableRef}
+      style={sortableStyle}
+      className="flex w-80 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/40"
       data-testid="board-column"
     >
       <div className="flex items-center gap-2 border-b bg-card px-3 py-2">
@@ -449,9 +497,15 @@ const TaskBoard = ({
     if (!over) return;
     const activeId = String(active.id);
     const overId = String(over.id);
-    if (!overId.startsWith(COL_PREFIX)) return;
-    const colKey = overId.slice(COL_PREFIX.length);
-    const target = columns.find((c) => c.key === colKey);
+    // `over` can be a column's card-drop area (`col:`) or, when reordering, a
+    // column's sortable node (`section:`) — resolve either to a column key.
+    const overKey = overId.startsWith(COL_PREFIX)
+      ? overId.slice(COL_PREFIX.length)
+      : overId.startsWith(SECTION_PREFIX)
+        ? overId.slice(SECTION_PREFIX.length)
+        : null;
+    if (overKey === null) return;
+    const target = columns.find((c) => c.key === overKey);
     if (!target) return;
 
     // Column reorder: a section header was dragged onto another column.
@@ -468,51 +522,70 @@ const TaskBoard = ({
     }
   };
 
+  const sectionIds = columns.map((c) => `${SECTION_PREFIX}${c.key}`);
+
   return (
-    <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={boardCollision}
+      onDragStart={handleStart}
+      onDragEnd={handleEnd}
+    >
       {/* px/pt give focus rings room — overflow-x-auto also clips vertically,
-          so a ring on the section-name input or a card would be cut off. */}
-      <div className="flex gap-4 overflow-x-auto px-0.5 pt-1 pb-2" data-testid="task-board">
-        {columns.map((column) => (
-          <BoardColumnView
-            key={column.key}
-            column={column}
-            definitions={definitions}
-            assignableUsers={assignableUsers}
-            onOpen={onOpen}
-            onAssign={onAssign}
-            onAddTask={onAddTask}
-            onDeleteSection={onDeleteSection}
-          />
-        ))}
-        {addingSection ? (
-          <input
-            autoFocus
-            value={newSectionTitle}
-            onChange={(e) => setNewSectionTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitSection();
-              } else if (e.key === "Escape") {
-                cancelSection();
-              }
-            }}
-            onBlur={cancelSection}
-            placeholder="Section name…"
-            className="h-9 w-80 shrink-0 rounded-lg border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            data-testid="board-add-section-input"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingSection(true)}
-            className="flex h-9 w-80 shrink-0 items-center gap-1 rounded-lg border border-dashed px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-            data-testid="board-add-section"
-          >
-            <Plus className="h-4 w-4" /> Add section
-          </button>
-        )}
+          so a ring on the section-name input or a card would be cut off.
+          items-stretch + a viewport min-height make every column (and the
+          add-section placeholder) the same, full height. */}
+      <div
+        className="flex min-h-[calc(100vh-16rem)] items-stretch gap-4 overflow-x-auto px-0.5 pt-1 pb-2"
+        data-testid="task-board"
+      >
+        <SortableContext items={sectionIds} strategy={horizontalListSortingStrategy}>
+          {columns.map((column) => (
+            <BoardColumnView
+              key={column.key}
+              column={column}
+              definitions={definitions}
+              assignableUsers={assignableUsers}
+              onOpen={onOpen}
+              onAssign={onAssign}
+              onAddTask={onAddTask}
+              onDeleteSection={onDeleteSection}
+            />
+          ))}
+        </SortableContext>
+        {/* The add-section placeholder is itself a full-height column (matches
+            the real columns via the parent's items-stretch) with its control
+            pinned to the top. */}
+        <div className="flex w-80 shrink-0 flex-col rounded-xl border border-dashed p-2">
+          {addingSection ? (
+            <input
+              autoFocus
+              value={newSectionTitle}
+              onChange={(e) => setNewSectionTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitSection();
+                } else if (e.key === "Escape") {
+                  cancelSection();
+                }
+              }}
+              onBlur={cancelSection}
+              placeholder="Section name…"
+              className="h-9 w-full rounded-lg border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-testid="board-add-section-input"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingSection(true)}
+              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              data-testid="board-add-section"
+            >
+              <Plus className="h-4 w-4" /> Add section
+            </button>
+          )}
+        </div>
       </div>
       <DragOverlay>
         {draggingTask ? (

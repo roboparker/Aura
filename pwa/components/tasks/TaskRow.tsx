@@ -246,7 +246,7 @@ const TaskRow = ({
   };
 
   const description = plainTextDescription(task.description);
-  const titleClass = cn("font-medium", task.completedOn && "line-through text-muted-foreground");
+  const titleClass = cn("font-medium", task.completedOn && "text-muted-foreground");
 
   // Each task gets its own <tbody> so dnd-kit drags the main row + the
   // description sub-row together as a single unit. Multiple <tbody>s in one
@@ -257,6 +257,8 @@ const TaskRow = ({
     <tbody
       ref={setNodeRef}
       style={style}
+      // Completed tasks read as a uniformly muted row (no strikethrough).
+      className={cn(task.completedOn && "text-muted-foreground")}
       data-testid="task-item"
       onPaste={handleTaskPaste}
     >

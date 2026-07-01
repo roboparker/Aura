@@ -305,8 +305,8 @@ const SearchPage = () => {
       <Head>
         <title>{filters.q ? `Search: ${filters.q}` : "Search"} - Madori</title>
       </Head>
-      <main className="min-h-screen bg-muted">
-        <div className="mx-auto max-w-3xl space-y-5 px-4 py-8">
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">
           <SearchHeader
             filters={filters}
             activeSpace={activeSpace}

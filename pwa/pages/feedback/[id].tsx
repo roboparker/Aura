@@ -235,8 +235,8 @@ const FeedbackDetailPage = () => {
           {ticket ? `${ticket.title} - Madori` : "Feedback - Madori"}
         </title>
       </Head>
-      <main className="min-h-screen bg-muted">
-        <div className="max-w-3xl mx-auto px-4 py-8 space-y-4">
+      <main className="min-h-screen bg-background">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
           {notFound ? (
             <Card>
               <CardContent className="pt-6">

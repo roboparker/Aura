@@ -52,8 +52,18 @@ const RolePermissionMatrix = ({
     onChange(next);
   };
 
+  const setColumn = (action: PermissionAction, granted: boolean) => {
+    const next: PermissionMatrix = {};
+    for (const category of PERMISSION_CATEGORIES) {
+      next[category] = { ...value[category], [action]: granted };
+    }
+    onChange(next);
+  };
+
   const rowAll = (category: PermissionCategory): boolean =>
     PERMISSION_ACTIONS.every((action) => matrixAllows(value, category, action));
+  const colAll = (action: PermissionAction): boolean =>
+    PERMISSION_CATEGORIES.every((category) => matrixAllows(value, category, action));
   const allOn = PERMISSION_CATEGORIES.every((c) => rowAll(c));
 
   const headCell = "px-2 py-1.5 text-center text-xs font-medium text-muted-foreground";
@@ -66,11 +76,26 @@ const RolePermissionMatrix = ({
             <th className="px-3 py-1.5 text-left text-xs font-medium text-muted-foreground">
               Content type
             </th>
-            {PERMISSION_ACTIONS.map((action) => (
-              <th key={action} className={headCell}>
-                {ACTION_LABELS[action]}
-              </th>
-            ))}
+            {PERMISSION_ACTIONS.map((action) => {
+              const colOn = colAll(action);
+              return (
+                <th key={action} className={headCell}>
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setColumn(action, !colOn)}
+                    className="rounded px-1.5 py-0.5 text-xs hover:bg-accent disabled:opacity-50"
+                    title={
+                      colOn
+                        ? `Clear ${ACTION_LABELS[action]} for all content types`
+                        : `Grant ${ACTION_LABELS[action]} for all content types`
+                    }
+                  >
+                    {ACTION_LABELS[action]}
+                  </button>
+                </th>
+              );
+            })}
             <th className={headCell}>
               <button
                 type="button"

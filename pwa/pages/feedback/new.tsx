@@ -72,8 +72,8 @@ const NewFeedbackPage = () => {
       <Head>
         <title>New feedback - Madori</title>
       </Head>
-      <main className="min-h-screen bg-muted">
-        <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
+      <main className="min-h-screen bg-background">
+        <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
           <h1 className="text-2xl font-bold">New feedback</h1>
 
           <Card>

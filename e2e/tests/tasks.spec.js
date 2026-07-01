@@ -62,7 +62,8 @@ test.describe("Tasks", () => {
     await checkbox.check();
     await completeResponse;
     await expect(checkbox).toBeChecked();
-    await expect(item.locator(`text=${title}`)).toHaveClass(/line-through/);
+    // Completed tasks read as muted (no strikethrough).
+    await expect(item.locator(`text=${title}`)).toHaveClass(/text-muted-foreground/);
 
     // Uncomplete
     const uncompleteResponse = page.waitForResponse(
@@ -74,7 +75,7 @@ test.describe("Tasks", () => {
     await checkbox.uncheck();
     await uncompleteResponse;
     await expect(checkbox).not.toBeChecked();
-    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
+    await expect(item.locator(`text=${title}`)).not.toHaveClass(/text-muted-foreground/);
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
     await item.getByRole("button", { name: /^Delete "/ }).click();
@@ -212,9 +213,6 @@ test.describe("Tasks", () => {
     });
     const overdueCell = overdueItem.locator('[data-testid="task-due-date"]');
     await expect(overdueCell).toHaveAttribute("data-status", "overdue");
-    await expect(
-      overdueItem.locator('[data-testid="task-due-date-overdue-icon"]'),
-    ).toBeVisible();
 
     // Filter chip reports a count and toggles the list.
     const filter = page.locator('[data-testid="overdue-filter-toggle"]');

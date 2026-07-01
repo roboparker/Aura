@@ -2,13 +2,22 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Plus, Settings, ShieldCheck } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  Plus,
+  Settings,
+  ShieldCheck,
+  SlidersHorizontal,
+  Tag,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection } from "@/lib/apiClient";
 import { CONTENT_SECTIONS } from "@/lib/contentSections";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import PagesNavTree from "./PagesNavTree";
 import SpaceSwitcher from "./SpaceSwitcher";
 
 // The account menu (avatar + personal links + sign out + stop
@@ -173,50 +182,70 @@ const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
         </button>
       </div>
 
-      {!collapsed && (
-        <>
-          {shown.map((item) => {
-            const href = `/${section.resource}/${item.id}`;
-            return (
-              <span key={item["@id"]}>
-                {wrap(
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "w-full min-w-0 justify-start font-normal",
-                      currentPath === href && "bg-accent text-accent-foreground",
-                    )}
-                  >
-                    <Link href={href}>
-                      {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, so the row
-                          text lines up under the heading label. */}
-                      <span className="truncate pl-5">{item.title}</span>
-                    </Link>
-                  </Button>,
-                )}
-              </span>
-            );
-          })}
+      {!collapsed &&
+        (() => {
+          const addLink = (
+            <span>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start font-normal text-muted-foreground"
+                >
+                  <Link href={aggregatorHref}>
+                    <Plus className="size-4" />
+                    New {section.singular}
+                  </Link>
+                </Button>,
+              )}
+            </span>
+          );
 
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start font-normal text-muted-foreground"
-              >
-                <Link href={aggregatorHref}>
-                  <Plus className="size-4" />
-                  New {section.singular}
-                </Link>
-              </Button>,
-            )}
-          </span>
-        </>
-      )}
+          // Pages support drag-to-reorder + nesting in the menu; the rest are
+          // a flat, capped list.
+          if (section.resource === "pages") {
+            return (
+              <PagesNavTree
+                spaceIri={spaceIri}
+                currentPath={currentPath}
+                wrap={wrap}
+                addLink={addLink}
+              />
+            );
+          }
+
+          return (
+            <>
+              {shown.map((item) => {
+                const href = `/${section.resource}/${item.id}`;
+                return (
+                  <span key={item["@id"]}>
+                    {wrap(
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="sm"
+                        className={cn(
+                          "w-full min-w-0 justify-start font-normal",
+                          currentPath === href &&
+                            "bg-accent text-accent-foreground",
+                        )}
+                      >
+                        <Link href={href}>
+                          {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, so the
+                              row text lines up under the heading label. */}
+                          <span className="truncate pl-5">{item.title}</span>
+                        </Link>
+                      </Button>,
+                    )}
+                  </span>
+                );
+              })}
+              {addLink}
+            </>
+          );
+        })()}
     </div>
   );
 };
@@ -327,7 +356,7 @@ const SettingsSection = ({
   wrap: (children: ReactNode) => ReactNode;
 }) => {
   const router = useRouter();
-  const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
+  const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
 
   const storageKey = "madori.navCollapsed.settings";
   const [collapsed, setCollapsed] = useState(false);
@@ -365,9 +394,15 @@ const SettingsSection = ({
           },
           {
             href: `/spaces/${activeSpace.id}/roles`,
-            label: "Permissions",
+            label: "Roles",
             match: "/spaces/[id]/roles",
           },
+        ]
+      : []),
+    // API keys is gated on the `api_keys` permission, not space-admin: admins
+    // have it by default, but a member granted it via a role sees it too.
+    ...(activeSpace && can("api_keys", "read")
+      ? [
           {
             href: `/spaces/${activeSpace.id}/api-keys`,
             label: "API keys",
@@ -375,9 +410,11 @@ const SettingsSection = ({
           },
         ]
       : []),
-    { href: "/tags", label: "Tags", match: "/tags" },
-    { href: "/custom-fields", label: "Custom fields", match: "/custom-fields" },
   ];
+
+  // Tags + Custom fields moved out to top-level nav items; only space
+  // admins have anything left in this section.
+  if (links.length === 0) return null;
 
   return (
     <div className="mt-3 first:mt-0">
@@ -437,10 +474,13 @@ const SidebarNav = ({
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
   const { activeSpace } = useActiveSpace();
+  const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
 
   if (!isAuthenticated || !user) return null;
+
+  const calendarActive = router.pathname === "/calendar";
 
   return (
     <div className="flex h-full flex-col">
@@ -451,6 +491,27 @@ const SidebarNav = ({
       )}
 
       <nav className="flex flex-col gap-0.5 px-2 pt-2 pb-4 flex-1 overflow-y-auto">
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  calendarActive && "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/calendar">
+                  <CalendarDays className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="truncate">Calendar</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
         {activeSpace &&
           CONTENT_SECTIONS.map((section) => (
             <ContentSection
@@ -460,6 +521,50 @@ const SidebarNav = ({
               wrap={wrap}
             />
           ))}
+
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/tags") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/tags">
+                  <Tag className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
+                  <span className="truncate">Tags</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/custom-fields") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/custom-fields">
+                  <SlidersHorizontal className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
+                  <span className="truncate">Custom fields</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
 
         <SettingsSection wrap={wrap} />
 

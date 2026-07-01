@@ -93,7 +93,6 @@ const CustomFieldsManager = ({
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
   const [filled, setFilled] = useState<Record<string, number>>({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<CustomFieldDefinition | null>(null);
@@ -140,7 +139,6 @@ const CustomFieldsManager = ({
       );
       if (!res.ok) return;
       const data: FieldStatsResponse = await res.json();
-      setTotal(data.total);
       const map: Record<string, number> = {};
       for (const s of data.stats) map[s.definition] = s.filled;
       setFilled(map);
@@ -278,19 +276,6 @@ const CustomFieldsManager = ({
 
   return (
     <div className="space-y-6" data-testid="custom-fields-manager">
-      <div className="flex justify-end">
-        {isSpaceAdmin && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={openCreate}
-            data-testid="custom-field-add"
-          >
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
-          </Button>
-        )}
-      </div>
-
       {loadError && (
         <Alert variant="destructive">
           <AlertDescription>{loadError}</AlertDescription>
@@ -313,13 +298,14 @@ const CustomFieldsManager = ({
               size="sm"
               className="mt-3"
               onClick={openCreate}
+              data-testid="custom-field-add"
             >
               <Plus className="mr-1 h-3.5 w-3.5" /> Add field
             </Button>
           )}
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="overflow-hidden rounded-lg border bg-card">
           {/* Change log is project-scoped activity; only shown in a
               project context (not on the space-level manager). */}
           {projectId && (
@@ -346,7 +332,6 @@ const CustomFieldsManager = ({
                 <TableHead>Kind</TableHead>
                 <TableHead>Required</TableHead>
                 <TableHead>Footer</TableHead>
-                <TableHead className="text-right">Filled</TableHead>
                 {isSpaceAdmin && (
                   <TableHead className="w-28 text-right">Actions</TableHead>
                 )}
@@ -366,8 +351,6 @@ const CustomFieldsManager = ({
                     <FieldRow
                       key={def["@id"]}
                       def={def}
-                      total={total}
-                      filled={filled[def["@id"]] ?? 0}
                       isSpaceAdmin={isSpaceAdmin}
                       draggable={isSpaceAdmin && defs.length > 1}
                       onEdit={() => openEdit(def)}
@@ -444,8 +427,6 @@ const CustomFieldsManager = ({
 
 const FieldRow = ({
   def,
-  total,
-  filled,
   isSpaceAdmin,
   draggable,
   onEdit,
@@ -453,8 +434,6 @@ const FieldRow = ({
   onDelete,
 }: {
   def: CustomFieldDefinition;
-  total: number;
-  filled: number;
   isSpaceAdmin: boolean;
   draggable: boolean;
   onEdit: () => void;
@@ -498,11 +477,10 @@ const FieldRow = ({
       <TableCell>
         <span
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+            "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium",
             badge.wrap,
           )}
         >
-          <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
           {kindLabelFor(def.kind).toLowerCase()} ·{" "}
           {subtypeLabelFor(def.kind, def.subtype).toLowerCase()}
         </span>
@@ -529,9 +507,6 @@ const FieldRow = ({
         ) : (
           <span className="text-muted-foreground">—</span>
         )}
-      </TableCell>
-      <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-        {filled} / {total}
       </TableCell>
       {isSpaceAdmin && (
         <TableCell className="text-right">

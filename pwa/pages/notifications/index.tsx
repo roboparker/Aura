@@ -115,8 +115,8 @@ const NotificationsPage = () => {
       <Head>
         <title>Notifications - Madori</title>
       </Head>
-      <main className="min-h-screen bg-muted">
-        <div className="mx-auto max-w-3xl space-y-5 px-4 py-8">
+      <main className="min-h-screen bg-background">
+        <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
