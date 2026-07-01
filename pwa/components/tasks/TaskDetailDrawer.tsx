@@ -512,6 +512,7 @@ const TaskDetailDrawer = ({
                     options={assignableUsers}
                     onChange={(iris) => void patchTask({ assignees: iris })}
                     subjectLabel={task.title}
+                    chipsClassName="flex-col items-start gap-2"
                   />
                 </Row>
               </dl>

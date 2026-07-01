@@ -22,6 +22,7 @@ export const PERMISSION_CATEGORIES = [
   "tags",
   "groups",
   "files",
+  "api_keys",
 ] as const;
 export type PermissionCategory = (typeof PERMISSION_CATEGORIES)[number];
 
@@ -35,6 +36,7 @@ export const CATEGORY_LABELS: Record<PermissionCategory, string> = {
   tags: "Tags",
   groups: "Groups",
   files: "Files",
+  api_keys: "API keys",
 };
 
 export const ACTION_LABELS: Record<PermissionAction, string> = {

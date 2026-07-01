@@ -64,19 +64,9 @@ const ApiTokensTable = () => {
 
   return (
     <div className="space-y-3" data-testid="api-tokens">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Use these to authenticate Madori&apos;s REST + MCP APIs as you.
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => setCreateOpen(true)}
-          data-testid="api-token-generate"
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" /> Generate token
-        </Button>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Use these to authenticate Madori&apos;s REST + MCP APIs as you.
+      </p>
 
       {error && (
         <Alert variant="destructive">
@@ -86,10 +76,6 @@ const ApiTokensTable = () => {
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : tokens.length === 0 ? (
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No tokens yet. Generate one to call the API as you.
-        </p>
       ) : (
         <div className="rounded-md border">
           <Table>
@@ -103,6 +89,16 @@ const ApiTokensTable = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {tokens.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="py-6 text-center text-sm text-muted-foreground"
+                  >
+                    No tokens yet. Generate one to call the API as you.
+                  </TableCell>
+                </TableRow>
+              )}
               {tokens.map((t) => (
                 <TableRow key={t["@id"]} data-testid="api-token-row">
                   <TableCell className="font-medium">{t.name}</TableCell>
@@ -171,6 +167,14 @@ const ApiTokensTable = () => {
               ))}
             </TableBody>
           </Table>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex w-full items-center gap-1 border-t px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            data-testid="api-token-generate"
+          >
+            <Plus className="h-3.5 w-3.5" /> Generate token
+          </button>
         </div>
       )}
 

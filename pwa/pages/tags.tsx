@@ -11,7 +11,6 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -206,24 +205,11 @@ const Tags = () => {
           <PageHeader
             title="Tags"
             icon={<TagIcon className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
-            count={tagsQuery.isLoading ? null : tags.length}
             subtitle={
               <>
                 Shared across everyone in
                 {activeSpace ? ` the “${activeSpace.name}” space` : " this space"}.
               </>
-            }
-            actions={
-              can("tags", "create") ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={startCreate}
-                  disabled={creating || !spaceIri}
-                >
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add tag
-                </Button>
-              ) : undefined
             }
           />
 
@@ -235,16 +221,8 @@ const Tags = () => {
 
           {tagsQuery.isLoading ? (
             <p className="text-muted-foreground">Loading tags...</p>
-          ) : tags.length === 0 && !creating ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground">
-                  No tags yet. Use “Add tag” to create one.
-                </p>
-              </CardContent>
-            </Card>
           ) : (
-            <div className="overflow-hidden rounded-lg border" data-testid="tag-list">
+            <div className="overflow-hidden rounded-lg border bg-card" data-testid="tag-list">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
@@ -254,51 +232,13 @@ const Tags = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {creating && (
-                    <tr data-testid="tag-create-row" className="border-b last:border-0">
-                      <td colSpan={3} className="px-4 py-3">
-                        <form onSubmit={handleCreate} className="space-y-3">
-                          <Input
-                            type="text"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                            maxLength={100}
-                            aria-label="Title"
-                            placeholder="Tag name"
-                            autoFocus
-                          />
-                          <MarkdownEditor
-                            key={editorResetKey}
-                            ariaLabel="Description"
-                            value={description}
-                            onChange={setDescription}
-                          />
-                          <ColorSwatchPicker
-                            value={color}
-                            onChange={setColor}
-                            ariaLabel="Color"
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              type="submit"
-                              size="sm"
-                              disabled={
-                                createMutation.isPending || !title.trim() || !spaceIri
-                              }
-                            >
-                              {createMutation.isPending ? "Adding..." : "Add tag"}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              onClick={cancelCreate}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </form>
+                  {tags.length === 0 && !creating && (
+                    <tr data-testid="tag-empty">
+                      <td
+                        colSpan={3}
+                        className="px-4 py-6 text-center text-muted-foreground"
+                      >
+                        No tags yet. Use “Add tag” below to create one.
                       </td>
                     </tr>
                   )}
@@ -354,22 +294,22 @@ const Tags = () => {
                         data-testid="tag-item"
                         className="border-b last:border-0 hover:bg-accent/40"
                       >
-                        <td className="px-4 py-2 align-top">
+                        <td className="px-4 py-2 align-middle">
                           <span
-                            className="inline-block rounded px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-white"
+                            className="inline-block rounded px-2 py-1 text-sm font-semibold whitespace-nowrap text-white"
                             style={{ backgroundColor: tag.color }}
                           >
                             {tag.title}
                           </span>
                         </td>
-                        <td className="min-w-0 px-4 py-2 align-top">
+                        <td className="min-w-0 px-4 py-2 align-middle">
                           {tag.description ? (
                             <MarkdownView source={tag.description} />
                           ) : (
                             <span className="text-muted-foreground/50">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-2 text-right align-top whitespace-nowrap">
+                        <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -391,8 +331,67 @@ const Tags = () => {
                       </tr>
                     ),
                   )}
+                  {creating && (
+                    <tr data-testid="tag-create-row" className="border-b last:border-0">
+                      <td colSpan={3} className="px-4 py-3">
+                        <form onSubmit={handleCreate} className="space-y-3">
+                          <Input
+                            type="text"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            required
+                            maxLength={100}
+                            aria-label="Title"
+                            placeholder="Tag name"
+                            autoFocus
+                          />
+                          <MarkdownEditor
+                            key={editorResetKey}
+                            ariaLabel="Description"
+                            value={description}
+                            onChange={setDescription}
+                          />
+                          <ColorSwatchPicker
+                            value={color}
+                            onChange={setColor}
+                            ariaLabel="Color"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="submit"
+                              size="sm"
+                              disabled={
+                                createMutation.isPending || !title.trim() || !spaceIri
+                              }
+                            >
+                              {createMutation.isPending ? "Adding..." : "Add tag"}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={cancelCreate}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </form>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
+              {can("tags", "create") && !creating && (
+                <button
+                  type="button"
+                  onClick={startCreate}
+                  disabled={!spaceIri}
+                  className="flex w-full items-center gap-1 border-t px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                  data-testid="tag-add-row"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add tag
+                </button>
+              )}
             </div>
           )}
         </div>

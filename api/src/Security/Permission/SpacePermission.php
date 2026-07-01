@@ -33,6 +33,7 @@ final class SpacePermission
     public const TAGS = 'tags';
     public const GROUPS = 'groups';
     public const FILES = 'files';
+    public const API_KEYS = 'api_keys';
 
     /** @var list<string> */
     public const CATEGORIES = [
@@ -45,6 +46,7 @@ final class SpacePermission
         self::TAGS,
         self::GROUPS,
         self::FILES,
+        self::API_KEYS,
     ];
 
     public static function isCategory(string $category): bool
@@ -69,15 +71,21 @@ final class SpacePermission
     }
 
     /**
-     * A fully-true matrix (everything allowed) — the seeded default for the
-     * built-in "Member" role, so a space behaves as before until an admin
-     * tightens it.
+     * The seeded default for the built-in "Member" role: everything allowed
+     * so a space behaves as before until an admin tightens it — EXCEPT
+     * api-key management, which is admin-reserved by default. A member only
+     * gains it through an explicitly-assigned custom role that grants it.
      *
      * @return array<string, array<string, bool>>
      */
     public static function fullMatrix(): array
     {
-        return self::matrixOf(true);
+        $matrix = self::matrixOf(true);
+        foreach (self::ACTIONS as $action) {
+            $matrix[self::API_KEYS][$action] = false;
+        }
+
+        return $matrix;
     }
 
     /**
@@ -90,6 +98,10 @@ final class SpacePermission
     {
         $matrix = self::emptyMatrix();
         foreach (self::CATEGORIES as $category) {
+            // Guests never see API-key management (admin-reserved).
+            if (self::API_KEYS === $category) {
+                continue;
+            }
             $matrix[$category][self::READ] = true;
         }
         $matrix[self::COMMENTS][self::CREATE] = true;

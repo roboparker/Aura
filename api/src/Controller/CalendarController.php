@@ -78,7 +78,20 @@ final class CalendarController extends AbstractController
             return $this->json(['error' => 'Requested range is too large.'], 400);
         }
 
-        $tasks = $this->fetchTasks($space, $user, $rangeStart, $rangeEnd);
+        // Optional narrowing to one project (the project-tab calendar). Only
+        // the trailing id matters; the query still requires it to live in the
+        // space, so a foreign project id simply yields nothing.
+        $rawProject = $request->query->getString('project');
+        $projectId = null;
+        if ('' !== $rawProject) {
+            $segment = 1 === preg_match('#([0-9a-f-]+)$#i', $rawProject, $m) ? $m[1] : '';
+            if (!Uuid::isValid($segment)) {
+                return $this->json(['error' => 'Invalid `project`.'], 400);
+            }
+            $projectId = $segment;
+        }
+
+        $tasks = $this->fetchTasks($space, $user, $rangeStart, $rangeEnd, $projectId);
 
         $entries = [];
         foreach ($tasks as $task) {
@@ -123,6 +136,7 @@ final class CalendarController extends AbstractController
         User $user,
         \DateTimeImmutable $rangeStart,
         \DateTimeImmutable $rangeEnd,
+        ?string $projectId,
     ): array {
         $qb = $this->em->getRepository(Task::class)->createQueryBuilder('t')
             ->leftJoin('t.project', 'p')
@@ -132,6 +146,18 @@ final class CalendarController extends AbstractController
             ->setParameter('start', $rangeStart)
             ->setParameter('end', $rangeEnd)
             ->setParameter('space', $space);
+
+        if (null !== $projectId) {
+            // Project-tab calendar: just that project's tasks, still scoped to
+            // the space so a foreign project id resolves to nothing.
+            $qb->andWhere('p.space = :space AND p.id = :projectId')
+                ->setParameter('projectId', $projectId);
+
+            /** @var list<Task> $scoped */
+            $scoped = $qb->getQuery()->getResult();
+
+            return $scoped;
+        }
 
         // Standalone (project-less) tasks are owner-only and only belong on the
         // owner's personal-space calendar.

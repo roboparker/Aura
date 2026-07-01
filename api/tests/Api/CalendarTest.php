@@ -87,6 +87,32 @@ class CalendarTest extends ApiTestCase
         $this->assertSame(['2026-06-15', '2026-06-16', '2026-06-17'], $dates);
     }
 
+    public function testCalendarProjectFilterScopesToOneProject(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $one = $this->createProject($alice, 'Alpha');
+        $two = $this->createProject($alice, 'Beta');
+        $space = $one->getSpace();
+        assert($space instanceof Space);
+
+        $this->createTask($alice, 'Alpha task', $one, '2026-06-15T09:00:00+00:00');
+        $this->createTask($alice, 'Beta task', $two, '2026-06-16T09:00:00+00:00');
+        $this->createTask($alice, 'Loose task', null, '2026-06-17T09:00:00+00:00');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $response = $client->request(
+            'GET',
+            $this->url($space, '2026-06-01', '2026-06-30') . '&project=' . $one->getId(),
+        );
+        $this->assertResponseIsSuccessful();
+
+        $titles = $this->entryTitles($response->toArray());
+        $this->assertContains('Alpha task', $titles);
+        $this->assertNotContains('Beta task', $titles);
+        $this->assertNotContains('Loose task', $titles);
+    }
+
     public function testCalendarHidesForNonMember(): void
     {
         $alice = $this->createUser('alice@example.com');

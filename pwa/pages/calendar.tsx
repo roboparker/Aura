@@ -1,19 +1,14 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import { dayKeyDiff, parseDayKey } from "@/lib/calendarDates";
-import WorkspaceCalendar, {
-  type CalendarEntry,
-  type RescheduleScope,
-} from "@/components/calendar/WorkspaceCalendar";
+import CalendarView from "@/components/calendar/CalendarView";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import { type AssigneeOption } from "@/components/tasks/AssigneesCombobox";
 import { type TagOption } from "@/components/tasks/TagsCombobox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Collection<T> {
   member?: T[];
@@ -26,18 +21,10 @@ const CalendarPage = () => {
   const router = useRouter();
   const currentUserIri = user ? `/users/${user.id}` : null;
 
-  const spaceIri = activeSpace ? activeSpace["@id"] : null;
-
-  const [entries, setEntries] = useState<CalendarEntry[]>([]);
-  const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
   const [allTags, setAllTags] = useState<TagOption[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Filters (derived options from the loaded entries).
-  const [projectFilter, setProjectFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
+  // Bumped after a reschedule so the drawer's parent list stays coherent.
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Deep-linkable task drawer via `?task={id}`.
   const activeTaskId =
@@ -95,110 +82,8 @@ const CalendarPage = () => {
     })();
   }, [isAuthenticated]);
 
-  const loadEntries = useCallback(async () => {
-    if (!spaceIri || !range) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const url = `${ENTRYPOINT}/calendar?${new URLSearchParams({
-        space: spaceIri,
-        start: range.start,
-        end: range.end,
-      }).toString()}`;
-      const res = await fetch(url, {
-        credentials: "include",
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) throw new Error("Failed to load calendar.");
-      const data: { entries?: CalendarEntry[] } = await res.json();
-      setEntries(data.entries ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load calendar.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [spaceIri, range]);
-
-  useEffect(() => {
-    void loadEntries();
-  }, [loadEntries]);
-
-  const onRangeChange = useCallback((start: string, end: string) => {
-    setRange((prev) =>
-      prev && prev.start === start && prev.end === end ? prev : { start, end },
-    );
-  }, []);
-
-  const reschedule = useCallback(
-    async (entry: CalendarEntry, targetKey: string, scope: RescheduleScope) => {
-      try {
-        if (entry.recurring && scope === "single") {
-          const res = await fetch(
-            `${ENTRYPOINT}/tasks/${encodeURIComponent(entry.taskId)}/detach-occurrence`,
-            {
-              method: "POST",
-              credentials: "include",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ date: entry.occurrenceDate, dueDate: targetKey }),
-            },
-          );
-          if (!res.ok) throw new Error("Failed to move occurrence.");
-        } else {
-          // Shift the anchor by the dragged delta (covers non-recurring moves
-          // and "all occurrences"); preserves the task's time-of-day.
-          const deltaDays = dayKeyDiff(entry.occurrenceDate, targetKey);
-          const base = entry.dueDate ? new Date(entry.dueDate) : parseDayKey(entry.occurrenceDate);
-          base.setDate(base.getDate() + deltaDays);
-          const res = await fetch(`${ENTRYPOINT}/tasks/${encodeURIComponent(entry.taskId)}`, {
-            method: "PATCH",
-            credentials: "include",
-            headers: { "Content-Type": "application/merge-patch+json" },
-            body: JSON.stringify({ dueDate: base.toISOString() }),
-          });
-          if (!res.ok) throw new Error("Failed to reschedule task.");
-        }
-        await loadEntries();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to reschedule.");
-      }
-    },
-    [loadEntries],
-  );
-
-  const projectOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const e of entries) {
-      if (e.project) seen.set(e.project["@id"], e.project.title);
-    }
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [entries]);
-
-  const assigneeOptions = useMemo(() => {
-    const seen = new Map<string, string>();
-    for (const e of entries) {
-      for (const a of e.assignees) {
-        const name =
-          a.nickname || `${a.givenName ?? ""} ${a.familyName ?? ""}`.trim() || a["@id"];
-        seen.set(a["@id"], name);
-      }
-    }
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
-  }, [entries]);
-
-  const visibleEntries = useMemo(
-    () =>
-      entries.filter(
-        (e) =>
-          (projectFilter === "" || e.project?.["@id"] === projectFilter) &&
-          (assigneeFilter === "" || e.assignees.some((a) => a["@id"] === assigneeFilter)),
-      ),
-    [entries, projectFilter, assigneeFilter],
-  );
-
   if (authLoading || !isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-background" />
-    );
+    return <div className="min-h-screen bg-background" />;
   }
 
   return (
@@ -207,54 +92,14 @@ const CalendarPage = () => {
         <title>Calendar - Madori</title>
       </Head>
       <main className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-bold">Calendar</h1>
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={projectFilter}
-                onChange={(e) => setProjectFilter(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                aria-label="Filter by project"
-                data-testid="calendar-project-filter"
-              >
-                <option value="">All projects</option>
-                {projectOptions.map(([iri, title]) => (
-                  <option key={iri} value={iri}>
-                    {title}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={assigneeFilter}
-                onChange={(e) => setAssigneeFilter(e.target.value)}
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                aria-label="Filter by assignee"
-                data-testid="calendar-assignee-filter"
-              >
-                <option value="">All assignees</option>
-                {assigneeOptions.map(([iri, name]) => (
-                  <option key={iri} value={iri}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
+        <div className="w-full px-4 py-8">
+          <h1 className="mb-4 text-2xl font-bold">Calendar</h1>
           {activeSpace ? (
-            <WorkspaceCalendar
-              entries={visibleEntries}
-              isLoading={isLoading}
-              onRangeChange={onRangeChange}
+            <CalendarView
+              spaceIri={activeSpace["@id"]}
               onOpen={openTaskDetail}
-              onReschedule={reschedule}
+              refreshSignal={refreshKey}
+              assignableUsers={assignableUsers}
             />
           ) : (
             <p className="text-sm text-muted-foreground">Loading space…</p>
@@ -269,8 +114,8 @@ const CalendarPage = () => {
         currentUserIri={currentUserIri}
         assignableUsers={assignableUsers}
         allTags={allTags}
-        onTaskChanged={() => void loadEntries()}
-        onTaskDeleted={() => void loadEntries()}
+        onTaskChanged={() => setRefreshKey((k) => k + 1)}
+        onTaskDeleted={() => setRefreshKey((k) => k + 1)}
       />
     </>
   );

@@ -18,7 +18,9 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
-import TaskCalendar from "@/components/projects/TaskCalendar";
+import CalendarView from "@/components/calendar/CalendarView";
+import FilterMultiSelect from "@/components/common/FilterMultiSelect";
+import { displayName } from "@/lib/userDisplay";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import { computeColumnWidths } from "@/components/projects/columnWidths";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
@@ -188,6 +190,11 @@ const ProjectDetail = () => {
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
+  const [calendarRefresh, setCalendarRefresh] = useState(0);
+  // Board view filters (assignee / tags).
+  const [boardAssignees, setBoardAssignees] = useState<Set<string>>(new Set());
+  const [boardTags, setBoardTags] = useState<Set<string>>(new Set());
   const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
   const [sections, setSections] = useState<TaskSection[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
@@ -274,6 +281,21 @@ const ProjectDetail = () => {
         {
           pathname: "/projects/[id]",
           query: { ...router.query, id: projectId, task: task.id },
+        },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router, projectId],
+  );
+  // Id-based opener for the calendar (which hands back a task id, not a Task).
+  const openTaskById = useCallback(
+    (taskId: string) => {
+      if (!projectId) return;
+      void router.push(
+        {
+          pathname: "/projects/[id]",
+          query: { ...router.query, id: projectId, task: taskId },
         },
         undefined,
         { shallow: true },
@@ -542,10 +564,6 @@ const ProjectDetail = () => {
     () => definitions.filter((d) => showsOnSurface(d.visibility, "board")),
     [definitions],
   );
-  const calendarDefinitions = useMemo(
-    () => definitions.filter((d) => showsOnSurface(d.visibility, "calendar")),
-    [definitions],
-  );
 
   // The assignee picker must only offer users who can actually be assigned
   // to this project's tasks — its space members — not the caller's whole
@@ -558,6 +576,21 @@ const ProjectDetail = () => {
     const memberIris = new Set(project.members.map((m) => m["@id"]));
     return assignableUsers.filter((u) => memberIris.has(u["@id"]));
   }, [assignableUsers, project]);
+
+  // Board filter option lists (alphabetical).
+  const byName = (a: [string, string], b: [string, string]) =>
+    a[1].localeCompare(b[1], undefined, { sensitivity: "base" });
+  const boardAssigneeOptions = useMemo<[string, string][]>(
+    () =>
+      projectAssignableUsers
+        .map((u): [string, string] => [u["@id"], displayName(u)])
+        .sort(byName),
+    [projectAssignableUsers],
+  );
+  const boardTagOptions = useMemo<[string, string][]>(
+    () => allTags.map((t): [string, string] => [t["@id"], t.title]).sort(byName),
+    [allTags],
+  );
 
   // Per-user, per-project list-view state (column order + sort + filters),
   // persisted in localStorage. Applied within each section by SectionBlock.
@@ -1543,6 +1576,22 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="board" className="mt-4">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <FilterMultiSelect
+                      label="Assignees"
+                      options={boardAssigneeOptions}
+                      selected={boardAssignees}
+                      onChange={setBoardAssignees}
+                      testId="board-assignee-filter"
+                    />
+                    <FilterMultiSelect
+                      label="Tags"
+                      options={boardTagOptions}
+                      selected={boardTags}
+                      onChange={setBoardTags}
+                      testId="board-tag-filter"
+                    />
+                  </div>
                   <TaskBoard
                     definitions={boardDefinitions}
                     assignableUsers={projectAssignableUsers}
@@ -1552,7 +1601,13 @@ const ProjectDetail = () => {
                       title: group.section
                         ? group.section.title
                         : DEFAULT_SECTION_LABEL,
-                      tasks: group.tasks,
+                      tasks: group.tasks.filter(
+                        (t) =>
+                          (boardAssignees.size === 0 ||
+                            t.assignees.some((a) => boardAssignees.has(a["@id"]))) &&
+                          (boardTags.size === 0 ||
+                            t.tags.some((tag) => boardTags.has(tag["@id"]))),
+                      ),
                     }))}
                     onOpen={(taskIri) => {
                       const task = tasks.find((t) => t["@id"] === taskIri);
@@ -1587,18 +1642,15 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="calendar" className="mt-4">
-                  <TaskCalendar
-                    tasks={tasks}
-                    definitions={calendarDefinitions}
+                  {/* Same calendar as the top-level /calendar, filtered to this
+                      project (issue #442). */}
+                  <CalendarView
+                    spaceIri={projectSpaceIri(project)}
+                    projectIri={project["@id"]}
+                    onOpen={openTaskById}
+                    onTasksChanged={() => void load()}
+                    refreshSignal={calendarRefresh}
                     assignableUsers={projectAssignableUsers}
-                    onOpen={(taskIri) => {
-                      const task = tasks.find((t) => t["@id"] === taskIri);
-                      if (task) openTaskDetail(task);
-                    }}
-                    onAssign={(taskIri, iris) => {
-                      const task = tasks.find((t) => t["@id"] === taskIri);
-                      if (task) void patchTask(task, { assignees: iris });
-                    }}
                   />
                 </TabsContent>
 
@@ -1618,7 +1670,7 @@ const ProjectDetail = () => {
         currentUserIri={currentUserIri}
         assignableUsers={projectAssignableUsers}
         allTags={allTags}
-        onTaskChanged={(updated) =>
+        onTaskChanged={(updated) => {
           setTasks((prev) =>
             prev.map((t) =>
               t["@id"] === updated["@id"]
@@ -1635,11 +1687,13 @@ const ProjectDetail = () => {
                   }
                 : t,
             ),
-          )
-        }
-        onTaskDeleted={(iri) =>
-          setTasks((prev) => prev.filter((t) => t["@id"] !== iri))
-        }
+          );
+          setCalendarRefresh((k) => k + 1);
+        }}
+        onTaskDeleted={(iri) => {
+          setTasks((prev) => prev.filter((t) => t["@id"] !== iri));
+          setCalendarRefresh((k) => k + 1);
+        }}
       />
 
       {/* Field editor sheet: create (from the add-column "+") or edit an
@@ -2012,20 +2066,30 @@ const AddTaskRow = ({
   };
 
   if (!adding) {
+    // Mirror the per-column cell structure of the data + expanded rows (rather
+    // than one merged colSpan cell) so the column borders stay aligned and the
+    // placeholder doesn't break up the table.
     return (
       <tr className="border-b" data-testid="project-add-task-trigger">
         <td className="px-3 py-2" />
-        <td colSpan={columns.length + 1} className="px-2 py-2">
-          <button
-            ref={triggerRef}
-            type="button"
-            onClick={open}
-            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            data-testid="project-add-task"
-          >
-            <Plus className="h-4 w-4" /> Add task
-          </button>
-        </td>
+        {columns.map((column) =>
+          column.key === "task" ? (
+            <td key="task" className="px-2 py-2">
+              <button
+                ref={triggerRef}
+                type="button"
+                onClick={open}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                data-testid="project-add-task"
+              >
+                <Plus className="h-4 w-4" /> Add task
+              </button>
+            </td>
+          ) : (
+            <td key={column.key} className="px-2 py-2" />
+          ),
+        )}
+        <td className="px-2 py-2" />
       </tr>
     );
   }
