@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main with full history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           # Always check out main rather than the tag commit — git-cliff
           # reads tags from the fetched history regardless of HEAD, and
@@ -100,7 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
