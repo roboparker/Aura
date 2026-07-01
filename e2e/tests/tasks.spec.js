@@ -62,7 +62,8 @@ test.describe("Tasks", () => {
     await checkbox.check();
     await completeResponse;
     await expect(checkbox).toBeChecked();
-    await expect(item.locator(`text=${title}`)).toHaveClass(/line-through/);
+    // Completed tasks read as muted (no strikethrough).
+    await expect(item.locator(`text=${title}`)).toHaveClass(/text-muted-foreground/);
 
     // Uncomplete
     const uncompleteResponse = page.waitForResponse(
@@ -74,7 +75,7 @@ test.describe("Tasks", () => {
     await checkbox.uncheck();
     await uncompleteResponse;
     await expect(checkbox).not.toBeChecked();
-    await expect(item.locator(`text=${title}`)).not.toHaveClass(/line-through/);
+    await expect(item.locator(`text=${title}`)).not.toHaveClass(/text-muted-foreground/);
 
     // Delete (trash icon button — accessible name is `Delete "<title>"`)
     await item.getByRole("button", { name: /^Delete "/ }).click();
