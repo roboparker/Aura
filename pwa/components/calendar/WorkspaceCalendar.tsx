@@ -110,7 +110,7 @@ const EntryCard = ({
       title={entry.title}
       data-testid="calendar-entry"
     >
-      <div className="mb-1 flex items-center gap-1">
+      <div className="mb-2 flex items-center gap-1">
         {entry.recurring && (
           <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Repeats" />
         )}
