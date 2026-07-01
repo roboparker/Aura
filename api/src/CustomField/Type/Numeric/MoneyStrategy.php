@@ -8,7 +8,7 @@ use App\CustomField\CustomFieldKind;
 use App\CustomField\Footer\FooterKind;
 use App\CustomField\Type\AbstractTypeStrategy;
 use App\CustomField\Type\TypeViolation;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 use Symfony\Component\Intl\Currencies;
 
 /**
@@ -96,7 +96,7 @@ final class MoneyStrategy extends AbstractTypeStrategy
         return $violations;
     }
 
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array
     {
         if (!is_array($value)) {
             return [new TypeViolation('', 'Expected an object with amount and currency.')];

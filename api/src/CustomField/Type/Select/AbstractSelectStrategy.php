@@ -7,7 +7,7 @@ namespace App\CustomField\Type\Select;
 use App\CustomField\CustomFieldKind;
 use App\CustomField\Type\AbstractTypeStrategy;
 use App\CustomField\Type\TypeViolation;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 
 /**
  * Shared validation + normalization for select kinds. The (single,
@@ -75,7 +75,7 @@ abstract class AbstractSelectStrategy extends AbstractTypeStrategy
         return $violations;
     }
 
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array
     {
         return $this->validateValueAgainstKeys($value, $this->keysFromConfig($config), $config);
     }
