@@ -115,17 +115,17 @@ const EntryCard = ({
           <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" aria-label="Repeats" />
         )}
         <span className="min-w-0 flex-1 truncate font-medium">{entry.title}</span>
-        {entry.assignees.length > 0 && (
-          <span className="flex shrink-0 -space-x-1.5">
-            {entry.assignees.slice(0, 3).map((a) => (
-              <UserAvatar key={a["@id"]} user={a} size="sm" className="h-5 w-5 ring-2 ring-card" />
-            ))}
-          </span>
-        )}
       </div>
       {entry.project && (
         <span className="block truncate text-[11px] text-muted-foreground">
           {entry.project.title}
+        </span>
+      )}
+      {entry.assignees.length > 0 && (
+        <span className="flex -space-x-1.5">
+          {entry.assignees.slice(0, 3).map((a) => (
+            <UserAvatar key={a["@id"]} user={a} size="sm" className="h-5 w-5 ring-2 ring-card" />
+          ))}
         </span>
       )}
     </div>
