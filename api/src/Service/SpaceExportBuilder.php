@@ -224,7 +224,8 @@ final class SpaceExportBuilder
             'tags' => array_map(static fn (Tag $t): string => $t->getTitle(), $task->getTags()->toArray()),
             'customFieldValues' => array_map(static fn (CustomFieldValue $v): array => [
                 'definitionId' => null !== $v->getDefinition() ? (string) $v->getDefinition()->getId() : null,
-                'name' => $v->getDefinition()?->getName(),
+                'globalDefinitionId' => null !== $v->getGlobalDefinition() ? (string) $v->getGlobalDefinition()->getId() : null,
+                'name' => $v->getEffectiveDefinition()?->getName(),
                 'value' => $v->getValue(),
             ], $task->getCustomFieldValues()->toArray()),
             'attachments' => array_map(fn (MediaObject $m): array => [

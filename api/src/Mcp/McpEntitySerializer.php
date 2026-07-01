@@ -56,7 +56,8 @@ final class McpEntitySerializer
             'customFieldValues' => array_map(
                 fn (CustomFieldValue $v) => [
                     'definitionId' => null === $v->getDefinition() ? null : (string) $v->getDefinition()->getId(),
-                    'name' => $v->getDefinition()?->getName(),
+                    'globalDefinitionId' => null === $v->getGlobalDefinition() ? null : (string) $v->getGlobalDefinition()->getId(),
+                    'name' => $v->getEffectiveDefinition()?->getName(),
                     'value' => $v->getValue(),
                 ],
                 $task->getCustomFieldValues()->toArray(),

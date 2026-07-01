@@ -4,6 +4,7 @@ namespace App\Validator;
 
 use App\CustomField\CustomFieldTypeRegistry;
 use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
@@ -59,29 +60,43 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         $providedDefinitionIds = [];
 
         foreach ($values as $index => $cfv) {
-            $definition = $cfv->getDefinition();
-            if (null === $definition) {
-                // NotNull constraint on the property surfaces the
-                // missing definition separately.
-                continue;
-            }
-            // A value is only legal for a definition the task's project has
-            // opted into (the space-owned field is attached to this project).
-            $attached = false;
-            if (null !== $project) {
-                foreach ($definition->getProjects() as $defProject) {
-                    if ((string) $defProject->getId() === (string) $project->getId()) {
-                        $attached = true;
-                        break;
-                    }
-                }
-            }
-            if (!$attached) {
-                $this->context->buildViolation($constraint->messageWrongProject)
-                    ->setParameter('{{ name }}', $definition->getName())
+            $spaceDefinition = $cfv->getDefinition();
+            $globalDefinition = $cfv->getGlobalDefinition();
+
+            // XOR: a value points at exactly one definition source. Neither
+            // or both is the transient invalid state the DB CHECK also guards.
+            if ((null === $spaceDefinition) === (null === $globalDefinition)) {
+                $this->context->buildViolation($constraint->messageDefinitionSource)
                     ->atPath(sprintf('customFieldValues[%d].definition', $index))
                     ->addViolation();
                 continue;
+            }
+
+            $definition = $spaceDefinition ?? $globalDefinition;
+            if (null === $definition) {
+                continue;
+            }
+
+            // A space-owned value is only legal for a definition the task's
+            // project has opted into. Global fields are instance-wide; their
+            // per-project opt-in check lands with the join table (commit 3).
+            if (null !== $spaceDefinition) {
+                $attached = false;
+                if (null !== $project) {
+                    foreach ($spaceDefinition->getProjects() as $defProject) {
+                        if ((string) $defProject->getId() === (string) $project->getId()) {
+                            $attached = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$attached) {
+                    $this->context->buildViolation($constraint->messageWrongProject)
+                        ->setParameter('{{ name }}', $spaceDefinition->getName())
+                        ->atPath(sprintf('customFieldValues[%d].definition', $index))
+                        ->addViolation();
+                    continue;
+                }
             }
 
             $defId = (string) $definition->getId();
@@ -105,7 +120,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
 
     private function dispatchToStrategy(
         CustomFieldValue $cfv,
-        CustomFieldDefinition $definition,
+        CustomFieldDefinitionInterface $definition,
         ValidCustomFieldValues $constraint,
         int $index,
     ): void {

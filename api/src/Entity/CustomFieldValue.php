@@ -7,7 +7,6 @@ use App\Repository\CustomFieldValueRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
-use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * Per-task value for a {@see CustomFieldDefinition} (#84). Embedded as a
@@ -26,8 +25,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'custom_field_value')]
 #[ORM\Index(columns: ['task_id'], name: 'idx_cfv_task')]
 #[ORM\Index(columns: ['definition_id'], name: 'idx_cfv_definition')]
+#[ORM\Index(columns: ['global_definition_id'], name: 'idx_cfv_global_definition')]
 #[ORM\Index(columns: ['search_vector'], name: 'idx_cfv_search_vector', flags: ['gin'])]
 #[ORM\UniqueConstraint(name: 'uniq_cfv_task_definition', columns: ['task_id', 'definition_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_cfv_task_global_definition', columns: ['task_id', 'global_definition_id'])]
 class CustomFieldValue
 {
     #[ORM\Id]
@@ -46,16 +47,32 @@ class CustomFieldValue
     private ?Task $task = null;
 
     /**
-     * Bare IRI on read — embedding the full definition would balloon
-     * every task payload by N fields. Clients already fetched the
-     * definitions when rendering the project's field schema.
+     * The space-owned definition this value is for, OR null when the value
+     * points at a {@see $globalDefinition} instead. Exactly one of the two
+     * is non-null — the XOR is enforced by {@see ValidCustomFieldValues} and
+     * a DB CHECK (`chk_cfv_definition_exactly_one`). Reach the live
+     * definition regardless of source through {@see getEffectiveDefinition()}.
+     *
+     * Bare IRI on read — embedding the full definition would balloon every
+     * task payload by N fields. Clients already fetched the definitions when
+     * rendering the project's field schema.
      */
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: CustomFieldDefinition::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Assert\NotNull(message: 'Custom field definition is required.')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['task:read', 'task:write'])]
     private ?CustomFieldDefinition $definition = null;
+
+    /**
+     * The instance-wide global definition this value is for, OR null when
+     * the value points at a space-owned {@see $definition}. The global
+     * sibling in the polymorphic pair — see the note on {@see $definition}.
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: GlobalCustomFieldDefinition::class)]
+    #[ORM\JoinColumn(name: 'global_definition_id', nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['task:read', 'task:write'])]
+    private ?GlobalCustomFieldDefinition $globalDefinition = null;
 
     /**
      * Type-erased scalar (or list). Stored as JSON so a single column
@@ -121,6 +138,29 @@ class CustomFieldValue
     {
         $this->definition = $definition;
         return $this;
+    }
+
+    public function getGlobalDefinition(): ?GlobalCustomFieldDefinition
+    {
+        return $this->globalDefinition;
+    }
+
+    public function setGlobalDefinition(?GlobalCustomFieldDefinition $globalDefinition): static
+    {
+        $this->globalDefinition = $globalDefinition;
+        return $this;
+    }
+
+    /**
+     * The live definition this value belongs to, whichever source it points
+     * at. Every custom-field consumer (validator, FTS subscriber, footer
+     * aggregator, serializers) reads through this so it never has to care
+     * whether the field is space-owned or global. Null only in the
+     * transient invalid state where neither FK is set.
+     */
+    public function getEffectiveDefinition(): ?CustomFieldDefinitionInterface
+    {
+        return $this->definition ?? $this->globalDefinition;
     }
 
     public function getValue(): mixed
