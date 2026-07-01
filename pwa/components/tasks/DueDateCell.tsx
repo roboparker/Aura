@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, Bell, Repeat, X } from "lucide-react";
+import { Bell, Repeat, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -109,27 +109,27 @@ const DueDateCell = ({
             data-testid={testIdPrefix}
             data-status={status}
           >
-            {status === "overdue" && (
-              <AlertTriangle
-                className="h-3.5 w-3.5"
-                aria-hidden="true"
-                data-testid={`${testIdPrefix}-overdue-icon`}
-              />
-            )}
             <span>{formatDueDate(value)}</span>
-            {recurrenceValue && (
-              <Repeat
-                className="h-3 w-3 text-muted-foreground"
-                aria-label={formatRecurrenceSummary(recurrenceValue)}
-                data-testid={`${testIdPrefix}-repeat-icon`}
-              />
-            )}
-            {reminderCount > 0 && (
-              <Bell
-                className="h-3 w-3 text-muted-foreground"
-                aria-label={`${reminderCount} reminder${reminderCount === 1 ? "" : "s"} set`}
-                data-testid={`${testIdPrefix}-reminder-icon`}
-              />
+            {(recurrenceValue || reminderCount > 0) && (
+              // Recurrence + reminder indicators sit flush to the right edge of
+              // the cell (pr-3 keeps them clear of the hover clear-X). ml-auto
+              // pushes the cluster past the date text.
+              <span className="ml-auto flex items-center gap-1 pr-3">
+                {recurrenceValue && (
+                  <Repeat
+                    className="h-3 w-3 text-muted-foreground"
+                    aria-label={formatRecurrenceSummary(recurrenceValue)}
+                    data-testid={`${testIdPrefix}-repeat-icon`}
+                  />
+                )}
+                {reminderCount > 0 && (
+                  <Bell
+                    className="h-3 w-3 text-muted-foreground"
+                    aria-label={`${reminderCount} reminder${reminderCount === 1 ? "" : "s"} set`}
+                    data-testid={`${testIdPrefix}-reminder-icon`}
+                  />
+                )}
+              </span>
             )}
           </button>
         ) : (

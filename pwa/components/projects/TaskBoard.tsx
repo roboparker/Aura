@@ -219,7 +219,7 @@ const CardBody = ({
     <p
       className={cn(
         "text-sm leading-snug",
-        task.completedOn && "text-muted-foreground line-through",
+        task.completedOn && "text-muted-foreground",
       )}
     >
       {task.title}
@@ -471,8 +471,13 @@ const TaskBoard = ({
   return (
     <DndContext sensors={sensors} onDragStart={handleStart} onDragEnd={handleEnd}>
       {/* px/pt give focus rings room — overflow-x-auto also clips vertically,
-          so a ring on the section-name input or a card would be cut off. */}
-      <div className="flex gap-4 overflow-x-auto px-0.5 pt-1 pb-2" data-testid="task-board">
+          so a ring on the section-name input or a card would be cut off.
+          items-stretch + a viewport min-height make every column (and the
+          add-section placeholder) the same, full height. */}
+      <div
+        className="flex min-h-[calc(100vh-16rem)] items-stretch gap-4 overflow-x-auto px-0.5 pt-1 pb-2"
+        data-testid="task-board"
+      >
         {columns.map((column) => (
           <BoardColumnView
             key={column.key}
@@ -485,34 +490,39 @@ const TaskBoard = ({
             onDeleteSection={onDeleteSection}
           />
         ))}
-        {addingSection ? (
-          <input
-            autoFocus
-            value={newSectionTitle}
-            onChange={(e) => setNewSectionTitle(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitSection();
-              } else if (e.key === "Escape") {
-                cancelSection();
-              }
-            }}
-            onBlur={cancelSection}
-            placeholder="Section name…"
-            className="h-9 w-80 shrink-0 rounded-lg border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            data-testid="board-add-section-input"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingSection(true)}
-            className="flex h-9 w-80 shrink-0 items-center gap-1 rounded-lg border border-dashed px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-            data-testid="board-add-section"
-          >
-            <Plus className="h-4 w-4" /> Add section
-          </button>
-        )}
+        {/* The add-section placeholder is itself a full-height column (matches
+            the real columns via the parent's items-stretch) with its control
+            pinned to the top. */}
+        <div className="flex w-80 shrink-0 flex-col rounded-xl border border-dashed p-2">
+          {addingSection ? (
+            <input
+              autoFocus
+              value={newSectionTitle}
+              onChange={(e) => setNewSectionTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commitSection();
+                } else if (e.key === "Escape") {
+                  cancelSection();
+                }
+              }}
+              onBlur={cancelSection}
+              placeholder="Section name…"
+              className="h-9 w-full rounded-lg border bg-card px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-testid="board-add-section-input"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingSection(true)}
+              className="flex items-center gap-1 rounded-md px-1.5 py-1 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              data-testid="board-add-section"
+            >
+              <Plus className="h-4 w-4" /> Add section
+            </button>
+          )}
+        </div>
       </div>
       <DragOverlay>
         {draggingTask ? (

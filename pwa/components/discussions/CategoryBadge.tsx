@@ -78,13 +78,12 @@ const CategoryBadge = ({ category, className }: Props) => {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
+        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium",
         meta.pill,
         className,
       )}
       data-testid="discussion-category-badge"
     >
-      <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} aria-hidden />
       {meta.label}
     </span>
   );

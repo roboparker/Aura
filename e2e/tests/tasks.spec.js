@@ -212,9 +212,6 @@ test.describe("Tasks", () => {
     });
     const overdueCell = overdueItem.locator('[data-testid="task-due-date"]');
     await expect(overdueCell).toHaveAttribute("data-status", "overdue");
-    await expect(
-      overdueItem.locator('[data-testid="task-due-date-overdue-icon"]'),
-    ).toBeVisible();
 
     // Filter chip reports a count and toggles the list.
     const filter = page.locator('[data-testid="overdue-filter-toggle"]');

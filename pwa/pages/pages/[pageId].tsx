@@ -376,7 +376,7 @@ const PageDetailView = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-muted px-4 py-12">
+      <main className="min-h-screen bg-background px-4 py-12">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Page not found</h1>
@@ -397,7 +397,7 @@ const PageDetailView = () => {
       <Head>
         <title>{page ? `${page.title} - Madori` : "Page - Madori"}</title>
       </Head>
-      <main className="min-h-screen bg-muted">
+      <main className="min-h-screen bg-background">
         <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
           {error && (
             <Alert variant="destructive">

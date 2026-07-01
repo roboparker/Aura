@@ -58,6 +58,14 @@ const AssignMenu = ({
                   className="ring-2 ring-card"
                 />
               ))}
+              {assignees.length > 3 && (
+                <span
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md bg-muted text-xs font-medium text-muted-foreground ring-2 ring-card"
+                  title={`${assignees.length - 3} more`}
+                >
+                  +{assignees.length - 3}
+                </span>
+              )}
             </span>
           ) : (
             <AssigneePlaceholder className="hover:border-foreground/40 hover:text-foreground" />
