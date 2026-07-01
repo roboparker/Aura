@@ -89,7 +89,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     message: 'A field with this name already exists in this space.',
 )]
 #[ValidCustomFieldDefinition]
-class CustomFieldDefinition
+class CustomFieldDefinition implements CustomFieldDefinitionInterface
 {
     /**
      * Legacy flat-type constants from the pre-#227 enum. The columns

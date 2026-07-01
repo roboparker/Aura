@@ -166,6 +166,73 @@ class CustomFieldFooterTest extends ApiTestCase
         $this->assertEqualsCanonicalizing(7, $first['value']);
     }
 
+    public function testSelectBreakdownCountsPerOption(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $status = $this->seedSelectField($project, 'Status', [
+            ['key' => 'backlog', 'label' => 'Backlog'],
+            ['key' => 'in_progress', 'label' => 'In progress'],
+            ['key' => 'done', 'label' => 'Done'],
+        ], footerKind: 'breakdown');
+
+        $this->seedTaskWithValue($alice, $project, $status, 'backlog');
+        $this->seedTaskWithValue($alice, $project, $status, 'done');
+        $this->seedTaskWithValue($alice, $project, $status, 'done');
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('breakdown', $first['kind']);
+        // One row per configured option, in order, zero-filled where unused.
+        $this->assertSame([
+            ['key' => 'backlog', 'label' => 'Backlog', 'count' => 1],
+            ['key' => 'in_progress', 'label' => 'In progress', 'count' => 0],
+            ['key' => 'done', 'label' => 'Done', 'count' => 2],
+        ], $first['value']);
+    }
+
+    public function testMultiSelectBreakdownUnrollsEachValue(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $project = $this->createProject($alice, 'Backend');
+        $labels = $this->seedMultiSelectField($project, 'Labels', [
+            ['key' => 'bug', 'label' => 'Bug'],
+            ['key' => 'chore', 'label' => 'Chore'],
+        ], footerKind: 'breakdown');
+
+        // One task tagged both, one tagged just bug → bug=2, chore=1.
+        $this->seedTaskWithValue($alice, $project, $labels, ['bug', 'chore']);
+        $this->seedTaskWithValue($alice, $project, $labels, ['bug']);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $this->assertResponseIsSuccessful();
+        $response = $client->getResponse();
+        self::assertNotNull($response);
+        $body = $response->toArray();
+        $footers = $body['footers'] ?? null;
+        $this->assertIsArray($footers);
+        $first = $footers[0] ?? null;
+        $this->assertIsArray($first);
+        $this->assertSame('breakdown', $first['kind']);
+        $this->assertSame([
+            ['key' => 'bug', 'label' => 'Bug', 'count' => 2],
+            ['key' => 'chore', 'label' => 'Chore', 'count' => 1],
+        ], $first['value']);
+    }
+
     public function testMoneyFooterEmitsAmountCurrencyShape(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -256,6 +323,44 @@ class CustomFieldFooterTest extends ApiTestCase
             ->setKind(CustomFieldKind::NUMERIC->value)
             ->setSubtype('money')
             ->setConfig(['currency' => $currency]);
+        if (null !== $footerKind) {
+            $field->setFooter(['kind' => $footerKind]);
+        }
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+        return $field;
+    }
+
+    /**
+     * @param list<array{key: string, label: string}> $options
+     */
+    private function seedSelectField(Project $project, string $name, array $options, ?string $footerKind): CustomFieldDefinition
+    {
+        $field = new CustomFieldDefinition();
+        $field->setProject($project)
+            ->setName($name)
+            ->setKind(CustomFieldKind::SELECT->value)
+            ->setSubtype('single')
+            ->setConfig(['multi' => false, 'options' => $options]);
+        if (null !== $footerKind) {
+            $field->setFooter(['kind' => $footerKind]);
+        }
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
+        return $field;
+    }
+
+    /**
+     * @param list<array{key: string, label: string}> $options
+     */
+    private function seedMultiSelectField(Project $project, string $name, array $options, ?string $footerKind): CustomFieldDefinition
+    {
+        $field = new CustomFieldDefinition();
+        $field->setProject($project)
+            ->setName($name)
+            ->setKind(CustomFieldKind::SELECT->value)
+            ->setSubtype('multi')
+            ->setConfig(['multi' => true, 'options' => $options]);
         if (null !== $footerKind) {
             $field->setFooter(['kind' => $footerKind]);
         }

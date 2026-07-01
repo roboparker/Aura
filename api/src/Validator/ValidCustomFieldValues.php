@@ -29,6 +29,7 @@ use Symfony\Component\Validator\Constraint;
 final class ValidCustomFieldValues extends Constraint
 {
     public string $messageNoProject = 'Custom fields require the task to belong to a project.';
+    public string $messageDefinitionSource = 'A custom field value must reference exactly one definition (space or global).';
     public string $messageWrongProject = 'Custom field "{{ name }}" does not belong to this task\'s project.';
     public string $messageDuplicate = 'Custom field "{{ name }}" is set more than once.';
     public string $messageRequired = 'Custom field "{{ name }}" is required.';

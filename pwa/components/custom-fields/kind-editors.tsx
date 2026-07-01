@@ -113,7 +113,7 @@ export const KIND_DESCRIPTORS: Record<CustomFieldKind, KindDescriptor> = {
       { value: "multi", label: "Multi-select" },
     ],
     supportsMulti: false,
-    footerKinds: ["count"],
+    footerKinds: ["count", "breakdown"],
   },
   reference: {
     label: "Reference",

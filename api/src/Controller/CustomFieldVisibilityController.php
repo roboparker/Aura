@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\ProjectFieldVisibility;
 use App\Entity\User;
@@ -67,18 +68,15 @@ final class CustomFieldVisibilityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $payload = $request->toArray();
-        $raw = $payload['visibility'] ?? null;
         // Accept a comma-joined SET of surfaces (list/board/calendar) or the
         // legacy single value; normalise to a deduped, ordered surface string.
-        $surfaces = is_string($raw) ? CustomFieldDefinition::visibilitySurfaces($raw) : [];
-        if ([] === $surfaces) {
+        $visibility = $this->parseVisibility($request);
+        if (null === $visibility) {
             return new JsonResponse(
                 ['error' => 'visibility must list one or more of: ' . implode(', ', CustomFieldDefinition::SURFACES) . '.'],
                 400,
             );
         }
-        $visibility = implode(',', array_values(array_unique($surfaces)));
 
         $row = $this->overrides->findOneFor($project, $definition);
         if (null === $row) {
@@ -91,6 +89,76 @@ final class CustomFieldVisibilityController extends AbstractController
         $this->em->flush();
 
         return new JsonResponse(['visibility' => $visibility], 200);
+    }
+
+    /**
+     * The global-field twin of {@see __invoke()}: sets where an instance-wide
+     * global field shows WITHIN this project. Same access + body contract; the
+     * override targets the polymorphic global arm of {@see ProjectFieldVisibility}.
+     */
+    #[Route(
+        '/projects/{id}/global_custom_field_definitions/{defId}/visibility',
+        name: 'project_global_custom_field_definition_visibility',
+        methods: ['PUT'],
+    )]
+    public function globalVisibility(
+        string $id,
+        string $defId,
+        Request $request,
+        #[CurrentUser] ?User $user,
+    ): Response {
+        if (null === $user) {
+            return new JsonResponse(['error' => 'Not authenticated.'], 401);
+        }
+        if (!Uuid::isValid($id) || !Uuid::isValid($defId)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $project = $this->em->getRepository(Project::class)->find($id);
+        if (null === $project || !$this->canManage($project, $user)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $definition = $this->em->getRepository(GlobalCustomFieldDefinition::class)->find($defId);
+        if (null === $definition || !$project->getGlobalCustomFieldDefinitions()->contains($definition)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $visibility = $this->parseVisibility($request);
+        if (null === $visibility) {
+            return new JsonResponse(
+                ['error' => 'visibility must list one or more of: ' . implode(', ', CustomFieldDefinition::SURFACES) . '.'],
+                400,
+            );
+        }
+
+        $row = $this->overrides->findOneForGlobal($project, $definition);
+        if (null === $row) {
+            $row = (new ProjectFieldVisibility())
+                ->setProject($project)
+                ->setGlobalDefinition($definition);
+            $this->em->persist($row);
+        }
+        $row->setVisibility($visibility);
+        $this->em->flush();
+
+        return new JsonResponse(['visibility' => $visibility], 200);
+    }
+
+    /**
+     * Parse + normalise the `{visibility}` body into a deduped, ordered
+     * comma-joined surface string, or null when it names no valid surface.
+     */
+    private function parseVisibility(Request $request): ?string
+    {
+        $payload = $request->toArray();
+        $raw = $payload['visibility'] ?? null;
+        $surfaces = is_string($raw) ? CustomFieldDefinition::visibilitySurfaces($raw) : [];
+        if ([] === $surfaces) {
+            return null;
+        }
+
+        return implode(',', array_values(array_unique($surfaces)));
     }
 
     private function canManage(Project $project, User $user): bool

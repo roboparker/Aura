@@ -3,7 +3,7 @@
 namespace App\Validator;
 
 use App\CustomField\CustomFieldTypeRegistry;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
@@ -59,23 +59,31 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         $providedDefinitionIds = [];
 
         foreach ($values as $index => $cfv) {
-            $definition = $cfv->getDefinition();
-            if (null === $definition) {
-                // NotNull constraint on the property surfaces the
-                // missing definition separately.
+            $spaceDefinition = $cfv->getDefinition();
+            $globalDefinition = $cfv->getGlobalDefinition();
+
+            // XOR: a value points at exactly one definition source. Neither
+            // or both is the transient invalid state the DB CHECK also guards.
+            if ((null === $spaceDefinition) === (null === $globalDefinition)) {
+                $this->context->buildViolation($constraint->messageDefinitionSource)
+                    ->atPath(sprintf('customFieldValues[%d].definition', $index))
+                    ->addViolation();
                 continue;
             }
-            // A value is only legal for a definition the task's project has
-            // opted into (the space-owned field is attached to this project).
-            $attached = false;
-            if (null !== $project) {
-                foreach ($definition->getProjects() as $defProject) {
-                    if ((string) $defProject->getId() === (string) $project->getId()) {
-                        $attached = true;
-                        break;
-                    }
-                }
+
+            $definition = $spaceDefinition ?? $globalDefinition;
+            if (null === $definition) {
+                continue;
             }
+
+            // A value is only legal for a definition the task's project has
+            // opted into — a space-owned field via the project.customFieldDefinitions
+            // M2M, a global field via project.globalCustomFieldDefinitions.
+            $attached = null !== $project && (
+                null !== $spaceDefinition
+                    ? $this->projectHasDefinition($project->getCustomFieldDefinitions(), $spaceDefinition)
+                    : $this->projectHasDefinition($project->getGlobalCustomFieldDefinitions(), $definition)
+            );
             if (!$attached) {
                 $this->context->buildViolation($constraint->messageWrongProject)
                     ->setParameter('{{ name }}', $definition->getName())
@@ -105,7 +113,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
 
     private function dispatchToStrategy(
         CustomFieldValue $cfv,
-        CustomFieldDefinition $definition,
+        CustomFieldDefinitionInterface $definition,
         ValidCustomFieldValues $constraint,
         int $index,
     ): void {
@@ -143,6 +151,21 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
     }
 
     /**
+     * @param iterable<CustomFieldDefinitionInterface> $collection
+     */
+    private function projectHasDefinition(iterable $collection, CustomFieldDefinitionInterface $definition): bool
+    {
+        $target = (string) $definition->getId();
+        foreach ($collection as $candidate) {
+            if ((string) $candidate->getId() === $target) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<string, CustomFieldValue> $providedDefinitionIds
      */
     private function enforceRequired(
@@ -150,13 +173,17 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         array $providedDefinitionIds,
         ValidCustomFieldValues $constraint,
     ): void {
-        // Required = the project's opted-in fields that aren't nullable.
-        $definitions = array_filter(
+        // Required = the project's opted-in fields (space + global) that
+        // aren't nullable. Both sources share the value-set keyed by def id.
+        $definitions = array_merge(
             $project->getCustomFieldDefinitions()->toArray(),
-            static fn (CustomFieldDefinition $d): bool => !$d->isNullable(),
+            $project->getGlobalCustomFieldDefinitions()->toArray(),
         );
 
         foreach ($definitions as $definition) {
+            if ($definition->isNullable()) {
+                continue;
+            }
             $defId = (string) $definition->getId();
             $cfv = $providedDefinitionIds[$defId] ?? null;
             if (null === $cfv || $this->isEmpty($cfv->getValue())) {

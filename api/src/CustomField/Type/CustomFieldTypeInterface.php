@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\CustomField\Type;
 
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 
 /**
  * Strategy for a single (kind, subtype) custom-field type. Each concrete
@@ -58,7 +58,7 @@ interface CustomFieldTypeInterface
      * @param array<string, mixed> $config
      * @return list<TypeViolation>
      */
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array;
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array;
 
     /**
      * Canonical storage form — applied on persist so different inputs

@@ -125,8 +125,9 @@ const CardCustomFields = ({
   const chips = definitions
     .map((def) => ({
       def,
-      value: task.customFieldValues.find((v) => v.definition === def["@id"])
-        ?.value,
+      value: task.customFieldValues.find(
+        (v) => (v.definition ?? v.globalDefinition) === def["@id"],
+      )?.value,
     }))
     .filter(({ value }) => !isEmptyValue(value));
   if (chips.length === 0) return null;

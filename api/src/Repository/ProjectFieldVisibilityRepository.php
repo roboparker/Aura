@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\CustomFieldDefinition;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\ProjectFieldVisibility;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -22,6 +23,9 @@ class ProjectFieldVisibilityRepository extends ServiceEntityRepository
 
     /**
      * Visibility overrides for a project, keyed by definition UUID string.
+     * Covers both field sources — space and global override rows land in the
+     * same map (their UUIDs never collide) so the collection providers can
+     * look up either without caring which source they hold.
      *
      * @return array<string, string> definitionId => visibility
      */
@@ -29,7 +33,7 @@ class ProjectFieldVisibilityRepository extends ServiceEntityRepository
     {
         $map = [];
         foreach ($this->findBy(['project' => $project]) as $row) {
-            $defId = $row->getDefinition()?->getId();
+            $defId = $row->getEffectiveDefinition()?->getId();
             if (null !== $defId) {
                 $map[(string) $defId] = $row->getVisibility();
             }
@@ -43,5 +47,12 @@ class ProjectFieldVisibilityRepository extends ServiceEntityRepository
         CustomFieldDefinition $definition,
     ): ?ProjectFieldVisibility {
         return $this->findOneBy(['project' => $project, 'definition' => $definition]);
+    }
+
+    public function findOneForGlobal(
+        Project $project,
+        GlobalCustomFieldDefinition $definition,
+    ): ?ProjectFieldVisibility {
+        return $this->findOneBy(['project' => $project, 'globalDefinition' => $definition]);
     }
 }
