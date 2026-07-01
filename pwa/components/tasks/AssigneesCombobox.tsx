@@ -95,7 +95,7 @@ const AssigneesCombobox = ({
           }
         >
           {value.length === 0 && (
-            <AssigneePlaceholder size="xs" className="group-hover/field:border-foreground/40 group-hover/field:text-foreground" />
+            <AssigneePlaceholder className="group-hover/field:border-foreground/40 group-hover/field:text-foreground" />
           )}
           <ComboboxValue>
             {value.map((u) => (
