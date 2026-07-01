@@ -1,7 +1,8 @@
 /**
- * Shared local-date helpers for the calendar surfaces (the project
- * `TaskCalendar` tab and the top-level `/calendar` page). All dates are
- * handled in the browser's local timezone; the canonical key is `YYYY-MM-DD`.
+ * Shared local-date helpers for the calendar surface (`WorkspaceCalendar`,
+ * used by both the top-level `/calendar` page and the project Calendar tab).
+ * All dates are handled in the browser's local timezone; the canonical key is
+ * `YYYY-MM-DD`.
  */
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

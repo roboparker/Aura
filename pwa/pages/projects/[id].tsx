@@ -18,7 +18,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import TaskBoard from "@/components/projects/TaskBoard";
-import TaskCalendar from "@/components/projects/TaskCalendar";
+import CalendarView from "@/components/calendar/CalendarView";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import { computeColumnWidths } from "@/components/projects/columnWidths";
 import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
@@ -188,6 +188,8 @@ const ProjectDetail = () => {
 
   const [project, setProject] = useState<Project | null>(null);
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
+  const [calendarRefresh, setCalendarRefresh] = useState(0);
   const [definitions, setDefinitions] = useState<CustomFieldDefinition[]>([]);
   const [sections, setSections] = useState<TaskSection[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
@@ -274,6 +276,21 @@ const ProjectDetail = () => {
         {
           pathname: "/projects/[id]",
           query: { ...router.query, id: projectId, task: task.id },
+        },
+        undefined,
+        { shallow: true },
+      );
+    },
+    [router, projectId],
+  );
+  // Id-based opener for the calendar (which hands back a task id, not a Task).
+  const openTaskById = useCallback(
+    (taskId: string) => {
+      if (!projectId) return;
+      void router.push(
+        {
+          pathname: "/projects/[id]",
+          query: { ...router.query, id: projectId, task: taskId },
         },
         undefined,
         { shallow: true },
@@ -540,10 +557,6 @@ const ProjectDetail = () => {
   );
   const boardDefinitions = useMemo(
     () => definitions.filter((d) => showsOnSurface(d.visibility, "board")),
-    [definitions],
-  );
-  const calendarDefinitions = useMemo(
-    () => definitions.filter((d) => showsOnSurface(d.visibility, "calendar")),
     [definitions],
   );
 
@@ -1587,18 +1600,14 @@ const ProjectDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="calendar" className="mt-4">
-                  <TaskCalendar
-                    tasks={tasks}
-                    definitions={calendarDefinitions}
-                    assignableUsers={projectAssignableUsers}
-                    onOpen={(taskIri) => {
-                      const task = tasks.find((t) => t["@id"] === taskIri);
-                      if (task) openTaskDetail(task);
-                    }}
-                    onAssign={(taskIri, iris) => {
-                      const task = tasks.find((t) => t["@id"] === taskIri);
-                      if (task) void patchTask(task, { assignees: iris });
-                    }}
+                  {/* Same calendar as the top-level /calendar, filtered to this
+                      project (issue #442). */}
+                  <CalendarView
+                    spaceIri={projectSpaceIri(project)}
+                    projectIri={project["@id"]}
+                    onOpen={openTaskById}
+                    onTasksChanged={() => void load()}
+                    refreshSignal={calendarRefresh}
                   />
                 </TabsContent>
 
@@ -1618,7 +1627,7 @@ const ProjectDetail = () => {
         currentUserIri={currentUserIri}
         assignableUsers={projectAssignableUsers}
         allTags={allTags}
-        onTaskChanged={(updated) =>
+        onTaskChanged={(updated) => {
           setTasks((prev) =>
             prev.map((t) =>
               t["@id"] === updated["@id"]
@@ -1635,11 +1644,13 @@ const ProjectDetail = () => {
                   }
                 : t,
             ),
-          )
-        }
-        onTaskDeleted={(iri) =>
-          setTasks((prev) => prev.filter((t) => t["@id"] !== iri))
-        }
+          );
+          setCalendarRefresh((k) => k + 1);
+        }}
+        onTaskDeleted={(iri) => {
+          setTasks((prev) => prev.filter((t) => t["@id"] !== iri));
+          setCalendarRefresh((k) => k + 1);
+        }}
       />
 
       {/* Field editor sheet: create (from the add-column "+") or edit an
