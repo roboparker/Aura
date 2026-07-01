@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, Plus, Settings, ShieldCheck } from "lucide-react";
+import { CalendarDays, ChevronDown, Plus, Settings, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection } from "@/lib/apiClient";
@@ -437,10 +437,13 @@ const SidebarNav = ({
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
   const { activeSpace } = useActiveSpace();
+  const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const wrap = itemWrapper ?? ((c) => c);
 
   if (!isAuthenticated || !user) return null;
+
+  const calendarActive = router.pathname === "/calendar";
 
   return (
     <div className="flex h-full flex-col">
@@ -451,6 +454,27 @@ const SidebarNav = ({
       )}
 
       <nav className="flex flex-col gap-0.5 px-2 pt-2 pb-4 flex-1 overflow-y-auto">
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  calendarActive && "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/calendar">
+                  <CalendarDays className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="truncate">Calendar</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
         {activeSpace &&
           CONTENT_SECTIONS.map((section) => (
             <ContentSection

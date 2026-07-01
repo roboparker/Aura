@@ -188,6 +188,19 @@ class Task
     private ?array $recurrenceRule = null;
 
     /**
+     * Occurrence dates (`Y-m-d`) excluded from the recurrence series —
+     * iCalendar EXDATE semantics. Set server-side when a single occurrence is
+     * "detached" from the series (dragged to a new day on the calendar, which
+     * clones a standalone task for that date and skips the original slot here).
+     * Read-only on the wire; managed by {@see \App\Controller\TaskDetachOccurrenceController}.
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['task:read'])]
+    private ?array $recurrenceExceptions = null;
+
+    /**
      * Reminders to fire around the due date. Each entry is an object — either
      * relative (`{type:"relative", value:int, unit:"minutes"|"hours"|"days",
      * repeat:bool}`, fired `value` units before the due date) or absolute
@@ -409,6 +422,37 @@ class Task
     public function setRecurrenceRule(?array $recurrenceRule): static
     {
         $this->recurrenceRule = $recurrenceRule;
+        return $this;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getRecurrenceExceptions(): array
+    {
+        return $this->recurrenceExceptions ?? [];
+    }
+
+    /**
+     * @param list<string>|null $recurrenceExceptions
+     */
+    public function setRecurrenceExceptions(?array $recurrenceExceptions): static
+    {
+        // Normalise empty → null so a cleared list doesn't linger as `[]`.
+        $this->recurrenceExceptions = ($recurrenceExceptions ?? []) === []
+            ? null
+            : ($recurrenceExceptions ?? []);
+        return $this;
+    }
+
+    /** Add one `Y-m-d` exception date (idempotent). */
+    public function addRecurrenceException(string $date): static
+    {
+        $current = $this->getRecurrenceExceptions();
+        if (!in_array($date, $current, true)) {
+            $current[] = $date;
+            $this->recurrenceExceptions = $current;
+        }
         return $this;
     }
 
