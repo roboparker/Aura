@@ -21,7 +21,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -86,7 +86,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -147,7 +147,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -194,7 +194,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -219,7 +219,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -250,7 +250,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -298,7 +298,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Download images artifact
         uses: actions/download-artifact@v8
@@ -339,7 +339,7 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       -
         name: Lint Dockerfiles
         uses: hadolint/hadolint-action@v3.3.0
