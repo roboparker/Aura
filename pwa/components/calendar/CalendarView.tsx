@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Filter } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { dayKeyDiff, parseDayKey } from "@/lib/calendarDates";
 import WorkspaceCalendar, {
@@ -6,6 +7,85 @@ import WorkspaceCalendar, {
   type RescheduleScope,
 } from "@/components/calendar/WorkspaceCalendar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+
+/**
+ * Multi-select filter dropdown mirroring the project list view's column
+ * filters — a button (with an active count) that opens a checkbox list.
+ */
+const MultiFilter = ({
+  label,
+  options,
+  selected,
+  onChange,
+  testId,
+}: {
+  label: string;
+  options: [value: string, label: string][];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  testId?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const count = selected.size;
+  const toggle = (value: string, checked: boolean) => {
+    const next = new Set(selected);
+    if (checked) next.add(value);
+    else next.delete(value);
+    onChange(next);
+  };
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className={cn("h-8 gap-1", count > 0 && "border-primary/60 text-foreground")}
+          data-testid={testId}
+        >
+          <Filter className="h-3.5 w-3.5" />
+          {label}
+          {count > 0 && <span className="text-muted-foreground">({count})</span>}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="max-h-72 w-56 overflow-y-auto p-1">
+        {options.length === 0 ? (
+          <p className="px-2 py-1.5 text-xs text-muted-foreground">No options</p>
+        ) : (
+          options.map(([value, optionLabel]) => (
+            <label
+              key={value}
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+            >
+              <Checkbox
+                checked={selected.has(value)}
+                onCheckedChange={(c) => toggle(value, c === true)}
+              />
+              <span className="truncate">{optionLabel}</span>
+            </label>
+          ))
+        )}
+        {count > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange(new Set())}
+            className="mt-1 w-full rounded px-2 py-1.5 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            Clear
+          </button>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 interface CalendarViewProps {
   /** Space whose tasks the calendar projects (`/spaces/{id}` IRI). */
@@ -39,8 +119,8 @@ const CalendarView = ({
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projectFilter, setProjectFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
+  const [projectFilter, setProjectFilter] = useState<Set<string>>(new Set());
+  const [assigneeFilter, setAssigneeFilter] = useState<Set<string>>(new Set());
 
   const loadEntries = useCallback(async () => {
     if (!range) return;
@@ -145,8 +225,10 @@ const CalendarView = ({
     () =>
       entries.filter(
         (e) =>
-          (projectFilter === "" || e.project?.["@id"] === projectFilter) &&
-          (assigneeFilter === "" || e.assignees.some((a) => a["@id"] === assigneeFilter)),
+          (projectFilter.size === 0 ||
+            (e.project != null && projectFilter.has(e.project["@id"]))) &&
+          (assigneeFilter.size === 0 ||
+            e.assignees.some((a) => assigneeFilter.has(a["@id"]))),
       ),
     [entries, projectFilter, assigneeFilter],
   );
@@ -155,35 +237,21 @@ const CalendarView = ({
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         {!projectIri && (
-          <select
-            value={projectFilter}
-            onChange={(e) => setProjectFilter(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-            aria-label="Filter by project"
-            data-testid="calendar-project-filter"
-          >
-            <option value="">All projects</option>
-            {projectOptions.map(([iri, title]) => (
-              <option key={iri} value={iri}>
-                {title}
-              </option>
-            ))}
-          </select>
+          <MultiFilter
+            label="Projects"
+            options={projectOptions}
+            selected={projectFilter}
+            onChange={setProjectFilter}
+            testId="calendar-project-filter"
+          />
         )}
-        <select
-          value={assigneeFilter}
-          onChange={(e) => setAssigneeFilter(e.target.value)}
-          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-          aria-label="Filter by assignee"
-          data-testid="calendar-assignee-filter"
-        >
-          <option value="">All assignees</option>
-          {assigneeOptions.map(([iri, name]) => (
-            <option key={iri} value={iri}>
-              {name}
-            </option>
-          ))}
-        </select>
+        <MultiFilter
+          label="Assignees"
+          options={assigneeOptions}
+          selected={assigneeFilter}
+          onChange={setAssigneeFilter}
+          testId="calendar-assignee-filter"
+        />
       </div>
 
       {error && (
