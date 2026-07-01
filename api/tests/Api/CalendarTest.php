@@ -54,10 +54,10 @@ class CalendarTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', $this->url($space, '2026-06-01', '2026-06-30'));
+        $response = $client->request('GET', $this->url($space, '2026-06-01', '2026-06-30'));
         $this->assertResponseIsSuccessful();
 
-        $titles = $this->entryTitles($client->getResponse()->toArray());
+        $titles = $this->entryTitles($response->toArray());
         $this->assertContains('In range', $titles);
         $this->assertContains('Standalone', $titles);
         $this->assertNotContains('Out of range', $titles);
@@ -80,10 +80,10 @@ class CalendarTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', $this->url($space, '2026-06-01', '2026-06-30'));
+        $response = $client->request('GET', $this->url($space, '2026-06-01', '2026-06-30'));
         $this->assertResponseIsSuccessful();
 
-        $dates = $this->occurrenceDatesFor($client->getResponse()->toArray(), 'Daily standup');
+        $dates = $this->occurrenceDatesFor($response->toArray(), 'Daily standup');
         $this->assertSame(['2026-06-15', '2026-06-16', '2026-06-17'], $dates);
     }
 
@@ -121,9 +121,9 @@ class CalendarTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        $client->request('GET', $this->url($space, '2026-06-15', '2026-06-21'));
+        $response = $client->request('GET', $this->url($space, '2026-06-15', '2026-06-21'));
         $this->assertResponseIsSuccessful();
-        $dates = $this->occurrenceDatesFor($client->getResponse()->toArray(), 'Standup');
+        $dates = $this->occurrenceDatesFor($response->toArray(), 'Standup');
 
         // 06-16 is now an EXDATE (gone from the series); the detached copy
         // lands on 06-20; the rest of the series still projects.
