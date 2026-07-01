@@ -3,7 +3,9 @@
 namespace App\Entity;
 
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -12,7 +14,10 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\CustomField\CustomFieldKind;
 use App\Repository\GlobalCustomFieldDefinitionRepository;
+use App\State\GlobalCustomFieldVisibilityProvider;
 use App\Validator\ValidCustomFieldDefinition;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -43,6 +48,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            provider: GlobalCustomFieldVisibilityProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_ADMIN')",
@@ -61,6 +67,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['global_custom_field_definition:write']],
     order: ['position' => 'ASC', 'createdAt' => 'ASC'],
 )]
+#[ApiFilter(SearchFilter::class, properties: ['projects' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: GlobalCustomFieldDefinitionRepository::class)]
 #[ORM\Table(name: 'global_custom_field_definition')]
@@ -166,9 +173,30 @@ class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
     #[Groups(['global_custom_field_definition:read'])]
     private \DateTimeImmutable $createdAt;
 
+    /**
+     * Projects that have opted this global field into their task view.
+     * Inverse side — the join table is owned by
+     * {@see Project::$globalCustomFieldDefinitions}. Backs the `?projects=`
+     * filter the PWA uses to fetch a project's effective global field set.
+     *
+     * @var Collection<int, Project>
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToMany(targetEntity: Project::class, mappedBy: 'globalCustomFieldDefinitions')]
+    private Collection $projects;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
+        $this->projects = new ArrayCollection();
+    }
+
+    /**
+     * @return Collection<int, Project>
+     */
+    public function getProjects(): Collection
+    {
+        return $this->projects;
     }
 
     public function getId(): ?Uuid

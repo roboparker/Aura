@@ -3,7 +3,6 @@
 namespace App\Validator;
 
 use App\CustomField\CustomFieldTypeRegistry;
-use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
@@ -77,26 +76,20 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
                 continue;
             }
 
-            // A space-owned value is only legal for a definition the task's
-            // project has opted into. Global fields are instance-wide; their
-            // per-project opt-in check lands with the join table (commit 3).
-            if (null !== $spaceDefinition) {
-                $attached = false;
-                if (null !== $project) {
-                    foreach ($spaceDefinition->getProjects() as $defProject) {
-                        if ((string) $defProject->getId() === (string) $project->getId()) {
-                            $attached = true;
-                            break;
-                        }
-                    }
-                }
-                if (!$attached) {
-                    $this->context->buildViolation($constraint->messageWrongProject)
-                        ->setParameter('{{ name }}', $spaceDefinition->getName())
-                        ->atPath(sprintf('customFieldValues[%d].definition', $index))
-                        ->addViolation();
-                    continue;
-                }
+            // A value is only legal for a definition the task's project has
+            // opted into — a space-owned field via the project.customFieldDefinitions
+            // M2M, a global field via project.globalCustomFieldDefinitions.
+            $attached = null !== $project && (
+                null !== $spaceDefinition
+                    ? $this->projectHasDefinition($project->getCustomFieldDefinitions(), $spaceDefinition)
+                    : $this->projectHasDefinition($project->getGlobalCustomFieldDefinitions(), $definition)
+            );
+            if (!$attached) {
+                $this->context->buildViolation($constraint->messageWrongProject)
+                    ->setParameter('{{ name }}', $definition->getName())
+                    ->atPath(sprintf('customFieldValues[%d].definition', $index))
+                    ->addViolation();
+                continue;
             }
 
             $defId = (string) $definition->getId();
@@ -158,6 +151,21 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
     }
 
     /**
+     * @param iterable<CustomFieldDefinitionInterface> $collection
+     */
+    private function projectHasDefinition(iterable $collection, CustomFieldDefinitionInterface $definition): bool
+    {
+        $target = (string) $definition->getId();
+        foreach ($collection as $candidate) {
+            if ((string) $candidate->getId() === $target) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<string, CustomFieldValue> $providedDefinitionIds
      */
     private function enforceRequired(
@@ -165,13 +173,17 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         array $providedDefinitionIds,
         ValidCustomFieldValues $constraint,
     ): void {
-        // Required = the project's opted-in fields that aren't nullable.
-        $definitions = array_filter(
+        // Required = the project's opted-in fields (space + global) that
+        // aren't nullable. Both sources share the value-set keyed by def id.
+        $definitions = array_merge(
             $project->getCustomFieldDefinitions()->toArray(),
-            static fn (CustomFieldDefinition $d): bool => !$d->isNullable(),
+            $project->getGlobalCustomFieldDefinitions()->toArray(),
         );
 
         foreach ($definitions as $definition) {
+            if ($definition->isNullable()) {
+                continue;
+            }
             $defId = (string) $definition->getId();
             $cfv = $providedDefinitionIds[$defId] ?? null;
             if (null === $cfv || $this->isEmpty($cfv->getValue())) {

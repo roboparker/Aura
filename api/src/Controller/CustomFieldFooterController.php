@@ -6,7 +6,8 @@ namespace App\Controller;
 
 use App\CustomField\Footer\FooterAggregator;
 use App\Doctrine\SpaceMembershipDql;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Task;
 use App\Entity\User;
@@ -71,16 +72,20 @@ class CustomFieldFooterController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        // The fields this project has opted into, in space order.
-        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        // The fields this project has opted into — space + global — in
+        // position order (a project's effective field set is the union).
+        $definitions = array_merge(
+            $project->getCustomFieldDefinitions()->toArray(),
+            $project->getGlobalCustomFieldDefinitions()->toArray(),
+        );
         usort(
             $definitions,
-            static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
+            static fn (CustomFieldDefinitionInterface $a, CustomFieldDefinitionInterface $b): int
                 => $a->getPosition() <=> $b->getPosition(),
         );
         $haveFooters = array_filter(
             $definitions,
-            static fn (CustomFieldDefinition $d) => null !== $d->getFooter(),
+            static fn (CustomFieldDefinitionInterface $d) => null !== $d->getFooter(),
         );
 
         // Cheap exit when no field has a footer configured — saves the
@@ -94,10 +99,13 @@ class CustomFieldFooterController extends AbstractController
 
         return new JsonResponse([
             'footers' => array_map(static function (array $row): array {
-                /** @var CustomFieldDefinition $def */
+                /** @var CustomFieldDefinitionInterface $def */
                 $def = $row['definition'];
+                $iriBase = $def instanceof GlobalCustomFieldDefinition
+                    ? '/global_custom_field_definitions/'
+                    : '/custom_field_definitions/';
                 return [
-                    'definition' => '/custom_field_definitions/' . $def->getId(),
+                    'definition' => $iriBase . $def->getId(),
                     'name' => $def->getName(),
                     'kind' => $row['kind'],
                     'label' => $row['label'],

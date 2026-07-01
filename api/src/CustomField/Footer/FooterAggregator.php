@@ -6,7 +6,8 @@ namespace App\CustomField\Footer;
 
 use App\CustomField\CustomFieldKind;
 use App\CustomField\CustomFieldTypeRegistry;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
+use App\Entity\GlobalCustomFieldDefinition;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -41,11 +42,11 @@ final class FooterAggregator
     }
 
     /**
-     * @param iterable<CustomFieldDefinition> $definitions
-     * @param list<string>                    $taskIds       UUIDs (string) of tasks in scope.
+     * @param iterable<CustomFieldDefinitionInterface> $definitions
+     * @param list<string>                             $taskIds       UUIDs (string) of tasks in scope.
      *
      * @return list<array{
-     *     definition: CustomFieldDefinition,
+     *     definition: CustomFieldDefinitionInterface,
      *     kind: string,
      *     label: ?string,
      *     value: mixed,
@@ -82,9 +83,18 @@ final class FooterAggregator
     }
 
     /**
+     * The FK column a value stores this definition in — space-owned fields
+     * live in `definition_id`, global fields in `global_definition_id`.
+     */
+    private function definitionColumn(CustomFieldDefinitionInterface $definition): string
+    {
+        return $definition instanceof GlobalCustomFieldDefinition ? 'global_definition_id' : 'definition_id';
+    }
+
+    /**
      * @param list<string> $taskIds
      */
-    private function compute(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function compute(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
         // No tasks in scope — every aggregate is either null or 0.
         if ([] === $taskIds) {
@@ -92,7 +102,7 @@ final class FooterAggregator
         }
 
         if (FooterKind::COUNT->value === $aggKind) {
-            return $this->countNonNull($definition->getId()?->toRfc4122(), $taskIds);
+            return $this->countNonNull($this->definitionColumn($definition), $definition->getId()?->toRfc4122(), $taskIds);
         }
 
         $kind = $definition->getKind();
@@ -121,7 +131,7 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function countNonNull(?string $definitionId, array $taskIds): int
+    private function countNonNull(string $column, ?string $definitionId, array $taskIds): int
     {
         if (null === $definitionId) {
             return 0;
@@ -130,9 +140,10 @@ final class FooterAggregator
         $sql = sprintf(
             'SELECT COUNT(*)
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL',
+            $column,
             $placeholders,
         );
         $stmt = $this->connection->executeQuery(
@@ -149,12 +160,13 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function aggregateNumeric(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function aggregateNumeric(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
         if (null === $definitionId) {
             return null;
         }
+        $column = $this->definitionColumn($definition);
         [$placeholders, $params] = $this->bindUuids($taskIds);
 
         $isMoney = 'money' === $definition->getSubtype();
@@ -180,11 +192,12 @@ final class FooterAggregator
         $sql = sprintf(
             "SELECT %s(%s)
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL",
             $aggSql,
             $valueExpr,
+            $column,
             $placeholders,
         );
         $raw = $this->connection->executeQuery(
@@ -215,7 +228,7 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function aggregateDate(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function aggregateDate(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
         if (null === $definitionId) {
@@ -224,6 +237,7 @@ final class FooterAggregator
         if (!in_array($aggKind, [FooterKind::MIN->value, FooterKind::MAX->value], true)) {
             return null;
         }
+        $column = $this->definitionColumn($definition);
         [$placeholders, $params] = $this->bindUuids($taskIds);
 
         $aggSql = FooterKind::MIN->value === $aggKind ? 'MIN' : 'MAX';
@@ -233,10 +247,11 @@ final class FooterAggregator
         $sql = sprintf(
             "SELECT %s(value #>> '{}')
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL",
             $aggSql,
+            $column,
             $placeholders,
         );
         $raw = $this->connection->executeQuery(

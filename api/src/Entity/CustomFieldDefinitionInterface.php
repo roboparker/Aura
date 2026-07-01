@@ -47,6 +47,9 @@ interface CustomFieldDefinitionInterface
 
     public function isNullable(): bool;
 
+    /** Sort position within its manager's list. */
+    public function getPosition(): int;
+
     /** The owning space, or null for instance-wide global definitions. */
     public function getSpace(): ?Space;
 

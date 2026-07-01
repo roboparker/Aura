@@ -150,6 +150,20 @@ class ProjectCopyController extends AbstractController
             $this->copyFieldVisibility($copy, $clone, $effective);
         }
 
+        // Global fields (#global-custom-fields) are instance-wide — a copy in
+        // any space opts into the same definitions (nothing to clone), keeping
+        // each field's per-project visibility override.
+        foreach ($source->getGlobalCustomFieldDefinitions() as $sourceGlobal) {
+            $effective = $sourceVisibility[(string) $sourceGlobal->getId()]
+                ?? $sourceGlobal->getVisibility();
+            $copy->addGlobalCustomFieldDefinition($sourceGlobal);
+            $row = (new ProjectFieldVisibility())
+                ->setProject($copy)
+                ->setGlobalDefinition($sourceGlobal)
+                ->setVisibility($effective);
+            $this->em->persist($row);
+        }
+
         // Optional task clone (#182 deep-copy). Opt-in via
         // `includeTasks: true` so the default copy stays metadata +
         // schema only. The clone carries forward the structural
