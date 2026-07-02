@@ -321,7 +321,7 @@ jobs:
         # Cache Playwright's npm install across runs — keyed on the
         # lockfile so a dependency bump invalidates cleanly.
         name: Cache e2e node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: e2e/node_modules
           key: e2e-node-modules-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
