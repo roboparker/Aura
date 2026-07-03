@@ -34,6 +34,7 @@ final class SpacePermission
     public const GROUPS = 'groups';
     public const FILES = 'files';
     public const API_KEYS = 'api_keys';
+    public const TIME_ENTRIES = 'time_entries';
 
     /** @var list<string> */
     public const CATEGORIES = [
@@ -47,6 +48,7 @@ final class SpacePermission
         self::GROUPS,
         self::FILES,
         self::API_KEYS,
+        self::TIME_ENTRIES,
     ];
 
     public static function isCategory(string $category): bool

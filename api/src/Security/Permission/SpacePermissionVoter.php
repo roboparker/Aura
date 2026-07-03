@@ -14,6 +14,7 @@ use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\TaskRelationship;
 use App\Entity\TaskSection;
+use App\Entity\TimeEntry;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -77,6 +78,7 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof Tag => $subject->getSpace(),
             $subject instanceof UserGroup => $subject->getSpace(),
             $subject instanceof TaskSection => $subject->getProject()?->getSpace(),
+            $subject instanceof TimeEntry => $subject->getSpace(),
             $subject instanceof TaskRelationship => $subject->getSource()?->getProject()?->getSpace(),
             $subject instanceof Comment => $this->commentSpace($subject),
             default => null,
