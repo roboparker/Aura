@@ -37,6 +37,68 @@ class MicrosoftCalendarClientTest extends KernelTestCase
         return $connection;
     }
 
+    private function tokenlessConnection(): OAuthConnection
+    {
+        $connection = new OAuthConnection('microsoft');
+        $this->tokens->store($connection, new AccessToken(['access_token' => 'x', 'expires_in' => -100]));
+
+        return $connection;
+    }
+
+    public function testCreateWithoutValidTokenThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse($this->json(['id' => 'x'])));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->tokenlessConnection(), 'primary', $event);
+    }
+
+    public function testApiErrorThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse('', ['http_code' => 500]));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->connection(), 'primary', $event);
+    }
+
+    public function testCreateWithoutIdThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse($this->json(['no_id' => true])));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->connection(), 'primary', $event);
+    }
+
+    public function testListChangesPaginates(): void
+    {
+        $page1 = new MockResponse($this->json([
+            'value' => [['id' => 'a', 'start' => ['dateTime' => '2026-08-20T00:00:00', 'timeZone' => 'UTC']]],
+            '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=2',
+        ]));
+        $page2 = new MockResponse($this->json([
+            'value' => [['id' => 'b', '@removed' => ['reason' => 'deleted']]],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=final',
+        ]));
+        $client = new MicrosoftCalendarClient(new MockHttpClient([$page1, $page2]), $this->tokens, $this->mapper);
+
+        $page = $client->listChanges($this->connection(), 'primary', null);
+
+        $this->assertStringContainsString('deltatoken=final', (string) $page->nextSyncToken);
+        $this->assertCount(2, $page->changes);
+        $this->assertTrue($page->changes[1]->cancelled);
+    }
+
+    public function testSubscribeWithoutIdThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse($this->json(['no_id' => true])));
+
+        $this->expectException(CalendarSyncException::class);
+        $client->subscribe($this->connection(), 'https://example.test/wh', 'secret');
+    }
+
     /** @return array{0: MicrosoftCalendarClient, 1: MockResponse} */
     private function clientReturning(MockResponse $response): array
     {
@@ -144,6 +206,16 @@ class MicrosoftCalendarClientTest extends KernelTestCase
         $subject = $this->body($response)['subject'] ?? null;
         $this->assertIsString($subject);
         $this->assertStringStartsWith('✓', $subject);
+    }
+
+    public function testDeleteEvent(): void
+    {
+        [$client, $response] = $this->clientReturning(new MockResponse('', ['http_code' => 204]));
+
+        $client->deleteEvent($this->connection(), 'primary', 'evt-1');
+
+        $this->assertSame('DELETE', $response->getRequestMethod());
+        $this->assertStringContainsString('/me/events/evt-1', $response->getRequestUrl());
     }
 
     public function testDeleteGoneEventRaisesGone(): void

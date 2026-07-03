@@ -138,12 +138,14 @@ jobs:
         # trailing floor argument up as coverage climbs. Nudged to 83.5 after
         # removing the discussion move/copy controllers (fully covered code +
         # their tests), which shaved the api/src average a hair under 84.
-        # Lowered to 81.5 for the SSO + calendar-sync subsystem (#267/#581/#582):
-        # its OAuth-redirect dances (SsoController, OAuthConnectionController) and
-        # provider builders can't be unit-tested without live provider flows. The
-        # unit-testable parts — the Google/Microsoft client wire formats and the
-        # subscription lifecycle — are covered; ratchet back up as flow tests land.
-        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 81.5
+        # Lowered to 81.5 for the SSO + calendar-sync subsystem (#267/#581/#582),
+        # then ratcheted back up to 85.0 once that subsystem got real coverage —
+        # MockHttpClient wire-format tests for the Google/Microsoft/Stripe clients,
+        # stub-provider tests for the SSO + OAuth callback dances, the SSO client
+        # factory, a real pg_dump BackupRunner test, and assorted service/entity
+        # units. Continue ratcheting toward 90% as the remaining controllers get
+        # endpoint tests.
+        run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 85.0
 
   phpstan:
     name: PHPStan

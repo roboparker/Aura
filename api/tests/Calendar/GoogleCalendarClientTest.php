@@ -37,6 +37,61 @@ class GoogleCalendarClientTest extends KernelTestCase
         return $connection;
     }
 
+    /** A connection whose token is expired with no refresh token → unusable. */
+    private function tokenlessConnection(): OAuthConnection
+    {
+        $connection = new OAuthConnection('google');
+        $this->tokens->store($connection, new AccessToken(['access_token' => 'x', 'expires_in' => -100]));
+
+        return $connection;
+    }
+
+    public function testCreateWithoutValidTokenThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse($this->json(['id' => 'x'])));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->tokenlessConnection(), 'primary', $event);
+    }
+
+    public function testApiErrorThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse('', ['http_code' => 500]));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->connection(), 'primary', $event);
+    }
+
+    public function testCreateWithoutIdThrows(): void
+    {
+        [$client] = $this->clientReturning(new MockResponse($this->json(['no_id' => true])));
+        $event = new CalendarEvent('t', null, new \DateTimeImmutable('2026-08-15'), false);
+
+        $this->expectException(CalendarSyncException::class);
+        $client->createEvent($this->connection(), 'primary', $event);
+    }
+
+    public function testListChangesPaginates(): void
+    {
+        $page1 = new MockResponse($this->json([
+            'items' => [['id' => 'a', 'status' => 'confirmed', 'start' => ['date' => '2026-08-20']]],
+            'nextPageToken' => 'p2',
+        ]));
+        $page2 = new MockResponse($this->json([
+            'items' => [['id' => 'b', 'status' => 'confirmed', 'start' => ['dateTime' => '2026-08-21T09:00:00Z']]],
+            'nextSyncToken' => 'final',
+        ]));
+        $client = new GoogleCalendarClient(new MockHttpClient([$page1, $page2]), $this->tokens, $this->mapper);
+
+        $page = $client->listChanges($this->connection(), 'primary', null);
+
+        $this->assertSame('final', $page->nextSyncToken);
+        $this->assertCount(2, $page->changes);
+        $this->assertSame('2026-08-21', $page->changes[1]->date?->format('Y-m-d'));
+    }
+
     /** @return array{0: GoogleCalendarClient, 1: MockResponse} */
     private function clientReturning(MockResponse $response): array
     {
@@ -126,6 +181,19 @@ class GoogleCalendarClientTest extends KernelTestCase
         $client->createEvent($this->connection(), 'primary', $event);
 
         $this->assertSame(['RRULE:FREQ=WEEKLY;BYDAY=MO'], $this->body($response)['recurrence'] ?? null);
+    }
+
+    public function testUpdateEvent(): void
+    {
+        [$client, $response] = $this->clientReturning(new MockResponse($this->json(['id' => 'evt-9'])));
+        $event = new CalendarEvent('Renamed', 'body', new \DateTimeImmutable('2026-08-15'), true);
+
+        $client->updateEvent($this->connection(), 'primary', 'evt-9', $event);
+
+        $this->assertStringContainsString('/events/evt-9', $response->getRequestUrl());
+        $summary = $this->body($response)['summary'] ?? null;
+        $this->assertIsString($summary);
+        $this->assertStringStartsWith('✓', $summary);
     }
 
     public function testDeleteEvent(): void
