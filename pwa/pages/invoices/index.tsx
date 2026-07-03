@@ -209,7 +209,7 @@ const InvoicesPage = () => {
                 const meta = STATUS_META[invoice.status];
                 return (
                   <li key={invoice["@id"]} className="flex items-center justify-between gap-4 px-4 py-3">
-                    <div className="min-w-0">
+                    <Link href={`/invoices/${invoice.id}`} className="min-w-0 flex-1 hover:opacity-80">
                       <p className="flex items-center gap-2 font-medium">
                         {invoice.number ?? "Draft"}
                         <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", meta.badgeClass)}>
@@ -219,7 +219,7 @@ const InvoicesPage = () => {
                       <p className="truncate text-xs text-muted-foreground">
                         {clientName(invoice.client) || "—"}
                       </p>
-                    </div>
+                    </Link>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="font-medium tabular-nums">
                         {formatMoney(invoice.total, invoice.currency)}

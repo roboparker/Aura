@@ -51,6 +51,9 @@ export interface Invoice {
   subtotal: number;
   taxAmount: number;
   total: number;
+  recurrenceFrequency: "weekly" | "monthly" | "yearly" | null;
+  recurrenceInterval: number | null;
+  nextIssueDate: string | null;
   sentAt: string | null;
   paidAt: string | null;
   createdAt: string;
