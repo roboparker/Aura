@@ -35,6 +35,7 @@ final class AccessPolicy
         'notifications',
         'files',
         'time_entries',
+        'invoices',
         // Account surfaces (token actors only — not impersonation, which uses
         // User::IMPERSONATION_CATEGORIES). 'profile' gates /api/me + /me/preferences;
         // 'security' gates /me/2fa, /me/sessions, account lifecycle, change-password.

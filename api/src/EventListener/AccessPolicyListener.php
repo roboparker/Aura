@@ -64,6 +64,8 @@ final class AccessPolicyListener
         'notifications' => 'notifications',
         'media-objects' => 'files',
         'time_entries' => 'time_entries',
+        'clients' => 'invoices',
+        'invoices' => 'invoices',
     ];
 
     /**

@@ -35,6 +35,8 @@ final class SpacePermission
     public const FILES = 'files';
     public const API_KEYS = 'api_keys';
     public const TIME_ENTRIES = 'time_entries';
+    /** Invoicing + its clients (clients ride this category). Admin-reserved by default. */
+    public const INVOICES = 'invoices';
 
     /** @var list<string> */
     public const CATEGORIES = [
@@ -49,7 +51,17 @@ final class SpacePermission
         self::FILES,
         self::API_KEYS,
         self::TIME_ENTRIES,
+        self::INVOICES,
     ];
+
+    /**
+     * Categories not granted to a plain member by default — an admin must
+     * assign a custom role to unlock them. Everything else is on by default so
+     * a space behaves as before until an admin tightens it.
+     *
+     * @var list<string>
+     */
+    public const ADMIN_RESERVED = [self::API_KEYS, self::INVOICES];
 
     public static function isCategory(string $category): bool
     {
@@ -83,8 +95,10 @@ final class SpacePermission
     public static function fullMatrix(): array
     {
         $matrix = self::matrixOf(true);
-        foreach (self::ACTIONS as $action) {
-            $matrix[self::API_KEYS][$action] = false;
+        foreach (self::ADMIN_RESERVED as $category) {
+            foreach (self::ACTIONS as $action) {
+                $matrix[$category][$action] = false;
+            }
         }
 
         return $matrix;
@@ -100,8 +114,8 @@ final class SpacePermission
     {
         $matrix = self::emptyMatrix();
         foreach (self::CATEGORIES as $category) {
-            // Guests never see API-key management (admin-reserved).
-            if (self::API_KEYS === $category) {
+            // Guests never see admin-reserved surfaces (API keys, invoicing).
+            if (in_array($category, self::ADMIN_RESERVED, true)) {
                 continue;
             }
             $matrix[$category][self::READ] = true;
