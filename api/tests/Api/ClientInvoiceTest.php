@@ -161,6 +161,84 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testIssueAssignsNumberThenMarkPaid(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
+        $invoice = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $invoiceIri = $invoice['@id'];
+        $this->assertIsString($invoiceIri);
+
+        // Issue → first per-space number + sent status.
+        $issued = $client->request('POST', $invoiceIri . '/issue', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertSame('INV-0001', $issued['number'] ?? null);
+        $this->assertSame('sent', $issued['status'] ?? null);
+
+        // Re-issuing a non-draft is rejected.
+        $client->request('POST', $invoiceIri . '/issue', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(409);
+
+        // Mark paid.
+        $paid = $client->request('POST', $invoiceIri . '/mark-paid', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertSame('paid', $paid['status'] ?? null);
+        $this->assertNotNull($paid['paidAt'] ?? null);
+    }
+
+    public function testVoidReleasesBilledTime(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
+
+        $invoice = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+
+        // Voiding releases the billed entry, so it can be re-invoiced.
+        $client->request('POST', $invoice['@id'] . '/void', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+    }
+
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
