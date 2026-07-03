@@ -74,6 +74,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Index(columns: ['space_id', 'started_at'], name: 'idx_time_entry_space_started')]
 #[ORM\Index(columns: ['user_id', 'started_at'], name: 'idx_time_entry_user_started')]
 #[ORM\Index(columns: ['project_id'], name: 'idx_time_entry_project')]
+// Partial unique index (at most one running timer per user). Declared here with
+// the `where` option so doctrine:schema:validate matches the migration's
+// CREATE UNIQUE INDEX ... WHERE ended_at IS NULL (mirrors Space's personal-space index).
+#[ORM\UniqueConstraint(
+    name: 'uniq_time_entry_running_per_user',
+    columns: ['user_id'],
+    options: ['where' => '(ended_at IS NULL)'],
+)]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback('validateConsistency')]
 class TimeEntry

@@ -73,7 +73,9 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame(2200, $invoice['taxAmount'] ?? null);
         $this->assertSame(24200, $invoice['total'] ?? null);
         $this->assertSame(Invoice::STATUS_DRAFT, $invoice['status'] ?? null);
-        $this->assertCount(2, $invoice['lineItems'] ?? []);
+        $lineItems = $invoice['lineItems'] ?? [];
+        $this->assertIsArray($lineItems);
+        $this->assertCount(2, $lineItems);
     }
 
     public function testMemberWithoutInvoiceRoleCannotCreateClient(): void
@@ -227,7 +229,7 @@ class ClientInvoiceTest extends ApiTestCase
         ])->toArray();
 
         // Voiding releases the billed entry, so it can be re-invoiced.
-        $client->request('POST', $invoice['@id'] . '/void', [
+        $client->request('POST', $this->iri($invoice) . '/void', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -262,7 +264,7 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $sent = $client->request('POST', $invoice['@id'] . '/send', [
+        $sent = $client->request('POST', $this->iri($invoice) . '/send', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
@@ -304,13 +306,15 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $client->request('POST', $invoice['@id'] . '/send', [
+        $client->request('POST', $this->iri($invoice) . '/send', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
         $this->assertEmailCount(1);
-        $this->assertEmailAddressContains($this->getMailerMessage(), 'To', 'billing@acme.test');
+        $message = $this->getMailerMessage();
+        $this->assertNotNull($message);
+        $this->assertEmailAddressContains($message, 'To', 'billing@acme.test');
     }
 
     public function testOverdueSweepFlipsPastDueSentInvoices(): void
@@ -347,7 +351,6 @@ class ClientInvoiceTest extends ApiTestCase
 
         // Run the daily overdue sweep.
         $repo = $this->entityManager->getRepository(Invoice::class);
-        assert($repo instanceof \App\Repository\InvoiceRepository);
         $changed = $repo->markOverdue(new \DateTimeImmutable('today'));
         $this->assertSame(1, $changed);
 
@@ -384,7 +387,6 @@ class ClientInvoiceTest extends ApiTestCase
 
         // Run the recurring spawn.
         $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
-        assert($spawner instanceof \App\Service\RecurringInvoiceSpawner);
         $spawned = $spawner->spawnDue(new \DateTimeImmutable('today'));
         $this->assertSame(1, $spawned);
 
@@ -415,7 +417,7 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $response = $client->request('GET', $invoice['@id'] . '/pdf');
+        $response = $client->request('GET', $this->iri($invoice) . '/pdf');
         $this->assertResponseIsSuccessful();
         $this->assertResponseHeaderSame('content-type', 'application/pdf');
         // A real PDF starts with the %PDF- magic bytes.
@@ -505,6 +507,19 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
+    }
+
+    /**
+     * The `@id` of a decoded resource, narrowed to string for concatenation.
+     *
+     * @param array<int|string, mixed> $row
+     */
+    private function iri(array $row): string
+    {
+        $iri = $row['@id'] ?? null;
+        $this->assertIsString($iri);
+
+        return $iri;
     }
 
     private function createSharedSpace(User $admin, ?User $member = null): Space
