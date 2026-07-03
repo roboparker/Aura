@@ -186,7 +186,12 @@ final class SpacePermissionResolver
             }
             $roles = $this->effectiveRoles($space, $membership);
             if (null === $roles) {
-                continue; // no roles + no Member role → unrestricted
+                // No roles + no Member role → unrestricted, EXCEPT admin-reserved
+                // categories, which require an explicit grant (mirrors the voter).
+                if (in_array($category, SpacePermission::ADMIN_RESERVED, true)) {
+                    $denied[] = (string) $space->getId();
+                }
+                continue;
             }
             $allowed = false;
             foreach ($roles as $role) {

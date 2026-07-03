@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Security\Permission;
 
+use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Discussion;
+use App\Entity\Invoice;
 use App\Entity\Page;
 use App\Entity\Project;
 use App\Entity\Space;
@@ -14,6 +16,7 @@ use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\TaskRelationship;
 use App\Entity\TaskSection;
+use App\Entity\TimeEntry;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -58,8 +61,16 @@ final class SpacePermissionVoter extends Voter
             return false;
         }
         [, $category, $action] = explode('.', $attribute);
+        $space = $this->resolveSpace($subject);
 
-        return $this->resolver->can($user, $this->resolveSpace($subject), $category, $action);
+        // Admin-reserved categories (api keys, invoicing) must not be swept in by
+        // the "member with no roles is unrestricted" back-compat rule — they need
+        // an explicit grant (space admin or an assigned role).
+        if (in_array($category, SpacePermission::ADMIN_RESERVED, true)) {
+            return $this->resolver->canByExplicitGrant($user, $space, $category, $action);
+        }
+
+        return $this->resolver->can($user, $space, $category, $action);
     }
 
     /**
@@ -77,6 +88,9 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof Tag => $subject->getSpace(),
             $subject instanceof UserGroup => $subject->getSpace(),
             $subject instanceof TaskSection => $subject->getProject()?->getSpace(),
+            $subject instanceof TimeEntry => $subject->getSpace(),
+            $subject instanceof Client => $subject->getSpace(),
+            $subject instanceof Invoice => $subject->getSpace(),
             $subject instanceof TaskRelationship => $subject->getSource()?->getProject()?->getSpace(),
             $subject instanceof Comment => $this->commentSpace($subject),
             default => null,

@@ -63,6 +63,9 @@ final class AccessPolicyListener
         'comments' => 'comments',
         'notifications' => 'notifications',
         'media-objects' => 'files',
+        'time_entries' => 'time_entries',
+        'clients' => 'invoices',
+        'invoices' => 'invoices',
     ];
 
     /**

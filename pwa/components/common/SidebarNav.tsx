@@ -10,6 +10,9 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Tag,
+  Clock,
+  Receipt,
+  Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
@@ -479,9 +482,10 @@ const SidebarNav = ({
   includeSpaceSwitcher = false,
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
-  const { activeSpace } = useActiveSpace();
+  const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
+  const canInvoices = can("invoices", "read");
   const wrap = itemWrapper ?? ((c) => c);
 
   if (!isAuthenticated || !user) return null;
@@ -566,6 +570,72 @@ const SidebarNav = ({
                 <Link href="/custom-fields">
                   <SlidersHorizontal className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
                   <span className="truncate">Custom fields</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/time") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/time">
+                  <Clock className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+                  <span className="truncate">Time</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && canInvoices && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/clients") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/clients">
+                  <Users className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span className="truncate">Clients</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && canInvoices && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/invoices") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/invoices">
+                  <Receipt className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+                  <span className="truncate">Invoices</span>
                 </Link>
               </Button>,
             )}

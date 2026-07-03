@@ -42,6 +42,25 @@ interface StripeGatewayInterface
     ): string;
 
     /**
+     * Create a one-off (mode=payment) Checkout Session for a single amount and
+     * return its hosted URL — used for invoice payment, distinct from the
+     * subscription checkout above. $metadata rides onto the session + payment
+     * intent so the webhook can resolve our invoice.
+     *
+     * @param int                   $amount   in minor units of $currency
+     * @param array<string, string> $metadata
+     */
+    public function createPaymentCheckout(
+        int $amount,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        ?string $customerEmail,
+        array $metadata,
+    ): string;
+
+    /**
      * Create a Billing Portal session for an existing customer and return its
      * hosted URL.
      */

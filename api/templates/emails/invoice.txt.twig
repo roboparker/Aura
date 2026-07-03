@@ -1,0 +1,9 @@
+{# @var invoice \App\Entity\Invoice #}
+{# @var client \App\Entity\Client #}
+Hi {{ client.name }},
+
+{{ fromName }} has sent you {% if invoice.number %}invoice {{ invoice.number }}{% else %}an invoice{% endif %} for {{ (invoice.total / 100)|number_format(2) }} {{ invoice.currency }}{% if invoice.dueDate %}, due {{ invoice.dueDate|date('F j, Y') }}{% endif %}.
+
+View and pay your invoice: {{ viewUrl }}
+
+You can review the line items, download a PDF, and pay online from that page.

@@ -16,10 +16,14 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
 {
     public const VALID_SIGNATURE = 'test-valid-signature';
     public const CHECKOUT_URL = 'https://checkout.stripe.test/session';
+    public const PAYMENT_URL = 'https://checkout.stripe.test/pay';
     public const PORTAL_URL = 'https://billing.stripe.test/portal';
 
     /** @var list<array{priceId: string, quantity: int, customerId: ?string, customerEmail: ?string, metadata: array<string, string>}> */
     public array $checkoutSessions = [];
+
+    /** @var list<array{amount: int, currency: string, description: string, metadata: array<string, string>}> */
+    public array $paymentSessions = [];
 
     /** @var list<array{customerId: string, returnUrl: string}> */
     public array $portalSessions = [];
@@ -52,6 +56,25 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         ];
 
         return self::CHECKOUT_URL;
+    }
+
+    public function createPaymentCheckout(
+        int $amount,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        ?string $customerEmail,
+        array $metadata,
+    ): string {
+        $this->paymentSessions[] = [
+            'amount' => $amount,
+            'currency' => $currency,
+            'description' => $description,
+            'metadata' => $metadata,
+        ];
+
+        return self::PAYMENT_URL;
     }
 
     public function createBillingPortalSession(string $customerId, string $returnUrl): string
@@ -88,6 +111,7 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
     public function reset(): void
     {
         $this->checkoutSessions = [];
+        $this->paymentSessions = [];
         $this->portalSessions = [];
         $this->canceledSubscriptions = [];
         $this->configured = true;
