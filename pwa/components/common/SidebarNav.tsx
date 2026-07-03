@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Tag,
+  Clock,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
@@ -566,6 +567,28 @@ const SidebarNav = ({
                 <Link href="/custom-fields">
                   <SlidersHorizontal className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
                   <span className="truncate">Custom fields</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/time") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/time">
+                  <Clock className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+                  <span className="truncate">Time</span>
                 </Link>
               </Button>,
             )}
