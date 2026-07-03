@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+    * { font-family: Helvetica, Arial, sans-serif; }
+    body { color: #1f2937; font-size: 12px; margin: 0; }
+    h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: 1px; }
+    .muted { color: #6b7280; }
+    .header { border-bottom: 2px solid #111827; padding-bottom: 12px; margin-bottom: 20px; }
+    .header .status { float: right; text-transform: uppercase; font-size: 11px; font-weight: bold;
+        border: 1px solid #9ca3af; border-radius: 4px; padding: 3px 8px; color: #374151; }
+    .parties { width: 100%; margin-bottom: 24px; }
+    .parties td { vertical-align: top; width: 50%; }
+    .label { text-transform: uppercase; font-size: 10px; letter-spacing: 1px; color: #6b7280; margin-bottom: 4px; }
+    .name { font-weight: bold; font-size: 13px; }
+    table.lines { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    table.lines th { text-align: left; border-bottom: 1px solid #d1d5db; padding: 6px 8px; font-size: 10px;
+        text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
+    table.lines td { padding: 8px; border-bottom: 1px solid #f3f4f6; }
+    .num { text-align: right; }
+    .totals { width: 40%; margin-left: 60%; }
+    .totals td { padding: 4px 8px; }
+    .totals .grand td { border-top: 2px solid #111827; font-weight: bold; font-size: 14px; }
+    .notes { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e5e7eb; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+{% set c = invoice.currency %}
+{% macro money(amount, currency) %}{{ (amount / 100)|number_format(2) }} {{ currency }}{% endmacro %}
+{% import _self as fmt %}
+
+<div class="header">
+    <span class="status">{{ invoice.status }}</span>
+    <h1>INVOICE</h1>
+    <div class="muted">{{ invoice.number ?? 'Draft' }}</div>
+</div>
+
+<table class="parties">
+    <tr>
+        <td>
+            <div class="label">From</div>
+            <div class="name">{{ invoice.space.name ?? '' }}</div>
+        </td>
+        <td>
+            <div class="label">Bill to</div>
+            <div class="name">{{ invoice.client.name ?? '' }}</div>
+            {% if invoice.client.email %}<div class="muted">{{ invoice.client.email }}</div>{% endif %}
+            {% if invoice.client.address %}<div class="muted">{{ invoice.client.address|nl2br }}</div>{% endif %}
+        </td>
+    </tr>
+</table>
+
+<table class="parties">
+    <tr>
+        <td>
+            <div class="label">Issue date</div>
+            <div>{{ invoice.issueDate ? invoice.issueDate|date('M j, Y') : '—' }}</div>
+        </td>
+        <td>
+            <div class="label">Due date</div>
+            <div>{{ invoice.dueDate ? invoice.dueDate|date('M j, Y') : '—' }}</div>
+        </td>
+    </tr>
+</table>
+
+<table class="lines">
+    <thead>
+        <tr>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit</th>
+            <th class="num">Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for line in invoice.lineItems %}
+        <tr>
+            <td>{{ line.description }}</td>
+            <td class="num">{{ line.quantity }}</td>
+            <td class="num">{{ fmt.money(line.unitAmount, c) }}</td>
+            <td class="num">{{ fmt.money(line.amount, c) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<table class="totals">
+    <tr>
+        <td>Subtotal</td>
+        <td class="num">{{ fmt.money(invoice.subtotal, c) }}</td>
+    </tr>
+    {% if invoice.taxAmount > 0 %}
+    <tr>
+        <td>Tax ({{ (invoice.taxRate / 100)|number_format(2) }}%)</td>
+        <td class="num">{{ fmt.money(invoice.taxAmount, c) }}</td>
+    </tr>
+    {% endif %}
+    <tr class="grand">
+        <td>Total</td>
+        <td class="num">{{ fmt.money(invoice.total, c) }}</td>
+    </tr>
+</table>
+
+{% if invoice.notes %}
+<div class="notes">{{ invoice.notes }}</div>
+{% endif %}
+</body>
+</html>

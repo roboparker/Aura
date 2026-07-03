@@ -239,6 +239,35 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
     }
 
+    public function testInvoicePdfRenders(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'lineItems' => [['description' => 'Design work', 'quantity' => 2, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $response = $client->request('GET', $invoice['@id'] . '/pdf');
+        $this->assertResponseIsSuccessful();
+        $this->assertResponseHeaderSame('content-type', 'application/pdf');
+        // A real PDF starts with the %PDF- magic bytes.
+        $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
