@@ -126,9 +126,6 @@ class SsoTest extends ApiTestCase
         $this->assertNull($remaining);
     }
 
-    /**
-     * @param list<string> $roles
-     */
     public function testAdminConfigRequiresAdmin(): void
     {
         static::createClient()->request('GET', '/admin/sso');
@@ -153,7 +150,9 @@ class SsoTest extends ApiTestCase
 
         // Now advertised by the public status endpoint.
         $status = static::createClient()->request('GET', '/auth/sso/status')->toArray();
-        $this->assertContains('google', $status['providers'] ?? []);
+        $statusProviders = $status['providers'] ?? [];
+        $this->assertIsArray($statusProviders);
+        $this->assertContains('google', $statusProviders);
 
         // Admin read shows the client id + a secret flag, never the secret.
         $listed = $client->request('GET', '/admin/sso')->toArray();
