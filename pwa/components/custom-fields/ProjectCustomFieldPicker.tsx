@@ -4,7 +4,11 @@ import { Settings2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { visibilitySurfaces, type CustomFieldDefinition } from "./types";
+import {
+  isGlobalDefinition,
+  visibilitySurfaces,
+  type CustomFieldDefinition,
+} from "./types";
 
 interface Collection<T> {
   member?: T[];
@@ -12,17 +16,19 @@ interface Collection<T> {
 }
 
 interface Props {
-  /** Space that owns the fields (#custom-fields-space). */
+  /** Space that owns the space fields (#custom-fields-space). */
   spaceIri: string;
   /** This project's IRI (`/projects/{id}`) — the PATCH target. */
   projectIri: string;
-  /** IRIs of the fields currently shown on this project. */
+  /** IRIs of the SPACE fields currently shown on this project. */
   attachedIris: string[];
-  /** Per-project visibility ('list'|'board'|'both') for attached fields, keyed by definition IRI. */
+  /** IRIs of the GLOBAL fields currently shown on this project. */
+  attachedGlobalIris: string[];
+  /** Per-project visibility for attached fields, keyed by definition IRI. */
   projectVisibility: Record<string, string>;
-  /** Space admins can edit definitions inline (creation lives in space settings). */
+  /** Space admins can edit space definitions inline (creation lives in space settings). */
   isSpaceAdmin: boolean;
-  /** Open the field editor for an existing definition. */
+  /** Open the field editor for an existing SPACE definition. */
   onEdit: (def: CustomFieldDefinition) => void;
   /** Re-sync after attach/detach so the task columns update. */
   onChanged: () => void;
@@ -37,22 +43,35 @@ const KIND_LABEL: Record<string, string> = {
   reference: "Reference",
 };
 
+/** Endpoint segment for a field source's per-project routes. */
+const routeBaseFor = (global: boolean): string =>
+  global ? "global_custom_field_definitions" : "custom_field_definitions";
+
+/** The project M2M key for a field source. */
+const attachKeyFor = (global: boolean): string =>
+  global ? "globalCustomFieldDefinitions" : "customFieldDefinitions";
+
 /**
- * Per-project field selector (#custom-fields-space): fields are defined at the
- * space level; each project ticks the ones it shows on its tasks. Toggling
- * PATCHes the project's `customFieldDefinitions` M2M. Defining / editing the
- * fields themselves lives in the space-level manager (/custom-fields).
+ * Per-project field selector: fields are defined at the space level
+ * (#custom-fields-space) or instance-wide by admins (#global-custom-fields);
+ * each project ticks the ones it shows on its tasks. Toggling PATCHes the
+ * project's matching M2M (`customFieldDefinitions` / `globalCustomFieldDefinitions`)
+ * — a project's effective field set is the union. Space fields can be edited
+ * inline by space admins; global fields are managed by platform admins on the
+ * admin page, so they're shown read-only here.
  */
 const ProjectCustomFieldPicker = ({
   spaceIri,
   projectIri,
   attachedIris,
+  attachedGlobalIris,
   projectVisibility,
   isSpaceAdmin,
   onEdit,
   onChanged,
 }: Props) => {
   const [spaceFields, setSpaceFields] = useState<CustomFieldDefinition[]>([]);
+  const [globalFields, setGlobalFields] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -60,17 +79,30 @@ const ProjectCustomFieldPicker = ({
   const load = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    const sortFields = (list: CustomFieldDefinition[]): CustomFieldDefinition[] =>
+      [...list].sort(
+        (a, b) => a.position - b.position || a.name.localeCompare(b.name),
+      );
     try {
-      const res = await fetch(
-        `${ENTRYPOINT}/custom_field_definitions?space=${encodeURIComponent(spaceIri)}`,
-        { credentials: "include", headers: { Accept: "application/ld+json" } },
-      );
-      if (!res.ok) throw new Error("Failed to load fields.");
-      const data: Collection<CustomFieldDefinition> = await res.json();
-      const list = data.member ?? data["hydra:member"] ?? [];
-      setSpaceFields(
-        [...list].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
-      );
+      const [spaceRes, globalRes] = await Promise.all([
+        fetch(
+          `${ENTRYPOINT}/custom_field_definitions?space=${encodeURIComponent(spaceIri)}`,
+          { credentials: "include", headers: { Accept: "application/ld+json" } },
+        ),
+        fetch(`${ENTRYPOINT}/global_custom_field_definitions`, {
+          credentials: "include",
+          headers: { Accept: "application/ld+json" },
+        }),
+      ]);
+      if (!spaceRes.ok) throw new Error("Failed to load fields.");
+      const spaceData: Collection<CustomFieldDefinition> = await spaceRes.json();
+      setSpaceFields(sortFields(spaceData.member ?? spaceData["hydra:member"] ?? []));
+      if (globalRes.ok) {
+        const globalData: Collection<CustomFieldDefinition> = await globalRes.json();
+        setGlobalFields(
+          sortFields(globalData.member ?? globalData["hydra:member"] ?? []),
+        );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load fields.");
     } finally {
@@ -82,12 +114,12 @@ const ProjectCustomFieldPicker = ({
     void load();
   }, [load]);
 
-  const patchAttached = async (iris: string[]): Promise<void> => {
+  const patchAttached = async (global: boolean, iris: string[]): Promise<void> => {
     const res = await fetch(`${ENTRYPOINT}${projectIri}`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/merge-patch+json" },
-      body: JSON.stringify({ customFieldDefinitions: iris }),
+      body: JSON.stringify({ [attachKeyFor(global)]: iris }),
     });
     if (!res.ok) throw new Error("Failed to update fields.");
   };
@@ -97,18 +129,20 @@ const ProjectCustomFieldPicker = ({
   // it; turning one on (re)attaches and sets the per-project surface set.
   const updateField = async (
     iri: string,
+    global: boolean,
     nextList: boolean,
     nextBoard: boolean,
     nextCalendar: boolean,
   ) => {
-    const wasAttached = attachedIris.includes(iri);
+    const attached = global ? attachedGlobalIris : attachedIris;
+    const wasAttached = attached.includes(iri);
     const projectId = projectIri.split("/").pop();
     const defId = iri.split("/").pop();
     setBusy(iri);
     try {
       if (!nextList && !nextBoard && !nextCalendar) {
         if (wasAttached) {
-          await patchAttached(attachedIris.filter((i) => i !== iri));
+          await patchAttached(global, attached.filter((i) => i !== iri));
         }
       } else {
         const surfaces = [
@@ -117,10 +151,10 @@ const ProjectCustomFieldPicker = ({
           nextCalendar ? "calendar" : null,
         ].filter(Boolean);
         if (!wasAttached) {
-          await patchAttached([...attachedIris, iri]);
+          await patchAttached(global, [...attached, iri]);
         }
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId ?? "")}/custom_field_definitions/${encodeURIComponent(defId ?? "")}/visibility`,
+          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId ?? "")}/${routeBaseFor(global)}/${encodeURIComponent(defId ?? "")}/visibility`,
           {
             method: "PUT",
             credentials: "include",
@@ -138,19 +172,86 @@ const ProjectCustomFieldPicker = ({
     }
   };
 
+  const renderRow = (def: CustomFieldDefinition) => {
+    const global = isGlobalDefinition(def);
+    const attached = global ? attachedGlobalIris : attachedIris;
+    const checked = attached.includes(def["@id"]);
+    const surfaces = checked
+      ? visibilitySurfaces(projectVisibility[def["@id"]] ?? "both")
+      : [];
+    const showList = surfaces.includes("list");
+    const showBoard = surfaces.includes("board");
+    const showCalendar = surfaces.includes("calendar");
+    const isBusy = busy === def["@id"];
+    return (
+      <li key={def["@id"]} className="flex items-center gap-3 px-3 py-2 text-sm">
+        <span className={cn("min-w-0 flex-1 truncate", !checked && "text-muted-foreground")}>
+          {def.name}
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {KIND_LABEL[def.kind] ?? def.kind}
+        </span>
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch
+            checked={showList}
+            disabled={isBusy}
+            onCheckedChange={(v) =>
+              void updateField(def["@id"], global, v, showBoard, showCalendar)
+            }
+            aria-label={`Show ${def.name} on the task list`}
+          />
+          List
+        </label>
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch
+            checked={showBoard}
+            disabled={isBusy}
+            onCheckedChange={(v) =>
+              void updateField(def["@id"], global, showList, v, showCalendar)
+            }
+            aria-label={`Show ${def.name} on the board`}
+          />
+          Board
+        </label>
+        <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Switch
+            checked={showCalendar}
+            disabled={isBusy}
+            onCheckedChange={(v) =>
+              void updateField(def["@id"], global, showList, showBoard, v)
+            }
+            aria-label={`Show ${def.name} on the calendar`}
+          />
+          Calendar
+        </label>
+        {isSpaceAdmin && !global ? (
+          <button
+            type="button"
+            onClick={() => onEdit(def)}
+            aria-label={`Edit ${def.name}`}
+            className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Settings2 className="h-3.5 w-3.5" />
+          </button>
+        ) : (
+          <span className="w-[1.625rem] shrink-0" />
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="space-y-4" data-testid="project-custom-field-picker">
       <div className="space-y-1">
         <h3 className="text-sm font-medium">Custom fields</h3>
         <p className="text-xs text-muted-foreground">
-          Toggle where each of the space&apos;s fields shows on this
-          project — the task list, the board, and/or the calendar (all off =
-          not on this project). Custom fields are defined and ordered at the
-          space level in{" "}
+          Toggle where each field shows on this project — the task list, the
+          board, and/or the calendar (all off = not on this project). Space
+          fields are defined in{" "}
           <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
             space settings
           </Link>
-          .
+          ; global fields are managed by admins.
         </p>
       </div>
 
@@ -158,83 +259,38 @@ const ProjectCustomFieldPicker = ({
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading fields…</p>
-      ) : spaceFields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          This space has no custom fields yet. Define them in{" "}
-          <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
-            space settings
-          </Link>
-          .
-        </p>
       ) : (
-        <ul className="divide-y rounded-md border">
-          {spaceFields.map((def) => {
-            const checked = attachedIris.includes(def["@id"]);
-            const surfaces = checked
-              ? visibilitySurfaces(projectVisibility[def["@id"]] ?? "both")
-              : [];
-            const showList = surfaces.includes("list");
-            const showBoard = surfaces.includes("board");
-            const showCalendar = surfaces.includes("calendar");
-            const isBusy = busy === def["@id"];
-            return (
-              <li
-                key={def["@id"]}
-                className="flex items-center gap-3 px-3 py-2 text-sm"
-              >
-                <span className={cn("min-w-0 flex-1 truncate", !checked && "text-muted-foreground")}>
-                  {def.name}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {KIND_LABEL[def.kind] ?? def.kind}
-                </span>
-                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <Switch
-                    checked={showList}
-                    disabled={isBusy}
-                    onCheckedChange={(v) =>
-                      void updateField(def["@id"], v, showBoard, showCalendar)
-                    }
-                    aria-label={`Show ${def.name} on the task list`}
-                  />
-                  List
-                </label>
-                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <Switch
-                    checked={showBoard}
-                    disabled={isBusy}
-                    onCheckedChange={(v) =>
-                      void updateField(def["@id"], showList, v, showCalendar)
-                    }
-                    aria-label={`Show ${def.name} on the board`}
-                  />
-                  Board
-                </label>
-                <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <Switch
-                    checked={showCalendar}
-                    disabled={isBusy}
-                    onCheckedChange={(v) =>
-                      void updateField(def["@id"], showList, showBoard, v)
-                    }
-                    aria-label={`Show ${def.name} on the calendar`}
-                  />
-                  Calendar
-                </label>
-                {isSpaceAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => onEdit(def)}
-                    aria-label={`Edit ${def.name}`}
-                    className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <Settings2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <div className="space-y-4">
+          <section className="space-y-1.5">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Space fields
+            </h4>
+            {spaceFields.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                This space has no custom fields yet. Define them in{" "}
+                <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+                  space settings
+                </Link>
+                .
+              </p>
+            ) : (
+              <ul className="divide-y rounded-md border">
+                {spaceFields.map(renderRow)}
+              </ul>
+            )}
+          </section>
+
+          {globalFields.length > 0 && (
+            <section className="space-y-1.5">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Global fields
+              </h4>
+              <ul className="divide-y rounded-md border">
+                {globalFields.map(renderRow)}
+              </ul>
+            </section>
+          )}
+        </div>
       )}
     </div>
   );

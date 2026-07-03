@@ -26,7 +26,11 @@ export interface ColumnTask {
     email: string;
   }>;
   tags: Array<{ "@id": string; title: string }>;
-  customFieldValues: Array<{ definition: string; value: unknown }>;
+  customFieldValues: Array<{
+    definition?: string | null;
+    globalDefinition?: string | null;
+    value: unknown;
+  }>;
 }
 
 /** How a column's header dropdown renders its filter, and how rows match it. */
@@ -158,7 +162,9 @@ export const orderColumns = (
 };
 
 const cfValue = (task: ColumnTask, def: CustomFieldDefinition): unknown =>
-  task.customFieldValues.find((v) => v.definition === def["@id"])?.value ?? null;
+  task.customFieldValues.find(
+    (v) => (v.definition ?? v.globalDefinition) === def["@id"],
+  )?.value ?? null;
 
 const optionLabel = (def: CustomFieldDefinition, key: string): string => {
   const opt = def.config.options?.find((o) => o.key === key);

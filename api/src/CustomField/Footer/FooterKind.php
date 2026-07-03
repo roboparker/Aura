@@ -16,6 +16,11 @@ enum FooterKind: string
     case MIN = 'min';
     case MAX = 'max';
     case COUNT = 'count';
+    /**
+     * Per-option counts for a select field — a `{key, label, count}` list
+     * (one entry per configured option). Only select strategies advertise it.
+     */
+    case BREAKDOWN = 'breakdown';
 
     /**
      * @return list<string>

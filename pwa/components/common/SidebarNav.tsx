@@ -290,6 +290,12 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
     { href: "/admin/users", label: "Users", match: "/admin/users" },
     { href: "/admin/waitlist", label: "Waitlist", match: "/admin/waitlist" },
     { href: "/admin/segments", label: "Segments", match: "/admin/segments" },
+    { href: "/admin/sso", label: "SSO", match: "/admin/sso" },
+    {
+      href: "/admin/global-custom-fields",
+      label: "Global custom fields",
+      match: "/admin/global-custom-fields",
+    },
     { href: "/feedback", label: "Feedback", match: "/feedback" },
     ...ADMIN_EXTERNAL_LINKS.map((l) => ({ ...l, match: l.href, external: true })),
   ];

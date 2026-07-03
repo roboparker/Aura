@@ -4,6 +4,10 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Default the calendar-webhook base URL to empty (webhooks off) when the
+    # env var is unset — see app.calendar_webhook_base_url below (#582 Phase D).
+    env(CALENDAR_WEBHOOK_BASE_URL): ''
+
     # Minimum `Symfony\Component\Validator\Constraints\PasswordStrength` score
     # required for signup, change-password, and reset-password. 0 =
     # VERY_WEAK, 2 = MEDIUM, 4 = VERY_STRONG. Staging + production stay at
@@ -50,6 +54,14 @@ parameters:
     # day has been rolled into a snapshot.
     app.usage_db_row_overhead_bytes: 512
     app.usage_counter_retention_days: 90
+
+    # Calendar sync webhooks (#582 Phase D, App\Service\CalendarSubscription
+    # manager). The public base URL providers post change-notifications to —
+    # subscriptions are only created when this is set, so calendar webhooks are
+    # dark-launched (blank = off; poll-based two-way sync still works). In prod
+    # this is the app's public https origin (e.g. https://madori.app); Google
+    # additionally requires the domain be verified for push notifications.
+    app.calendar_webhook_base_url: '%env(CALENDAR_WEBHOOK_BASE_URL)%'
 
     # Billing / freemium gate (App\Service\UsageLimiter). The paid "Team"
     # plan is per-seat, billed to a Space; a free shared space is capped on
@@ -149,6 +161,19 @@ services:
     # prod/dev; the test suite swaps in an in-memory recorder (see when@test).
     App\Billing\StripeGatewayInterface: '@App\Billing\StripeGateway'
 
+    # Calendar sync (#582): real provider clients over HttpClient in prod/dev;
+    # the test suite swaps in an in-memory recorder (see when@test). The
+    # registry routes by provider so the handler + puller stay provider-agnostic.
+    App\Calendar\CalendarClientInterface: '@App\Calendar\GoogleCalendarClient'
+    App\Calendar\CalendarClientRegistry:
+        arguments:
+            $clients:
+                google: '@App\Calendar\GoogleCalendarClient'
+                microsoft: '@App\Calendar\MicrosoftCalendarClient'
+    App\Service\CalendarSubscriptionManager:
+        arguments:
+            $webhookBaseUrl: '%app.calendar_webhook_base_url%'
+
     App\Validator\PasswordPolicyValidator:
         arguments:
             $minStrength: '%app.password_min_strength%'
@@ -206,3 +231,15 @@ when@test:
         App\Tests\Billing\InMemoryStripeGateway:
             public: true
         App\Billing\StripeGatewayInterface: '@App\Tests\Billing\InMemoryStripeGateway'
+        # Calendar sync: never call a provider in tests — record pushes in
+        # memory so the sync handler + puller run end-to-end. One recorder backs
+        # every provider so multi-provider fan-out is exercised. Public so tests
+        # can inspect it.
+        App\Tests\Calendar\InMemoryCalendarClient:
+            public: true
+        App\Calendar\CalendarClientInterface: '@App\Tests\Calendar\InMemoryCalendarClient'
+        App\Calendar\CalendarClientRegistry:
+            arguments:
+                $clients:
+                    google: '@App\Tests\Calendar\InMemoryCalendarClient'
+                    microsoft: '@App\Tests\Calendar\InMemoryCalendarClient'

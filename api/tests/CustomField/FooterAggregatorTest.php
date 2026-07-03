@@ -10,6 +10,7 @@ use App\CustomField\Type\Date\DateStrategy;
 use App\CustomField\Type\Numeric\FloatStrategy;
 use App\CustomField\Type\Numeric\IntStrategy;
 use App\CustomField\Type\Numeric\MoneyStrategy;
+use App\CustomField\Type\Select\SingleSelectStrategy;
 use App\Entity\CustomFieldDefinition;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -38,6 +39,7 @@ final class FooterAggregatorTest extends TestCase
             new FloatStrategy(),
             new MoneyStrategy(),
             new DateStrategy(),
+            new SingleSelectStrategy(),
         ]);
     }
 
@@ -149,6 +151,34 @@ final class FooterAggregatorTest extends TestCase
         foreach ($rows as $row) {
             $this->assertNull($row['value']);
         }
+    }
+
+    public function testSelectBreakdownEmptyTaskSetReturnsZeroFilledOptions(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        // Breakdown short-circuits to zero counts without querying when the
+        // task scope is empty.
+        $connection->expects($this->never())->method('executeQuery');
+
+        $def = $this->definition('select', 'single', ['kind' => FooterKind::BREAKDOWN->value]);
+        $def->setConfig([
+            'options' => [
+                ['key' => 'backlog', 'label' => 'Backlog'],
+                ['key' => 'done', 'label' => 'Done'],
+            ],
+        ]);
+
+        $rows = $this->aggregator($connection)->aggregate([$def], []);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(FooterKind::BREAKDOWN->value, $rows[0]['kind']);
+        $this->assertSame(
+            [
+                ['key' => 'backlog', 'label' => 'Backlog', 'count' => 0],
+                ['key' => 'done', 'label' => 'Done', 'count' => 0],
+            ],
+            $rows[0]['value'],
+        );
     }
 
     public function testMissingLabelIsNull(): void

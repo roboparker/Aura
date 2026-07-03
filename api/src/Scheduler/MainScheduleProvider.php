@@ -7,6 +7,7 @@ use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
 use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
+use App\Message\PullCalendarChanges;
 use App\Message\RunBackup;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
@@ -87,6 +88,11 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // UsageSnapshotBuilder). 03:15 lands after midnight (so the
                 // day it labels is complete) and clear of the other jobs.
                 RecurringMessage::cron('15 3 * * *', new CaptureUsageSnapshot(), $utc),
+                // Calendar pull: every 15 minutes, reflect provider-side moves
+                // + deletions of Aura-managed events back onto their tasks
+                // (App\Service\CalendarPuller, #582 Phase B). Bounds two-way
+                // lag until push-notification channels land (Phase D).
+                RecurringMessage::cron('*/15 * * * *', new PullCalendarChanges(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

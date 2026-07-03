@@ -47,6 +47,12 @@ security:
             stateless: false
             provider: app_user_provider
             user_checker: App\Security\UserChecker
+            # Explicit 401-JSON entry point — this is an API firewall, so
+            # unauthenticated access returns 401 (the PWA owns routing to the
+            # sign-in page). Social-login (#267) is a controller flow
+            # (SsoController) that logs the user in programmatically, so it
+            # needs no firewall authenticator here.
+            entry_point: App\Security\JsonAuthenticationEntryPoint
             json_login:
                 check_path: auth_login
                 username_path: email
@@ -98,6 +104,11 @@ security:
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
         - { path: ^/me/sessions, roles: ROLE_USER }
+        # Self-service calendar-feed management (reveal/regenerate/revoke).
+        # The feed itself (/calendar/feed/{token}.ics) is token-authenticated
+        # and stays PUBLIC_ACCESS via the catch-all — calendar clients can't
+        # present a session cookie.
+        - { path: ^/me/calendar-feed, roles: ROLE_USER }
         # Account lifecycle (GDPR/CCPA): any fully-authenticated account —
         # including a waitlisted ROLE_WAITLISTED one, which holds no ROLE_USER
         # — must be able to deactivate, export, and delete itself. The
@@ -111,9 +122,21 @@ security:
         - { path: ^/account-exports/, roles: IS_AUTHENTICATED_FULLY }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
+        # SSO admin config (enable toggle, allowed domains, button label).
+        # Linking / unlinking a social account to the signed-in user (#267).
+        - { path: ^/me/sso, roles: ROLE_USER }
+        # OAuth account connections for API access (#581).
+        - { path: ^/me/connections, roles: ROLE_USER }
+        # Admin-managed SSO provider configuration (#267).
+        - { path: ^/admin/sso, roles: ROLE_ADMIN }
         # User segments (A/B tests, beta gating, rollouts) — platform admins
         # only. Covers the ApiResource CRUD and the member/preview controller.
         - { path: ^/segments, roles: ROLE_ADMIN }
+        # Global custom fields (#global-custom-fields) — instance-wide,
+        # admin-managed. Only create/edit/delete is platform-admin; reads stay
+        # open to any authenticated user (ROLE_USER, enforced on the entity) so
+        # global fields render in the per-project field picker and on task values.
+        - { path: ^/global_custom_field_definitions, methods: [POST, PUT, PATCH, DELETE], roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
         - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
@@ -123,6 +146,10 @@ security:
         # verified in App\Billing\StripeGateway. The other /spaces/{id}/billing
         # routes fall through to the catch-all and enforce auth in the controller.
         - { path: ^/billing/webhook$, methods: [POST], roles: PUBLIC_ACCESS }
+        # Calendar change-notification webhooks (#582 Phase D): unauthenticated
+        # at the firewall — authenticity is the per-subscription secret the
+        # provider echoes back, verified in CalendarWebhookController.
+        - { path: ^/calendar/webhook/, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/docs, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: PUBLIC_ACCESS }
 

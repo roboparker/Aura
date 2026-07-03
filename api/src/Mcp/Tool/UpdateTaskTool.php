@@ -3,6 +3,7 @@
 namespace App\Mcp\Tool;
 
 use App\Entity\CustomFieldDefinition;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Project;
 use App\Entity\Task;
@@ -66,10 +67,11 @@ final class UpdateTaskTool implements McpToolInterface
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'definitionId' => ['type' => 'string', 'description' => 'UUID of a CustomFieldDefinition on the task\'s project.'],
+                            'definitionId' => ['type' => 'string', 'description' => 'UUID of a CustomFieldDefinition on the task\'s project. Provide this OR globalDefinitionId, not both.'],
+                            'globalDefinitionId' => ['type' => 'string', 'description' => 'UUID of a GlobalCustomFieldDefinition (instance-wide) opted into by the task\'s project. Provide this OR definitionId, not both.'],
                             'value' => ['description' => 'The value, shaped to the field\'s kind/subtype (string, number, bool, ISO date, {amount,currency} for money, an IRI for references, or an array when the field is multi).'],
                         ],
-                        'required' => ['definitionId', 'value'],
+                        'required' => ['value'],
                         'additionalProperties' => false,
                     ],
                 ],
@@ -172,16 +174,31 @@ final class UpdateTaskTool implements McpToolInterface
             if (!is_array($entry)) {
                 throw McpException::invalidInput('Each customFieldValues entry must be an object.');
             }
-            $definitionId = $this->input->requireUuid(
-                'customFieldValues[].definitionId',
-                $entry['definitionId'] ?? null,
-            );
-            $definition = $this->em->getRepository(CustomFieldDefinition::class)->find($definitionId);
-            if (null === $definition) {
-                throw McpException::notFound(sprintf('Custom field %s', $definitionId));
-            }
             $value = new CustomFieldValue();
-            $value->setDefinition($definition);
+            // A value targets exactly one definition source — a space-owned
+            // field (definitionId) or an instance-wide global field
+            // (globalDefinitionId). The XOR is policed by ValidCustomFieldValues.
+            if (array_key_exists('globalDefinitionId', $entry) && null !== $entry['globalDefinitionId']) {
+                $globalId = $this->input->requireUuid(
+                    'customFieldValues[].globalDefinitionId',
+                    $entry['globalDefinitionId'],
+                );
+                $global = $this->em->getRepository(GlobalCustomFieldDefinition::class)->find($globalId);
+                if (null === $global) {
+                    throw McpException::notFound(sprintf('Global custom field %s', $globalId));
+                }
+                $value->setGlobalDefinition($global);
+            } else {
+                $definitionId = $this->input->requireUuid(
+                    'customFieldValues[].definitionId',
+                    $entry['definitionId'] ?? null,
+                );
+                $definition = $this->em->getRepository(CustomFieldDefinition::class)->find($definitionId);
+                if (null === $definition) {
+                    throw McpException::notFound(sprintf('Custom field %s', $definitionId));
+                }
+                $value->setDefinition($definition);
+            }
             $value->setValue($entry['value'] ?? null);
             $task->addCustomFieldValue($value);
         }

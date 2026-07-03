@@ -23,7 +23,11 @@ export interface WidthTask {
   dueDate: string | null;
   assignees: unknown[];
   tags: { title: string }[];
-  customFieldValues: { definition: string; value: unknown }[];
+  customFieldValues: {
+    definition?: string | null;
+    globalDefinition?: string | null;
+    value: unknown;
+  }[];
 }
 
 // Rough metrics for the text-sm table cells (px). Heuristic, not exact — the
@@ -102,7 +106,9 @@ const contentChars = (col: ListColumn, task: WidthTask): number => {
       return task.tags.map((t) => t.title).join(", ").length;
     default: {
       const iri = col.definition?.["@id"];
-      const value = task.customFieldValues.find((v) => v.definition === iri)?.value;
+      const value = task.customFieldValues.find(
+        (v) => (v.definition ?? v.globalDefinition) === iri,
+      )?.value;
       return cfText(col.definition, value).length;
     }
   }

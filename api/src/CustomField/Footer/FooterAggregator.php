@@ -6,7 +6,8 @@ namespace App\CustomField\Footer;
 
 use App\CustomField\CustomFieldKind;
 use App\CustomField\CustomFieldTypeRegistry;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
+use App\Entity\GlobalCustomFieldDefinition;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -41,11 +42,11 @@ final class FooterAggregator
     }
 
     /**
-     * @param iterable<CustomFieldDefinition> $definitions
-     * @param list<string>                    $taskIds       UUIDs (string) of tasks in scope.
+     * @param iterable<CustomFieldDefinitionInterface> $definitions
+     * @param list<string>                             $taskIds       UUIDs (string) of tasks in scope.
      *
      * @return list<array{
-     *     definition: CustomFieldDefinition,
+     *     definition: CustomFieldDefinitionInterface,
      *     kind: string,
      *     label: ?string,
      *     value: mixed,
@@ -82,17 +83,32 @@ final class FooterAggregator
     }
 
     /**
+     * The FK column a value stores this definition in — space-owned fields
+     * live in `definition_id`, global fields in `global_definition_id`.
+     */
+    private function definitionColumn(CustomFieldDefinitionInterface $definition): string
+    {
+        return $definition instanceof GlobalCustomFieldDefinition ? 'global_definition_id' : 'definition_id';
+    }
+
+    /**
      * @param list<string> $taskIds
      */
-    private function compute(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function compute(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
+        // Per-option breakdown (select only). Handled first so it also renders
+        // a complete zero-filled list when no tasks are in scope.
+        if (FooterKind::BREAKDOWN->value === $aggKind) {
+            return $this->aggregateBreakdown($definition, $taskIds);
+        }
+
         // No tasks in scope — every aggregate is either null or 0.
         if ([] === $taskIds) {
             return FooterKind::COUNT->value === $aggKind ? 0 : null;
         }
 
         if (FooterKind::COUNT->value === $aggKind) {
-            return $this->countNonNull($definition->getId()?->toRfc4122(), $taskIds);
+            return $this->countNonNull($this->definitionColumn($definition), $definition->getId()?->toRfc4122(), $taskIds);
         }
 
         $kind = $definition->getKind();
@@ -121,7 +137,7 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function countNonNull(?string $definitionId, array $taskIds): int
+    private function countNonNull(string $column, ?string $definitionId, array $taskIds): int
     {
         if (null === $definitionId) {
             return 0;
@@ -130,9 +146,10 @@ final class FooterAggregator
         $sql = sprintf(
             'SELECT COUNT(*)
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL',
+            $column,
             $placeholders,
         );
         $stmt = $this->connection->executeQuery(
@@ -149,12 +166,13 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function aggregateNumeric(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function aggregateNumeric(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
         if (null === $definitionId) {
             return null;
         }
+        $column = $this->definitionColumn($definition);
         [$placeholders, $params] = $this->bindUuids($taskIds);
 
         $isMoney = 'money' === $definition->getSubtype();
@@ -180,11 +198,12 @@ final class FooterAggregator
         $sql = sprintf(
             "SELECT %s(%s)
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL",
             $aggSql,
             $valueExpr,
+            $column,
             $placeholders,
         );
         $raw = $this->connection->executeQuery(
@@ -215,7 +234,7 @@ final class FooterAggregator
     /**
      * @param list<string> $taskIds
      */
-    private function aggregateDate(CustomFieldDefinition $definition, string $aggKind, array $taskIds): mixed
+    private function aggregateDate(CustomFieldDefinitionInterface $definition, string $aggKind, array $taskIds): mixed
     {
         $definitionId = $definition->getId()?->toRfc4122();
         if (null === $definitionId) {
@@ -224,6 +243,7 @@ final class FooterAggregator
         if (!in_array($aggKind, [FooterKind::MIN->value, FooterKind::MAX->value], true)) {
             return null;
         }
+        $column = $this->definitionColumn($definition);
         [$placeholders, $params] = $this->bindUuids($taskIds);
 
         $aggSql = FooterKind::MIN->value === $aggKind ? 'MIN' : 'MAX';
@@ -233,10 +253,11 @@ final class FooterAggregator
         $sql = sprintf(
             "SELECT %s(value #>> '{}')
              FROM custom_field_value
-             WHERE definition_id = ?
+             WHERE %s = ?
                AND task_id IN (%s)
                AND value IS NOT NULL",
             $aggSql,
+            $column,
             $placeholders,
         );
         $raw = $this->connection->executeQuery(
@@ -244,6 +265,67 @@ final class FooterAggregator
             array_merge([$definitionId], $params),
         )->fetchOne();
         return is_string($raw) && '' !== $raw ? $raw : null;
+    }
+
+    /**
+     * Per-option counts for a select field: one `{key, label, count}` row per
+     * configured option, in option order, including zero-count options so the
+     * breakdown is stable. Counts occurrences across the scoped tasks —
+     * single-select stores the bare key, multi-select a JSON array of keys
+     * (unrolled here). No DB round-trip when the scope is empty.
+     *
+     * @param list<string> $taskIds
+     * @return list<array{key: string, label: string, count: int}>
+     */
+    private function aggregateBreakdown(CustomFieldDefinitionInterface $definition, array $taskIds): array
+    {
+        $config = $definition->getConfig();
+        $rawOptions = $config['options'] ?? null;
+        $options = is_array($rawOptions) ? $rawOptions : [];
+
+        $counts = [];
+        $definitionId = $definition->getId()?->toRfc4122();
+        if ([] !== $taskIds && null !== $definitionId) {
+            $isMulti = true === ($config['multi'] ?? false);
+            // Single-select stores the bare key (`value #>> '{}'`); multi-select
+            // stores a JSON array — unroll each element to a text key.
+            $keyExpr = $isMulti
+                ? 'jsonb_array_elements_text(value::jsonb)'
+                : "value #>> '{}'";
+            [$placeholders, $params] = $this->bindUuids($taskIds);
+            $sql = sprintf(
+                'SELECT k, COUNT(*) AS c
+                 FROM (
+                     SELECT %s AS k
+                     FROM custom_field_value
+                     WHERE %s = ?
+                       AND task_id IN (%s)
+                       AND value IS NOT NULL
+                 ) keys
+                 GROUP BY k',
+                $keyExpr,
+                $this->definitionColumn($definition),
+                $placeholders,
+            );
+            /** @var list<array{k: mixed, c: mixed}> $rows */
+            $rows = $this->connection->executeQuery($sql, array_merge([$definitionId], $params))->fetchAllAssociative();
+            foreach ($rows as $row) {
+                if (is_string($row['k'])) {
+                    $counts[$row['k']] = is_numeric($row['c']) ? (int) $row['c'] : 0;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($options as $option) {
+            if (!is_array($option) || !is_string($key = $option['key'] ?? null)) {
+                continue;
+            }
+            $label = is_string($option['label'] ?? null) ? $option['label'] : $key;
+            $result[] = ['key' => $key, 'label' => $label, 'count' => $counts[$key] ?? 0];
+        }
+
+        return $result;
     }
 
     /**

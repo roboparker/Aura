@@ -11,6 +11,8 @@ use App\Security\Access\AccessPolicy;
 use App\Service\AvatarColorService;
 use App\State\UserPasswordHasherProcessor;
 use App\Validator\PasswordPolicy;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Scheb\TwoFactorBundle\Model\BackupCodeInterface;
 use Scheb\TwoFactorBundle\Model\Totp\TotpConfiguration;
@@ -100,6 +102,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      */
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $waitlisted = false;
+
+    /**
+     * Linked social-login identities (#267) — one per connected provider
+     * (Google / Microsoft / GitHub). Any of them signs the user in. Managed
+     * server-side by {@see \App\Controller\SsoController}; see {@see SsoIdentity}.
+     *
+     * @var Collection<int, SsoIdentity>
+     */
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: SsoIdentity::class, cascade: ['remove'], orphanRemoval: true)]
+    private Collection $ssoIdentities;
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
@@ -435,6 +447,34 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function setWaitlisted(bool $waitlisted): static
     {
         $this->waitlisted = $waitlisted;
+        return $this;
+    }
+
+    public function __construct()
+    {
+        $this->ssoIdentities = new ArrayCollection();
+    }
+
+    /**
+     * @return Collection<int, SsoIdentity>
+     */
+    public function getSsoIdentities(): Collection
+    {
+        return $this->ssoIdentities;
+    }
+
+    public function addSsoIdentity(SsoIdentity $identity): static
+    {
+        if (!$this->ssoIdentities->contains($identity)) {
+            $this->ssoIdentities->add($identity);
+            $identity->setUser($this);
+        }
+        return $this;
+    }
+
+    public function removeSsoIdentity(SsoIdentity $identity): static
+    {
+        $this->ssoIdentities->removeElement($identity);
         return $this;
     }
 

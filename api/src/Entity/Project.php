@@ -156,11 +156,29 @@ class Project
     #[Groups(['project:read', 'project:write'])]
     private Collection $customFieldDefinitions;
 
+    /**
+     * Instance-wide global custom-field definitions this project opts into
+     * (#global-custom-fields). Same per-project chooser as the space fields
+     * above, but a separate join table — a project's effective field set is
+     * the union of the two. Global definitions are admin-managed; a project
+     * member can only toggle them on/off here (write) — never edit them.
+     *
+     * @var Collection<int, GlobalCustomFieldDefinition>
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToMany(targetEntity: GlobalCustomFieldDefinition::class, inversedBy: 'projects')]
+    #[ORM\JoinTable(name: 'project_global_custom_field_definition')]
+    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'global_custom_field_definition_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['project:read', 'project:write'])]
+    private Collection $globalCustomFieldDefinitions;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
         $this->tasks = new ArrayCollection();
         $this->customFieldDefinitions = new ArrayCollection();
+        $this->globalCustomFieldDefinitions = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -244,6 +262,28 @@ class Project
     public function removeCustomFieldDefinition(CustomFieldDefinition $definition): static
     {
         $this->customFieldDefinitions->removeElement($definition);
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, GlobalCustomFieldDefinition>
+     */
+    public function getGlobalCustomFieldDefinitions(): Collection
+    {
+        return $this->globalCustomFieldDefinitions;
+    }
+
+    public function addGlobalCustomFieldDefinition(GlobalCustomFieldDefinition $definition): static
+    {
+        if (!$this->globalCustomFieldDefinitions->contains($definition)) {
+            $this->globalCustomFieldDefinitions->add($definition);
+        }
+        return $this;
+    }
+
+    public function removeGlobalCustomFieldDefinition(GlobalCustomFieldDefinition $definition): static
+    {
+        $this->globalCustomFieldDefinitions->removeElement($definition);
         return $this;
     }
 

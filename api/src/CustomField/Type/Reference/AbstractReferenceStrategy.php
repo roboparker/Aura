@@ -8,7 +8,7 @@ use App\CustomField\CustomFieldKind;
 use App\CustomField\Type\AbstractTypeStrategy;
 use App\CustomField\Type\MultiValueHelper;
 use App\CustomField\Type\TypeViolation;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\Space;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
@@ -80,7 +80,7 @@ abstract class AbstractReferenceStrategy extends AbstractTypeStrategy
      */
     abstract protected function isInScope(object $target, Space $space): bool;
 
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array
     {
         $multi = $this->isMulti($config);
         $shape = $this->ensureMultiShape($value, $multi);

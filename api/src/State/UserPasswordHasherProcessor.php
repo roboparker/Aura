@@ -5,12 +5,11 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
-use App\Service\SpaceRoleSeeder;
+use App\Service\PersonalSpaceProvisioner;
 use App\Service\WaitlistJoinedMailer;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -43,7 +42,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         #[Autowire(service: 'limiter.signup_ip')]
         private RateLimiterFactoryInterface $signupLimiter,
         private RequestStack $requestStack,
-        private SpaceRoleSeeder $roleSeeder,
+        private PersonalSpaceProvisioner $personalSpaceProvisioner,
     ) {
     }
 
@@ -164,20 +163,7 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
      */
     private function createPersonalSpace(User $user): void
     {
-        $space = (new Space())
-            ->setName(Space::PERSONAL_SPACE_NAME)
-            ->setIsPersonal(true)
-            ->setVisibility(Space::VISIBILITY_PRIVATE)
-            ->setCreatedBy($user);
-
-        $membership = (new SpaceMembership())
-            ->setUser($user)
-            ->setRole(Space::ROLE_ADMIN);
-        $space->addUserMembership($membership);
-
-        $this->em->persist($space);
-        $this->roleSeeder->seed($space);
-        $this->em->flush();
+        $this->personalSpaceProvisioner->provision($user);
     }
 
     /**

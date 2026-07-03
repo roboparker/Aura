@@ -7,7 +7,7 @@ namespace App\CustomField\Type\Boolean;
 use App\CustomField\CustomFieldKind;
 use App\CustomField\Type\AbstractTypeStrategy;
 use App\CustomField\Type\TypeViolation;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 
 /**
  * `boolean.boolean` — single-value checkbox. The only subtype under
@@ -32,7 +32,7 @@ final class BooleanStrategy extends AbstractTypeStrategy
         return 'boolean';
     }
 
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array
     {
         if (is_bool($value)) {
             return [];

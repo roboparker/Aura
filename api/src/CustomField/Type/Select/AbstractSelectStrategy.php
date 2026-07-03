@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\CustomField\Type\Select;
 
 use App\CustomField\CustomFieldKind;
+use App\CustomField\Footer\FooterKind;
 use App\CustomField\Type\AbstractTypeStrategy;
 use App\CustomField\Type\TypeViolation;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 
 /**
  * Shared validation + normalization for select kinds. The (single,
@@ -21,14 +22,22 @@ use App\Entity\CustomFieldDefinition;
  * stable identifier is `key`, the user-facing string is `label`,
  * and `color` is optional UI styling.
  *
- * Footer: `count` only — sum/avg/min/max aren't meaningful on
- * categorical choices.
+ * Footer: `count` (filled rows) + `breakdown` (per-option counts) —
+ * sum/avg/min/max aren't meaningful on categorical choices.
  */
 abstract class AbstractSelectStrategy extends AbstractTypeStrategy
 {
     public function kind(): string
     {
         return CustomFieldKind::SELECT->value;
+    }
+
+    /**
+     * @return list<value-of<FooterKind>>
+     */
+    public function supportedAggregations(): array
+    {
+        return [FooterKind::COUNT->value, FooterKind::BREAKDOWN->value];
     }
 
     public function validateConfig(array $config): array
@@ -75,7 +84,7 @@ abstract class AbstractSelectStrategy extends AbstractTypeStrategy
         return $violations;
     }
 
-    public function validateValue(mixed $value, array $config, CustomFieldDefinition $definition): array
+    public function validateValue(mixed $value, array $config, CustomFieldDefinitionInterface $definition): array
     {
         return $this->validateValueAgainstKeys($value, $this->keysFromConfig($config), $config);
     }

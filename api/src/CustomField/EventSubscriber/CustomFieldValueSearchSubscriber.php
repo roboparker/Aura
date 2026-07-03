@@ -62,7 +62,7 @@ final class CustomFieldValueSearchSubscriber
 
     private function refresh(CustomFieldValue $cfv): void
     {
-        $definition = $cfv->getDefinition();
+        $definition = $cfv->getEffectiveDefinition();
         if (null === $definition) {
             $cfv->setValueSearch(null);
             return;

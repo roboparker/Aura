@@ -2,14 +2,35 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { AvatarUser } from "@/components/user/UserAvatar";
 import { type ViolationMap } from "@/lib/violations";
-import type { CustomFieldDefinition } from "@/components/custom-fields/types";
+import {
+  isGlobalDefinition,
+  type CustomFieldDefinition,
+} from "@/components/custom-fields/types";
 import CustomFieldValueFields from "./CustomFieldValueFields";
 
-/** One `{definition, value}` pair as carried on `Task.customFieldValues`. */
+/**
+ * One value pair as carried on `Task.customFieldValues`. Polymorphic like the
+ * server entity: a value targets EITHER a space-owned field (`definition`) or
+ * an instance-wide global field (`globalDefinition`) — exactly one is set.
+ */
 export interface CustomFieldValuePair {
-  definition: string;
+  definition?: string | null;
+  globalDefinition?: string | null;
   value: unknown;
 }
+
+/** The definition IRI a value pair belongs to, whichever source it points at. */
+export const valuePairDefinitionIri = (pair: CustomFieldValuePair): string =>
+  pair.definition ?? pair.globalDefinition ?? "";
+
+/** Build a write pair, keying the right FK by the definition's source. */
+export const makeValuePair = (
+  def: CustomFieldDefinition,
+  value: unknown,
+): CustomFieldValuePair =>
+  isGlobalDefinition(def["@id"])
+    ? { globalDefinition: def["@id"], value }
+    : { definition: def["@id"], value };
 
 interface Props {
   definitions: CustomFieldDefinition[];
@@ -50,7 +71,7 @@ const CustomFieldValueList = ({
   // Working copy keyed by definition IRI.
   const initial = useMemo(() => {
     const map: Record<string, unknown> = {};
-    for (const v of values) map[v.definition] = v.value;
+    for (const v of values) map[valuePairDefinitionIri(v)] = v.value;
     return map;
   }, [values]);
 
@@ -80,7 +101,7 @@ const CustomFieldValueList = ({
       const value = working[def["@id"]];
       if (isEmpty(value)) continue;
       indexToDef.push(def["@id"]);
-      payload.push({ definition: def["@id"], value });
+      payload.push(makeValuePair(def, value));
     }
 
     setSaving(true);

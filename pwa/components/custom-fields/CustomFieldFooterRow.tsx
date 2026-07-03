@@ -4,7 +4,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import TaskTableColumns from "@/components/projects/TaskTableColumns";
 import type { ListColumn } from "@/components/projects/listColumns";
-import type { FooterResponse, FooterRow } from "./types";
+import type {
+  FooterBreakdownEntry,
+  FooterResponse,
+  FooterRow,
+} from "./types";
 
 /**
  * Renders the aggregated footer row for a project's task list. Fetches
@@ -86,6 +90,43 @@ const formatNumber = (v: number): string => {
     : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 };
 
+const isBreakdown = (v: unknown): v is FooterBreakdownEntry[] =>
+  Array.isArray(v) &&
+  v.every(
+    (e) =>
+      e !== null &&
+      typeof e === "object" &&
+      "count" in e &&
+      "label" in e,
+  );
+
+/**
+ * Renders a footer value. Scalar aggregations (sum/avg/min/max/count, money)
+ * go through {@link formatValue}; a select `breakdown` renders as a small
+ * stacked per-option "label count" list.
+ */
+const FooterValue = ({ row }: { row: FooterRow }) => {
+  if (row.kind === "breakdown" && isBreakdown(row.value)) {
+    if (row.value.length === 0) return <>—</>;
+    return (
+      <span className="flex flex-col gap-0.5">
+        {row.value.map((entry) => (
+          <span
+            key={entry.key}
+            className="flex items-baseline justify-between gap-3 whitespace-nowrap"
+          >
+            <span className="font-normal text-muted-foreground">
+              {entry.label}
+            </span>
+            <span className="tabular-nums">{entry.count}</span>
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return <>{formatValue(row)}</>;
+};
+
 const CustomFieldFooterRow = ({
   projectId,
   filters,
@@ -161,8 +202,8 @@ const CustomFieldFooterRow = ({
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {row.label ?? row.kind}
                   </span>
-                  <span className="truncate tabular-nums font-semibold">
-                    {formatValue(row)}
+                  <span className="tabular-nums font-semibold">
+                    <FooterValue row={row} />
                   </span>
                 </div>
               )}
@@ -253,7 +294,9 @@ const CustomFieldFooterRow = ({
             <span className="text-muted-foreground">
               {row.label ?? `${row.name} (${row.kind})`}
             </span>
-            <span className="font-medium tabular-nums">{formatValue(row)}</span>
+            <span className="font-medium tabular-nums">
+              <FooterValue row={row} />
+            </span>
           </div>
         ))}
       </CardContent>

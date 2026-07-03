@@ -6,7 +6,9 @@ namespace App\Controller;
 
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
+use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\Task;
@@ -67,39 +69,33 @@ class CustomFieldStatsController extends AbstractController
             ->getSingleScalarResult();
 
         // At most one value row per (task, definition) thanks to the unique
-        // constraint, so a plain COUNT over non-null values is the number
-        // of tasks that have filled the field.
-        /** @var list<array{did: Uuid|string, filled: int|string}> $rows */
-        $rows = $this->em->createQueryBuilder()
-            ->select('IDENTITY(cfv.definition) AS did', 'COUNT(cfv.id) AS filled')
-            ->from(CustomFieldValue::class, 'cfv')
-            ->join('cfv.task', 't')
-            ->where('t.project = :project')
-            ->andWhere('cfv.value IS NOT NULL')
-            ->setParameter('project', $project)
-            ->groupBy('cfv.definition')
-            ->getQuery()
-            ->getArrayResult();
+        // constraints, so a plain COUNT over non-null values is the number
+        // of tasks that have filled the field. Values point at either a
+        // space definition or a global one — count both, keyed by def UUID
+        // (space and global UUIDs never collide).
+        $filledByDef = array_merge(
+            $this->filledCounts($project, 'definition'),
+            $this->filledCounts($project, 'globalDefinition'),
+        );
 
-        $filledByDef = [];
-        foreach ($rows as $row) {
-            $did = $row['did'];
-            $key = $did instanceof Uuid ? $did->toRfc4122() : $did;
-            $filledByDef[$key] = (int) $row['filled'];
-        }
-
-        // The fields this project has opted into, in space order.
-        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        // The fields this project has opted into — space + global — in order.
+        $definitions = array_merge(
+            $project->getCustomFieldDefinitions()->toArray(),
+            $project->getGlobalCustomFieldDefinitions()->toArray(),
+        );
         usort(
             $definitions,
-            static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
+            static fn (CustomFieldDefinitionInterface $a, CustomFieldDefinitionInterface $b): int
                 => $a->getPosition() <=> $b->getPosition(),
         );
 
-        $stats = array_map(function (CustomFieldDefinition $def) use ($filledByDef): array {
+        $stats = array_map(function (CustomFieldDefinitionInterface $def) use ($filledByDef): array {
             $key = (string) $def->getId();
+            $iriBase = $def instanceof GlobalCustomFieldDefinition
+                ? '/global_custom_field_definitions/'
+                : '/custom_field_definitions/';
             return [
-                'definition' => '/custom_field_definitions/' . $def->getId(),
+                'definition' => $iriBase . $def->getId(),
                 'filled' => $filledByDef[$key] ?? 0,
             ];
         }, $definitions);
@@ -127,14 +123,90 @@ class CustomFieldStatsController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
+        return new JsonResponse(['options' => $this->computeOptionStats($definition, 'definition')]);
+    }
+
+    /**
+     * Per-option usage for a GLOBAL select field, across every task that
+     * carries it. Admin-only (mirrors the definition's write gate) since a
+     * global field has no space to scope reads by.
+     */
+    #[Route(
+        '/global_custom_field_definitions/{id}/option_stats',
+        name: 'global_custom_field_definition_option_stats',
+        methods: ['GET'],
+    )]
+    public function globalOptionStats(string $id, #[CurrentUser] ?User $user): Response
+    {
+        if (null === $user) {
+            return new JsonResponse(['error' => 'Not authenticated.'], 401);
+        }
+        if (!$this->isGranted('ROLE_ADMIN')) {
+            return new JsonResponse(['error' => 'Forbidden.'], 403);
+        }
+        if (!Uuid::isValid($id)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $definition = $this->em->getRepository(GlobalCustomFieldDefinition::class)->find($id);
+        if (null === $definition) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        return new JsonResponse(['options' => $this->computeOptionStats($definition, 'globalDefinition')]);
+    }
+
+    /**
+     * Filled (non-null) value counts for a project's fields, keyed by the
+     * definition UUID string. `$association` is the CustomFieldValue side to
+     * group on — `definition` (space) or `globalDefinition`.
+     *
+     * @return array<string, int>
+     */
+    private function filledCounts(Project $project, string $association): array
+    {
+        /** @var list<array{did: Uuid|string|null, filled: int|string}> $rows */
+        $rows = $this->em->createQueryBuilder()
+            ->select(sprintf('IDENTITY(cfv.%s) AS did', $association), 'COUNT(cfv.id) AS filled')
+            ->from(CustomFieldValue::class, 'cfv')
+            ->join('cfv.task', 't')
+            ->where('t.project = :project')
+            ->andWhere('cfv.value IS NOT NULL')
+            ->andWhere(sprintf('cfv.%s IS NOT NULL', $association))
+            ->setParameter('project', $project)
+            ->groupBy(sprintf('cfv.%s', $association))
+            ->getQuery()
+            ->getArrayResult();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $did = $row['did'];
+            if (null === $did) {
+                continue;
+            }
+            $key = $did instanceof Uuid ? $did->toRfc4122() : $did;
+            $out[$key] = (int) $row['filled'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Per-option usage counts for a select definition, whichever source it
+     * comes from. `$association` selects the CustomFieldValue FK to filter on.
+     *
+     * @return list<array{key: string, label: string, count: int}>
+     */
+    private function computeOptionStats(CustomFieldDefinitionInterface $definition, string $association): array
+    {
         if (CustomFieldKind::SELECT->value !== $definition->getKind()) {
-            return new JsonResponse(['options' => []]);
+            return [];
         }
 
         $counts = [];
         /** @var list<CustomFieldValue> $values */
         $values = $this->em->getRepository(CustomFieldValue::class)
-            ->findBy(['definition' => $definition]);
+            ->findBy([$association => $definition]);
         foreach ($values as $cfv) {
             foreach ($this->keysOf($cfv->getValue()) as $key) {
                 $counts[$key] = ($counts[$key] ?? 0) + 1;
@@ -154,7 +226,7 @@ class CustomFieldStatsController extends AbstractController
             $result[] = ['key' => $key, 'label' => $label, 'count' => $counts[$key] ?? 0];
         }
 
-        return new JsonResponse(['options' => $result]);
+        return $result;
     }
 
     /**

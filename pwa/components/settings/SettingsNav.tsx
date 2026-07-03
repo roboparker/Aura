@@ -1,11 +1,19 @@
 import Link from "next/link";
-import { Bell, KeyRound, Shield, TriangleAlert, User } from "lucide-react";
+import {
+  Bell,
+  CalendarSync,
+  KeyRound,
+  Shield,
+  TriangleAlert,
+  User,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type SettingsSectionKey =
   | "profile"
   | "security"
   | "notifications"
+  | "calendar-sync"
   | "api-tokens"
   | "danger";
 
@@ -30,6 +38,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "Notifications",
     href: "/settings/notifications",
     Icon: Bell,
+  },
+  {
+    key: "calendar-sync",
+    label: "Calendar sync",
+    href: "/settings/calendar-sync",
+    Icon: CalendarSync,
   },
   {
     key: "api-tokens",
