@@ -282,6 +282,37 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testSendEmailsTheClient(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'email' => 'billing@acme.test', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'lineItems' => [['description' => 'Work', 'quantity' => 1, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $client->request('POST', $invoice['@id'] . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertEmailCount(1);
+        $this->assertEmailAddressContains($this->getMailerMessage(), 'To', 'billing@acme.test');
+    }
+
     public function testInvoicePdfRenders(): void
     {
         $admin = $this->createUser('admin@example.com');

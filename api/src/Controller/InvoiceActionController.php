@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\InvoiceRepository;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
+use App\Service\InvoiceMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,6 +34,7 @@ class InvoiceActionController extends AbstractController
         private EntityManagerInterface $em,
         private InvoiceRepository $invoices,
         private SpacePermissionResolver $permissions,
+        private InvoiceMailer $mailer,
     ) {
     }
 
@@ -111,6 +113,9 @@ class InvoiceActionController extends AbstractController
         }
         $invoice->setSentAt(new \DateTimeImmutable());
         $this->em->flush();
+
+        // Best-effort: email the client the public link (no-op without an email).
+        $this->mailer->sendInvoice($invoice, $plain);
 
         return $this->json([
             'id' => (string) $invoice->getId(),
