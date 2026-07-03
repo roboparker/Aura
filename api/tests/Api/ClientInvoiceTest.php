@@ -123,6 +123,66 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame(0, $list['totalItems'] ?? null);
     }
 
+    public function testGenerateInvoiceFromTrackedTime(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        // Two billable completed entries + one non-billable (excluded).
+        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
+        $this->trackTime($client, $spaceIri, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00', true, 8000);
+        $this->trackTime($client, $spaceIri, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00', false, 9000);
+
+        $response = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertSame(201, $response->getStatusCode(), $response->getContent(false));
+        $result = $response->toArray();
+
+        // 1h×6000 + 0.5h×8000 = 10000; the non-billable entry is excluded.
+        $this->assertSame(2, $result['lineItemCount'] ?? null);
+        $this->assertSame(10000, $result['subtotal'] ?? null);
+
+        // The pulled entries are now billed, so a second run has nothing to bill.
+        $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    private function trackTime(
+        \ApiPlatform\Symfony\Bundle\Test\Client $client,
+        string $spaceIri,
+        string $startedAt,
+        string $endedAt,
+        bool $billable,
+        int $rateAmount,
+    ): void {
+        $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'startedAt' => $startedAt,
+                'endedAt' => $endedAt,
+                'billable' => $billable,
+                'rateAmount' => $rateAmount,
+                'rateCurrency' => 'USD',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+    }
+
     private function createSharedSpace(User $admin, ?User $member = null): Space
     {
         $space = (new Space())->setName('Studio')->setCreatedBy($admin);

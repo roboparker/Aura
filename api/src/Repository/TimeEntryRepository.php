@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\Project;
+use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -34,5 +36,27 @@ class TimeEntryRepository extends ServiceEntityRepository
         assert(null === $result || $result instanceof TimeEntry);
 
         return $result;
+    }
+
+    /**
+     * Completed, billable, not-yet-billed entries in a space — the pool an
+     * invoice draws from. Optionally narrowed to one project.
+     *
+     * @return list<TimeEntry>
+     */
+    public function findInvoiceable(Space $space, ?Project $project = null): array
+    {
+        $qb = $this->createQueryBuilder('t')
+            ->andWhere('t.space = :space')
+            ->andWhere('t.billable = true')
+            ->andWhere('t.endedAt IS NOT NULL')
+            ->andWhere('t.billedAt IS NULL')
+            ->setParameter('space', $space)
+            ->orderBy('t.startedAt', 'ASC');
+        if (null !== $project) {
+            $qb->andWhere('t.project = :project')->setParameter('project', $project);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }
