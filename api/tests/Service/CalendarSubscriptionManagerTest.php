@@ -80,6 +80,38 @@ class CalendarSubscriptionManagerTest extends KernelTestCase
         $this->assertContains('unsubscribe', $ops);
     }
 
+    public function testRemoveWithoutSubscriptionIsNoOp(): void
+    {
+        // No ensure() first → nothing to tear down.
+        $this->manager('https://x.test')->remove($this->connection());
+        $this->assertSame([], $this->recorder()->subscriptions);
+    }
+
+    public function testRenewExpiringResubscribesNearExpiry(): void
+    {
+        $connection = $this->connection();
+        $manager = $this->manager('https://x.test');
+        $manager->ensure($connection);
+
+        // Backdate the subscription to just inside the renewal window.
+        $subscription = $this->em->getRepository(CalendarSubscription::class)->findOneBy(['connection' => $connection]);
+        $this->assertNotNull($subscription);
+        $subscription->setExpiresAt(new \DateTimeImmutable('+1 hour'));
+        $this->em->flush();
+        $this->recorder()->reset();
+
+        $manager->renewExpiring();
+
+        $ops = array_column($this->recorder()->subscriptions, 'op');
+        $this->assertContains('subscribe', $ops);
+    }
+
+    public function testRenewExpiringDisabledIsNoOp(): void
+    {
+        $this->manager('')->renewExpiring();
+        $this->assertSame([], $this->recorder()->subscriptions);
+    }
+
     private function manager(string $webhookBaseUrl): CalendarSubscriptionManager
     {
         $registry = self::getContainer()->get(CalendarClientRegistry::class);

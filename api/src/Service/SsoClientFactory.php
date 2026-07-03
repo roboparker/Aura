@@ -20,8 +20,11 @@ use TheNetworg\OAuth2\Client\Provider\Azure;
  * provider from the admin-managed {@see SsoConfig} (DB), at request time.
  * Replaces knp's build-time ClientRegistry so credentials can live in the DB.
  * Okta/Auth0 are generic OIDC providers resolved via discovery.
+ *
+ * Not `final` so tests can substitute a stub provider (the OAuth callback can't
+ * otherwise be exercised without a live provider).
  */
-final class SsoClientFactory
+class SsoClientFactory
 {
     /** OAuth scopes per provider (space/comma joining is the provider's own). */
     public const SCOPES = [
