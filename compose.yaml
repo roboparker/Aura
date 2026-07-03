@@ -26,6 +26,9 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
+      # Calendar-sync webhooks (#582 Phase D): public HTTPS origin providers
+      # POST change-notifications to. Blank = webhooks off (poll still syncs).
+      CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       # Hostname for the Umami dashboard site block in the Caddyfile.
       # Prod: analytics.<domain> (with a matching DNS A record).
@@ -104,6 +107,9 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL:-https://localhost}
+      # Calendar-sync webhooks (#582 Phase D): the worker creates/renews the
+      # provider subscriptions on the pull cron, so it needs the base URL too.
+      CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
