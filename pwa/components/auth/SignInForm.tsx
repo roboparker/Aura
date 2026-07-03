@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { useState } from "react";
 import { Formik, Form } from "formik";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -12,6 +11,7 @@ import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
+import SsoButtons from "@/components/auth/SsoButtons";
 
 interface SignInValues {
   email: string;
@@ -47,7 +47,6 @@ interface Props {
 const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: Props) => {
   const { login } = useAuth();
   const router = useRouter();
-  const [ssoNotice, setSsoNotice] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
@@ -73,12 +72,6 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
           <AlertDescription>
             Password reset successfully. Please sign in with your new password.
           </AlertDescription>
-        </Alert>
-      )}
-
-      {ssoNotice && (
-        <Alert>
-          <AlertDescription>{ssoNotice}</AlertDescription>
         </Alert>
       )}
 
@@ -179,14 +172,7 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="w-full h-12 text-base font-semibold text-foreground border border-border"
-                onClick={() => setSsoNotice("SSO sign-in isn't enabled for this workspace yet.")}
-              >
-                Sign in with SSO
-              </Button>
+              <SsoButtons next={next} verb="Sign in" />
             </div>
           </Form>
         )}
