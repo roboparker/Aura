@@ -7,6 +7,7 @@ use App\Entity\Invoice;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
+use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -308,6 +309,69 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseHeaderSame('content-type', 'application/pdf');
         // A real PDF starts with the %PDF- magic bytes.
         $this->assertStringStartsWith('%PDF-', $response->getContent());
+    }
+
+    public function testPublicPayStartsCheckoutThenWebhookMarksPaid(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'lineItems' => [['description' => 'Work', 'quantity' => 2, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoiceIri = $invoice['@id'];
+        $this->assertIsString($invoiceIri);
+        $invoiceId = substr($invoiceIri, (int) strrpos($invoiceIri, '/') + 1);
+
+        $sent = $client->request('POST', $invoiceIri . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $token = $sent['token'];
+        $this->assertIsString($token);
+
+        // The public pay endpoint starts a Stripe checkout (in-memory in tests).
+        $pay = $client->request('POST', '/public/invoices/' . $token . '/pay', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('stripe', $pay['provider'] ?? null);
+        $this->assertSame(InMemoryStripeGateway::PAYMENT_URL, $pay['url'] ?? null);
+
+        // The provider's completed-checkout webhook marks the invoice paid.
+        $event = [
+            'type' => 'checkout.session.completed',
+            'data' => ['object' => [
+                'payment_status' => 'paid',
+                'metadata' => ['invoice_id' => $invoiceId],
+            ]],
+        ];
+        $client->request('POST', '/billing/webhook', [
+            'body' => json_encode($event),
+            'headers' => [
+                'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE,
+                'Content-Type' => 'application/json',
+            ],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $refreshed = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertSame('paid', $refreshed['status'] ?? null);
+        $this->assertNotNull($refreshed['paidAt'] ?? null);
     }
 
     private function trackTime(

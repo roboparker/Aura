@@ -2,10 +2,13 @@
 
 namespace App\Controller;
 
+use App\Billing\BillingException;
+use App\Billing\Payment\PaymentGatewayRegistry;
 use App\Entity\Invoice;
 use App\Repository\InvoiceRepository;
 use App\Service\InvoicePdfRenderer;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -21,6 +24,9 @@ class PublicInvoiceController extends AbstractController
     public function __construct(
         private InvoiceRepository $invoices,
         private InvoicePdfRenderer $renderer,
+        private PaymentGatewayRegistry $gateways,
+        #[Autowire('%env(default::APP_FRONTEND_URL)%')]
+        private string $frontendUrl,
     ) {
     }
 
@@ -70,6 +76,35 @@ class PublicInvoiceController extends AbstractController
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => sprintf('inline; filename="%s"', $this->renderer->filename($invoice)),
         ]);
+    }
+
+    #[Route('/public/invoices/{token}/pay', name: 'public_invoice_pay', methods: ['POST'])]
+    public function pay(string $token): JsonResponse
+    {
+        $invoice = $this->resolve($token);
+        if (null === $invoice) {
+            return $this->json(['error' => 'Invoice not found.'], 404);
+        }
+        if (Invoice::STATUS_PAID === $invoice->getStatus()) {
+            return $this->json(['error' => 'This invoice is already paid.'], 409);
+        }
+        if ($invoice->getTotal() <= 0) {
+            return $this->json(['error' => 'Nothing to pay on this invoice.'], 409);
+        }
+
+        $gateway = $this->gateways->default();
+        if (null === $gateway || !$gateway->isConfigured()) {
+            return $this->json(['error' => 'Online payment is not available.'], 503);
+        }
+
+        $base = rtrim($this->frontendUrl, '/') . '/i/' . $token;
+        try {
+            $url = $gateway->createInvoicePayment($invoice, $base . '?paid=1', $base);
+        } catch (BillingException $e) {
+            return $this->json(['error' => 'Could not start payment: ' . $e->getMessage()], 502);
+        }
+
+        return $this->json(['provider' => $gateway->key(), 'url' => $url], 201);
     }
 
     private function resolve(string $token): ?Invoice

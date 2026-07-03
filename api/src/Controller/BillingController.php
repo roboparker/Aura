@@ -8,6 +8,7 @@ use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
 use App\Entity\Space;
 use App\Entity\CancellationFeedback;
+use App\Entity\Invoice;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -246,10 +247,42 @@ class BillingController extends AbstractController
             $this->syncSubscription($object, true);
         } elseif ('customer.subscription.created' === $type || 'customer.subscription.updated' === $type) {
             $this->syncSubscription($object, false);
+        } elseif ('checkout.session.completed' === $type) {
+            $this->markInvoicePaid($object);
         }
         // Any other event type is acknowledged and ignored.
 
         return new Response('', Response::HTTP_OK);
+    }
+
+    /**
+     * Mark one of our client invoices (#445) paid off a completed one-off
+     * Checkout Session. Idempotent + safe: only acts on sessions carrying our
+     * `invoice_id` metadata with payment_status=paid, and never resurrects a
+     * void invoice.
+     *
+     * @param array<mixed, mixed> $session
+     */
+    private function markInvoicePaid(array $session): void
+    {
+        $invoiceId = $this->stringAt($session, ['metadata', 'invoice_id']);
+        if (null === $invoiceId) {
+            return; // Not an invoice checkout (e.g. a subscription session).
+        }
+        if ('paid' !== $this->stringAt($session, ['payment_status'])) {
+            return;
+        }
+        $invoice = $this->em->getRepository(Invoice::class)->find($invoiceId);
+        if (!$invoice instanceof Invoice) {
+            $this->logger->warning('Invoice payment webhook could not resolve invoice.', ['invoice_id' => $invoiceId]);
+            return;
+        }
+        if (Invoice::STATUS_PAID === $invoice->getStatus() || Invoice::STATUS_VOID === $invoice->getStatus()) {
+            return;
+        }
+        $invoice->setStatus(Invoice::STATUS_PAID);
+        $invoice->setPaidAt(new \DateTimeImmutable());
+        $this->em->flush();
     }
 
     /**
