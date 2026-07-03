@@ -35,6 +35,14 @@ framework:
             # the POST inserts the row and queues this; the worker zips the
             # user's own data + uploaded files and emails the download link.
             App\Message\GenerateAccountExport: async
+            # Calendar sync (#582): push a task to the owner's connected
+            # calendar off the request path — one job per create/update/delete
+            # of a dated task. The handler no-ops when no account is linked.
+            App\Message\SyncTaskToCalendar: async
+            # Targeted calendar pull dispatched by the webhook controller (#582
+            # Phase D) — async so the provider callback returns immediately (the
+            # scheduled sweep reaches the same handler via scheduler_default).
+            App\Message\PullCalendarChanges: async
 
 when@test:
     framework:

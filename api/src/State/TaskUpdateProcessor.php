@@ -4,14 +4,17 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Entity\CalendarEventLink;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Message\SyncTaskToCalendar;
 use App\Repository\TaskRepository;
 use App\Service\RecurrenceCalculator;
 use App\Service\TaskActivityNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Wraps the default ORM persist processor on `PATCH /tasks/{id}` so we can
@@ -39,6 +42,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
         private Security $security,
         private TaskActivityNotifier $activity,
         private RecurrenceCalculator $recurrence,
+        private MessageBusInterface $bus,
     ) {
     }
 
@@ -81,8 +85,34 @@ final class TaskUpdateProcessor implements ProcessorInterface
             }
         }
 
+        $successor = null;
         if ($shouldRecur) {
-            $this->createNextOccurrence($result);
+            $successor = $this->createNextOccurrence($result);
+        }
+
+        // Keep the owner's connected calendar (#582) in step.
+        $owner = $result->getOwner();
+        if ($owner instanceof User) {
+            if ($successor instanceof Task) {
+                // The recurring series continues on the spawned occurrence,
+                // which inherited the calendar event link(s) — updating it moves
+                // the native series forward. The completed task no longer owns an
+                // event, so we deliberately don't dispatch for it (#582 Phase D4).
+                $successorId = $successor->getId();
+                if (null !== $successorId) {
+                    $this->bus->dispatch(SyncTaskToCalendar::upsert((string) $successorId, (string) $owner->getId()));
+                }
+            } else {
+                // Dispatch when the task is (or just stopped being) dated — the
+                // latter lets the handler remove an event whose task lost its due
+                // date. Covers title edits, reschedules, completion, and a
+                // recurring series that has now ended.
+                $previousDue = $previous instanceof Task ? $previous->getDueDate() : null;
+                $id = $result->getId();
+                if ((null !== $result->getDueDate() || null !== $previousDue) && null !== $id) {
+                    $this->bus->dispatch(SyncTaskToCalendar::upsert((string) $id, (string) $owner->getId()));
+                }
+            }
         }
 
         return $result;
@@ -92,16 +122,17 @@ final class TaskUpdateProcessor implements ProcessorInterface
      * Clone the just-completed task into a fresh, incomplete row whose
      * dueDate is advanced per the recurrence rule. Tags, assignees, project,
      * description, and title carry over. Position goes to the top of the
-     * owner's list to mirror normal task creation.
+     * owner's list to mirror normal task creation. Returns the spawned task
+     * (or null when the series has ended).
      */
-    private function createNextOccurrence(Task $completed): void
+    private function createNextOccurrence(Task $completed): ?Task
     {
         // Caller only invokes us after asserting both fields are set —
         // re-narrow so phpstan sees the non-null shape below.
         $dueDate = $completed->getDueDate();
         $rule = $completed->getRecurrenceRule();
         if (null === $dueDate || null === $rule) {
-            return;
+            return null;
         }
 
         // A count-based end treats `ends.count` as the number of occurrences
@@ -113,7 +144,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
         if (is_array($ends) && ($ends['type'] ?? null) === 'count') {
             $remaining = is_int($ends['count'] ?? null) ? $ends['count'] : 1;
             if ($remaining <= 1) {
-                return;
+                return null;
             }
             $nextRule['ends'] = ['type' => 'count', 'count' => $remaining - 1];
         }
@@ -121,7 +152,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
         $nextDue = $this->recurrence->nextDueDate($dueDate, $rule);
         if (null === $nextDue) {
             // Series ended (e.g. past the `until` bound).
-            return;
+            return null;
         }
 
         $next = new Task();
@@ -147,6 +178,16 @@ final class TaskUpdateProcessor implements ProcessorInterface
         }
 
         $this->em->persist($next);
+
+        // Hand any calendar event link(s) to the successor so the native
+        // recurring series continues on it instead of the completed task
+        // spawning a duplicate series (#582 Phase D4).
+        foreach ($this->em->getRepository(CalendarEventLink::class)->findBy(['task' => $completed]) as $link) {
+            $link->setTask($next);
+        }
+
         $this->em->flush();
+
+        return $next;
     }
 }

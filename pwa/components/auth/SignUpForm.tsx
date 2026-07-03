@@ -4,6 +4,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { fetchWithTimeout } from "@/lib/fetchWithTimeout";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import SsoButtons from "@/components/auth/SsoButtons";
 import { FormikField } from "@/components/ui/formik-field";
 import {
   MIN_PASSWORD_LENGTH,
@@ -277,6 +278,7 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {submitLabel}
               </Button>
+              <SsoButtons verb="Sign up" />
             </Form>
           );
         }}

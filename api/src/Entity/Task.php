@@ -17,6 +17,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
+use App\State\TaskDeleteProcessor;
 use App\State\TaskOwnerProcessor;
 use App\State\TaskSearchProvenanceProvider;
 use App\State\TaskUpdateProcessor;
@@ -63,6 +64,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or (object.isAccessibleBy(user) and is_granted('space.tasks.delete', object)))",
+            processor: TaskDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['task:read']],

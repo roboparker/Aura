@@ -11,10 +11,15 @@
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.0",
         "dragonmantank/cron-expression": "^3.4",
+        "drenso/symfony-oidc-bundle": "^4.5",
         "intervention/image": "^4.0",
         "league/flysystem-bundle": "^3.3",
+        "league/oauth2-facebook": "^2.2",
+        "league/oauth2-github": "^3.1",
+        "league/oauth2-google": "^5.0",
         "minishlink/web-push": "^10.0",
         "nelmio/cors-bundle": "^2.2",
+        "patrickbussmann/oauth2-apple": "^0.4.0",
         "phpdocumentor/reflection-docblock": "^6.0",
         "phpstan/phpdoc-parser": "^2.0",
         "scheb/2fa-backup-code": "^8.5",
@@ -46,7 +51,8 @@
         "symfony/twig-bundle": "7.4.*",
         "symfony/uid": "7.4.*",
         "symfony/validator": "7.4.*",
-        "symfony/yaml": "7.4.*"
+        "symfony/yaml": "7.4.*",
+        "thenetworg/oauth2-azure": "^2.2"
     },
     "require-dev": {
         "api-platform/schema-generator": "^5.0",

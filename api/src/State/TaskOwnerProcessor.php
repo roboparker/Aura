@@ -5,10 +5,12 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Task;
+use App\Message\SyncTaskToCalendar;
 use App\Repository\TaskRepository;
 use App\Security\AuthenticatedUserResolver;
 use App\Service\TaskActivityNotifier;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Sets the owner of a new Task to the currently authenticated user and
@@ -29,6 +31,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
         private AuthenticatedUserResolver $auth,
         private TaskRepository $tasks,
         private TaskActivityNotifier $activity,
+        private MessageBusInterface $bus,
     ) {
     }
 
@@ -57,6 +60,13 @@ final class TaskOwnerProcessor implements ProcessorInterface
 
         // On create, every assignee is freshly assigned.
         $this->activity->notifyAssigned($result, $user, $result->getAssignees());
+
+        // Push to the owner's connected calendar (#582). The handler no-ops
+        // when the owner hasn't linked an account, so a dated task is enough.
+        $id = $result->getId();
+        if (null !== $result->getDueDate() && null !== $id) {
+            $this->bus->dispatch(SyncTaskToCalendar::upsert((string) $id, (string) $user->getId()));
+        }
 
         return $result;
     }
