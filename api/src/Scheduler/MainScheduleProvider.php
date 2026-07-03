@@ -6,6 +6,7 @@ use App\Message\CaptureUsageSnapshot;
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
 use App\Message\MarkOverdueInvoices;
+use App\Message\SpawnRecurringInvoices;
 use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
@@ -97,6 +98,9 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // Overdue invoices: flip sent invoices past their due date to
                 // overdue, daily at 03:50 UTC (InvoiceRepository::markOverdue).
                 RecurringMessage::cron('50 3 * * *', new MarkOverdueInvoices(), $utc),
+                // Recurring invoices: clone due templates into fresh drafts,
+                // daily at 03:55 UTC (App\Service\RecurringInvoiceSpawner).
+                RecurringMessage::cron('55 3 * * *', new SpawnRecurringInvoices(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

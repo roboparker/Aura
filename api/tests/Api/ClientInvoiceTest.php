@@ -355,6 +355,44 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame('overdue', $refreshed['status'] ?? null);
     }
 
+    public function testRecurringInvoiceSpawnsAFreshDraft(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('monthly', $invoice['recurrenceFrequency'] ?? null);
+
+        // Run the recurring spawn.
+        $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
+        assert($spawner instanceof \App\Service\RecurringInvoiceSpawner);
+        $spawned = $spawner->spawnDue(new \DateTimeImmutable('today'));
+        $this->assertSame(1, $spawned);
+
+        // Now two invoices: the template + the fresh draft clone.
+        $list = $client->request('GET', '/invoices?space=' . $spaceIri)->toArray();
+        $this->assertSame(2, $list['totalItems'] ?? null);
+    }
+
     public function testInvoicePdfRenders(): void
     {
         $admin = $this->createUser('admin@example.com');

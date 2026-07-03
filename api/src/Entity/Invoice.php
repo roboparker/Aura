@@ -87,6 +87,13 @@ class Invoice
         self::STATUS_VOID,
     ];
 
+    public const FREQ_WEEKLY = 'weekly';
+    public const FREQ_MONTHLY = 'monthly';
+    public const FREQ_YEARLY = 'yearly';
+
+    /** @var list<string> */
+    public const FREQUENCIES = [self::FREQ_WEEKLY, self::FREQ_MONTHLY, self::FREQ_YEARLY];
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -140,6 +147,25 @@ class Invoice
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['invoice:read', 'invoice:write'])]
     private ?string $notes = null;
+
+    /**
+     * When set, this invoice is a recurring template: the sweep clones it into a
+     * fresh draft each time {@see $nextIssueDate} arrives. One of weekly / monthly
+     * / yearly, repeated every {@see $recurrenceInterval}.
+     */
+    #[ORM\Column(length: 10, nullable: true)]
+    #[Assert\Choice(choices: self::FREQUENCIES, message: 'Invalid recurrence frequency.')]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?string $recurrenceFrequency = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $recurrenceInterval = null;
+
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?\DateTimeImmutable $nextIssueDate = null;
 
     /**
      * @var Collection<int, InvoiceLineItem>
@@ -213,6 +239,76 @@ class Invoice
                 ->atPath('client')
                 ->addViolation();
         }
+
+        if (null !== $this->recurrenceFrequency) {
+            if (null === $this->recurrenceInterval || $this->recurrenceInterval < 1) {
+                $context->buildViolation('A recurring invoice needs an interval of at least 1.')
+                    ->atPath('recurrenceInterval')
+                    ->addViolation();
+            }
+            if (null === $this->nextIssueDate) {
+                $context->buildViolation('A recurring invoice needs a next issue date.')
+                    ->atPath('nextIssueDate')
+                    ->addViolation();
+            }
+        }
+    }
+
+    public function isRecurring(): bool
+    {
+        return null !== $this->recurrenceFrequency;
+    }
+
+    /** The interval string for DateTimeImmutable::modify(), e.g. "+1 month". */
+    public function recurrenceStep(): ?string
+    {
+        if (null === $this->recurrenceFrequency || null === $this->recurrenceInterval) {
+            return null;
+        }
+        $unit = match ($this->recurrenceFrequency) {
+            self::FREQ_WEEKLY => 'week',
+            self::FREQ_MONTHLY => 'month',
+            self::FREQ_YEARLY => 'year',
+            default => null,
+        };
+
+        return null === $unit ? null : sprintf('+%d %s', $this->recurrenceInterval, $unit);
+    }
+
+    public function getRecurrenceFrequency(): ?string
+    {
+        return $this->recurrenceFrequency;
+    }
+
+    public function setRecurrenceFrequency(?string $recurrenceFrequency): self
+    {
+        $this->recurrenceFrequency = $recurrenceFrequency;
+
+        return $this;
+    }
+
+    public function getRecurrenceInterval(): ?int
+    {
+        return $this->recurrenceInterval;
+    }
+
+    public function setRecurrenceInterval(?int $recurrenceInterval): self
+    {
+        $this->recurrenceInterval = $recurrenceInterval;
+
+        return $this;
+    }
+
+    public function getNextIssueDate(): ?\DateTimeImmutable
+    {
+        return $this->nextIssueDate;
+    }
+
+    public function setNextIssueDate(?\DateTimeImmutable $nextIssueDate): self
+    {
+        $this->nextIssueDate = $nextIssueDate;
+
+        return $this;
     }
 
     public function getId(): ?Uuid

@@ -41,6 +41,22 @@ class InvoiceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Recurring-template invoices whose next issue date has arrived.
+     *
+     * @return list<Invoice>
+     */
+    public function findDueRecurring(\DateTimeImmutable $today): array
+    {
+        return $this->createQueryBuilder('i')
+            ->andWhere('i.recurrenceFrequency IS NOT NULL')
+            ->andWhere('i.nextIssueDate IS NOT NULL')
+            ->andWhere('i.nextIssueDate <= :today')
+            ->setParameter('today', $today)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Flip every sent invoice whose due date has passed to overdue, in one bulk
      * UPDATE. Returns how many were changed. Paid/void/draft are left alone.
      */
