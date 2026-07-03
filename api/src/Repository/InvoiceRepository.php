@@ -39,4 +39,23 @@ class InvoiceRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['publicToken' => $hash]);
     }
+
+    /**
+     * Flip every sent invoice whose due date has passed to overdue, in one bulk
+     * UPDATE. Returns how many were changed. Paid/void/draft are left alone.
+     */
+    public function markOverdue(\DateTimeImmutable $today): int
+    {
+        return $this->createQueryBuilder('i')
+            ->update()
+            ->set('i.status', ':overdue')
+            ->where('i.status = :sent')
+            ->andWhere('i.dueDate IS NOT NULL')
+            ->andWhere('i.dueDate < :today')
+            ->setParameter('overdue', Invoice::STATUS_OVERDUE)
+            ->setParameter('sent', Invoice::STATUS_SENT)
+            ->setParameter('today', $today)
+            ->getQuery()
+            ->execute();
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Scheduler;
 use App\Message\CaptureUsageSnapshot;
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
+use App\Message\MarkOverdueInvoices;
 use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
@@ -93,6 +94,9 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // (App\Service\CalendarPuller, #582 Phase B). Bounds two-way
                 // lag until push-notification channels land (Phase D).
                 RecurringMessage::cron('*/15 * * * *', new PullCalendarChanges(), $utc),
+                // Overdue invoices: flip sent invoices past their due date to
+                // overdue, daily at 03:50 UTC (InvoiceRepository::markOverdue).
+                RecurringMessage::cron('50 3 * * *', new MarkOverdueInvoices(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

@@ -313,6 +313,48 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertEmailAddressContains($this->getMailerMessage(), 'To', 'billing@acme.test');
     }
 
+    public function testOverdueSweepFlipsPastDueSentInvoices(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'dueDate' => '2020-01-01',
+                'lineItems' => [['description' => 'Work', 'quantity' => 1, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoiceIri = $invoice['@id'];
+        $this->assertIsString($invoiceIri);
+
+        // Send it so it's "sent" (and past-due).
+        $client->request('POST', $invoiceIri . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        // Run the daily overdue sweep.
+        $repo = $this->entityManager->getRepository(Invoice::class);
+        assert($repo instanceof \App\Repository\InvoiceRepository);
+        $changed = $repo->markOverdue(new \DateTimeImmutable('today'));
+        $this->assertSame(1, $changed);
+
+        $refreshed = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertSame('overdue', $refreshed['status'] ?? null);
+    }
+
     public function testInvoicePdfRenders(): void
     {
         $admin = $this->createUser('admin@example.com');
