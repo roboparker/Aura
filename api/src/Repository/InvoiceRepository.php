@@ -33,4 +33,10 @@ class InvoiceRepository extends ServiceEntityRepository
 
         return (int) $count;
     }
+
+    /** Resolve an invoice from a public-link token (caller passes the sha256 hash). */
+    public function findByPublicTokenHash(string $hash): ?Invoice
+    {
+        return $this->findOneBy(['publicToken' => $hash]);
+    }
 }

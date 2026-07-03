@@ -239,6 +239,48 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
     }
 
+    public function testSendMintsPublicLinkAndPublicViewWorks(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'lineItems' => [['description' => 'Work', 'quantity' => 2, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $sent = $client->request('POST', $invoice['@id'] . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('INV-0001', $sent['number'] ?? null);
+        $token = $sent['token'] ?? null;
+        $this->assertIsString($token);
+
+        // The public token view resolves the invoice (no auth required by route).
+        $public = $client->request('GET', '/public/invoices/' . $token)->toArray();
+        $this->assertSame('INV-0001', $public['number'] ?? null);
+        $this->assertSame(10000, $public['total'] ?? null);
+        $this->assertSame('Acme Co', $public['billTo'] ?? null);
+
+        // An unknown token 404s.
+        $client->request('GET', '/public/invoices/deadbeef');
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testInvoicePdfRenders(): void
     {
         $admin = $this->createUser('admin@example.com');

@@ -81,6 +81,46 @@ class InvoiceActionController extends AbstractController
         return $this->summary($invoice);
     }
 
+    #[Route('/invoices/{id}/send', name: 'invoice_send', methods: ['POST'])]
+    public function send(string $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $invoice = $this->authorize($id, $user);
+        if ($invoice instanceof JsonResponse) {
+            return $invoice;
+        }
+        if (Invoice::STATUS_VOID === $invoice->getStatus()) {
+            return $this->json(['error' => 'A void invoice cannot be sent.'], 409);
+        }
+
+        // Assign a number on first send (like issue), so a sent invoice is final.
+        $space = $invoice->getSpace();
+        if (null !== $space && null === $invoice->getNumber()) {
+            $next = $this->invoices->countNumbered($space) + 1;
+            $invoice->setNumber('INV-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT));
+        }
+        if (null === $invoice->getIssueDate()) {
+            $invoice->setIssueDate(new \DateTimeImmutable('today'));
+        }
+
+        // Mint a shareable public token (sha256-hashed at rest, like the export
+        // + password-reset tokens); the plaintext only leaves in the link.
+        $plain = bin2hex(random_bytes(32));
+        $invoice->setPublicToken(hash('sha256', $plain));
+        if (Invoice::STATUS_DRAFT === $invoice->getStatus()) {
+            $invoice->setStatus(Invoice::STATUS_SENT);
+        }
+        $invoice->setSentAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        return $this->json([
+            'id' => (string) $invoice->getId(),
+            'number' => $invoice->getNumber(),
+            'status' => $invoice->getStatus(),
+            'token' => $plain,
+            'publicUrl' => '/public/invoices/' . $plain,
+        ], 201);
+    }
+
     #[Route('/invoices/{id}/void', name: 'invoice_void', methods: ['POST'])]
     public function void(string $id, #[CurrentUser] ?User $user): JsonResponse
     {
