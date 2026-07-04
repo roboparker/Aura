@@ -4,6 +4,7 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -12,6 +13,7 @@ use App\Service\SpaceMemberAdder;
 use App\Service\SpaceRoleSeeder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 /**
  * Stamps the creator on a new Space and provisions an admin
@@ -55,6 +57,17 @@ final class SpaceCreateProcessor implements ProcessorInterface
 
         $data->setCreatedBy($user);
         $data->setIsPersonal(false);
+
+        // A space can be created under an organization (owner = that org) — the
+        // caller must be a non-guest member of it. Otherwise it's a personal
+        // space owned by the creator (organization stays null). #billing Phase 1
+        $organization = $data->getOrganization();
+        if (null !== $organization) {
+            $role = $organization->roleFor($user);
+            if (null === $role || Organization::ROLE_GUEST === $role) {
+                throw new AccessDeniedHttpException('You cannot create a space in this organization.');
+            }
+        }
 
         $membership = (new SpaceMembership())
             ->setUser($user)

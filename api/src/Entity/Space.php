@@ -215,7 +215,7 @@ class Space
      */
     #[ORM\ManyToOne(targetEntity: Organization::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
-    #[Groups(['space:read'])]
+    #[Groups(['space:read', 'space:write'])]
     private ?Organization $organization = null;
 
     /**

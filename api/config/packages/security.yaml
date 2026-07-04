@@ -127,6 +127,8 @@ security:
         - { path: ^/me/sso, roles: ROLE_USER }
         # OAuth account connections for API access (#581).
         - { path: ^/me/connections, roles: ROLE_USER }
+        # Organizations (#billing Phase 1) — the account layer above spaces.
+        - { path: ^/organizations, roles: ROLE_USER }
         # Admin-managed SSO provider configuration (#267).
         - { path: ^/admin/sso, roles: ROLE_ADMIN }
         # User segments (A/B tests, beta gating, rollouts) — platform admins
