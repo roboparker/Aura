@@ -103,6 +103,8 @@ security:
         # PWA can route it to the /waitlist gate.
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
+        # Personal-account billing (#billing Phase 1b).
+        - { path: ^/me/billing, roles: ROLE_USER }
         - { path: ^/me/sessions, roles: ROLE_USER }
         # Self-service calendar-feed management (reveal/regenerate/revoke).
         # The feed itself (/calendar/feed/{token}.ics) is token-authenticated

@@ -45,6 +45,19 @@ final class PlanGate
         return $this->catalog->for($this->planForOrganization($organization));
     }
 
+    /** The user's own **personal** account plan (ignores org memberships). */
+    public function personalPlan(User $user): Plan
+    {
+        $subscription = $this->subscriptions->findActiveForUser($user);
+
+        return null === $subscription ? Plan::Free : Plan::fromStorage($subscription->getPlan());
+    }
+
+    public function personalEntitlements(User $user): PlanEntitlements
+    {
+        return $this->catalog->for($this->personalPlan($user));
+    }
+
     /** The best plan the user is entitled to across all their spaces. */
     public function planForUser(User $user): Plan
     {

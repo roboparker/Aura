@@ -346,6 +346,7 @@ class BillingController extends AbstractController
             // Resolve the billing account: an organization (#billing Phase 1b),
             // falling back to the legacy per-space id.
             $orgId = $this->stringAt($sub, ['metadata', 'organization_id']);
+            $userId = $this->stringAt($sub, ['metadata', 'user_id']);
             $spaceId = $this->stringAt($sub, ['metadata', 'space_id']);
             $row = (new Subscription())->setStripeSubscriptionId($stripeSubId);
             if (null !== $orgId) {
@@ -355,6 +356,13 @@ class BillingController extends AbstractController
                     return;
                 }
                 $row->setOrganization($org);
+            } elseif (null !== $userId) {
+                $account = $this->em->getRepository(User::class)->find($userId);
+                if (!$account instanceof User) {
+                    $this->logger->warning('Stripe webhook could not resolve personal account.', ['subscription' => $stripeSubId, 'user_id' => $userId]);
+                    return;
+                }
+                $row->setOwnerUser($account);
             } elseif (null !== $spaceId) {
                 $space = $this->em->getRepository(Space::class)->find($spaceId);
                 if (!$space instanceof Space) {
