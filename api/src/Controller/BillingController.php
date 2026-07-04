@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Billing\BillingException;
+use App\Billing\Plan;
+use App\Billing\PlanGate;
 use App\Billing\StripeGatewayInterface;
 use App\Entity\Space;
 use App\Entity\CancellationFeedback;
@@ -48,14 +50,43 @@ class BillingController extends AbstractController
         private SubscriptionRepository $subscriptions,
         private UsageLimiter $usageLimiter,
         private CancellationFeedbackRecorder $feedback,
+        private PlanGate $planGate,
         private LoggerInterface $logger,
-        #[Autowire('%env(default::STRIPE_PRICE_TEAM_MONTHLY)%')]
-        private string $priceMonthly,
-        #[Autowire('%env(default::STRIPE_PRICE_TEAM_YEARLY)%')]
-        private string $priceYearly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_MONTHLY)%')]
+        private string $proMonthly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_YEARLY)%')]
+        private string $proYearly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_MONTHLY)%')]
+        private string $businessMonthly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_YEARLY)%')]
+        private string $businessYearly,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
     ) {
+    }
+
+    /**
+     * The Stripe price id for a self-serve plan × interval, or '' when that
+     * plan isn't configured on this instance. Enterprise is sales-led (no
+     * self-serve price).
+     */
+    private function priceFor(Plan $plan, string $interval): string
+    {
+        $yearly = Subscription::INTERVAL_YEAR === $interval;
+
+        return match ($plan) {
+            Plan::Pro => $yearly ? $this->proYearly : $this->proMonthly,
+            Plan::Business => $yearly ? $this->businessYearly : $this->businessMonthly,
+            default => '',
+        };
+    }
+
+    /** Self-serve plan from the request body (pro | business); defaults to Pro. */
+    private function readPlan(Request $request): Plan
+    {
+        $body = $this->readBody($request);
+
+        return 'business' === ($body['plan'] ?? null) ? Plan::Business : Plan::Pro;
     }
 
     #[Route('/spaces/{id}/billing/checkout', name: 'billing_checkout', methods: ['POST'])]
@@ -73,7 +104,8 @@ class BillingController extends AbstractController
         }
 
         $interval = $this->readInterval($request);
-        $priceId = Subscription::INTERVAL_YEAR === $interval ? $this->priceYearly : $this->priceMonthly;
+        $plan = $this->readPlan($request);
+        $priceId = $this->priceFor($plan, $interval);
         if ('' === $priceId) {
             return $this->json(['error' => 'The selected plan is not configured.'], 503);
         }
@@ -93,7 +125,8 @@ class BillingController extends AbstractController
                 cancelUrl: $this->frontendUrl . '/spaces/' . $id . '/settings?billing=cancelled',
                 customerId: $customerId,
                 customerEmail: null !== $customerId ? null : $user?->getEmail(),
-                metadata: ['space_id' => $id],
+                // Stamp the plan so the webhook records which tier was bought.
+                metadata: ['space_id' => $id, 'plan' => $plan->value],
             );
         } catch (BillingException $e) {
             $this->logger->error('Stripe checkout session failed', ['exception' => $e, 'space' => $id]);
@@ -206,9 +239,11 @@ class BillingController extends AbstractController
         }
 
         $subscription = $this->subscriptions->findActiveForSpace($space);
+        $entitlements = $this->planGate->spaceEntitlements($space);
 
         return $this->json([
-            'plan' => $subscription?->getPlan() ?? 'free',
+            'plan' => $entitlements->plan->value,
+            'planLabel' => $entitlements->plan->label(),
             'status' => $subscription?->getStatus(),
             'active' => null !== $subscription,
             'billingAvailable' => $this->stripe->isConfigured(),
@@ -217,9 +252,13 @@ class BillingController extends AbstractController
             'currentPeriodEnd' => $subscription?->getCurrentPeriodEnd()?->format(\DateTimeInterface::ATOM),
             'cancelAtPeriodEnd' => $subscription?->getCancelAtPeriodEnd() ?? false,
             'isAdmin' => $space->isAdmin($user) || $this->isGranted('ROLE_ADMIN'),
-            'limits' => [
-                'freeSpaceMemberLimit' => $this->usageLimiter->freeSpaceMemberLimit(),
+            // The full entitlement matrix for this space's plan — drives the
+            // upgrade/feature-gating UI.
+            'features' => $entitlements->features,
+            'limits' => $entitlements->limits + [
                 'memberCount' => \count($space->getEffectiveUsers()),
+                // Back-compat keys the current PWA card still reads.
+                'freeSpaceMemberLimit' => $this->usageLimiter->freeSpaceMemberLimit(),
                 'freeMcpDailyLimit' => $this->usageLimiter->freeMcpDailyLimit(),
             ],
         ]);
@@ -319,6 +358,12 @@ class BillingController extends AbstractController
 
         $status = $deleted ? Subscription::STATUS_CANCELED : ($this->stringAt($sub, ['status']) ?? Subscription::STATUS_INCOMPLETE);
         $row->setStatus($status);
+
+        // The tier bought, carried on the subscription metadata from checkout.
+        $planMeta = $this->stringAt($sub, ['metadata', 'plan']);
+        if (null !== $planMeta) {
+            $row->setPlan($planMeta);
+        }
 
         $customerId = $this->stringAt($sub, ['customer']);
         if (null !== $customerId) {

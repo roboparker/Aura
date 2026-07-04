@@ -71,4 +71,27 @@ final class SubscriptionRepository extends ServiceEntityRepository
 
         return $count > 0;
     }
+
+    /**
+     * The distinct plan strings of the entitling subscriptions the user belongs
+     * to (direct or via group). Used to resolve their best effective plan.
+     *
+     * @return list<string>
+     */
+    public function entitlingPlansForUser(User $user): array
+    {
+        $dql = sprintf(
+            'SELECT DISTINCT s.plan FROM %s s WHERE s.status IN (:statuses) AND %s',
+            Subscription::class,
+            SpaceMembershipDql::userBelongsToProjectSpace('s'),
+        );
+
+        $plans = $this->getEntityManager()
+            ->createQuery($dql)
+            ->setParameter('statuses', Subscription::ENTITLING_STATUSES)
+            ->setParameter('user', $user)
+            ->getSingleColumnResult();
+
+        return array_values(array_filter($plans, 'is_string'));
+    }
 }
