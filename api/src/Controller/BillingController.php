@@ -8,6 +8,7 @@ use App\Billing\BillingException;
 use App\Billing\Plan;
 use App\Billing\PlanGate;
 use App\Billing\StripeGatewayInterface;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\CancellationFeedback;
 use App\Entity\Invoice;
@@ -342,17 +343,29 @@ class BillingController extends AbstractController
 
         $row = $this->subscriptions->findByStripeSubscriptionId($stripeSubId);
         if (null === $row) {
+            // Resolve the billing account: an organization (#billing Phase 1b),
+            // falling back to the legacy per-space id.
+            $orgId = $this->stringAt($sub, ['metadata', 'organization_id']);
             $spaceId = $this->stringAt($sub, ['metadata', 'space_id']);
-            $space = null !== $spaceId ? $this->em->getRepository(Space::class)->find($spaceId) : null;
-            if (!$space instanceof Space) {
-                $this->logger->warning('Stripe subscription webhook could not resolve space.', [
-                    'subscription' => $stripeSubId,
-                    'space_id' => $spaceId,
-                ]);
+            $row = (new Subscription())->setStripeSubscriptionId($stripeSubId);
+            if (null !== $orgId) {
+                $org = $this->em->getRepository(Organization::class)->find($orgId);
+                if (!$org instanceof Organization) {
+                    $this->logger->warning('Stripe webhook could not resolve organization.', ['subscription' => $stripeSubId, 'organization_id' => $orgId]);
+                    return;
+                }
+                $row->setOrganization($org);
+            } elseif (null !== $spaceId) {
+                $space = $this->em->getRepository(Space::class)->find($spaceId);
+                if (!$space instanceof Space) {
+                    $this->logger->warning('Stripe webhook could not resolve space.', ['subscription' => $stripeSubId, 'space_id' => $spaceId]);
+                    return;
+                }
+                $row->setSpace($space);
+            } else {
+                $this->logger->warning('Stripe webhook carried no billing account.', ['subscription' => $stripeSubId]);
                 return;
             }
-            $row = new Subscription();
-            $row->setSpace($space)->setStripeSubscriptionId($stripeSubId);
             $this->em->persist($row);
         }
 

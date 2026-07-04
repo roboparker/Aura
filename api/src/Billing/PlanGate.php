@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Billing;
 
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -30,6 +31,18 @@ final class PlanGate
         $subscription = $this->subscriptions->findActiveForSpace($space);
 
         return null === $subscription ? Plan::Free : Plan::fromStorage($subscription->getPlan());
+    }
+
+    public function planForOrganization(Organization $organization): Plan
+    {
+        $subscription = $this->subscriptions->findActiveForOrganization($organization);
+
+        return null === $subscription ? Plan::Free : Plan::fromStorage($subscription->getPlan());
+    }
+
+    public function organizationEntitlements(Organization $organization): PlanEntitlements
+    {
+        return $this->catalog->for($this->planForOrganization($organization));
     }
 
     /** The best plan the user is entitled to across all their spaces. */
