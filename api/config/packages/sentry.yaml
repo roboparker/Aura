@@ -1,0 +1,20 @@
+# Sentry error + performance monitoring for the API + worker.
+#
+# Dark-launched: a blank SENTRY_DSN leaves the SDK disabled, so dev / test / CI
+# never send events. Set SENTRY_DSN in the environment (server .env in prod, via
+# the compose `environment:` block) to turn it on. The SDK auto-reads
+# SENTRY_ENVIRONMENT + SENTRY_RELEASE from the environment when present.
+# See docs/developer/monitoring.md.
+sentry:
+    dsn: '%env(default::SENTRY_DSN)%'
+    options:
+        # Light performance tracing for the free tier — override with
+        # SENTRY_TRACES_SAMPLE_RATE (0 disables tracing, 1.0 = everything).
+        traces_sample_rate: '%env(float:SENTRY_TRACES_SAMPLE_RATE)%'
+        # Don't attach IPs / cookies / request bodies by default.
+        send_default_pii: false
+
+when@test:
+    sentry:
+        # Never emit from the test suite, even if a DSN leaks into the env.
+        dsn: null

@@ -26,6 +26,7 @@
         "scheb/2fa-backup-code": "^8.5",
         "scheb/2fa-bundle": "^8.5",
         "scheb/2fa-totp": "^8.5",
+        "sentry/sentry-symfony": "^5.10",
         "stof/doctrine-extensions-bundle": "^1.15",
         "symfony/asset": "7.4.*",
         "symfony/console": "7.4.*",
