@@ -208,6 +208,17 @@ class Space
     private ?User $createdBy = null;
 
     /**
+     * The organization account that owns this space (#billing Phase 1), or null
+     * for a **personal** space (owned by {@see $createdBy}). This is the
+     * GitHub-style split: a space belongs to a person or an org, never both. The
+     * plan a space runs on resolves through this owner (see PlanGate).
+     */
+    #[ORM\ManyToOne(targetEntity: Organization::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['space:read'])]
+    private ?Organization $organization = null;
+
+    /**
      * Direct user memberships. Populated by SpaceCreateProcessor for
      * new shared spaces and by UserPasswordHasherProcessor for the
      * personal space at signup. PR 3 (#186) will add the invite-by-email
@@ -473,6 +484,17 @@ class Space
     public function setCreatedBy(?User $createdBy): static
     {
         $this->createdBy = $createdBy;
+        return $this;
+    }
+
+    public function getOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    public function setOrganization(?Organization $organization): static
+    {
+        $this->organization = $organization;
         return $this;
     }
 
