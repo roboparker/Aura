@@ -149,10 +149,18 @@ class SpaceMemberController extends AbstractController
 
         // `role` (admin/member) and `roles` (custom space-role IRIs) are both
         // optional — a PATCH may change either or both.
+        // An org guest can never be elevated in an org space — they're
+        // confined to the restricted guest role (the seat invariant).
+        $memberUser = $membership->getUser();
+        $isOrgGuest = null !== $memberUser && $this->memberAdder->isOrgGuest($space, $memberUser);
+
         if (array_key_exists('role', $payload)) {
             $role = is_string($payload['role'] ?? null) ? $payload['role'] : '';
             if (!in_array($role, Space::ALLOWED_ROLES, true)) {
                 return $this->json(['error' => 'Role must be one of: admin, member.'], 422);
+            }
+            if ($isOrgGuest && Space::ROLE_ADMIN === $role) {
+                return $this->json(['error' => 'Organization guests cannot be space admins.'], 403);
             }
 
             // Never let the last admin be demoted — a space must always
@@ -172,6 +180,16 @@ class SpaceMemberController extends AbstractController
             $resolved = $this->resolveRoles($space, $payload['roles']);
             if ($resolved instanceof JsonResponse) {
                 return $resolved;
+            }
+            if ($isOrgGuest) {
+                foreach ($resolved as $spaceRole) {
+                    if (SpaceRole::BUILTIN_GUEST !== $spaceRole->getBuiltinKey()) {
+                        return $this->json(
+                            ['error' => 'Organization guests can only hold the guest role.'],
+                            403,
+                        );
+                    }
+                }
             }
             $membership->clearRoles();
             foreach ($resolved as $spaceRole) {
