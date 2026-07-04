@@ -137,6 +137,9 @@
             "config/routes/scheb_2fa.yaml"
         ]
     },
+    "sentry/sentry-symfony": {
+        "version": "5.10.0"
+    },
     "squizlabs/php_codesniffer": {
         "version": "3.13",
         "recipe": {
