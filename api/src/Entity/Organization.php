@@ -2,12 +2,19 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
 use App\Repository\OrganizationRepository;
+use App\State\OrganizationCreateProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * An organization account (#billing Phase 1) — the GitHub-style team account
@@ -20,6 +27,24 @@ use Symfony\Component\Uid\Uuid;
  * {@see SpaceRole} governs *content* — two independent layers. All non-`guest`
  * roles count as a billable seat; guests are free.
  */
+#[ApiResource(
+    operations: [
+        // Scoped to the caller's organizations by OrganizationAccessExtension.
+        new GetCollection(security: "is_granted('ROLE_USER')"),
+        new Post(security: "is_granted('ROLE_USER')", processor: OrganizationCreateProcessor::class),
+        new Get(
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.hasMember(user))",
+            securityMessage: 'Organization not found.',
+        ),
+        new Patch(
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.isAdmin(user))",
+            securityMessage: 'Only organization admins can edit it.',
+        ),
+    ],
+    normalizationContext: ['groups' => ['organization:read']],
+    denormalizationContext: ['groups' => ['organization:write']],
+    order: ['createdAt' => 'DESC'],
+)]
 #[ORM\Entity(repositoryClass: OrganizationRepository::class)]
 #[ORM\Table(name: 'organization')]
 #[ORM\UniqueConstraint(name: 'uniq_organization_slug', columns: ['slug'])]
@@ -59,6 +84,8 @@ class Organization
     private ?Uuid $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'An organization name is required.')]
+    #[Assert\Length(max: 255)]
     #[Groups(['organization:read', 'organization:write'])]
     private string $name = '';
 
@@ -147,6 +174,47 @@ class Organization
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    /** Number of paid seats (members whose role isn't guest). */
+    #[Groups(['organization:read'])]
+    public function getSeatCount(): int
+    {
+        return $this->seatCount();
+    }
+
+    /**
+     * Flattened member roster for the detail UI (avoids embedding + a User
+     * serialization group).
+     *
+     * @return list<array{id: string, role: string, joinedAt: string, user: array<string, mixed>}>
+     */
+    #[Groups(['organization:read'])]
+    public function getMemberList(): array
+    {
+        $out = [];
+        foreach ($this->memberships as $membership) {
+            $user = $membership->getUser();
+            if (null === $user) {
+                continue;
+            }
+            $out[] = [
+                'id' => (string) $membership->getId(),
+                'role' => $membership->getRole(),
+                'joinedAt' => $membership->getJoinedAt()->format(\DateTimeInterface::ATOM),
+                'user' => [
+                    'id' => (string) $user->getId(),
+                    'email' => $user->getEmail(),
+                    'givenName' => $user->getGivenName(),
+                    'familyName' => $user->getFamilyName(),
+                    'nickname' => $user->getNickname(),
+                    'personalizedColor' => $user->getPersonalizedColor(),
+                    'avatarUrls' => $user->getAvatarUrls(),
+                ],
+            ];
+        }
+
+        return $out;
     }
 
     /**
