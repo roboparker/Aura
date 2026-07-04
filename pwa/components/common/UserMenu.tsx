@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { useRouter } from "next/router";
 import {
+  Building2,
   ChevronDown,
   ListChecks,
   LogOut,
@@ -25,6 +26,7 @@ import { cn } from "@/lib/utils";
 // action below the divider.
 const USER_MENU_LINKS = [
   { href: "/my-tasks", label: "My Tasks", icon: ListChecks },
+  { href: "/organizations", label: "Organizations", icon: Building2 },
   { href: "/feedback", label: "Feedback", icon: MessagesSquare },
   { href: "/settings/profile", label: "Settings", icon: Settings },
 ];
