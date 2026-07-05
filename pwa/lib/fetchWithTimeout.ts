@@ -8,14 +8,19 @@
 const DEFAULT_TIMEOUT_MS = 10_000;
 
 /**
- * Resolve the request target and refuse anything that isn't same-origin
- * with the app. Every caller talks to our own API (`ENTRYPOINT`, which is
- * `window.origin` in the browser), so a cross-origin target can only be the
- * result of a tainted URL — block it before the request leaves the browser
- * with the user's session cookies attached (request-forgery defense).
+ * Resolve the request target against the app origin, refuse anything that
+ * isn't same-origin, and return a URL **rebuilt from the trusted
+ * `window.location.origin`** — only the path/query/hash come from the caller.
+ *
+ * Every caller talks to our own API (`ENTRYPOINT`, which is `window.origin`
+ * in the browser), so a cross-origin target can only be the result of a
+ * tainted URL — block it before the request leaves the browser with the
+ * user's session cookies attached (request-forgery defense, #371). Rebuilding
+ * from the constant origin also keeps the request host out of the taint path:
+ * the host is never a user-controlled value.
  */
-function assertSameOrigin(input: RequestInfo | URL): void {
-  if (typeof window === "undefined") return;
+function sameOriginTarget(input: RequestInfo | URL): RequestInfo | URL {
+  if (typeof window === "undefined") return input;
   const raw =
     typeof input === "string"
       ? input
@@ -31,6 +36,8 @@ function assertSameOrigin(input: RequestInfo | URL): void {
   if (resolved.origin !== window.location.origin) {
     throw new Error("Refusing to fetch a cross-origin URL.");
   }
+  // Host is the constant, trusted origin; only path/query/hash are caller-derived.
+  return new URL(resolved.pathname + resolved.search + resolved.hash, window.location.origin).href;
 }
 
 /**
@@ -48,11 +55,11 @@ export async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit & { timeoutMs?: number } = {},
 ): Promise<Response> {
-  assertSameOrigin(input);
+  const target = sameOriginTarget(input);
   const { timeoutMs = DEFAULT_TIMEOUT_MS, signal, ...rest } = init;
   const effectiveSignal = signal ?? AbortSignal.timeout(timeoutMs);
   try {
-    return await fetch(input, { ...rest, signal: effectiveSignal });
+    return await fetch(target, { ...rest, signal: effectiveSignal });
   } catch (err) {
     if (
       err instanceof DOMException &&
