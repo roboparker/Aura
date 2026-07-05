@@ -76,7 +76,7 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
   );
 
   // While dragging, hide the dragged page's own descendants so it can't be
-  // nested inside itself and the boardion maths stay sane.
+  // nested inside itself and the projection maths stay sane.
   const flattened = useMemo<FlatPage[]>(() => {
     const flat = flattenTree(items, collapsed);
     if (!activeId) return flat;
@@ -93,7 +93,7 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
     return flat.filter((i) => !excluded.has(i["@id"]));
   }, [items, collapsed, activeId]);
 
-  const boarded =
+  const projected =
     activeId && overId
       ? getProjection(flattened, activeId, overId, offsetLeft, INDENT)
       : null;
@@ -124,11 +124,11 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
   const onDragEnd = async ({ active, over }: DragEndEvent) => {
     const activeIri = String(active.id);
     const overIri = over ? String(over.id) : null;
-    const boardion = boarded;
+    const projection = projected;
     reset();
-    if (!overIri || !boardion) return;
+    if (!overIri || !projection) return;
 
-    const { next, updates } = applyMove(items, activeIri, overIri, boardion);
+    const { next, updates } = applyMove(items, activeIri, overIri, projection);
     if (updates.length === 0) return;
     setItems(next); // optimistic
 
@@ -170,8 +170,8 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
               key={item["@id"]}
               item={item}
               depth={
-                item["@id"] === activeId && boarded
-                  ? boarded.depth
+                item["@id"] === activeId && projected
+                  ? projected.depth
                   : item.depth
               }
               collapsed={collapsed.has(item["@id"])}
@@ -216,7 +216,7 @@ const PageRow = ({
         paddingLeft: depth * INDENT,
       }}
       className={cn(
-        "group/pagerow flex items-center rounded-md",
+        "group/pagerow relative flex items-center rounded-md",
         active && "bg-accent text-accent-foreground",
         isDragging && "opacity-60",
       )}
@@ -237,10 +237,12 @@ const PageRow = ({
         <span className="w-[1.375rem] shrink-0" aria-hidden />
       )}
 
+      {/* Drag handle overlays the right edge on hover so it doesn't indent the
+          row text (which should line up with the other nav sections). */}
       <button
         type="button"
         aria-label={`Reorder ${item.title}`}
-        className="shrink-0 cursor-grab rounded p-0.5 text-muted-foreground/50 opacity-0 hover:text-foreground group-hover/pagerow:opacity-100"
+        className="absolute right-1 top-1/2 z-10 -translate-y-1/2 cursor-grab rounded bg-accent p-0.5 text-muted-foreground/60 opacity-0 hover:text-foreground group-hover/pagerow:opacity-100"
         {...attributes}
         {...listeners}
       >
