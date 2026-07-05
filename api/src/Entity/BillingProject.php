@@ -86,6 +86,7 @@ class BillingProject
     #[Groups(['billing_project:read', 'billing_project:write'])]
     private ?Space $space = null;
 
+    #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: Client::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'A client is required.')]
