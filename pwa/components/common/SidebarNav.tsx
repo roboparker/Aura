@@ -73,10 +73,10 @@ interface ResourceRow {
  * / `discussions`), scoped by `?space=<iri>` — the same filter the
  * aggregators and SpaceContentTabs use.
  *
- * Keyed under the resource's react-query prefix (e.g. `["projects", …]`)
- * so the aggregators' `invalidateQueries({ queryKey: ["projects"] })`
- * on create/edit/delete refreshes this list too — a project added on
- * `/projects` shows up here without a manual reload.
+ * Keyed under the resource's react-query prefix (e.g. `["boards", …]`)
+ * so the aggregators' `invalidateQueries({ queryKey: ["boards"] })`
+ * on create/edit/delete refreshes this list too — a board added on
+ * `/boards` shows up here without a manual reload.
  */
 function useSpaceResources(
   spaceIri: string | null,

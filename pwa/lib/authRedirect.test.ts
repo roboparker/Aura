@@ -59,7 +59,7 @@ describe("safeNextPath", () => {
 describe("signinHrefForCurrent", () => {
   it("preserves a safe current path as ?next=", () => {
     expect(signinHrefForCurrent("/boards/123")).toBe(
-      "/signin?next=%2Fprojects%2F123",
+      "/signin?next=%2Fboards%2F123",
     );
   });
 

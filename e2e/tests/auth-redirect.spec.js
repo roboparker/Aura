@@ -75,7 +75,7 @@ test.describe("Auth redirect", () => {
     await page.goto(`${BASE_URL}/boards`);
 
     // We're bounced to /signin and the original path is preserved on `next`.
-    await expect(page).toHaveURL(/\/signin\?next=%2Fprojects/);
+    await expect(page).toHaveURL(/\/signin\?next=%2Fboards/);
 
     // Submit the sign-in form.
     await page.fill("#email", email);
