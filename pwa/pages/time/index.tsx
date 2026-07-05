@@ -1,13 +1,15 @@
 import Head from "next/head";
+import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clock, Play, Square } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { apiGetCollection, apiSend } from "@/lib/apiClient";
+import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
+  BillingProjectOption,
   TimeEntry,
   elapsedSeconds,
   formatClock,
@@ -25,11 +27,22 @@ import { Switch } from "@/components/ui/switch";
 
 const MERGE_PATCH = "application/merge-patch+json";
 
-/** "YYYY-MM-DDTHH:mm" for a datetime-local input, in local time. */
-const toLocalInput = (d: Date): string => {
+const SELECT_CLASS =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+
+/** "YYYY-MM-DD" for a date input (local). */
+const todayInput = (d: Date): string => {
   const pad = (n: number) => n.toString().padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+/** "HH:mm" for a time input (local). */
+const timeInput = (d: Date): string => {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+/** Compose a local date + time into an absolute ISO string. */
+const composeIso = (date: string, time: string): string =>
+  new Date(`${date}T${time}`).toISOString();
 
 const dayLabel = (iso: string): string =>
   new Date(iso).toLocaleDateString(undefined, {
@@ -46,10 +59,12 @@ const TimePage = () => {
 
   const [showComposer, setShowComposer] = useState(false);
   const [description, setDescription] = useState("");
-  const [startedAt, setStartedAt] = useState(() => toLocalInput(new Date()));
-  const [endedAt, setEndedAt] = useState("");
+  const [workDate, setWorkDate] = useState(() => todayInput(new Date()));
+  const [startTime, setStartTime] = useState(() => timeInput(new Date()));
+  const [endTime, setEndTime] = useState("");
   const [billable, setBillable] = useState(true);
-  const [rate, setRate] = useState("");
+  const [projectIri, setProjectIri] = useState("");
+  const [categoryIri, setCategoryIri] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
 
@@ -60,6 +75,8 @@ const TimePage = () => {
   }, [authLoading, isAuthenticated, router]);
 
   const spaceIri = activeSpace?.["@id"] ?? null;
+  const spaceId = activeSpace?.id ?? null;
+
   const entriesQuery = useQuery({
     queryKey: ["time_entries", spaceIri],
     enabled: isAuthenticated,
@@ -73,22 +90,53 @@ const TimePage = () => {
   const running = entries.find(isRunning) ?? null;
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["time_entries"] });
 
-  // Tick once a second only while a timer is running.
+  // Billing projects + categories the member may pick from.
+  const projectsQuery = useQuery({
+    queryKey: ["billing_project_options", spaceId],
+    enabled: isAuthenticated && !!spaceId,
+    queryFn: () =>
+      apiGet<{ options: BillingProjectOption[] }>(`/spaces/${spaceId}/billing-project-options`, {
+        errorMessage: "Failed to load billing projects.",
+      }).then((r) => r.options ?? []),
+  });
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+  const noProjects = !projectsQuery.isLoading && projects.length === 0;
+
+  const selectedProject = projects.find((p) => p["@id"] === projectIri) ?? null;
+  const categories = useMemo(() => selectedProject?.categories ?? [], [selectedProject]);
+  const projectName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of projects) m.set(p["@id"], p.name);
+    return m;
+  }, [projects]);
+
+  // Default the pickers once loaded / when the project changes.
+  useEffect(() => {
+    if (!projectIri && projects.length > 0) setProjectIri(projects[0]["@id"]);
+  }, [projects, projectIri]);
+  useEffect(() => {
+    if (categories.length > 0 && !categories.some((c) => c["@id"] === categoryIri)) {
+      setCategoryIri(categories[0]["@id"]);
+    }
+  }, [categories, categoryIri]);
+
   useEffect(() => {
     if (!running) return;
     const t = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(t);
   }, [running]);
 
+  const projectCategoryBody = () => ({
+    billingProject: projectIri,
+    category: categoryIri,
+    ...(spaceIri ? { space: spaceIri } : {}),
+  });
+
   const startTimer = useMutation({
     mutationFn: () =>
       apiSend<TimeEntry>("POST", "/time_entries", {
         errorMessage: "Failed to start the timer.",
-        body: {
-          startedAt: new Date().toISOString(),
-          billable: true,
-          ...(spaceIri ? { space: spaceIri } : {}),
-        },
+        body: { startedAt: new Date().toISOString(), billable: true, ...projectCategoryBody() },
       }),
     onSuccess: () => {
       setActionError(null);
@@ -109,25 +157,22 @@ const TimePage = () => {
   });
 
   const logEntry = useMutation({
-    mutationFn: () => {
-      const rateMinor = rate.trim() ? Math.round(parseFloat(rate) * 100) : null;
-      return apiSend<TimeEntry>("POST", "/time_entries", {
+    mutationFn: () =>
+      apiSend<TimeEntry>("POST", "/time_entries", {
         errorMessage: "Failed to log time.",
         body: {
           description: description.trim() || null,
-          startedAt: new Date(startedAt).toISOString(),
-          endedAt: endedAt ? new Date(endedAt).toISOString() : null,
+          startedAt: composeIso(workDate, startTime),
+          endedAt: endTime ? composeIso(workDate, endTime) : null,
           billable,
-          ...(rateMinor !== null ? { rateAmount: rateMinor, rateCurrency: "USD" } : {}),
-          ...(spaceIri ? { space: spaceIri } : {}),
+          ...projectCategoryBody(),
         },
-      });
-    },
+      }),
     onSuccess: () => {
       setDescription("");
-      setEndedAt("");
-      setRate("");
-      setStartedAt(toLocalInput(new Date()));
+      setEndTime("");
+      setStartTime(timeInput(new Date()));
+      setWorkDate(todayInput(new Date()));
       setShowComposer(false);
       setActionError(null);
       void refresh();
@@ -152,6 +197,7 @@ const TimePage = () => {
   }, [entries]);
 
   const canCreate = can("time_entries", "create");
+  const canTrack = !!projectIri && !!categoryIri;
   const error = actionError || (entriesQuery.isError ? "Failed to load time entries." : null);
 
   if (authLoading || !isAuthenticated) {
@@ -161,6 +207,51 @@ const TimePage = () => {
       </div>
     );
   }
+
+  const projectCategoryPickers = (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1.5">
+        <Label htmlFor="te-project">Billing project</Label>
+        <select
+          id="te-project"
+          value={projectIri}
+          onChange={(e) => setProjectIri(e.target.value)}
+          disabled={noProjects}
+          className={SELECT_CLASS}
+        >
+          {noProjects ? (
+            <option value="">No billing projects</option>
+          ) : (
+            projects.map((p) => (
+              <option key={p["@id"]} value={p["@id"]}>
+                {p.name}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="te-category">Category</Label>
+        <select
+          id="te-category"
+          value={categoryIri}
+          onChange={(e) => setCategoryIri(e.target.value)}
+          disabled={categories.length === 0}
+          className={SELECT_CLASS}
+        >
+          {categories.length === 0 ? (
+            <option value="">No categories</option>
+          ) : (
+            categories.map((c) => (
+              <option key={c["@id"]} value={c["@id"]}>
+                {c.name}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -182,45 +273,64 @@ const TimePage = () => {
             }
           />
 
-          {canCreate && (
+          {canCreate && noProjects && (
+            <Alert className="mb-4">
+              <AlertDescription>
+                You need a billing project to track time.{" "}
+                <Link href="/billing-projects" className="underline">
+                  Set one up
+                </Link>{" "}
+                (or ask a space admin).
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {canCreate && !noProjects && (
             <Card className="mb-6">
-              <CardContent className="flex items-center justify-between gap-4 py-4">
-                {running ? (
-                  <>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {running.description?.trim() || "Running timer"}
+              <CardContent className="space-y-4 py-4">
+                {projectCategoryPickers}
+                <div className="flex items-center justify-between gap-4">
+                  {running ? (
+                    <>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {running.description?.trim() || "Running timer"}
+                        </p>
+                        <p className="font-mono text-2xl tabular-nums">
+                          {formatClock(elapsedSeconds(running, nowTick))}
+                        </p>
+                      </div>
+                      <Button
+                        variant="destructive"
+                        onClick={() => stopTimer.mutate(running)}
+                        disabled={stopTimer.isPending}
+                      >
+                        <Square className="size-4" /> Stop
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Start a timer, or log past time.
                       </p>
-                      <p className="font-mono text-2xl tabular-nums">
-                        {formatClock(elapsedSeconds(running, nowTick))}
-                      </p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      onClick={() => stopTimer.mutate(running)}
-                      disabled={stopTimer.isPending}
-                    >
-                      <Square className="size-4" /> Stop
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm text-muted-foreground">
-                      Start a timer, or log past time.
-                    </p>
-                    <Button onClick={() => startTimer.mutate()} disabled={startTimer.isPending}>
-                      <Play className="size-4" /> Start timer
-                    </Button>
-                  </>
-                )}
+                      <Button
+                        onClick={() => startTimer.mutate()}
+                        disabled={startTimer.isPending || !canTrack}
+                      >
+                        <Play className="size-4" /> Start timer
+                      </Button>
+                    </>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
 
-          {showComposer && (
+          {showComposer && !noProjects && (
             <Card className="mb-6">
               <CardContent className="py-6">
                 <form onSubmit={handleLog} className="space-y-4">
+                  {projectCategoryPickers}
                   <div className="space-y-1.5">
                     <Label htmlFor="te-desc">
                       Description{" "}
@@ -234,14 +344,24 @@ const TimePage = () => {
                       placeholder="What did you work on?"
                     />
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="te-date">Date</Label>
+                      <Input
+                        id="te-date"
+                        type="date"
+                        value={workDate}
+                        onChange={(e) => setWorkDate(e.target.value)}
+                        required
+                      />
+                    </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="te-start">Start</Label>
                       <Input
                         id="te-start"
-                        type="datetime-local"
-                        value={startedAt}
-                        onChange={(e) => setStartedAt(e.target.value)}
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
                         required
                       />
                     </div>
@@ -252,32 +372,20 @@ const TimePage = () => {
                       </Label>
                       <Input
                         id="te-end"
-                        type="datetime-local"
-                        value={endedAt}
-                        onChange={(e) => setEndedAt(e.target.value)}
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
                       />
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-6">
-                    <div className="flex items-center gap-2">
-                      <Switch id="te-billable" checked={billable} onCheckedChange={setBillable} />
-                      <Label htmlFor="te-billable">Billable</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="te-rate">Rate / hr</Label>
-                      <Input
-                        id="te-rate"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={rate}
-                        onChange={(e) => setRate(e.target.value)}
-                        className="w-28"
-                        placeholder="0.00"
-                      />
-                    </div>
+                  <p className="text-xs text-muted-foreground">
+                    An entry can&apos;t span midnight — log separate entries per day.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Switch id="te-billable" checked={billable} onCheckedChange={setBillable} />
+                    <Label htmlFor="te-billable">Billable</Label>
                   </div>
-                  <Button type="submit" disabled={logEntry.isPending}>
+                  <Button type="submit" disabled={logEntry.isPending || !canTrack}>
                     {logEntry.isPending ? "Logging…" : "Log time"}
                   </Button>
                 </form>
@@ -320,6 +428,9 @@ const TimePage = () => {
                               hour: "numeric",
                               minute: "2-digit",
                             })}
+                            {entry.billingProject && projectName.has(entry.billingProject) && (
+                              <> · {projectName.get(entry.billingProject)}</>
+                            )}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-2">

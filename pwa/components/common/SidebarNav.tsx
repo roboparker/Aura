@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Briefcase,
   CalendarDays,
   ChevronDown,
   Plus,
@@ -592,6 +593,28 @@ const SidebarNav = ({
                 <Link href="/time">
                   <Clock className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
                   <span className="truncate">Time</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && canInvoices && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  router.pathname.startsWith("/billing-projects") &&
+                    "bg-accent text-accent-foreground",
+                )}
+              >
+                <Link href="/billing-projects">
+                  <Briefcase className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+                  <span className="truncate">Billing projects</span>
                 </Link>
               </Button>,
             )}
