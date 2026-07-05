@@ -76,7 +76,7 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
   );
 
   // While dragging, hide the dragged page's own descendants so it can't be
-  // nested inside itself and the projection maths stay sane.
+  // nested inside itself and the boardion maths stay sane.
   const flattened = useMemo<FlatPage[]>(() => {
     const flat = flattenTree(items, collapsed);
     if (!activeId) return flat;
@@ -93,7 +93,7 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
     return flat.filter((i) => !excluded.has(i["@id"]));
   }, [items, collapsed, activeId]);
 
-  const projected =
+  const boarded =
     activeId && overId
       ? getProjection(flattened, activeId, overId, offsetLeft, INDENT)
       : null;
@@ -124,11 +124,11 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
   const onDragEnd = async ({ active, over }: DragEndEvent) => {
     const activeIri = String(active.id);
     const overIri = over ? String(over.id) : null;
-    const projection = projected;
+    const boardion = boarded;
     reset();
-    if (!overIri || !projection) return;
+    if (!overIri || !boardion) return;
 
-    const { next, updates } = applyMove(items, activeIri, overIri, projection);
+    const { next, updates } = applyMove(items, activeIri, overIri, boardion);
     if (updates.length === 0) return;
     setItems(next); // optimistic
 
@@ -170,8 +170,8 @@ const PagesNavTree = ({ spaceIri, currentPath, wrap, addLink }: Props) => {
               key={item["@id"]}
               item={item}
               depth={
-                item["@id"] === activeId && projected
-                  ? projected.depth
+                item["@id"] === activeId && boarded
+                  ? boarded.depth
                   : item.depth
               }
               collapsed={collapsed.has(item["@id"])}

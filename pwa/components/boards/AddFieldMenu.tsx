@@ -29,7 +29,7 @@ const NEW_TYPES: Array<{
 ];
 
 interface AddFieldMenuProps {
-  /** Fields that exist on the project but aren't shown in the list view. */
+  /** Fields that exist on the board but aren't shown in the list view. */
   hiddenFields: CustomFieldDefinition[];
   /** Reveal an existing hidden field in the list view. */
   onEnable: (def: CustomFieldDefinition) => void;

@@ -42,7 +42,7 @@ import {
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 
-interface ProjectOwner {
+interface BoardOwner {
   email: string;
   givenName?: string | null;
   familyName?: string | null;
@@ -50,11 +50,11 @@ interface ProjectOwner {
   avatarUrls?: { thumb?: string; profile?: string } | null;
 }
 
-interface ProjectPreview {
+interface BoardPreview {
   "@id": string;
   id: string;
   title: string;
-  owner?: ProjectOwner | null;
+  owner?: BoardOwner | null;
   createdOn: string;
   taskCount: number;
   completedTaskCount: number;
@@ -92,7 +92,7 @@ const toAvatarUser = (m: SpaceMember): AvatarUser => ({
   personalizedColor: m.personalizedColor ?? "#64748b",
 });
 
-const ownerToAvatar = (o: ProjectOwner | ActivityActor): AvatarUser => ({
+const ownerToAvatar = (o: BoardOwner | ActivityActor): AvatarUser => ({
   email: o.email,
   givenName: o.givenName,
   familyName: o.familyName,
@@ -129,7 +129,7 @@ const fileLabel = (name: string, mime: string): string => {
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
 // the Overview tab.
-const TABS = ["overview", "projects", "discussions", "pages", "tasks", "files"] as const;
+const TABS = ["overview", "boards", "discussions", "pages", "tasks", "files"] as const;
 type TabKey = (typeof TABS)[number];
 const isTabKey = (v: unknown): v is TabKey =>
   typeof v === "string" && (TABS as readonly string[]).includes(v);
@@ -147,12 +147,12 @@ const SpaceDetail = () => {
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Dashboard (Overview) data. Projects + pages counts ride on the
+  // Dashboard (Overview) data. Boards + pages counts ride on the
   // space object; discussions + tasks counts come from the list
   // endpoints' totalItems. `null` = still loading / unavailable.
   const [discussionsCount, setDiscussionsCount] = useState<number | null>(null);
   const [tasksCount, setTasksCount] = useState<number | null>(null);
-  const [projectsPreview, setProjectsPreview] = useState<ProjectPreview[]>([]);
+  const [boardsPreview, setProjectsPreview] = useState<BoardPreview[]>([]);
   const [activity, setActivity] = useState<ActivityFeed | null>(null);
 
   const handleAttach = async (mediaObjectIri: string) => {
@@ -273,7 +273,7 @@ const SpaceDetail = () => {
   }, [spaceId, spaces, activeSpace?.id, setActiveSpace]);
 
   // Overview dashboard data: discussions/tasks counts (via totalItems)
-  // and a short projects preview. Kept separate from the main space
+  // and a short boards preview. Kept separate from the main space
   // load so it refreshes when the space changes without blocking the
   // header render.
   const spaceIri = space?.["@id"] ?? null;
@@ -298,7 +298,7 @@ const SpaceDetail = () => {
     void (async () => {
       const [d, t] = await Promise.all([
         totalOf(`${ENTRYPOINT}/discussions?space=${enc}&itemsPerPage=1`),
-        totalOf(`${ENTRYPOINT}/tasks?project.space=${enc}&itemsPerPage=1`),
+        totalOf(`${ENTRYPOINT}/tasks?board.space=${enc}&itemsPerPage=1`),
       ]);
       if (cancelled) return;
       setDiscussionsCount(d);
@@ -307,12 +307,12 @@ const SpaceDetail = () => {
     void (async () => {
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects?space=${enc}&itemsPerPage=5&order[createdOn]=desc`,
+          `${ENTRYPOINT}/boards?space=${enc}&itemsPerPage=5&order[createdOn]=desc`,
           opts,
         );
         if (!res.ok) return;
         const data = await res.json();
-        const list: ProjectPreview[] = data["hydra:member"] ?? data.member ?? [];
+        const list: BoardPreview[] = data["hydra:member"] ?? data.member ?? [];
         if (!cancelled) setProjectsPreview(list);
       } catch {
         /* preview is best-effort */
@@ -445,9 +445,9 @@ const SpaceDetail = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <StatCard
                   icon={FolderKanban}
-                  label="Projects"
-                  count={space.projectsCount}
-                  onClick={() => handleTabChange("projects")}
+                  label="Boards"
+                  count={space.boardsCount}
+                  onClick={() => handleTabChange("boards")}
                 />
                 <StatCard
                   icon={FileText}
@@ -472,7 +472,7 @@ const SpaceDetail = () => {
               <Tabs value={activeTab} onValueChange={handleTabChange}>
                 <TabsList className="mb-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="projects">Projects</TabsTrigger>
+                  <TabsTrigger value="boards">Boards</TabsTrigger>
                   <TabsTrigger value="discussions">Discussions</TabsTrigger>
                   <TabsTrigger value="pages">Pages</TabsTrigger>
                   <TabsTrigger value="tasks">Tasks</TabsTrigger>
@@ -490,7 +490,7 @@ const SpaceDetail = () => {
                             <EmptyState
                               icon={Clock}
                               title="No activity yet"
-                              hint="Create a project or page and the team's activity will show up here."
+                              hint="Create a board or page and the team's activity will show up here."
                             />
                           ) : (
                             <ul className="space-y-3.5">
@@ -532,9 +532,9 @@ const SpaceDetail = () => {
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-4">
                             <h2 className="font-semibold">
-                              Projects{" "}
+                              Boards{" "}
                               <span className="text-muted-foreground font-normal">
-                                {space.projectsCount}
+                                {space.boardsCount}
                               </span>
                             </h2>
                             <Button
@@ -543,21 +543,21 @@ const SpaceDetail = () => {
                               size="sm"
                               className="gap-1 text-emerald-600 hover:text-emerald-500"
                             >
-                              <Link href="/projects">
-                                New project
+                              <Link href="/boards">
+                                New board
                                 <Plus className="h-3.5 w-3.5" aria-hidden />
                               </Link>
                             </Button>
                           </div>
-                          {projectsPreview.length === 0 ? (
+                          {boardsPreview.length === 0 ? (
                             <EmptyState
                               icon={FolderKanban}
-                              title="No projects yet"
-                              hint="Projects organize tasks and timelines for a piece of the launch."
+                              title="No boards yet"
+                              hint="Boards organize tasks and timelines for a piece of the launch."
                             />
                           ) : (
                             <ul className="divide-y divide-border rounded-md border">
-                              {projectsPreview.map((p) => {
+                              {boardsPreview.map((p) => {
                                 const total = p.taskCount ?? 0;
                                 const done = p.completedTaskCount ?? 0;
                                 const pct =
@@ -567,7 +567,7 @@ const SpaceDetail = () => {
                                 return (
                                   <li key={p["@id"]}>
                                     <Link
-                                      href={`/projects/${p.id}`}
+                                      href={`/boards/${p.id}`}
                                       className="flex items-center gap-3 px-3 py-3 hover:bg-accent"
                                     >
                                       <div className="min-w-0 flex-1">
@@ -727,8 +727,8 @@ const SpaceDetail = () => {
                           <div className="space-y-2">
                             <QuickAction
                               icon={FolderKanban}
-                              label="New project"
-                              href="/projects"
+                              label="New board"
+                              href="/boards"
                             />
                             <QuickAction
                               icon={FileText}
@@ -747,10 +747,10 @@ const SpaceDetail = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="projects" className="mt-0">
+                <TabsContent value="boards" className="mt-0">
                   <SpaceProjectsList
                     spaceIri={space["@id"]}
-                    enabled={activeTab === "projects"}
+                    enabled={activeTab === "boards"}
                   />
                 </TabsContent>
 
@@ -850,10 +850,10 @@ const EmptyState = ({
   </div>
 );
 
-/** Renders the verb phrase for an activity row, e.g. "created the project Foo". */
+/** Renders the verb phrase for an activity row, e.g. "created the board Foo". */
 const ActivityVerb = ({ item }: { item: ActivityItem }) => {
   const type = item.objectClass.toLowerCase();
-  const noun = type === "project" ? "project" : type === "page" ? "page" : "task";
+  const noun = type === "board" ? "board" : type === "page" ? "page" : "task";
   const rawTitle = item.data?.title;
   const title =
     typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : null;

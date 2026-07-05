@@ -114,6 +114,6 @@ test.describe("Discussions", () => {
   });
 });
 
-// Cross-user space visibility is already covered by `projects.spec.js`;
+// Cross-user space visibility is already covered by `boards.spec.js`;
 // the panel inherits it via `SpaceAccessExtension` and `DiscussionAccessExtension`,
 // both of which have direct PHPUnit coverage in `DiscussionTest`.

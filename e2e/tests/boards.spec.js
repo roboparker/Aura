@@ -7,66 +7,66 @@ const {
   fillDescription,
 } = require("./helpers");
 
-const uniqueEmail = () => shared("projects");
+const uniqueEmail = () => shared("boards");
 
-test.describe("Projects", () => {
+test.describe("Boards", () => {
   test("unauthenticated visitors are redirected to sign in", async ({ page }) => {
-    await page.goto(`${BASE_URL}/projects`);
+    await page.goto(`${BASE_URL}/boards`);
     await expect(page).toHaveURL(/\/signin/);
   });
 
-  test("user can create, edit, and delete a project", async ({ page }) => {
+  test("user can create, edit, and delete a board", async ({ page }) => {
     const email = uniqueEmail();
     await registerAndSignIn(page, email);
 
-    await page.goto(`${BASE_URL}/projects`);
-    await expect(page).toHaveTitle("Projects - Madori");
-    await expect(page.locator("text=No projects yet")).toBeVisible();
+    await page.goto(`${BASE_URL}/boards`);
+    await expect(page).toHaveTitle("Boards - Madori");
+    await expect(page.locator("text=No boards yet")).toBeVisible();
 
-    // Create — the form lives behind the "New project" toggle now.
+    // Create — the form lives behind the "New board" toggle now.
     const title = `Launch plan ${Date.now()}`;
-    await page.getByTestId("new-project-button").click();
+    await page.getByTestId("new-board-button").click();
     await page.fill("#title", title);
     await fillDescription(page, undefined, "Q3 marketing push");
     await page.click('button[type="submit"]');
 
-    // Creating navigates to the new project's detail page; head back to
+    // Creating navigates to the new board's detail page; head back to
     // the list to verify it renders there.
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await page.goto(`${BASE_URL}/projects`);
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+    await page.goto(`${BASE_URL}/boards`);
 
-    const item = page.locator('[data-testid="project-item"]', { hasText: title });
+    const item = page.locator('[data-testid="board-item"]', { hasText: title });
     await expect(item).toBeVisible();
     await expect(item.locator("text=Q3 marketing push")).toBeVisible();
 
-    // Creator is auto-added as a member via ProjectOwnerProcessor.
-    await expect(item.locator('[data-testid="project-member"]')).toContainText(email);
+    // Creator is auto-added as a member via BoardOwnerProcessor.
+    await expect(item.locator('[data-testid="board-member"]')).toContainText(email);
 
     // Edit — update title and description
     await item.getByRole("button", { name: /^Edit$/ }).click();
     // Once editing, the form replaces the static title so scope by the sole
     // item on the page rather than by hasText which reads .value.
-    const editing = page.locator('[data-testid="project-item"]').first();
+    const editing = page.locator('[data-testid="board-item"]').first();
     await editing.getByLabel("Title").fill(`${title} v2`);
     await fillDescription(page, editing, "Updated copy");
     await editing.getByRole("button", { name: /Save/i }).click();
 
-    const updated = page.locator('[data-testid="project-item"]', { hasText: `${title} v2` });
+    const updated = page.locator('[data-testid="board-item"]', { hasText: `${title} v2` });
     await expect(updated).toBeVisible();
     await expect(updated.locator("text=Updated copy")).toBeVisible();
 
     // Delete — accept the confirm dialog
     page.once("dialog", (dialog) => dialog.accept());
     await updated.getByRole("button", { name: /Delete "/ }).click();
-    await expect(page.locator("text=No projects yet")).toBeVisible();
+    await expect(page.locator("text=No boards yet")).toBeVisible();
   });
 
   test("description supports markdown formatting", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
-    await page.goto(`${BASE_URL}/projects`);
-    await page.getByTestId("new-project-button").click();
+    await page.goto(`${BASE_URL}/boards`);
+    await page.getByTestId("new-board-button").click();
 
-    const title = `Markdown project ${Date.now()}`;
+    const title = `Markdown board ${Date.now()}`;
     await page.fill("#title", title);
 
     // Typing `# ` at the start of a BlockNote block turns it into a heading.
@@ -82,19 +82,19 @@ test.describe("Projects", () => {
 
     await page.click('button[type="submit"]');
 
-    // Creating navigates to the new project's detail page; head back to
+    // Creating navigates to the new board's detail page; head back to
     // the list to verify the rendered markdown there.
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await page.goto(`${BASE_URL}/projects`);
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+    await page.goto(`${BASE_URL}/boards`);
 
-    const item = page.locator('[data-testid="project-item"]', { hasText: title });
+    const item = page.locator('[data-testid="board-item"]', { hasText: title });
     // MarkdownView renders headings as real <h1> elements and list items as <li>.
     await expect(item.locator("h1", { hasText: "Big heading" })).toBeVisible();
     await expect(item.locator("li", { hasText: "first item" })).toBeVisible();
     await expect(item.locator("li", { hasText: "second item" })).toBeVisible();
   });
 
-  test("users only see projects they are members of", async ({ browser }) => {
+  test("users only see boards they are members of", async ({ browser }) => {
     const aliceEmail = uniqueEmail();
     const bobEmail = uniqueEmail();
     const suffix = Date.now();
@@ -103,24 +103,24 @@ test.describe("Projects", () => {
     const aliceContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const alicePage = await aliceContext.newPage();
     await registerAndSignIn(alicePage, aliceEmail);
-    await alicePage.goto(`${BASE_URL}/projects`);
-    await alicePage.getByTestId("new-project-button").click();
+    await alicePage.goto(`${BASE_URL}/boards`);
+    await alicePage.getByTestId("new-board-button").click();
     await alicePage.fill("#title", aliceProject);
     await alicePage.click('button[type="submit"]');
-    // Creating navigates to the new project's detail page; head back to
+    // Creating navigates to the new board's detail page; head back to
     // the list to verify it renders there.
-    await expect(alicePage).toHaveURL(/\/projects\/[a-f0-9-]+/);
-    await alicePage.goto(`${BASE_URL}/projects`);
+    await expect(alicePage).toHaveURL(/\/boards\/[a-f0-9-]+/);
+    await alicePage.goto(`${BASE_URL}/boards`);
     await expect(
-      alicePage.locator('[data-testid="project-item"]', { hasText: aliceProject }),
+      alicePage.locator('[data-testid="board-item"]', { hasText: aliceProject }),
     ).toBeVisible();
 
     const bobContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const bobPage = await bobContext.newPage();
     await registerAndSignIn(bobPage, bobEmail);
-    await bobPage.goto(`${BASE_URL}/projects`);
+    await bobPage.goto(`${BASE_URL}/boards`);
     await expect(bobPage.locator(`text=${aliceProject}`)).not.toBeVisible();
-    await expect(bobPage.locator("text=No projects yet")).toBeVisible();
+    await expect(bobPage.locator("text=No boards yet")).toBeVisible();
 
     await aliceContext.close();
     await bobContext.close();
@@ -129,18 +129,18 @@ test.describe("Projects", () => {
   test("the inline add-task row supports Tab between fields", async ({ page }) => {
     await registerAndSignIn(page, uniqueEmail());
 
-    // Creating a project lands on its detail page, which opens on the Tasks
+    // Creating a board lands on its detail page, which opens on the Tasks
     // tab in list view by default.
-    await page.goto(`${BASE_URL}/projects`);
-    await page.getByTestId("new-project-button").click();
+    await page.goto(`${BASE_URL}/boards`);
+    await page.getByTestId("new-board-button").click();
     const title = `Tab nav ${Date.now()}`;
     await page.fill("#title", title);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
 
     // Open the inline add row in the default ("In progress") section.
-    await page.getByTestId("project-new-task").click();
-    const titleInput = page.getByTestId("project-new-task-title");
+    await page.getByTestId("board-new-task").click();
+    const titleInput = page.getByTestId("board-new-task-title");
     await expect(titleInput).toBeVisible();
     await titleInput.click();
     await titleInput.fill("Keyboard task");
@@ -161,7 +161,7 @@ test.describe("Projects", () => {
     // title still creates the task.
     await titleInput.press("Enter");
     await expect(
-      page.locator('[data-testid="project-task-item"]', { hasText: "Keyboard task" }),
+      page.locator('[data-testid="board-task-item"]', { hasText: "Keyboard task" }),
     ).toBeVisible();
   });
 
@@ -185,15 +185,15 @@ test.describe("Projects", () => {
     expect(tagRes.ok()).toBeTruthy();
     const tag = await tagRes.json();
 
-    await page.goto(`${BASE_URL}/projects`);
-    await page.getByTestId("new-project-button").click();
+    await page.goto(`${BASE_URL}/boards`);
+    await page.getByTestId("new-board-button").click();
     const title = `Tag staging ${Date.now()}`;
     await page.fill("#title", title);
     await page.click('button[type="submit"]');
-    await expect(page).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
 
-    await page.getByTestId("project-new-task").click();
-    const titleInput = page.getByTestId("project-new-task-title");
+    await page.getByTestId("board-new-task").click();
+    const titleInput = page.getByTestId("board-new-task-title");
     await titleInput.fill("Tagged task");
 
     // Stage a tag, then submit from the title input.
@@ -202,7 +202,7 @@ test.describe("Projects", () => {
     await page.getByRole("option", { name: tag.title }).click();
     await titleInput.press("Enter");
 
-    const item = page.locator('[data-testid="project-task-item"]', {
+    const item = page.locator('[data-testid="board-task-item"]', {
       hasText: "Tagged task",
     });
     await expect(item).toBeVisible();
@@ -210,8 +210,8 @@ test.describe("Projects", () => {
     await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
   });
 
-  // Removed "account menu shows Projects link" — Projects is no
+  // Removed "account menu shows Boards link" — Boards is no
   // longer a top-level sidebar link after the sidebar redesign
-  // (#nav-refresh). The /projects page is still reachable directly
+  // (#nav-refresh). The /boards page is still reachable directly
   // and covered by the other tests in this file.
 });

@@ -1,7 +1,7 @@
-import type { ListColumn } from "@/components/projects/listColumns";
+import type { ListColumn } from "@/components/boards/listColumns";
 
 /**
- * Shared `<colgroup>` for the project list view's tables, so the per-section
+ * Shared `<colgroup>` for the board list view's tables, so the per-section
  * tables and the grand-total bar line up column-for-column. Every table that
  * uses it must be `table-fixed`. Layout:
  *

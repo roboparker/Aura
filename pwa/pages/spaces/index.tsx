@@ -131,7 +131,7 @@ const SpacesIndex = () => {
       <main className="px-6 py-8 max-w-7xl mx-auto">
         <PageHeader
           title="Spaces"
-          subtitle="Workspaces and shared rooms you belong to. Each space has its own members, projects, and pages."
+          subtitle="Workspaces and shared rooms you belong to. Each space has its own members, boards, and pages."
           actions={
             <>
               <Button

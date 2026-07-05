@@ -3,15 +3,15 @@ import type {
   FilterMap,
   FilterValue,
   SortState,
-} from "@/components/projects/listColumns";
+} from "@/components/boards/listColumns";
 
 /**
- * Per-project, per-browser persistence for the list view's column sort and
+ * Per-board, per-browser persistence for the list view's column sort and
  * filters. Kept in localStorage (a personal view preference, not shared
- * project state) under one key per project. Column order will join this
+ * board state) under one key per board. Column order will join this
  * shape when drag-to-reorder lands.
  */
-export interface ProjectListView {
+export interface BoardListView {
   sort: SortState | null;
   filters: FilterMap;
   /** Saved column key order; [] = the natural/default order. */
@@ -20,7 +20,7 @@ export interface ProjectListView {
   sectionOrder: string[];
 }
 
-interface UseProjectListView extends ProjectListView {
+interface UseProjectListView extends BoardListView {
   /** Set the active sort, or null to clear it. */
   setSort: (sort: SortState | null) => void;
   setFilter: (key: string, value: FilterValue | null) => void;
@@ -30,22 +30,22 @@ interface UseProjectListView extends ProjectListView {
   activeFilterCount: number;
 }
 
-const storageKey = (projectId: string): string =>
-  `madori.project.${projectId}.listview`;
+const storageKey = (boardId: string): string =>
+  `madori.board.${boardId}.listview`;
 
-const empty: ProjectListView = {
+const empty: BoardListView = {
   sort: null,
   filters: {},
   order: [],
   sectionOrder: [],
 };
 
-function load(projectId: string): ProjectListView {
+function load(boardId: string): BoardListView {
   if (typeof window === "undefined") return empty;
   try {
-    const raw = window.localStorage.getItem(storageKey(projectId));
+    const raw = window.localStorage.getItem(storageKey(boardId));
     if (!raw) return empty;
-    const parsed = JSON.parse(raw) as Partial<ProjectListView>;
+    const parsed = JSON.parse(raw) as Partial<BoardListView>;
     return {
       sort: parsed.sort ?? null,
       filters: parsed.filters ?? {},
@@ -57,26 +57,26 @@ function load(projectId: string): ProjectListView {
   }
 }
 
-export function useProjectListView(projectId: string | null): UseProjectListView {
-  const [view, setView] = useState<ProjectListView>(empty);
+export function useBoardListView(boardId: string | null): UseProjectListView {
+  const [view, setView] = useState<BoardListView>(empty);
 
   // Hydrate after mount so SSR and the first paint agree, then load the
-  // stored view for this project.
+  // stored view for this board.
   useEffect(() => {
-    if (projectId) setView(load(projectId));
-  }, [projectId]);
+    if (boardId) setView(load(boardId));
+  }, [boardId]);
 
   const persist = useCallback(
-    (next: ProjectListView) => {
+    (next: BoardListView) => {
       setView(next);
-      if (!projectId) return;
+      if (!boardId) return;
       try {
-        window.localStorage.setItem(storageKey(projectId), JSON.stringify(next));
+        window.localStorage.setItem(storageKey(boardId), JSON.stringify(next));
       } catch {
         // Storage-disabled browsers: state still applies for the session.
       }
     },
-    [projectId],
+    [boardId],
   );
 
   const setSort = useCallback(

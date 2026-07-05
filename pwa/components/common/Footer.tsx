@@ -83,7 +83,7 @@ const Footer = () => (
         </div>
         <div className="sm:col-span-1">
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Project
+            Board
           </h3>
           <ul className="space-y-1.5 text-sm">
             <li>

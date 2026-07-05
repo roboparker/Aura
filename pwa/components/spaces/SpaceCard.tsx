@@ -11,7 +11,7 @@ import SpaceTile from "./SpaceTile";
 /**
  * Card for the spaces grid (`/spaces`). Renders the colored tile, the
  * space name with a visibility badge (personal/shared) and the user's
- * role, the description, and a footer with member / project / page
+ * role, the description, and a footer with member / board / page
  * counts and the relative "updated X ago" timestamp.
  *
  * The whole card is a Link to the space detail; interactive children
@@ -30,8 +30,8 @@ interface Props {
 }
 
 const memberLabel = (n: number) => `${n} ${n === 1 ? "member" : "members"}`;
-const projectLabel = (n: number) =>
-  `${n} ${n === 1 ? "project" : "projects"}`;
+const boardLabel = (n: number) =>
+  `${n} ${n === 1 ? "board" : "boards"}`;
 const pageLabel = (n: number) => `${n} ${n === 1 ? "page" : "pages"}`;
 
 const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
@@ -91,7 +91,7 @@ const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
           )}
           <span className="inline-flex items-center gap-1">
             <FolderKanban className="h-3 w-3" aria-hidden />
-            {projectLabel(space.projectsCount)}
+            {boardLabel(space.boardsCount)}
           </span>
           <span className="inline-flex items-center gap-1">
             <FileText className="h-3 w-3" aria-hidden />

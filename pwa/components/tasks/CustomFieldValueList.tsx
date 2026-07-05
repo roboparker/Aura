@@ -41,7 +41,7 @@ interface Props {
    * paths back onto the field rows it built the array from.
    */
   onSave: (next: CustomFieldValuePair[]) => Promise<ViolationMap>;
-  projectIri?: string | null;
+  boardIri?: string | null;
   spaceIri?: string | null;
   users?: AvatarUser[];
   disabled?: boolean;
@@ -55,7 +55,7 @@ const isEmpty = (value: unknown): boolean =>
 
 /**
  * The CUSTOM FIELDS section of the task drawer: one editable row per
- * project definition, with inline 422 validation. Holds a working copy of
+ * board definition, with inline 422 validation. Holds a working copy of
  * the values and persists the whole array (debounced) so typing feels
  * inline; orphaned values are dropped so the server reaps them.
  */
@@ -63,7 +63,7 @@ const CustomFieldValueList = ({
   definitions,
   values,
   onSave,
-  projectIri,
+  boardIri,
   spaceIri,
   users,
   disabled,
@@ -162,7 +162,7 @@ const CustomFieldValueList = ({
         values={working}
         onChange={handleChange}
         violations={violations}
-        projectIri={projectIri}
+        boardIri={boardIri}
         spaceIri={spaceIri}
         users={users}
         disabled={disabled}

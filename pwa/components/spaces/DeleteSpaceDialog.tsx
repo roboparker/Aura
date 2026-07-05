@@ -55,7 +55,7 @@ const DeleteSpaceDialog = ({
     void (async () => {
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/tasks?project.space=${encodeURIComponent(space["@id"])}&itemsPerPage=1`,
+          `${ENTRYPOINT}/tasks?board.space=${encodeURIComponent(space["@id"])}&itemsPerPage=1`,
           { credentials: "include", headers: { Accept: "application/ld+json" } },
         );
         if (!res.ok) return;
@@ -76,7 +76,7 @@ const DeleteSpaceDialog = ({
   const canDelete = nameMatches && credential.trim() !== "" && !isDeleting;
 
   const rows: { count: number | null; label: string }[] = [
-    { count: space.projectsCount, label: "projects" },
+    { count: space.boardsCount, label: "boards" },
     { count: space.pagesCount, label: "pages" },
     { count: taskCount, label: "tasks" },
     { count: memberCount, label: "members will lose access" },

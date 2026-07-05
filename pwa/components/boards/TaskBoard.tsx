@@ -35,7 +35,7 @@ import {
 import { cn } from "@/lib/utils";
 
 /**
- * Kanban board view for a project: one column per board section, with task
+ * Kanban board view for a board: one column per board section, with task
  * cards that open the detail drawer on click and drag between sections. The
  * default "In progress" group (sectionIri === null) is the first column.
  *
@@ -69,7 +69,7 @@ interface TaskBoardProps {
   columns: BoardColumn[];
   /** Custom fields to surface on cards (already filtered to board visibility). */
   definitions: CustomFieldDefinition[];
-  /** Everyone assignable on this project, for the per-card assign menu. */
+  /** Everyone assignable on this board, for the per-card assign menu. */
   assignableUsers: BoardUser[];
   onOpen: (taskIri: string) => void;
   onMove: (taskIri: string, sectionIri: string | null) => void;

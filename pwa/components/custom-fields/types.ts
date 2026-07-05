@@ -33,7 +33,7 @@ export type CustomFieldSubtype =
   // reference
   | "user"
   | "task"
-  | "project"
+  | "board"
   | "page"
   | "discussion";
 
@@ -123,7 +123,7 @@ export interface CustomFieldDefinition {
  * Whether a definition (or bare IRI) is an instance-wide GLOBAL field rather
  * than a space-owned one (#global-custom-fields). Global fields live at
  * `/global_custom_field_definitions/...`; a task value keys them on
- * `globalDefinition` instead of `definition`, and per-project attach /
+ * `globalDefinition` instead of `definition`, and per-board attach /
  * visibility use the parallel `global_custom_field_definitions` routes.
  */
 export const isGlobalDefinition = (
@@ -145,7 +145,7 @@ export interface FooterResponse {
   footers: FooterRow[];
 }
 
-/** Per-definition fill stat from `GET /projects/{id}/custom_field_stats`. */
+/** Per-definition fill stat from `GET /boards/{id}/custom_field_stats`. */
 export interface FieldFillStat {
   definition: string;
   filled: number;
@@ -167,7 +167,7 @@ export interface OptionStatsResponse {
   options: OptionStat[];
 }
 
-/** One row from the project-scoped custom-field change log. */
+/** One row from the board-scoped custom-field change log. */
 export interface ActivityRow {
   id: number;
   action: string;

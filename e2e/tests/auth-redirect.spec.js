@@ -20,8 +20,8 @@ const AUTHED_PATHS = [
   "/admin/segments",
   "/my-tasks",
   "/tasks",
-  "/projects",
-  `/projects/${PLACEHOLDER_UUID}`,
+  "/boards",
+  `/boards/${PLACEHOLDER_UUID}`,
   "/discussions",
   `/discussions/${PLACEHOLDER_UUID}`,
   "/pages",
@@ -72,7 +72,7 @@ test.describe("Auth redirect", () => {
     expect(res.ok()).toBeTruthy();
 
     // Visit a restricted page anonymously.
-    await page.goto(`${BASE_URL}/projects`);
+    await page.goto(`${BASE_URL}/boards`);
 
     // We're bounced to /signin and the original path is preserved on `next`.
     await expect(page).toHaveURL(/\/signin\?next=%2Fprojects/);
@@ -83,7 +83,7 @@ test.describe("Auth redirect", () => {
     await page.click('button[type="submit"]');
 
     // Now we're back on the page we originally tried to visit.
-    await expect(page).toHaveURL(/\/projects$/);
+    await expect(page).toHaveURL(/\/boards$/);
   });
 
   test("/signup link on the auth card preserves ?next through registration", async ({
@@ -128,7 +128,7 @@ test.describe("Auth redirect", () => {
   });
 
   // Each entry is a `?next=` value that should be rejected by `safeNextPath()`
-  // and fall back to /projects (the default post-login landing). The list is
+  // and fall back to /boards (the default post-login landing). The list is
   // the full set of attack vectors the helper guards against; if any of them
   // ever land the user somewhere else, we want CI to scream.
   const HOSTILE_NEXT_VALUES = [
@@ -158,7 +158,7 @@ test.describe("Auth redirect", () => {
     },
     {
       label: "relative path without leading slash",
-      value: "projects",
+      value: "boards",
     },
     {
       label: "empty string",
@@ -187,7 +187,7 @@ test.describe("Auth redirect", () => {
 
       // Falls back to the default landing page rather than wherever
       // the attacker tried to send us.
-      await expect(page).toHaveURL(/\/projects$/);
+      await expect(page).toHaveURL(/\/boards$/);
     });
   }
 });

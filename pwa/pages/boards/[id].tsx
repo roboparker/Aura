@@ -17,13 +17,13 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
-import TaskBoard from "@/components/projects/TaskBoard";
+import TaskBoard from "@/components/boards/TaskBoard";
 import CalendarView from "@/components/calendar/CalendarView";
 import FilterMultiSelect from "@/components/common/FilterMultiSelect";
 import { displayName } from "@/lib/userDisplay";
-import TaskTableColumns from "@/components/projects/TaskTableColumns";
-import { computeColumnWidths } from "@/components/projects/columnWidths";
-import ColumnHeaderMenu from "@/components/projects/ColumnHeaderMenu";
+import TaskTableColumns from "@/components/boards/TaskTableColumns";
+import { computeColumnWidths } from "@/components/boards/columnWidths";
+import ColumnHeaderMenu from "@/components/boards/ColumnHeaderMenu";
 import {
   applyView,
   buildColumns,
@@ -32,8 +32,8 @@ import {
   type FilterValue,
   type ListColumn,
   type SortState,
-} from "@/components/projects/listColumns";
-import { useProjectListView } from "@/lib/useProjectListView";
+} from "@/components/boards/listColumns";
+import { useBoardListView } from "@/lib/useBoardListView";
 import {
   DndContext,
   PointerSensor,
@@ -55,9 +55,9 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import CustomFieldFooterRow from "@/components/custom-fields/CustomFieldFooterRow";
-import ProjectCustomFieldPicker from "@/components/custom-fields/ProjectCustomFieldPicker";
+import BoardCustomFieldPicker from "@/components/custom-fields/BoardCustomFieldPicker";
 import CustomFieldSheet from "@/components/custom-fields/CustomFieldSheet";
-import AddFieldMenu from "@/components/projects/AddFieldMenu";
+import AddFieldMenu from "@/components/boards/AddFieldMenu";
 import { CustomFieldValueEditor } from "@/components/tasks/value-editors";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import TagsCombobox, { type TagOption } from "@/components/tasks/TagsCombobox";
@@ -116,7 +116,7 @@ interface SpaceRef {
   isPersonal: boolean;
 }
 
-interface Project {
+interface Board {
   "@id": string;
   id: string;
   title: string;
@@ -127,7 +127,7 @@ interface Project {
   space: string | SpaceRef;
 }
 
-interface ProjectTask {
+interface BoardTask {
   "@id": string;
   id: string;
   title: string;
@@ -160,8 +160,8 @@ interface Collection<T> {
 const membersOf = <T,>(c: Collection<T>): T[] =>
   c.member ?? c["hydra:member"] ?? [];
 
-const projectSpaceIri = (project: Project): string =>
-  typeof project.space === "string" ? project.space : project.space["@id"];
+const boardSpaceIri = (board: Board): string =>
+  typeof board.space === "string" ? board.space : board.space["@id"];
 
 const isEmptyFieldValue = (value: unknown): boolean =>
   value === null ||
@@ -181,16 +181,16 @@ interface NewTaskDraft {
   tags: string[];
 }
 
-const ProjectDetail = () => {
+const BoardDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { spaces } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
-  const projectId = typeof id === "string" ? id : null;
+  const boardId = typeof id === "string" ? id : null;
   const currentUserIri = user ? `/users/${user.id}` : null;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [tasks, setTasks] = useState<ProjectTask[]>([]);
+  const [board, setProject] = useState<Board | null>(null);
+  const [tasks, setTasks] = useState<BoardTask[]>([]);
   // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
   const [calendarRefresh, setCalendarRefresh] = useState(0);
   // Board view filters (assignee / tags).
@@ -210,7 +210,7 @@ const ProjectDetail = () => {
   const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
     useState(false);
 
-  // Editable project name + description (Settings tab → Project details).
+  // Editable board name + description (Settings tab → Board details).
   const [nameDraft, setNameDraft] = useState("");
   const [descDraft, setDescDraft] = useState("");
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -219,21 +219,21 @@ const ProjectDetail = () => {
     kind: "success" | "error";
   } | null>(null);
 
-  // Seed the editable name/description drafts when a (different) project loads.
+  // Seed the editable name/description drafts when a (different) board loads.
   // Keyed on the id so a background reload after save doesn't clobber edits.
   useEffect(() => {
-    if (project) {
-      setNameDraft(project.title);
-      setDescDraft(project.description ?? "");
+    if (board) {
+      setNameDraft(board.title);
+      setDescDraft(board.description ?? "");
       setDetailsMessage(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]);
+  }, [board?.id]);
 
   const detailsDirty =
-    !!project &&
-    (nameDraft.trim() !== project.title ||
-      (descDraft.trim() || "") !== (project.description ?? ""));
+    !!board &&
+    (nameDraft.trim() !== board.title ||
+      (descDraft.trim() || "") !== (board.description ?? ""));
 
   // Each section shows a collapsed "+ Add task" trigger that expands into a
   // full draft row (managed locally by AddTaskRow). The top "New task" button
@@ -242,7 +242,7 @@ const ProjectDetail = () => {
   const focusDefaultAddRow = () =>
     requestAnimationFrame(() => defaultAddTriggerRef.current?.click());
 
-  // The project title + tabs sticky bar has a variable height, so we measure it
+  // The board title + tabs sticky bar has a variable height, so we measure it
   // and offset the column header to stick directly beneath it (navbar = 56px).
   const NAVBAR_H = 56;
   const stickyHeaderRef = useRef<HTMLDivElement | null>(null);
@@ -273,48 +273,48 @@ const ProjectDetail = () => {
   const activeTaskId =
     typeof router.query.task === "string" ? router.query.task : null;
   const openTaskDetail = useCallback(
-    (task: ProjectTask) => {
-      if (!projectId) return;
+    (task: BoardTask) => {
+      if (!boardId) return;
       // Interpolate `id` explicitly — relying on router.query alone throws in
       // Next 16 if the dynamic param is momentarily absent during a shallow
       // route transition.
       void router.push(
         {
-          pathname: "/projects/[id]",
-          query: { ...router.query, id: projectId, task: task.id },
+          pathname: "/boards/[id]",
+          query: { ...router.query, id: boardId, task: task.id },
         },
         undefined,
         { shallow: true },
       );
     },
-    [router, projectId],
+    [router, boardId],
   );
   // Id-based opener for the calendar (which hands back a task id, not a Task).
   const openTaskById = useCallback(
     (taskId: string) => {
-      if (!projectId) return;
+      if (!boardId) return;
       void router.push(
         {
-          pathname: "/projects/[id]",
-          query: { ...router.query, id: projectId, task: taskId },
+          pathname: "/boards/[id]",
+          query: { ...router.query, id: boardId, task: taskId },
         },
         undefined,
         { shallow: true },
       );
     },
-    [router, projectId],
+    [router, boardId],
   );
   const closeTaskDetail = useCallback(
     (open: boolean) => {
-      if (open || !projectId) return;
+      if (open || !boardId) return;
       const query = { ...router.query };
       delete query.task;
-      query.id = projectId;
-      void router.push({ pathname: "/projects/[id]", query }, undefined, {
+      query.id = boardId;
+      void router.push({ pathname: "/boards/[id]", query }, undefined, {
         shallow: true,
       });
     },
-    [router, projectId],
+    [router, boardId],
   );
 
   useEffect(() => {
@@ -324,7 +324,7 @@ const ProjectDetail = () => {
   }, [authLoading, isAuthenticated, router]);
 
   const load = useCallback(async () => {
-    if (!projectId) return;
+    if (!boardId) return;
     setError(null);
     setIsLoading(true);
     try {
@@ -332,43 +332,43 @@ const ProjectDetail = () => {
         credentials: "include" as const,
         headers: { Accept: "application/ld+json" },
       };
-      const projectRes = await fetch(
-        `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}`,
+      const boardRes = await fetch(
+        `${ENTRYPOINT}/boards/${encodeURIComponent(boardId)}`,
         init,
       );
-      if (projectRes.status === 404 || projectRes.status === 403) {
+      if (boardRes.status === 404 || boardRes.status === 403) {
         setNotFound(true);
         return;
       }
-      if (!projectRes.ok) throw new Error("Failed to load project.");
-      const projectData: Project = await projectRes.json();
-      setProject(projectData);
+      if (!boardRes.ok) throw new Error("Failed to load board.");
+      const boardData: Board = await boardRes.json();
+      setProject(boardData);
 
-      const projectIri = projectData["@id"];
+      const boardIri = boardData["@id"];
       const [tasksRes, defsRes, globalDefsRes, sectionsRes, usersRes, tagsRes] =
         await Promise.all([
-          fetch(`${ENTRYPOINT}/tasks?project=${encodeURIComponent(projectIri)}`, init),
+          fetch(`${ENTRYPOINT}/tasks?board=${encodeURIComponent(boardIri)}`, init),
           fetch(
-            `${ENTRYPOINT}/custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
+            `${ENTRYPOINT}/custom_field_definitions?boards=${encodeURIComponent(boardIri)}`,
             init,
           ),
           fetch(
-            `${ENTRYPOINT}/global_custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
+            `${ENTRYPOINT}/global_custom_field_definitions?boards=${encodeURIComponent(boardIri)}`,
             init,
           ),
           fetch(
-            `${ENTRYPOINT}/task_sections?project=${encodeURIComponent(projectIri)}`,
+            `${ENTRYPOINT}/task_sections?board=${encodeURIComponent(boardIri)}`,
             init,
           ),
           fetch(`${ENTRYPOINT}/me/assignable-users`, init),
           fetch(
-            `${ENTRYPOINT}/tags?space=${encodeURIComponent(projectSpaceIri(projectData))}`,
+            `${ENTRYPOINT}/tags?space=${encodeURIComponent(boardSpaceIri(boardData))}`,
             init,
           ),
         ]);
       if (!tasksRes.ok) throw new Error("Failed to load tasks.");
-      setTasks(membersOf<ProjectTask>(await tasksRes.json()));
-      // A project's effective field set is the union of its space fields and
+      setTasks(membersOf<BoardTask>(await tasksRes.json()));
+      // A board's effective field set is the union of its space fields and
       // the instance-wide global fields it opts into (#global-custom-fields).
       const spaceDefs = defsRes.ok
         ? membersOf<CustomFieldDefinition>(await defsRes.json())
@@ -389,15 +389,15 @@ const ProjectDetail = () => {
       if (usersRes.ok) setAssignableUsers(membersOf<AssigneeOption>(await usersRes.json()));
       if (tagsRes.ok) setAllTags(membersOf<TagOption>(await tagsRes.json()));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load project.");
+      setError(err instanceof Error ? err.message : "Failed to load board.");
     } finally {
       setIsLoading(false);
     }
-  }, [projectId]);
+  }, [boardId]);
 
   useEffect(() => {
-    if (isAuthenticated && projectId) void load();
-  }, [isAuthenticated, projectId, load]);
+    if (isAuthenticated && boardId) void load();
+  }, [isAuthenticated, boardId, load]);
 
   // Any change to the task set (inline edit, toggle, create, drawer) re-fetches
   // the aggregate footer so its sums/averages stay live without a reload.
@@ -408,14 +408,14 @@ const ProjectDetail = () => {
   // Re-sync the task-column definitions after the Settings-tab manager mutates
   // them, so a created/edited/reordered/deleted field reflects without reload.
   const reloadDefinitions = useCallback(async () => {
-    if (!project) return;
+    if (!board) return;
     try {
-      const iri = encodeURIComponent(project["@id"]);
+      const iri = encodeURIComponent(board["@id"]);
       const [spaceRes, globalRes] = await Promise.all([
-        fetch(`${ENTRYPOINT}/custom_field_definitions?projects=${iri}`, {
+        fetch(`${ENTRYPOINT}/custom_field_definitions?boards=${iri}`, {
           credentials: "include",
         }),
-        fetch(`${ENTRYPOINT}/global_custom_field_definitions?projects=${iri}`, {
+        fetch(`${ENTRYPOINT}/global_custom_field_definitions?boards=${iri}`, {
           credentials: "include",
         }),
       ]);
@@ -433,14 +433,14 @@ const ProjectDetail = () => {
     } catch {
       /* keep the current columns on a transient failure */
     }
-  }, [project]);
+  }, [board]);
 
-  // Attach a field to this project (per-project selection M2M). Space and
+  // Attach a field to this board (per-board selection M2M). Space and
   // global fields live in separate join tables, so PATCH the matching key
   // with the full current set of that source plus the new IRI.
   const attachFieldToProject = useCallback(
     async (defIri: string) => {
-      if (!project) return;
+      if (!board) return;
       if (definitions.some((d) => d["@id"] === defIri)) return;
       const global = isGlobalDefinition(defIri);
       const currentOfSource = definitions
@@ -450,7 +450,7 @@ const ProjectDetail = () => {
         ? "globalCustomFieldDefinitions"
         : "customFieldDefinitions";
       try {
-        await fetch(`${ENTRYPOINT}${project["@id"]}`, {
+        await fetch(`${ENTRYPOINT}${board["@id"]}`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/merge-patch+json" },
@@ -460,21 +460,21 @@ const ProjectDetail = () => {
         /* transient — the field just won't show until retried */
       }
     },
-    [project, definitions],
+    [board, definitions],
   );
 
-  // Fields on the project but hidden from the list view — offered in the
+  // Fields on the board but hidden from the list view — offered in the
   // add-column menu to re-show.
   const hiddenListFields = useMemo(
     () => definitions.filter((d) => !showsOnSurface(d.visibility, "list")),
     [definitions],
   );
 
-  // Reveal a hidden field in the list view by adding `list` to its per-project
+  // Reveal a hidden field in the list view by adding `list` to its per-board
   // surface set.
   const enableListField = useCallback(
     async (def: CustomFieldDefinition) => {
-      if (!projectId) return;
+      if (!boardId) return;
       const surfaces = [
         ...new Set([...visibilitySurfaces(def.visibility), "list"]),
       ].join(",");
@@ -483,7 +483,7 @@ const ProjectDetail = () => {
         : "custom_field_definitions";
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId)}/${base}/${encodeURIComponent(def.id)}/visibility`,
+          `${ENTRYPOINT}/boards/${encodeURIComponent(boardId)}/${base}/${encodeURIComponent(def.id)}/visibility`,
           {
             method: "PUT",
             credentials: "include",
@@ -496,23 +496,23 @@ const ProjectDetail = () => {
         /* transient — leave the field hidden */
       }
     },
-    [projectId, reloadDefinitions],
+    [boardId, reloadDefinitions],
   );
 
   // Create a tag from free text typed into a tags field (Enter / comma).
   const createTag = useCallback(
     async (title: string): Promise<TagOption | null> => {
-      if (!project) return null;
+      if (!board) return null;
       try {
         const res = await fetch(`${ENTRYPOINT}/tags`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/ld+json" },
-          // Tags are space-scoped: create it in this project's space. Give
+          // Tags are space-scoped: create it in this board's space. Give
           // it a random palette color so inline-created tags aren't all grey.
           body: JSON.stringify({
             title,
-            space: projectSpaceIri(project),
+            space: boardSpaceIri(board),
             color: randomPaletteColor(),
           }),
         });
@@ -528,7 +528,7 @@ const ProjectDetail = () => {
         return null;
       }
     },
-    [project],
+    [board],
   );
 
   // Drives the "create a new field of type X" modal opened from the add menu.
@@ -543,7 +543,7 @@ const ProjectDetail = () => {
 
   // Generic single-task PATCH used by every inline row editor.
   const patchTask = useCallback(
-    async (task: ProjectTask, body: Record<string, unknown>) => {
+    async (task: BoardTask, body: Record<string, unknown>) => {
       setError(null);
       try {
         const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
@@ -553,7 +553,7 @@ const ProjectDetail = () => {
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error("Failed to update task.");
-        const updated: ProjectTask = await res.json();
+        const updated: BoardTask = await res.json();
         setTasks((prev) =>
           prev.map((t) => (t["@id"] === task["@id"] ? updated : t)),
         );
@@ -567,7 +567,7 @@ const ProjectDetail = () => {
   // Replace one definition's value and PATCH the whole array (dropping empties,
   // in definition order) like the drawer's CustomFieldValueList does.
   const handleCustomFieldChange = useCallback(
-    (task: ProjectTask, defIri: string, value: unknown) => {
+    (task: BoardTask, defIri: string, value: unknown) => {
       const next = definitions
         .map((def) => {
           const existing = task.customFieldValues.find(
@@ -596,35 +596,35 @@ const ProjectDetail = () => {
   );
 
   // The assignee picker must only offer users who can actually be assigned
-  // to this project's tasks — its space members — not the caller's whole
+  // to this board's tasks — its space members — not the caller's whole
   // assignable universe (which spans every space they're in). On a private
   // board that narrows the list to just the user. `assignableUsers` carries
   // the rich avatar/colour shape the picker needs, so we filter it by the
-  // project's member IRIs rather than using the bare `project.members`.
-  const projectAssignableUsers = useMemo(() => {
-    if (!project) return assignableUsers;
-    const memberIris = new Set(project.members.map((m) => m["@id"]));
+  // board's member IRIs rather than using the bare `board.members`.
+  const boardAssignableUsers = useMemo(() => {
+    if (!board) return assignableUsers;
+    const memberIris = new Set(board.members.map((m) => m["@id"]));
     return assignableUsers.filter((u) => memberIris.has(u["@id"]));
-  }, [assignableUsers, project]);
+  }, [assignableUsers, board]);
 
   // Board filter option lists (alphabetical).
   const byName = (a: [string, string], b: [string, string]) =>
     a[1].localeCompare(b[1], undefined, { sensitivity: "base" });
   const boardAssigneeOptions = useMemo<[string, string][]>(
     () =>
-      projectAssignableUsers
+      boardAssignableUsers
         .map((u): [string, string] => [u["@id"], displayName(u)])
         .sort(byName),
-    [projectAssignableUsers],
+    [boardAssignableUsers],
   );
   const boardTagOptions = useMemo<[string, string][]>(
     () => allTags.map((t): [string, string] => [t["@id"], t.title]).sort(byName),
     [allTags],
   );
 
-  // Per-user, per-project list-view state (column order + sort + filters),
+  // Per-user, per-board list-view state (column order + sort + filters),
   // persisted in localStorage. Applied within each section by SectionBlock.
-  const listView = useProjectListView(projectId);
+  const listView = useBoardListView(boardId);
   const columns = useMemo(
     () => orderColumns(buildColumns(listDefinitions), listView.order),
     [listDefinitions, listView.order],
@@ -674,7 +674,7 @@ const ProjectDetail = () => {
     }
   };
 
-  const toggleComplete = async (task: ProjectTask) => {
+  const toggleComplete = async (task: BoardTask) => {
     const completedOn = task.completedOn ? null : new Date().toISOString();
     setError(null);
     try {
@@ -685,7 +685,7 @@ const ProjectDetail = () => {
         body: JSON.stringify({ completedOn }),
       });
       if (!res.ok) throw new Error("Failed to update task.");
-      const updated: ProjectTask = await res.json();
+      const updated: BoardTask = await res.json();
       setTasks((prev) => prev.map((t) => (t["@id"] === task["@id"] ? updated : t)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update task.");
@@ -695,8 +695,8 @@ const ProjectDetail = () => {
   // Row action menu: duplicate a task (copy its fields into a new task in the
   // same section) and delete it.
   const duplicateTask = useCallback(
-    async (task: ProjectTask) => {
-      if (!project) return;
+    async (task: BoardTask) => {
+      if (!board) return;
       setError(null);
       try {
         const res = await fetch(`${ENTRYPOINT}/tasks`, {
@@ -705,7 +705,7 @@ const ProjectDetail = () => {
           headers: { "Content-Type": "application/ld+json" },
           body: JSON.stringify({
             title: `${task.title} (copy)`,
-            project: project["@id"],
+            board: board["@id"],
             ...(task.section ? { section: task.section } : {}),
             ...(task.dueDate ? { dueDate: task.dueDate } : {}),
             ...(task.tags.length ? { tags: task.tags.map((t) => t["@id"]) } : {}),
@@ -720,16 +720,16 @@ const ProjectDetail = () => {
           }),
         });
         if (!res.ok) throw new Error("Failed to duplicate task.");
-        const created: ProjectTask = await res.json();
+        const created: BoardTask = await res.json();
         setTasks((prev) => [...prev, created]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to duplicate task.");
       }
     },
-    [project],
+    [board],
   );
 
-  const deleteTask = useCallback(async (task: ProjectTask) => {
+  const deleteTask = useCallback(async (task: BoardTask) => {
     setError(null);
     try {
       const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
@@ -749,7 +749,7 @@ const ProjectDetail = () => {
   const createTaskInSection = useCallback(
     async (sectionIri: string | null, draft: NewTaskDraft): Promise<boolean> => {
       const title = draft.title.trim();
-      if (!project || !title) return false;
+      if (!board || !title) return false;
       setError(null);
       try {
         const res = await fetch(`${ENTRYPOINT}/tasks`, {
@@ -758,7 +758,7 @@ const ProjectDetail = () => {
           headers: { "Content-Type": "application/ld+json" },
           body: JSON.stringify({
             title,
-            project: project["@id"],
+            board: board["@id"],
             ...(sectionIri ? { section: sectionIri } : {}),
             ...(draft.dueDate ? { dueDate: draft.dueDate } : {}),
             ...(draft.assignees.length ? { assignees: draft.assignees } : {}),
@@ -774,7 +774,7 @@ const ProjectDetail = () => {
               "Failed to create task.",
           );
         }
-        const created: ProjectTask = await res.json();
+        const created: BoardTask = await res.json();
         setTasks((prev) => [...prev, created]);
         return true;
       } catch (err) {
@@ -782,11 +782,11 @@ const ProjectDetail = () => {
         return false;
       }
     },
-    [project],
+    [board],
   );
 
   const createSection = async (title = "New section") => {
-    if (!project) return;
+    if (!board) return;
     const trimmed = title.trim() || "New section";
     try {
       const res = await fetch(`${ENTRYPOINT}/task_sections`, {
@@ -794,7 +794,7 @@ const ProjectDetail = () => {
         credentials: "include",
         headers: { "Content-Type": "application/ld+json" },
         body: JSON.stringify({
-          project: project["@id"],
+          board: board["@id"],
           title: trimmed,
           position: sections.length,
         }),
@@ -861,11 +861,11 @@ const ProjectDetail = () => {
   };
 
   const handleSaveDetails = async () => {
-    if (!project || !nameDraft.trim()) return;
+    if (!board || !nameDraft.trim()) return;
     setIsSavingDetails(true);
     setDetailsMessage(null);
     try {
-      const res = await fetch(`${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}`, {
+      const res = await fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/merge-patch+json" },
@@ -893,12 +893,12 @@ const ProjectDetail = () => {
   };
 
   const handleMove = async () => {
-    if (!project || !moveTargetIri) return;
+    if (!board || !moveTargetIri) return;
     setIsMoving(true);
     setMoveMessage(null);
     try {
       const res = await fetch(
-        `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/move`,
+        `${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}/move`,
         {
           method: "POST",
           credentials: "include",
@@ -909,7 +909,7 @@ const ProjectDetail = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data.detail || data.error || data["hydra:description"] || "Failed to move project.",
+          data.detail || data.error || data["hydra:description"] || "Failed to move board.",
         );
       }
       const target = spaces.find((s) => s["@id"] === moveTargetIri);
@@ -923,7 +923,7 @@ const ProjectDetail = () => {
       await load();
     } catch (err) {
       setMoveMessage({
-        text: err instanceof Error ? err.message : "Failed to move project.",
+        text: err instanceof Error ? err.message : "Failed to move board.",
         kind: "error",
       });
     } finally {
@@ -932,7 +932,7 @@ const ProjectDetail = () => {
   };
 
   const handleCopy = async () => {
-    if (!project) return;
+    if (!board) return;
     setIsCopying(true);
     setMoveMessage(null);
     try {
@@ -940,7 +940,7 @@ const ProjectDetail = () => {
       if (moveTargetIri) body.space = moveTargetIri;
       if (copyIncludeTasks) body.includeTasks = true;
       const res = await fetch(
-        `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}/copy`,
+        `${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}/copy`,
         {
           method: "POST",
           credentials: "include",
@@ -951,13 +951,13 @@ const ProjectDetail = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(
-          data.detail || data.error || data["hydra:description"] || "Failed to copy project.",
+          data.detail || data.error || data["hydra:description"] || "Failed to copy board.",
         );
       }
-      if (data.id) await router.push(`/projects/${data.id}`);
+      if (data.id) await router.push(`/boards/${data.id}`);
     } catch (err) {
       setMoveMessage({
-        text: err instanceof Error ? err.message : "Failed to copy project.",
+        text: err instanceof Error ? err.message : "Failed to copy board.",
         kind: "error",
       });
     } finally {
@@ -966,15 +966,15 @@ const ProjectDetail = () => {
   };
 
   const handleDeleteProject = async () => {
-    if (!project) return;
+    if (!board) return;
     const res = await fetch(
-      `${ENTRYPOINT}/projects/${encodeURIComponent(project.id)}`,
+      `${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`,
       { method: "DELETE", credentials: "include" },
     );
     if (!res.ok && res.status !== 204) {
-      throw new Error("Failed to delete project.");
+      throw new Error("Failed to delete board.");
     }
-    await router.push("/projects");
+    await router.push("/boards");
   };
 
   // Group tasks by board section. The default "In progress" group (null
@@ -982,7 +982,7 @@ const ProjectDetail = () => {
   // sections still render so tasks can be added/moved into them.
   const sectionGroups = useMemo(() => {
     const ordered = [...tasks].sort((a, b) => a.position - b.position);
-    const bySection = new Map<string, ProjectTask[]>();
+    const bySection = new Map<string, BoardTask[]>();
     for (const task of ordered) {
       const key = task.section ?? DEFAULT_SECTION_KEY;
       const list = bySection.get(key) ?? [];
@@ -992,7 +992,7 @@ const ProjectDetail = () => {
     const groups: {
       key: string;
       section: TaskSection | null;
-      tasks: ProjectTask[];
+      tasks: BoardTask[];
     }[] = [
       {
         key: DEFAULT_SECTION_KEY,
@@ -1180,12 +1180,12 @@ const ProjectDetail = () => {
       <div className="min-h-screen bg-background px-4 py-12">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="pt-6">
-            <h1 className="text-xl font-bold mb-2">Project not found</h1>
+            <h1 className="text-xl font-bold mb-2">Board not found</h1>
             <p className="text-muted-foreground mb-4">
               It may have been deleted, or you may not be a member.
             </p>
-            <Link href="/projects" className="text-primary font-medium">
-              Back to projects
+            <Link href="/boards" className="text-primary font-medium">
+              Back to boards
             </Link>
           </CardContent>
         </Card>
@@ -1193,29 +1193,29 @@ const ProjectDetail = () => {
     );
   }
 
-  const space = project
-    ? spaces.find((s) => s["@id"] === projectSpaceIri(project))
+  const space = board
+    ? spaces.find((s) => s["@id"] === boardSpaceIri(board))
     : undefined;
   return (
     <>
       <Head>
-        <title>{project ? `${project.title} - Madori` : "Project - Madori"}</title>
+        <title>{board ? `${board.title} - Madori` : "Board - Madori"}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="w-full">
-          {isLoading || !project ? (
-            <p className="text-muted-foreground">Loading project...</p>
+          {isLoading || !board ? (
+            <p className="text-muted-foreground">Loading board...</p>
           ) : (
             <>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                {/* Project title + tabs stick together on scroll. */}
+                {/* Board title + tabs stick together on scroll. */}
                 <div
                   ref={stickyHeaderRef}
                   className="sticky top-14 z-30 bg-background pt-2"
                 >
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <h1 className="text-2xl font-bold">{project.title}</h1>
+                      <h1 className="text-2xl font-bold">{board.title}</h1>
                       {space?.isPersonal && (
                         <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                       )}
@@ -1226,7 +1226,7 @@ const ProjectDetail = () => {
                           size="sm"
                           className="rounded-r-none"
                           onClick={focusDefaultAddRow}
-                          data-testid="project-new-task"
+                          data-testid="board-new-task"
                         >
                           <Plus className="mr-1 h-3.5 w-3.5" /> New task
                         </Button>
@@ -1236,7 +1236,7 @@ const ProjectDetail = () => {
                               size="sm"
                               className="rounded-l-none border-l border-primary-foreground/25 px-1.5"
                               aria-label="More add options"
-                              data-testid="project-add-menu"
+                              data-testid="board-add-menu"
                             >
                               <ChevronDown className="h-4 w-4" />
                             </Button>
@@ -1247,7 +1247,7 @@ const ProjectDetail = () => {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => void createSection()}
-                              data-testid="project-add-section"
+                              data-testid="board-add-section"
                             >
                               <Rows3 className="mr-2 h-4 w-4" /> Add section
                             </DropdownMenuItem>
@@ -1261,11 +1261,11 @@ const ProjectDetail = () => {
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
                     <TabsTrigger value="calendar">Calendar</TabsTrigger>
-                    <TabsTrigger value="fields" data-testid="project-fields-tab">
+                    <TabsTrigger value="fields" data-testid="board-fields-tab">
                       Custom fields
                     </TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
-                    <TabsTrigger value="settings" data-testid="project-settings-tab">
+                    <TabsTrigger value="settings" data-testid="board-settings-tab">
                       Settings
                     </TabsTrigger>
                   </TabsList>
@@ -1279,36 +1279,36 @@ const ProjectDetail = () => {
 
                 <TabsContent value="settings" className="mt-4">
                   <div className="mx-auto max-w-4xl space-y-6">
-                    {/* Project name + description. */}
+                    {/* Board name + description. */}
                     <Card>
                       <CardContent className="space-y-4 pt-6">
                         <div>
-                          <h3 className="text-sm font-medium">Project details</h3>
+                          <h3 className="text-sm font-medium">Board details</h3>
                           <p className="text-xs text-muted-foreground">
-                            The project&apos;s name and description.
+                            The board&apos;s name and description.
                           </p>
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="project-name">Name</Label>
+                          <Label htmlFor="board-name">Name</Label>
                           <Input
-                            id="project-name"
+                            id="board-name"
                             type="text"
                             value={nameDraft}
                             onChange={(e) => setNameDraft(e.target.value)}
                             maxLength={255}
-                            data-testid="project-name-input"
+                            data-testid="board-name-input"
                           />
                         </div>
                         <div className="space-y-1.5">
-                          <Label htmlFor="project-description">
+                          <Label htmlFor="board-description">
                             Description{" "}
                             <span className="font-normal text-muted-foreground">
                               (optional)
                             </span>
                           </Label>
                           <MarkdownEditor
-                            id="project-description"
-                            ariaLabel="Project description"
+                            id="board-description"
+                            ariaLabel="Board description"
                             value={descDraft}
                             onChange={setDescDraft}
                           />
@@ -1319,7 +1319,7 @@ const ProjectDetail = () => {
                             size="sm"
                             onClick={handleSaveDetails}
                             disabled={isSavingDetails || !nameDraft.trim() || !detailsDirty}
-                            data-testid="project-details-save"
+                            data-testid="board-details-save"
                           >
                             {isSavingDetails ? "Saving…" : "Save changes"}
                           </Button>
@@ -1346,29 +1346,29 @@ const ProjectDetail = () => {
                               <div>
                                 <h3 className="text-sm font-medium">Move or copy</h3>
                                 <p className="text-xs text-muted-foreground">
-                                  Relocate this project to another space, or duplicate it.
+                                  Relocate this board to another space, or duplicate it.
                                 </p>
                               </div>
                               <div
                                 className="flex flex-wrap items-center gap-2"
-                                data-testid="project-move-form"
+                                data-testid="board-move-form"
                               >
                                 <Label
-                                  htmlFor="project-move-target"
+                                  htmlFor="board-move-target"
                                   className="text-xs text-muted-foreground"
                                 >
                                   Move to
                                 </Label>
                                 <select
-                                  id="project-move-target"
+                                  id="board-move-target"
                                   value={moveTargetIri}
                                   onChange={(e) => setMoveTargetIri(e.target.value)}
                                   className="h-8 rounded-md border border-input bg-background px-2 text-sm"
-                                  data-testid="project-move-select"
+                                  data-testid="board-move-select"
                                 >
                                   <option value="">Pick a space…</option>
                                   {spaces
-                                    .filter((s) => s["@id"] !== projectSpaceIri(project))
+                                    .filter((s) => s["@id"] !== boardSpaceIri(board))
                                     .map((s) => (
                                       <option key={s["@id"]} value={s["@id"]}>
                                         {s.name}
@@ -1382,7 +1382,7 @@ const ProjectDetail = () => {
                                   variant="outline"
                                   onClick={handleMove}
                                   disabled={!moveTargetIri || isMoving || isCopying}
-                                  data-testid="project-move-submit"
+                                  data-testid="board-move-submit"
                                 >
                                   {isMoving ? "Moving…" : "Move"}
                                 </Button>
@@ -1392,7 +1392,7 @@ const ProjectDetail = () => {
                                   variant="outline"
                                   onClick={handleCopy}
                                   disabled={isMoving || isCopying}
-                                  data-testid="project-copy-submit"
+                                  data-testid="board-copy-submit"
                                 >
                                   {isCopying ? "Copying…" : "Copy"}
                                 </Button>
@@ -1402,7 +1402,7 @@ const ProjectDetail = () => {
                                     checked={copyIncludeTasks}
                                     onChange={(e) => setCopyIncludeTasks(e.target.checked)}
                                     className="h-3.5 w-3.5"
-                                    data-testid="project-copy-include-tasks"
+                                    data-testid="board-copy-include-tasks"
                                   />
                                   include tasks
                                 </label>
@@ -1427,10 +1427,10 @@ const ProjectDetail = () => {
                             <CardContent className="space-y-3 pt-6">
                               <div>
                                 <h3 className="text-sm font-medium text-destructive">
-                                  Delete this project
+                                  Delete this board
                                 </h3>
                                 <p className="text-xs text-muted-foreground">
-                                  Permanently delete this project and all of its tasks.
+                                  Permanently delete this board and all of its tasks.
                                   This can&apos;t be undone.
                                 </p>
                               </div>
@@ -1439,9 +1439,9 @@ const ProjectDetail = () => {
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => setConfirmDeleteProjectOpen(true)}
-                                data-testid="project-delete"
+                                data-testid="board-delete"
                               >
-                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete project
+                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete board
                               </Button>
                             </CardContent>
                           </Card>
@@ -1451,25 +1451,25 @@ const ProjectDetail = () => {
                   <ConfirmDialog
                     open={confirmDeleteProjectOpen}
                     onOpenChange={setConfirmDeleteProjectOpen}
-                    title="Delete this project?"
-                    description={`"${project.title}" and all of its tasks will be permanently deleted. This can't be undone.`}
-                    confirmLabel="Delete project"
+                    title="Delete this board?"
+                    description={`"${board.title}" and all of its tasks will be permanently deleted. This can't be undone.`}
+                    confirmLabel="Delete board"
                     onConfirm={handleDeleteProject}
                   />
                 </TabsContent>
 
                 <TabsContent value="fields" className="mt-4">
                   <div className="max-w-5xl">
-                    <ProjectCustomFieldPicker
-                      spaceIri={projectSpaceIri(project)}
-                      projectIri={project["@id"]}
+                    <BoardCustomFieldPicker
+                      spaceIri={boardSpaceIri(board)}
+                      boardIri={board["@id"]}
                       attachedIris={definitions
                         .filter((d) => !isGlobalDefinition(d))
                         .map((d) => d["@id"])}
                       attachedGlobalIris={definitions
                         .filter((d) => isGlobalDefinition(d))
                         .map((d) => d["@id"])}
-                      projectVisibility={Object.fromEntries(
+                      boardVisibility={Object.fromEntries(
                         definitions.map((d) => [d["@id"], d.visibility ?? "both"]),
                       )}
                       isSpaceAdmin
@@ -1486,7 +1486,7 @@ const ProjectDetail = () => {
                       in a sortable element, so a dragged section animates as a
                       single block. Every table shares the same fixed colgroup, so
                       columns stay aligned across the header + all sections. */}
-                  <div ref={listContainerRef} data-testid="project-task-list">
+                  <div ref={listContainerRef} data-testid="board-task-list">
                     {/* Column header — its own horizontal DnD context for column
                         reorder, wrapping the table (not nested inside it) so the
                         context's injected a11y nodes stay valid DOM. */}
@@ -1516,7 +1516,7 @@ const ProjectDetail = () => {
                                     filter={listView.filters[column.key]}
                                     onSetSort={listView.setSort}
                                     onSetFilter={listView.setFilter}
-                                    assignableUsers={projectAssignableUsers}
+                                    assignableUsers={boardAssignableUsers}
                                     allTags={allTags}
                                     onEdit={
                                       column.definition
@@ -1564,11 +1564,11 @@ const ProjectDetail = () => {
                             columns={columns}
                             colWidths={colWidths}
                             fullColSpan={fullColSpan}
-                            projectId={project.id}
-                            projectIri={project["@id"]}
-                            spaceIri={projectSpaceIri(project)}
+                            boardId={board.id}
+                            boardIri={board["@id"]}
+                            spaceIri={boardSpaceIri(board)}
                             allTags={allTags}
-                            assignableUsers={projectAssignableUsers}
+                            assignableUsers={boardAssignableUsers}
                             sort={listView.sort}
                             filters={listView.filters}
                             footerKey={footerKey}
@@ -1597,7 +1597,7 @@ const ProjectDetail = () => {
                           <TaskTableColumns columns={columns} widths={colWidths} />
                           <tbody>
                             <CustomFieldFooterRow
-                              projectId={project.id}
+                              boardId={board.id}
                               refreshKey={footerKey}
                               columns={columns}
                               asRow
@@ -1629,7 +1629,7 @@ const ProjectDetail = () => {
                   </div>
                   <TaskBoard
                     definitions={boardDefinitions}
-                    assignableUsers={projectAssignableUsers}
+                    assignableUsers={boardAssignableUsers}
                     columns={orderedSectionGroups.map((group) => ({
                       key: group.key,
                       sectionIri: group.section ? group.section["@id"] : null,
@@ -1678,19 +1678,19 @@ const ProjectDetail = () => {
 
                 <TabsContent value="calendar" className="mt-4">
                   {/* Same calendar as the top-level /calendar, filtered to this
-                      project (issue #442). */}
+                      board (issue #442). */}
                   <CalendarView
-                    spaceIri={projectSpaceIri(project)}
-                    projectIri={project["@id"]}
+                    spaceIri={boardSpaceIri(board)}
+                    boardIri={board["@id"]}
                     onOpen={openTaskById}
                     onTasksChanged={() => void load()}
                     refreshSignal={calendarRefresh}
-                    assignableUsers={projectAssignableUsers}
+                    assignableUsers={boardAssignableUsers}
                   />
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4">
-                  <ActivityPanel endpoint={`/projects/${project.id}/activity`} />
+                  <ActivityPanel endpoint={`/boards/${board.id}/activity`} />
                 </TabsContent>
               </Tabs>
             </>
@@ -1703,7 +1703,7 @@ const ProjectDetail = () => {
         open={Boolean(activeTaskId)}
         onOpenChange={closeTaskDetail}
         currentUserIri={currentUserIri}
-        assignableUsers={projectAssignableUsers}
+        assignableUsers={boardAssignableUsers}
         allTags={allTags}
         onTaskChanged={(updated) => {
           setTasks((prev) =>
@@ -1733,7 +1733,7 @@ const ProjectDetail = () => {
 
       {/* Field editor sheet: create (from the add-column "+") or edit an
           existing field (from a column header's options menu). */}
-      {project && (
+      {board && (
         <CustomFieldSheet
           open={newFieldType !== null || editFieldDef !== null}
           onOpenChange={(o) => {
@@ -1742,8 +1742,8 @@ const ProjectDetail = () => {
               setEditFieldDef(null);
             }
           }}
-          spaceIri={projectSpaceIri(project)}
-          projectIri={project["@id"]}
+          spaceIri={boardSpaceIri(board)}
+          boardIri={board["@id"]}
           initial={editFieldDef ?? undefined}
           initialKind={newFieldType?.kind}
           initialSubtype={newFieldType?.subtype}
@@ -1752,7 +1752,7 @@ const ProjectDetail = () => {
             const wasCreate = newFieldType !== null;
             setNewFieldType(null);
             setEditFieldDef(null);
-            // A field created from a project auto-attaches to it.
+            // A field created from a board auto-attaches to it.
             if (wasCreate && def?.["@id"]) {
               void attachFieldToProject(def["@id"]).then(
                 () => void reloadDefinitions(),
@@ -1775,13 +1775,13 @@ interface SectionRowsProps {
   section: TaskSection | null;
   /** Stable sortable id for the section's title row (the group key). */
   sortId: string;
-  tasks: ProjectTask[];
+  tasks: BoardTask[];
   columns: ListColumn[];
   /** Shared content-aware col widths (keeps every section aligned). */
   colWidths?: Record<string, string>;
   fullColSpan: number;
-  projectId: string;
-  projectIri: string;
+  boardId: string;
+  boardIri: string;
   spaceIri: string;
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
@@ -1792,12 +1792,12 @@ interface SectionRowsProps {
   dragging: boolean;
   addTriggerRef?: RefObject<HTMLButtonElement | null>;
   onCreate: (sectionIri: string | null, draft: NewTaskDraft) => Promise<boolean>;
-  onToggle: (task: ProjectTask) => void;
-  onOpen: (task: ProjectTask) => void;
-  onDuplicateTask: (task: ProjectTask) => void;
-  onDeleteTask: (task: ProjectTask) => void;
-  patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
-  onCustomFieldChange: (task: ProjectTask, defIri: string, value: unknown) => void;
+  onToggle: (task: BoardTask) => void;
+  onOpen: (task: BoardTask) => void;
+  onDuplicateTask: (task: BoardTask) => void;
+  onDeleteTask: (task: BoardTask) => void;
+  patchTask: (task: BoardTask, body: Record<string, unknown>) => Promise<void>;
+  onCustomFieldChange: (task: BoardTask, defIri: string, value: unknown) => void;
   onCreateTag: (title: string) => Promise<TagOption | null>;
   onRename: (section: TaskSection, title: string) => void | Promise<void>;
   onDelete: (section: TaskSection) => void | Promise<void>;
@@ -1814,8 +1814,8 @@ const SectionRows = ({
   columns,
   colWidths,
   fullColSpan,
-  projectId,
-  projectIri,
+  boardId,
+  boardIri,
   spaceIri,
   allTags,
   assignableUsers,
@@ -1883,13 +1883,13 @@ const SectionRows = ({
           strategy={verticalListSortingStrategy}
         >
           {visible.map((task) => (
-            <ProjectTaskRow
+            <BoardTaskRow
               key={task["@id"]}
               task={task}
               columns={columns}
               allTags={allTags}
               assignableUsers={assignableUsers}
-              projectIri={projectIri}
+              boardIri={boardIri}
               spaceIri={spaceIri}
               onToggle={onToggle}
               onOpen={onOpen}
@@ -1925,7 +1925,7 @@ const SectionRows = ({
       )}
       {!displayCollapsed && (
         <CustomFieldFooterRow
-          projectId={projectId}
+          boardId={boardId}
           filters={footerFilter}
           refreshKey={footerKey}
           columns={columns}
@@ -1963,7 +1963,7 @@ const SectionTitleRow = ({
   return (
     <tr
       className="group border-b"
-      data-testid="project-section"
+      data-testid="board-section"
     >
       <td colSpan={colSpan} className="relative py-1.5 pl-[2.375rem] pr-3">
         {/* Drag handle in the left gutter, hover-only — lined up with the
@@ -2105,7 +2105,7 @@ const AddTaskRow = ({
     // than one merged colSpan cell) so the column borders stay aligned and the
     // placeholder doesn't break up the table.
     return (
-      <tr className="border-b" data-testid="project-add-task-trigger">
+      <tr className="border-b" data-testid="board-add-task-trigger">
         <td className="px-3 py-2" />
         {columns.map((column) =>
           column.key === "task" ? (
@@ -2115,7 +2115,7 @@ const AddTaskRow = ({
                 type="button"
                 onClick={open}
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                data-testid="project-add-task"
+                data-testid="board-add-task"
               >
                 <Plus className="h-4 w-4" /> Add task
               </button>
@@ -2130,7 +2130,7 @@ const AddTaskRow = ({
   }
 
   return (
-    <tr className="border-b bg-muted/10" data-testid="project-new-task-row">
+    <tr className="border-b bg-muted/10" data-testid="board-new-task-row">
       <td className="py-2 pl-[2.375rem] pr-1 align-middle">
         <Plus className="h-4 w-4 text-muted-foreground" aria-hidden />
       </td>
@@ -2156,7 +2156,7 @@ const AddTaskRow = ({
                 disabled={busy}
                 elevation={0}
                 className="h-8"
-                data-testid="project-new-task-title"
+                data-testid="board-new-task-title"
               />
             </td>
           );
@@ -2168,7 +2168,7 @@ const AddTaskRow = ({
                 value={dueDate}
                 onChange={setDueDate}
                 ariaLabel="Due date for new task"
-                testIdPrefix="project-new-task-due"
+                testIdPrefix="board-new-task-due"
               />
             </td>
           );
@@ -2271,7 +2271,7 @@ const InlineTaskTitle = ({
   onSave,
   onOpenDetails,
 }: {
-  task: ProjectTask;
+  task: BoardTask;
   onSave: (title: string) => void;
   onOpenDetails: () => void;
 }) => {
@@ -2314,7 +2314,7 @@ const InlineTaskTitle = ({
         // via group-has) so it lines up seamlessly; the input itself stays
         // borderless.
         className="border-transparent px-2 font-medium hover:border-transparent focus-visible:border-transparent"
-        data-testid="project-task-title-input"
+        data-testid="board-task-title-input"
       />
     );
   }
@@ -2331,7 +2331,7 @@ const InlineTaskTitle = ({
           "max-w-full shrink truncate px-2 text-left font-medium",
           task.completedOn && "text-muted-foreground",
         )}
-        data-testid="project-task-title"
+        data-testid="board-task-title"
       >
         {task.title}
       </button>
@@ -2346,28 +2346,28 @@ const InlineTaskTitle = ({
   );
 };
 
-interface ProjectTaskRowProps {
-  task: ProjectTask;
+interface BoardTaskRowProps {
+  task: BoardTask;
   columns: ListColumn[];
   allTags: TagOption[];
   assignableUsers: AssigneeOption[];
-  projectIri: string;
+  boardIri: string;
   spaceIri: string;
-  onToggle: (task: ProjectTask) => void;
-  onOpen: (task: ProjectTask) => void;
-  onDuplicate: (task: ProjectTask) => void;
-  onDelete: (task: ProjectTask) => void;
-  patchTask: (task: ProjectTask, body: Record<string, unknown>) => Promise<void>;
-  onCustomFieldChange: (task: ProjectTask, defIri: string, value: unknown) => void;
+  onToggle: (task: BoardTask) => void;
+  onOpen: (task: BoardTask) => void;
+  onDuplicate: (task: BoardTask) => void;
+  onDelete: (task: BoardTask) => void;
+  patchTask: (task: BoardTask, body: Record<string, unknown>) => Promise<void>;
+  onCustomFieldChange: (task: BoardTask, defIri: string, value: unknown) => void;
   onCreateTag: (title: string) => Promise<TagOption | null>;
 }
 
-const ProjectTaskRow = ({
+const BoardTaskRow = ({
   task,
   columns,
   allTags,
   assignableUsers,
-  projectIri,
+  boardIri,
   spaceIri,
   onToggle,
   onOpen,
@@ -2376,7 +2376,7 @@ const ProjectTaskRow = ({
   patchTask,
   onCustomFieldChange,
   onCreateTag,
-}: ProjectTaskRowProps) => {
+}: BoardTaskRowProps) => {
   const {
     attributes,
     listeners,
@@ -2406,7 +2406,7 @@ const ProjectTaskRow = ({
             value={task.dueDate}
             onChange={(next) => void patchTask(task, { dueDate: next })}
             ariaLabel={`Due date for "${task.title}"`}
-            testIdPrefix="project-task-due-date"
+            testIdPrefix="board-task-due-date"
             recurrenceValue={task.recurrenceRule}
             onRecurrenceChange={(next) =>
               void patchTask(task, { recurrenceRule: next })
@@ -2446,10 +2446,10 @@ const ProjectTaskRow = ({
         const def = column.definition;
         if (!def) return null;
         return (
-          <ProjectCustomFieldCell
+          <BoardCustomFieldCell
             task={task}
             definition={def}
-            projectIri={projectIri}
+            boardIri={boardIri}
             spaceIri={spaceIri}
             users={assignableUsers}
             onCustomFieldChange={onCustomFieldChange}
@@ -2472,7 +2472,7 @@ const ProjectTaskRow = ({
         task.completedOn && "text-muted-foreground",
         isDragging && "relative z-10 bg-background opacity-80",
       )}
-      data-testid="project-task-item"
+      data-testid="board-task-item"
     >
       <td
         className={cn(
@@ -2480,7 +2480,7 @@ const ProjectTaskRow = ({
           // While the title is being edited, extend the editor's top/bottom
           // border left across the checkbox cell so it reads as one field
           // spanning to the row's left edge.
-          "group-has-[[data-testid=project-task-title-input]]:border-y group-has-[[data-testid=project-task-title-input]]:border-input",
+          "group-has-[[data-testid=board-task-title-input]]:border-y group-has-[[data-testid=board-task-title-input]]:border-input",
         )}
       >
         {/* Drag handle in the left gutter, revealed on row hover. */}
@@ -2490,7 +2490,7 @@ const ProjectTaskRow = ({
           {...listeners}
           aria-label={`Reorder "${task.title}"`}
           className="absolute left-1.5 top-1/2 -translate-y-1/2 cursor-grab touch-none text-muted-foreground/40 opacity-0 hover:text-foreground group-hover:opacity-100"
-          data-testid="project-task-drag"
+          data-testid="board-task-drag"
         >
           <GripVertical className="size-3.5" />
         </button>
@@ -2523,7 +2523,7 @@ const ProjectTaskRow = ({
             // All cells are p-0 so editors fill the cell and editing the title
             // doesn't change the row height.
             column.key === "task"
-              ? "min-w-[12rem] group-has-[[data-testid=project-task-title-input]]:border-y group-has-[[data-testid=project-task-title-input]]:border-r group-has-[[data-testid=project-task-title-input]]:border-input"
+              ? "min-w-[12rem] group-has-[[data-testid=board-task-title-input]]:border-y group-has-[[data-testid=board-task-title-input]]:border-r group-has-[[data-testid=board-task-title-input]]:border-input"
               : "border-l",
           )}
         >
@@ -2535,7 +2535,7 @@ const ProjectTaskRow = ({
       <td
         className="cursor-pointer px-2 py-2 align-middle"
         onClick={() => onOpen(task)}
-        data-testid="project-task-open-detail"
+        data-testid="board-task-open-detail"
       >
         <div className="flex justify-end">
         <DropdownMenu>
@@ -2545,7 +2545,7 @@ const ProjectTaskRow = ({
               onClick={(e) => e.stopPropagation()}
               aria-label={`Actions for "${task.title}"`}
               className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-              data-testid="project-task-actions"
+              data-testid="board-task-actions"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
@@ -2571,21 +2571,21 @@ const ProjectTaskRow = ({
   );
 };
 
-const ProjectCustomFieldCell = ({
+const BoardCustomFieldCell = ({
   task,
   definition,
-  projectIri,
+  boardIri,
   spaceIri,
   users,
   onCustomFieldChange,
 }: {
-  task: ProjectTask;
+  task: BoardTask;
   definition: CustomFieldDefinition;
-  projectIri: string;
+  boardIri: string;
   spaceIri: string;
   users: AssigneeOption[];
   onCustomFieldChange: (
-    task: ProjectTask,
+    task: BoardTask,
     defIri: string,
     value: unknown,
   ) => void;
@@ -2630,7 +2630,7 @@ const ProjectCustomFieldCell = ({
         dirty.current = true;
         setValue(next);
       }}
-      projectIri={projectIri}
+      boardIri={boardIri}
       spaceIri={spaceIri}
       users={users}
       compact
@@ -2638,4 +2638,4 @@ const ProjectCustomFieldCell = ({
   );
 };
 
-export default ProjectDetail;
+export default BoardDetail;

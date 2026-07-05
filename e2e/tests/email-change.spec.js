@@ -20,7 +20,7 @@ async function registerAndSignIn(page, request, email, password = "Password123!@
   await page.click('button[type="submit"]');
   // A fresh sign-in lands on the workspace home (#405); the email-change
   // form lives on the profile panel, so land callers there.
-  await expect(page).toHaveURL(/\/projects/);
+  await expect(page).toHaveURL(/\/boards/);
   await page.goto(`${BASE_URL}/settings/profile`);
   await expect(page).toHaveURL(/\/settings\/profile/);
 }
@@ -99,7 +99,7 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
     // Fresh sign-in lands on the workspace home (#405).
-    await expect(page).toHaveURL(/\/projects/);
+    await expect(page).toHaveURL(/\/boards/);
 
     // Now follow the revert link
     await page.goto(revertUrl);
@@ -112,7 +112,7 @@ test.describe("Change email (authenticated)", () => {
     await page.fill("#password", "Password123!@#");
     await page.click('button[type="submit"]');
     // Fresh sign-in lands on the workspace home (#405).
-    await expect(page).toHaveURL(/\/projects/);
+    await expect(page).toHaveURL(/\/boards/);
   });
 
   test("cannot request a change to an already-registered address", async ({

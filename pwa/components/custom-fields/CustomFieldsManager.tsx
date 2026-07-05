@@ -34,10 +34,10 @@ import { KIND_BADGE, kindLabelFor, subtypeLabelFor } from "./kind-editors";
 import type { CustomFieldDefinition, FieldStatsResponse } from "./types";
 
 /**
- * Schema editor for a project's custom field catalogue. Renders the
+ * Schema editor for a board's custom field catalogue. Renders the
  * fields as a sortable table (drag to reorder → column order on the task
  * list), opens a right-side {@link CustomFieldSheet} for create/edit, and
- * exposes the project-scoped change log. Talks to
+ * exposes the board-scoped change log. Talks to
  * `/custom_field_definitions` plus the reorder / stats / activity helper
  * endpoints.
  */
@@ -50,11 +50,11 @@ interface Props {
   /** Space that owns the fields (#custom-fields-space). Drives load + create.
    *  Omitted for the instance-wide global manager (#global-custom-fields). */
   spaceIri?: string;
-  /** Header `slug · N fields` badge label (space or project title). */
-  projectTitle: string;
-  /** When mounted in a project's Settings tab, enables drag-reorder (via the
-   *  project route) + the FILLED stat. Omit on the space-level manager. */
-  projectIri?: string;
+  /** Header `slug · N fields` badge label (space or board title). */
+  boardTitle: string;
+  /** When mounted in a board's Settings tab, enables drag-reorder (via the
+   *  board route) + the FILLED stat. Omit on the space-level manager. */
+  boardIri?: string;
   /** Active space name, surfaced in the admin notice + reference scope note. */
   spaceName?: string;
   isSpaceAdmin: boolean;
@@ -67,7 +67,7 @@ interface Props {
   onDefinitionsChanged?: () => void;
 }
 
-const projectIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
+const boardIdFromIri = (iri: string): string => iri.split("/").pop() ?? "";
 
 const errorMessage = async (res: Response): Promise<string> => {
   const data = await res.json().catch(() => ({}));
@@ -89,13 +89,13 @@ const sortByPosition = (
 
 const CustomFieldsManager = ({
   spaceIri,
-  projectIri,
+  boardIri,
   spaceName,
   isSpaceAdmin,
   collectionPath = "/custom_field_definitions",
   onDefinitionsChanged,
 }: Props) => {
-  const projectId = projectIri ? projectIdFromIri(projectIri) : null;
+  const boardId = boardIri ? boardIdFromIri(boardIri) : null;
   const [defs, setDefs] = useState<CustomFieldDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -140,10 +140,10 @@ const CustomFieldsManager = ({
   }, [spaceIri, collectionPath]);
 
   const loadStats = useCallback(async () => {
-    if (null === projectId) return;
+    if (null === boardId) return;
     try {
       const res = await fetch(
-        `${ENTRYPOINT}/projects/${projectId}/custom_field_stats`,
+        `${ENTRYPOINT}/boards/${boardId}/custom_field_stats`,
         { credentials: "include", headers: { Accept: "application/json" } },
       );
       if (!res.ok) return;
@@ -154,7 +154,7 @@ const CustomFieldsManager = ({
     } catch {
       /* fill counts are a nicety — ignore failures */
     }
-  }, [projectId]);
+  }, [boardId]);
 
   useEffect(() => {
     void load();
@@ -241,10 +241,10 @@ const CustomFieldsManager = ({
 
   const persistOrder = useCallback(
     async (ordered: CustomFieldDefinition[]) => {
-      if (null === projectId) return;
+      if (null === boardId) return;
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/reorder`,
+          `${ENTRYPOINT}/boards/${boardId}/custom_field_definitions/reorder`,
           {
             method: "POST",
             credentials: "include",
@@ -261,7 +261,7 @@ const CustomFieldsManager = ({
         void load(); // re-sync to the server's truth
       }
     },
-    [projectId, load, onDefinitionsChanged],
+    [boardId, load, onDefinitionsChanged],
   );
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -315,9 +315,9 @@ const CustomFieldsManager = ({
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card">
-          {/* Change log is project-scoped activity; only shown in a
-              project context (not on the space-level manager). */}
-          {projectId && (
+          {/* Change log is board-scoped activity; only shown in a
+              board context (not on the space-level manager). */}
+          {boardId && (
             <div className="flex items-center justify-end border-b px-2 py-1">
               <Button
                 type="button"
@@ -396,7 +396,7 @@ const CustomFieldsManager = ({
         onOpenChange={setSheetOpen}
         spaceIri={spaceIri}
         collectionPath={collectionPath}
-        projectIri={projectIri}
+        boardIri={boardIri}
         spaceName={spaceName}
         initial={editing ?? undefined}
         initialPosition={nextPosition}
@@ -409,7 +409,7 @@ const CustomFieldsManager = ({
       <CustomFieldChangeLog
         open={changeLogOpen}
         onOpenChange={setChangeLogOpen}
-        projectId={projectId}
+        boardId={boardId}
       />
 
       {deleteTarget && (

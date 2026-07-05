@@ -18,14 +18,14 @@ interface Collection<T> {
 interface Props {
   /** Space that owns the space fields (#custom-fields-space). */
   spaceIri: string;
-  /** This project's IRI (`/projects/{id}`) — the PATCH target. */
-  projectIri: string;
-  /** IRIs of the SPACE fields currently shown on this project. */
+  /** This board's IRI (`/boards/{id}`) — the PATCH target. */
+  boardIri: string;
+  /** IRIs of the SPACE fields currently shown on this board. */
   attachedIris: string[];
-  /** IRIs of the GLOBAL fields currently shown on this project. */
+  /** IRIs of the GLOBAL fields currently shown on this board. */
   attachedGlobalIris: string[];
-  /** Per-project visibility for attached fields, keyed by definition IRI. */
-  projectVisibility: Record<string, string>;
+  /** Per-board visibility for attached fields, keyed by definition IRI. */
+  boardVisibility: Record<string, string>;
   /** Space admins can edit space definitions inline (creation lives in space settings). */
   isSpaceAdmin: boolean;
   /** Open the field editor for an existing SPACE definition. */
@@ -43,29 +43,29 @@ const KIND_LABEL: Record<string, string> = {
   reference: "Reference",
 };
 
-/** Endpoint segment for a field source's per-project routes. */
+/** Endpoint segment for a field source's per-board routes. */
 const routeBaseFor = (global: boolean): string =>
   global ? "global_custom_field_definitions" : "custom_field_definitions";
 
-/** The project M2M key for a field source. */
+/** The board M2M key for a field source. */
 const attachKeyFor = (global: boolean): string =>
   global ? "globalCustomFieldDefinitions" : "customFieldDefinitions";
 
 /**
- * Per-project field selector: fields are defined at the space level
+ * Per-board field selector: fields are defined at the space level
  * (#custom-fields-space) or instance-wide by admins (#global-custom-fields);
- * each project ticks the ones it shows on its tasks. Toggling PATCHes the
- * project's matching M2M (`customFieldDefinitions` / `globalCustomFieldDefinitions`)
- * — a project's effective field set is the union. Space fields can be edited
+ * each board ticks the ones it shows on its tasks. Toggling PATCHes the
+ * board's matching M2M (`customFieldDefinitions` / `globalCustomFieldDefinitions`)
+ * — a board's effective field set is the union. Space fields can be edited
  * inline by space admins; global fields are managed by platform admins on the
  * admin page, so they're shown read-only here.
  */
-const ProjectCustomFieldPicker = ({
+const BoardCustomFieldPicker = ({
   spaceIri,
-  projectIri,
+  boardIri,
   attachedIris,
   attachedGlobalIris,
-  projectVisibility,
+  boardVisibility,
   isSpaceAdmin,
   onEdit,
   onChanged,
@@ -115,7 +115,7 @@ const ProjectCustomFieldPicker = ({
   }, [load]);
 
   const patchAttached = async (global: boolean, iris: string[]): Promise<void> => {
-    const res = await fetch(`${ENTRYPOINT}${projectIri}`, {
+    const res = await fetch(`${ENTRYPOINT}${boardIri}`, {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/merge-patch+json" },
@@ -125,8 +125,8 @@ const ProjectCustomFieldPicker = ({
   };
 
   // The List / Board / Calendar toggles drive both attachment and visibility:
-  // a field is on the project when any is on. Turning the last one off detaches
-  // it; turning one on (re)attaches and sets the per-project surface set.
+  // a field is on the board when any is on. Turning the last one off detaches
+  // it; turning one on (re)attaches and sets the per-board surface set.
   const updateField = async (
     iri: string,
     global: boolean,
@@ -136,7 +136,7 @@ const ProjectCustomFieldPicker = ({
   ) => {
     const attached = global ? attachedGlobalIris : attachedIris;
     const wasAttached = attached.includes(iri);
-    const projectId = projectIri.split("/").pop();
+    const boardId = boardIri.split("/").pop();
     const defId = iri.split("/").pop();
     setBusy(iri);
     try {
@@ -154,7 +154,7 @@ const ProjectCustomFieldPicker = ({
           await patchAttached(global, [...attached, iri]);
         }
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${encodeURIComponent(projectId ?? "")}/${routeBaseFor(global)}/${encodeURIComponent(defId ?? "")}/visibility`,
+          `${ENTRYPOINT}/boards/${encodeURIComponent(boardId ?? "")}/${routeBaseFor(global)}/${encodeURIComponent(defId ?? "")}/visibility`,
           {
             method: "PUT",
             credentials: "include",
@@ -177,7 +177,7 @@ const ProjectCustomFieldPicker = ({
     const attached = global ? attachedGlobalIris : attachedIris;
     const checked = attached.includes(def["@id"]);
     const surfaces = checked
-      ? visibilitySurfaces(projectVisibility[def["@id"]] ?? "both")
+      ? visibilitySurfaces(boardVisibility[def["@id"]] ?? "both")
       : [];
     const showList = surfaces.includes("list");
     const showBoard = surfaces.includes("board");
@@ -241,12 +241,12 @@ const ProjectCustomFieldPicker = ({
   };
 
   return (
-    <div className="space-y-4" data-testid="project-custom-field-picker">
+    <div className="space-y-4" data-testid="board-custom-field-picker">
       <div className="space-y-1">
         <h3 className="text-sm font-medium">Custom fields</h3>
         <p className="text-xs text-muted-foreground">
-          Toggle where each field shows on this project — the task list, the
-          board, and/or the calendar (all off = not on this project). Space
+          Toggle where each field shows on this board — the task list, the
+          board, and/or the calendar (all off = not on this board). Space
           fields are defined in{" "}
           <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
             space settings
@@ -296,4 +296,4 @@ const ProjectCustomFieldPicker = ({
   );
 };
 
-export default ProjectCustomFieldPicker;
+export default BoardCustomFieldPicker;

@@ -19,7 +19,7 @@ const CardPage = () => (
         title: "With header, content, and footer",
         code: `<Card className="max-w-sm">
   <CardHeader>
-    <CardTitle>Project moonshot</CardTitle>
+    <CardTitle>Board moonshot</CardTitle>
     <CardDescription>Q3 launch readiness</CardDescription>
   </CardHeader>
   <CardContent>
@@ -34,7 +34,7 @@ const CardPage = () => (
         preview: (
           <Card className="max-w-sm">
             <CardHeader>
-              <CardTitle>Project moonshot</CardTitle>
+              <CardTitle>Board moonshot</CardTitle>
               <CardDescription>Q3 launch readiness</CardDescription>
             </CardHeader>
             <CardContent>

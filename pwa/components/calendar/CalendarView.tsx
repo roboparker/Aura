@@ -11,11 +11,11 @@ import FilterMultiSelect from "@/components/common/FilterMultiSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CalendarViewProps {
-  /** Space whose tasks the calendar projects (`/spaces/{id}` IRI). */
+  /** Space whose tasks the calendar boards (`/spaces/{id}` IRI). */
   spaceIri: string;
-  /** When set, narrow to one project (the project-tab calendar) and hide the
-   *  project filter. */
-  projectIri?: string;
+  /** When set, narrow to one board (the board-tab calendar) and hide the
+   *  board filter. */
+  boardIri?: string;
   /** Open the task detail drawer (the host page owns the drawer). */
   onOpen: (taskId: string) => void;
   /** Notify the host that a task moved, so it can refresh its own list. */
@@ -28,14 +28,14 @@ interface CalendarViewProps {
 
 /**
  * Self-contained calendar surface shared by the top-level `/calendar` page and
- * the project detail's Calendar tab — same component, the only difference being
- * the project tab passes `projectIri` to filter to one project. Owns fetching
- * (`GET /calendar`), the assignee/project filters, and drag-to-reschedule; the
+ * the board detail's Calendar tab — same component, the only difference being
+ * the board tab passes `boardIri` to filter to one board. Owns fetching
+ * (`GET /calendar`), the assignee/board filters, and drag-to-reschedule; the
  * host page owns the task detail drawer (via `onOpen`).
  */
 const CalendarView = ({
   spaceIri,
-  projectIri,
+  boardIri,
   onOpen,
   onTasksChanged,
   refreshSignal,
@@ -45,7 +45,7 @@ const CalendarView = ({
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projectFilter, setProjectFilter] = useState<Set<string>>(new Set());
+  const [boardFilter, setProjectFilter] = useState<Set<string>>(new Set());
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string>>(new Set());
 
   const loadEntries = useCallback(async () => {
@@ -58,7 +58,7 @@ const CalendarView = ({
         start: range.start,
         end: range.end,
       };
-      if (projectIri) params.project = projectIri;
+      if (boardIri) params.board = boardIri;
       const res = await fetch(`${ENTRYPOINT}/calendar?${new URLSearchParams(params).toString()}`, {
         credentials: "include",
         headers: { Accept: "application/json" },
@@ -71,7 +71,7 @@ const CalendarView = ({
     } finally {
       setIsLoading(false);
     }
-  }, [spaceIri, projectIri, range]);
+  }, [spaceIri, boardIri, range]);
 
   useEffect(() => {
     void loadEntries();
@@ -146,10 +146,10 @@ const CalendarView = ({
     [loadEntries, onTasksChanged],
   );
 
-  const projectOptions = useMemo(() => {
+  const boardOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const e of entries) {
-      if (e.project) seen.set(e.project["@id"], e.project.title);
+      if (e.board) seen.set(e.board["@id"], e.board.title);
     }
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [entries]);
@@ -170,24 +170,24 @@ const CalendarView = ({
     () =>
       entries.filter(
         (e) =>
-          (projectFilter.size === 0 ||
-            (e.project != null && projectFilter.has(e.project["@id"]))) &&
+          (boardFilter.size === 0 ||
+            (e.board != null && boardFilter.has(e.board["@id"]))) &&
           (assigneeFilter.size === 0 ||
             e.assignees.some((a) => assigneeFilter.has(a["@id"]))),
       ),
-    [entries, projectFilter, assigneeFilter],
+    [entries, boardFilter, assigneeFilter],
   );
 
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        {!projectIri && (
+        {!boardIri && (
           <FilterMultiSelect
-            label="Projects"
-            options={projectOptions}
-            selected={projectFilter}
+            label="Boards"
+            options={boardOptions}
+            selected={boardFilter}
             onChange={setProjectFilter}
-            testId="calendar-project-filter"
+            testId="calendar-board-filter"
           />
         )}
         <FilterMultiSelect

@@ -10,7 +10,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 
 /**
  * Minimal v1 of the activity timeline (issue #89). Reads the audit
- * feed for either a task or project and renders one entry per row.
+ * feed for either a task or board and renders one entry per row.
  *
  * The feed shape is the same for both endpoints — see
  * `App\Controller\ActivityFeedSerializer`. We resolve the actor IRI
@@ -30,7 +30,7 @@ interface ActivityRow {
   id: number;
   action: "create" | "update" | "remove" | string;
   loggedAt: string;
-  objectClass: "Task" | "Project" | string;
+  objectClass: "Task" | "Board" | string;
   objectId: string;
   version: number;
   actor: string | null;
@@ -46,7 +46,7 @@ interface FeedResponse {
 }
 
 export interface ActivityPanelProps {
-  /** Endpoint to call: `/tasks/{id}/activity` or `/projects/{id}/activity`.
+  /** Endpoint to call: `/tasks/{id}/activity` or `/boards/{id}/activity`.
    *  Built by the parent so this component stays trigger-agnostic. */
   endpoint: string;
 }

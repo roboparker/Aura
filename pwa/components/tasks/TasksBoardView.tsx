@@ -4,16 +4,16 @@ import { cn } from "@/lib/utils";
 import { type Task } from "@/components/tasks/taskHelpers";
 
 /**
- * Read-only "board" view for the cross-project /tasks page: one column per
- * project the tasks belong to (plus a "No project" column for standalone
+ * Read-only "board" view for the cross-board /tasks page: one column per
+ * board the tasks belong to (plus a "No board" column for standalone
  * tasks). Cards open the detail drawer on click. Deliberately shows NO custom
  * fields — those live only in the detail pane — and cards aren't draggable
- * (a task can't change project from here).
+ * (a task can't change board from here).
  */
 interface TasksProjectBoardProps {
   tasks: Task[];
-  /** Project IRI → title, for the column headers. */
-  projectTitles: Map<string, string>;
+  /** Board IRI → title, for the column headers. */
+  boardTitles: Map<string, string>;
   onOpen: (task: Task) => void;
 }
 
@@ -25,35 +25,35 @@ const dueLabel = (iso: string): string => {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 };
 
-const TasksProjectBoard = ({
+const TasksBoardView = ({
   tasks,
-  projectTitles,
+  boardTitles,
   onOpen,
 }: TasksProjectBoardProps) => {
-  // Group tasks by project IRI (or the sentinel for standalone tasks).
+  // Group tasks by board IRI (or the sentinel for standalone tasks).
   const groups = new Map<string, Task[]>();
   for (const task of tasks) {
-    const key = task.project ?? NO_PROJECT;
+    const key = task.board ?? NO_PROJECT;
     const list = groups.get(key) ?? [];
     list.push(task);
     groups.set(key, list);
   }
 
-  // Real projects first (alphabetical by title), "No project" last.
+  // Real boards first (alphabetical by title), "No board" last.
   const columns = Array.from(groups.keys())
     .filter((k) => k !== NO_PROJECT)
     .sort((a, b) =>
-      (projectTitles.get(a) ?? a).localeCompare(projectTitles.get(b) ?? b),
+      (boardTitles.get(a) ?? a).localeCompare(boardTitles.get(b) ?? b),
     );
   if (groups.has(NO_PROJECT)) columns.push(NO_PROJECT);
 
   const columnTitle = (key: string): string =>
-    key === NO_PROJECT ? "No project" : projectTitles.get(key) ?? "Project";
+    key === NO_PROJECT ? "No board" : boardTitles.get(key) ?? "Board";
 
   return (
     <div
       className="flex min-h-[calc(100vh-16rem)] items-stretch gap-4 overflow-x-auto px-0.5 pt-1 pb-2"
-      data-testid="tasks-project-board"
+      data-testid="tasks-board-board"
     >
       {columns.map((key) => {
         const colTasks = (groups.get(key) ?? [])
@@ -143,4 +143,4 @@ const TasksProjectBoard = ({
   );
 };
 
-export default TasksProjectBoard;
+export default TasksBoardView;

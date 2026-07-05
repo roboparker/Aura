@@ -10,7 +10,7 @@ import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import { cn } from "@/lib/utils";
 
 /**
- * Per-item impersonation overrides. For each addressable type (projects,
+ * Per-item impersonation overrides. For each addressable type (boards,
  * pages, tasks, discussions) the user can pin specific items to none/view/edit,
  * overriding the category default from the PermissionTree above. Stored under
  * the `impersonationItemAccess` preference; enforced server-side by
@@ -24,18 +24,18 @@ const LEVELS: { value: ImpersonationLevel; label: string }[] = [
 ];
 
 const TYPES: {
-  type: "project" | "page" | "task" | "discussion";
+  type: "board" | "page" | "task" | "discussion";
   label: string;
   endpoint: string;
 }[] = [
-  { type: "project", label: "Projects", endpoint: "/projects" },
+  { type: "board", label: "Boards", endpoint: "/boards" },
   { type: "page", label: "Pages", endpoint: "/pages" },
   { type: "task", label: "Tasks", endpoint: "/tasks" },
   { type: "discussion", label: "Discussions", endpoint: "/discussions" },
 ];
 
 const EMPTY: Record<string, Record<string, ImpersonationLevel>> = {
-  project: {},
+  board: {},
   page: {},
   task: {},
   discussion: {},

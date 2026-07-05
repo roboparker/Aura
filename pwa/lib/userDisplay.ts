@@ -8,7 +8,7 @@
  *   4. "Unknown"
  *
  * The shape is intentionally loose — any user-like object with the
- * relevant string fields works (the auth-context `User`, project/group
+ * relevant string fields works (the auth-context `User`, board/group
  * `Member`s once they expose names, etc.).
  */
 export interface NamedUser {

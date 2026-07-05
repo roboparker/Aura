@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import TaskTableColumns from "@/components/projects/TaskTableColumns";
-import type { ListColumn } from "@/components/projects/listColumns";
+import TaskTableColumns from "@/components/boards/TaskTableColumns";
+import type { ListColumn } from "@/components/boards/listColumns";
 import type {
   FooterBreakdownEntry,
   FooterResponse,
@@ -11,8 +11,8 @@ import type {
 } from "./types";
 
 /**
- * Renders the aggregated footer row for a project's task list. Fetches
- * `/projects/{id}/custom_field_footers` whenever the projectId or
+ * Renders the aggregated footer row for a board's task list. Fetches
+ * `/boards/{id}/custom_field_footers` whenever the boardId or
  * `filters` query string changes, so the footer reflects the same row
  * set as the filtered task list above it.
  *
@@ -21,7 +21,7 @@ import type {
  * inspects a whitelist of params; everything else is ignored.
  */
 interface Props {
-  projectId: string;
+  boardId: string;
   filters?: string;
   /** Bump to force a re-fetch (e.g. after a task value is edited inline). */
   refreshKey?: number;
@@ -128,7 +128,7 @@ const FooterValue = ({ row }: { row: FooterRow }) => {
 };
 
 const CustomFieldFooterRow = ({
-  projectId,
+  boardId,
   filters,
   refreshKey,
   heading,
@@ -146,7 +146,7 @@ const CustomFieldFooterRow = ({
     let aborted = false;
     const qs = filters && filters.length > 0 ? `?${filters}` : "";
     void fetch(
-      `${ENTRYPOINT}/projects/${projectId}/custom_field_footers${qs}`,
+      `${ENTRYPOINT}/boards/${boardId}/custom_field_footers${qs}`,
       {
         credentials: "include",
         headers: { Accept: "application/json" },
@@ -164,7 +164,7 @@ const CustomFieldFooterRow = ({
     return () => {
       aborted = true;
     };
-  }, [projectId, filters, refreshKey]);
+  }, [boardId, filters, refreshKey]);
 
   const visibleRows = visibleDefinitions
     ? rows.filter((row) => visibleDefinitions.includes(row.definition))

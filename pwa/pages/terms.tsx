@@ -133,7 +133,7 @@ const Terms = () => (
           <section>
             <h2 className="text-xl font-semibold mb-2">9. Contact</h2>
             <p className="text-muted-foreground">
-              Questions about these Terms? Reach out via the project&apos;s{" "}
+              Questions about these Terms? Reach out via the board&apos;s{" "}
               <Link
                 href="https://github.com/roboparker/Aura"
                 target="_blank"

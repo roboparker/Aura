@@ -120,7 +120,7 @@ export const KIND_DESCRIPTORS: Record<CustomFieldKind, KindDescriptor> = {
     subtypes: [
       { value: "user", label: "User" },
       { value: "task", label: "Task" },
-      { value: "project", label: "Project" },
+      { value: "board", label: "Board" },
       { value: "page", label: "Page" },
       { value: "discussion", label: "Discussion" },
     ],
@@ -222,7 +222,7 @@ const REFERENCE_TARGETS: Array<{
 }> = [
   { value: "user", label: "User", description: "Pick a member of this space." },
   { value: "task", label: "Task", description: "Link to a task in this space." },
-  { value: "project", label: "Project", description: "Link to a project in this space." },
+  { value: "board", label: "Board", description: "Link to a board in this space." },
   { value: "page", label: "Page", description: "Link to a page in this space." },
   { value: "discussion", label: "Discussion", description: "Link to a discussion in this space." },
 ];

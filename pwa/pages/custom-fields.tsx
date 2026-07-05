@@ -11,10 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 
 /**
  * Space-level custom-field manager (#custom-fields-space). Defines the field
- * schema shared across the active space's projects. Linked from the sidebar
- * Settings section. Project-specific bits (drag-reorder + the FILLED stat) live
- * on each project's Settings → Custom fields tab, which mounts the same manager
- * with a project context.
+ * schema shared across the active space's boards. Linked from the sidebar
+ * Settings section. Board-specific bits (drag-reorder + the FILLED stat) live
+ * on each board's Settings → Custom fields tab, which mounts the same manager
+ * with a board context.
  */
 const CustomFields = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -49,7 +49,7 @@ const CustomFields = () => {
               <>
                 Reusable task fields defined once for
                 {activeSpace ? ` the “${activeSpace.name}” space` : " this space"}{" "}
-                — each project picks which to show on its tasks.
+                — each board picks which to show on its tasks.
               </>
             }
           />
@@ -57,7 +57,7 @@ const CustomFields = () => {
           {activeSpace ? (
             <CustomFieldsManager
               spaceIri={activeSpace["@id"]}
-              projectTitle={activeSpace.name}
+              boardTitle={activeSpace.name}
               spaceName={activeSpace.name}
               isSpaceAdmin={can("custom_fields", "update")}
             />

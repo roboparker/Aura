@@ -16,16 +16,16 @@ import type {
 } from "./types";
 
 /**
- * Right-side drawer showing the project-scoped custom-fields change log,
- * read from `GET /projects/{id}/custom_field_definitions/activity`. Each
+ * Right-side drawer showing the board-scoped custom-fields change log,
+ * read from `GET /boards/{id}/custom_field_definitions/activity`. Each
  * row pairs the Gedmo audit entry with an actor chip resolved from the
  * response's actor map (no per-row user fetch).
  */
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Null on the space-level manager (no project route → no change log). */
-  projectId: string | null;
+  /** Null on the space-level manager (no board route → no change log). */
+  boardId: string | null;
 }
 
 const ACTION_VERB: Record<string, string> = {
@@ -44,21 +44,21 @@ const FIELD_LABELS: Record<string, string> = {
   position: "order",
 };
 
-const CustomFieldChangeLog = ({ open, onOpenChange, projectId }: Props) => {
+const CustomFieldChangeLog = ({ open, onOpenChange, boardId }: Props) => {
   const [items, setItems] = useState<ActivityRow[]>([]);
   const [actors, setActors] = useState<Record<string, ActivityActor>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open || null === projectId) return;
+    if (!open || null === boardId) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);
     void (async () => {
       try {
         const res = await fetch(
-          `${ENTRYPOINT}/projects/${projectId}/custom_field_definitions/activity`,
+          `${ENTRYPOINT}/boards/${boardId}/custom_field_definitions/activity`,
           { credentials: "include", headers: { Accept: "application/json" } },
         );
         if (!res.ok) throw new Error("Failed to load the change log.");
@@ -79,7 +79,7 @@ const CustomFieldChangeLog = ({ open, onOpenChange, projectId }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [open, projectId]);
+  }, [open, boardId]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -91,7 +91,7 @@ const CustomFieldChangeLog = ({ open, onOpenChange, projectId }: Props) => {
         <SheetHeader className="border-b px-5 py-4">
           <SheetTitle>Change log</SheetTitle>
           <SheetDescription>
-            Every create, edit, and delete on this project&apos;s field schema.
+            Every create, edit, and delete on this board&apos;s field schema.
           </SheetDescription>
         </SheetHeader>
 

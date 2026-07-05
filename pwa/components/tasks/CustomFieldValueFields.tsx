@@ -12,7 +12,7 @@ interface CustomFieldValueFieldsProps {
   onChange: (defIri: string, next: unknown) => void;
   /** Validation messages keyed by definition IRI. */
   violations?: ViolationMap;
-  projectIri?: string | null;
+  boardIri?: string | null;
   spaceIri?: string | null;
   users?: AvatarUser[];
   disabled?: boolean;
@@ -23,7 +23,7 @@ interface CustomFieldValueFieldsProps {
 
 /**
  * Controlled list of per-definition custom-field value editors — the shared
- * body of the task drawer's auto-saving CustomFieldValueList and the project
+ * body of the task drawer's auto-saving CustomFieldValueList and the board
  * page's new-task form. Purely presentational: it holds no state and never
  * persists, so the parent owns the working copy and decides when to save.
  */
@@ -32,7 +32,7 @@ const CustomFieldValueFields = ({
   values,
   onChange,
   violations = {},
-  projectIri,
+  boardIri,
   spaceIri,
   users,
   disabled,
@@ -62,7 +62,7 @@ const CustomFieldValueFields = ({
           onChange={(next) => onChange(def["@id"], next)}
           error={violationFor(violations, def["@id"])}
           disabled={disabled}
-          projectIri={projectIri}
+          boardIri={boardIri}
           spaceIri={spaceIri}
           users={users}
           compact={compact}

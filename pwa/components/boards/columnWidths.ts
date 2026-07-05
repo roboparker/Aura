@@ -1,8 +1,8 @@
-import type { ListColumn } from "@/components/projects/listColumns";
+import type { ListColumn } from "@/components/boards/listColumns";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
 
 /**
- * Content-aware column widths for the project list view.
+ * Content-aware column widths for the board list view.
  *
  * The list is several separate `table-fixed` tables (sticky header, one per
  * section, grand-total) that share a `<colgroup>`, so their columns only line

@@ -26,7 +26,7 @@ interface Member {
   email: string;
 }
 
-interface Project {
+interface Board {
   "@id": string;
   id: string;
   title: string;
@@ -39,13 +39,13 @@ interface Project {
 const errorMessage = (err: unknown, fallback: string): string =>
   err instanceof Error ? err.message : fallback;
 
-const Projects = () => {
+const Boards = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  // The create form is hidden behind a "New project" toggle (mirrors the
+  // The create form is hidden behind a "New board" toggle (mirrors the
   // Pages page) rather than sitting open by default.
   const [showComposer, setShowComposer] = useState(false);
   const [title, setTitle] = useState("");
@@ -73,29 +73,29 @@ const Projects = () => {
   // either way. react-query keys on the space so switching spaces refetches
   // (and caches each space's list).
   const spaceIri = activeSpace?.["@id"] ?? null;
-  const projectsQuery = useQuery({
-    queryKey: ["projects", spaceIri],
+  const boardsQuery = useQuery({
+    queryKey: ["boards", spaceIri],
     enabled: isAuthenticated,
     queryFn: () =>
-      apiGetCollection<Project>(
-        spaceIri ? `/projects?space=${encodeURIComponent(spaceIri)}` : "/projects",
-        { errorMessage: "Failed to load projects." },
+      apiGetCollection<Board>(
+        spaceIri ? `/boards?space=${encodeURIComponent(spaceIri)}` : "/boards",
+        { errorMessage: "Failed to load boards." },
       ),
   });
-  const projects = projectsQuery.data ?? [];
-  const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["projects"] });
+  const boards = boardsQuery.data ?? [];
+  const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["boards"] });
 
-  const projectsMeta = contentSectionFor("projects");
-  const ProjectsIcon = projectsMeta.icon;
+  const boardsMeta = contentSectionFor("boards");
+  const BoardsIcon = boardsMeta.icon;
 
   const createMutation = useMutation({
     mutationFn: () =>
-      apiSend<Project>("POST", "/projects", {
-        errorMessage: "Failed to create project.",
+      apiSend<Board>("POST", "/boards", {
+        errorMessage: "Failed to create board.",
         body: {
           title: title.trim(),
           description: description.trim() || null,
-          // Pin the new project to the active space (#187) so work created
+          // Pin the new board to the active space (#187) so work created
           // in a shared space doesn't silently land in the personal one.
           ...(spaceIri ? { space: spaceIri } : {}),
         },
@@ -106,20 +106,20 @@ const Projects = () => {
       setEditorResetKey((k) => k + 1);
       setShowComposer(false);
       setActionError(null);
-      trackEvent("project-create");
-      // Refresh the list (and the sidebar, which shares the ["projects"]
-      // key prefix), then jump straight into the new project.
+      trackEvent("board-create");
+      // Refresh the list (and the sidebar, which shares the ["boards"]
+      // key prefix), then jump straight into the new board.
       void refreshProjects();
-      if (created) void router.push(`/projects/${created.id}`);
+      if (created) void router.push(`/boards/${created.id}`);
     },
-    onError: (err) => setActionError(errorMessage(err, "Failed to create project.")),
+    onError: (err) => setActionError(errorMessage(err, "Failed to create board.")),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (project: Project) =>
-      apiSend("PATCH", project["@id"], {
+    mutationFn: (board: Board) =>
+      apiSend("PATCH", board["@id"], {
         contentType: "application/merge-patch+json",
-        errorMessage: "Failed to update project.",
+        errorMessage: "Failed to update board.",
         body: {
           title: editTitle.trim(),
           description: editDescription.trim() || null,
@@ -130,22 +130,22 @@ const Projects = () => {
       setActionError(null);
       void refreshProjects();
     },
-    onError: (err) => setActionError(errorMessage(err, "Failed to update project.")),
+    onError: (err) => setActionError(errorMessage(err, "Failed to update board.")),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (project: Project) =>
-      apiSend("DELETE", project["@id"], { errorMessage: "Failed to delete project." }),
+    mutationFn: (board: Board) =>
+      apiSend("DELETE", board["@id"], { errorMessage: "Failed to delete board." }),
     onSuccess: () => {
       setActionError(null);
       void refreshProjects();
     },
-    onError: (err) => setActionError(errorMessage(err, "Failed to delete project.")),
+    onError: (err) => setActionError(errorMessage(err, "Failed to delete board.")),
   });
 
   const error =
     actionError ??
-    (projectsQuery.isError ? errorMessage(projectsQuery.error, "Failed to load projects.") : null);
+    (boardsQuery.isError ? errorMessage(boardsQuery.error, "Failed to load boards.") : null);
 
   const handleCreate = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -153,33 +153,33 @@ const Projects = () => {
     createMutation.mutate();
   };
 
-  const startEdit = (project: Project) => {
-    setEditingId(project["@id"]);
-    setEditTitle(project.title);
-    setEditDescription(project.description ?? "");
+  const startEdit = (board: Board) => {
+    setEditingId(board["@id"]);
+    setEditTitle(board.title);
+    setEditDescription(board.description ?? "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
   };
 
-  const handleUpdate = (event: FormEvent<HTMLFormElement>, project: Project) => {
+  const handleUpdate = (event: FormEvent<HTMLFormElement>, board: Board) => {
     event.preventDefault();
     if (!editTitle.trim()) return;
-    updateMutation.mutate(project);
+    updateMutation.mutate(board);
   };
 
-  const handleDelete = (project: Project) => {
-    // Deleting a project deletes it for every member, and its tasks revert to
-    // personal (project_id SET NULL). Make sure the user is aware.
+  const handleDelete = (board: Board) => {
+    // Deleting a board deletes it for every member, and its tasks revert to
+    // personal (board_id SET NULL). Make sure the user is aware.
     if (
       !window.confirm(
-        `Delete project "${project.title}"? This removes it for all members; project tasks become personal tasks of their owners.`,
+        `Delete board "${board.title}"? This removes it for all members; board tasks become personal tasks of their owners.`,
       )
     ) {
       return;
     }
-    deleteMutation.mutate(project);
+    deleteMutation.mutate(board);
   };
 
   if (authLoading || !isAuthenticated) {
@@ -193,24 +193,24 @@ const Projects = () => {
   return (
     <>
       <Head>
-        <title>Projects - Madori</title>
+        <title>Boards - Madori</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto">
           <PageHeader
-            title="Projects"
+            title="Boards"
             icon={
-              <ProjectsIcon className={cn("h-6 w-6 shrink-0", projectsMeta.iconClass)} />
+              <BoardsIcon className={cn("h-6 w-6 shrink-0", boardsMeta.iconClass)} />
             }
-            count={projectsQuery.isLoading ? null : projects.length}
+            count={boardsQuery.isLoading ? null : boards.length}
             actions={
-              can("projects", "create") ? (
+              can("boards", "create") ? (
                 <Button
                   size="sm"
                   onClick={() => setShowComposer((v) => !v)}
-                  data-testid="new-project-button"
+                  data-testid="new-board-button"
                 >
-                  {showComposer ? "Cancel" : "New project"}
+                  {showComposer ? "Cancel" : "New board"}
                 </Button>
               ) : undefined
             }
@@ -246,7 +246,7 @@ const Projects = () => {
                     />
                   </div>
                   <Button type="submit" disabled={createMutation.isPending || !title.trim()}>
-                    {createMutation.isPending ? "Adding..." : "Add Project"}
+                    {createMutation.isPending ? "Adding..." : "Add Board"}
                   </Button>
                 </form>
               </CardContent>
@@ -259,24 +259,24 @@ const Projects = () => {
             </Alert>
           )}
 
-          {projectsQuery.isLoading ? (
-            <p className="text-muted-foreground">Loading projects...</p>
-          ) : projects.length === 0 ? (
+          {boardsQuery.isLoading ? (
+            <p className="text-muted-foreground">Loading boards...</p>
+          ) : boards.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-muted-foreground">
-                  No projects yet. Click &ldquo;New project&rdquo; to start collaborating.
+                  No boards yet. Click &ldquo;New board&rdquo; to start collaborating.
                 </p>
               </CardContent>
             </Card>
           ) : (
-            <ul className="space-y-2" data-testid="project-list">
-              {projects.map((project) => (
-                <li key={project["@id"]} data-testid="project-item">
+            <ul className="space-y-2" data-testid="board-list">
+              {boards.map((board) => (
+                <li key={board["@id"]} data-testid="board-item">
                   <Card>
                     <CardContent className="pt-4 pb-4">
-                      {editingId === project["@id"] ? (
-                        <form onSubmit={(e) => handleUpdate(e, project)} className="space-y-3">
+                      {editingId === board["@id"] ? (
+                        <form onSubmit={(e) => handleUpdate(e, board)} className="space-y-3">
                           <Input
                             type="text"
                             value={editTitle}
@@ -309,45 +309,45 @@ const Projects = () => {
                           <div className="flex items-start justify-between gap-3">
                             <h2 className="font-semibold">
                               <Link
-                                href={`/projects/${project.id}`}
+                                href={`/boards/${board.id}`}
                                 className="text-primary hover:underline no-underline"
                               >
-                                {project.title}
+                                {board.title}
                               </Link>
                             </h2>
                             <div className="flex items-center gap-1 shrink-0">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => startEdit(project)}
+                                onClick={() => startEdit(board)}
                               >
                                 Edit
                               </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => handleDelete(project)}
-                                aria-label={`Delete "${project.title}"`}
+                                onClick={() => handleDelete(board)}
+                                aria-label={`Delete "${board.title}"`}
                                 className="text-destructive hover:text-destructive"
                               >
                                 Delete
                               </Button>
                             </div>
                           </div>
-                          {project.description && (
-                            <MarkdownView source={project.description} className="mt-1" />
+                          {board.description && (
+                            <MarkdownView source={board.description} className="mt-1" />
                           )}
-                          {project.members.length > 0 && (
+                          {board.members.length > 0 && (
                             <div
                               className="mt-2 flex flex-wrap items-center gap-1"
-                              data-testid="project-members"
+                              data-testid="board-members"
                             >
                               <span className="text-xs text-muted-foreground">Members:</span>
-                              {project.members.map((member) => (
+                              {board.members.map((member) => (
                                 <Badge
                                   key={member["@id"]}
                                   variant="secondary"
-                                  data-testid="project-member"
+                                  data-testid="board-member"
                                 >
                                   {member.email}
                                 </Badge>
@@ -368,4 +368,4 @@ const Projects = () => {
   );
 };
 
-export default Projects;
+export default Boards;

@@ -5,11 +5,11 @@ import type {
 } from "@/components/custom-fields/types";
 
 /**
- * Column model for the project list view: a flat, ordered descriptor list
+ * Column model for the board list view: a flat, ordered descriptor list
  * (built-in columns + one per custom-field definition) plus the per-kind
  * sort comparators and filter predicates the column header dropdowns drive.
- * State (sort + filters, and later column order) is persisted per-project,
- * per-browser by `useProjectListView`.
+ * State (sort + filters, and later column order) is persisted per-board,
+ * per-browser by `useBoardListView`.
  */
 
 /** A task as the list view sees it — only the bits these helpers read. */
@@ -105,7 +105,7 @@ const SORTABLE_KIND: Record<CustomFieldKind, boolean> = {
 };
 
 /**
- * Build the ordered column list from the project's custom-field
+ * Build the ordered column list from the board's custom-field
  * definitions. Built-ins lead in their canonical order; custom fields
  * follow in definition order (the caller can re-sequence the result).
  */

@@ -29,7 +29,7 @@ interface ClientRow {
   name: string;
   currency?: string | null;
 }
-interface ProjectRow {
+interface BoardRow {
   "@id": string;
   id: string;
   title: string;
@@ -70,7 +70,7 @@ const BillingProjectsPage = () => {
   const spaceIri = activeSpace?.["@id"] ?? null;
   const [projects, setProjects] = useState<BillingProject[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
-  const [taskProjects, setTaskProjects] = useState<ProjectRow[]>([]);
+  const [taskBoards, setTaskBoards] = useState<BoardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -100,11 +100,11 @@ const BillingProjectsPage = () => {
       const [bps, cls, prj] = await Promise.all([
         apiGetCollection<BillingProject>(`/billing_projects${q}`),
         apiGetCollection<ClientRow>(`/clients${q}`),
-        apiGetCollection<ProjectRow>(`/projects${q}`),
+        apiGetCollection<BoardRow>(`/boards${q}`),
       ]);
       setProjects(bps);
       setClients(cls);
-      setTaskProjects(prj);
+      setTaskBoards(prj);
     } catch (e) {
       setLoadError(
         e instanceof ApiError && e.status === 403
@@ -141,7 +141,7 @@ const BillingProjectsPage = () => {
         ? bp.categories.map((c) => ({ name: c.name, rate: toMajor(c.rateAmount) }))
         : [{ name: "", rate: "" }],
     );
-    setAssigned(bp.assignedProjectList.map((p) => `/projects/${p.id}`));
+    setAssigned(bp.assignedProjectList.map((p) => `/boards/${p.id}`));
     setFormError(null);
     setOpen(true);
   };
@@ -170,7 +170,7 @@ const BillingProjectsPage = () => {
         : await apiSend<BillingProject>("POST", "/billing_projects", { body: payload });
       const bpIri = saved?.["@id"] ?? editing?.["@id"];
       if (bpIri) {
-        await apiSend("PUT", `${bpIri}/projects`, { body: { projects: assigned } });
+        await apiSend("PUT", `${bpIri}/boards`, { body: { boards: assigned } });
       }
       setOpen(false);
       await load();
@@ -396,11 +396,11 @@ const BillingProjectsPage = () => {
               </Button>
             </div>
 
-            {taskProjects.length > 0 && (
+            {taskBoards.length > 0 && (
               <div className="space-y-2">
-                <Label>Assigned task projects</Label>
+                <Label>Assigned boards</Label>
                 <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border p-2">
-                  {taskProjects.map((p) => {
+                  {taskBoards.map((p) => {
                     const checked = assigned.includes(p["@id"]);
                     return (
                       <label key={p["@id"]} className="flex items-center gap-2 text-sm">
