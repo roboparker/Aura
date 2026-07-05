@@ -8,7 +8,7 @@ use App\Security\Permission\SpacePermission;
 /**
  * Scopes Discussion queries to spaces the current user belongs to (#185).
  * Uses the denormalised `discussion.space` FK so we don't have to join
- * through `discussion.project`. See {@see AbstractSpaceAccessExtension} for
+ * through `discussion.board`. See {@see AbstractSpaceAccessExtension} for
  * the shared direct-or-via-group membership predicate.
  */
 final class DiscussionAccessExtension extends AbstractSpaceAccessExtension

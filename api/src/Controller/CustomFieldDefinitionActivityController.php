@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use App\Service\ActivityFeedQuery;
 use Doctrine\ORM\EntityManagerInterface;
@@ -18,17 +18,17 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Project-level change log for the custom-fields schema:
- * `GET /projects/{id}/custom_field_definitions/activity`. Merges the
- * Gedmo audit history of every custom field definition in the project,
+ * Board-level change log for the custom-fields schema:
+ * `GET /boards/{id}/custom_field_definitions/activity`. Merges the
+ * Gedmo audit history of every custom field definition in the board,
  * newest-first, reusing {@see ActivityFeedQuery} so the shape matches the
- * task/project feeds (rows + actor map).
+ * task/board feeds (rows + actor map).
  *
  * Fields that have since been deleted stay in the log: their rows outlive
  * the entity (the audit table has no FK to it), and we recover their object
- * ids from the versioned `project` stamped on each create/update entry — so a
+ * ids from the versioned `board` stamped on each create/update entry — so a
  * deleted field's history, ending in its `remove` event, remains visible.
- * Access mirrors the project surface: any space member; 404 otherwise.
+ * Access mirrors the board surface: any space member; 404 otherwise.
  */
 class CustomFieldDefinitionActivityController extends AbstractController
 {
@@ -39,8 +39,8 @@ class CustomFieldDefinitionActivityController extends AbstractController
     }
 
     #[Route(
-        '/projects/{id}/custom_field_definitions/activity',
-        name: 'project_custom_field_definitions_activity',
+        '/boards/{id}/custom_field_definitions/activity',
+        name: 'board_custom_field_definitions_activity',
         methods: ['GET'],
     )]
     public function __invoke(string $id, Request $request, #[CurrentUser] ?User $user): Response
@@ -52,14 +52,14 @@ class CustomFieldDefinitionActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $project = $this->em->getRepository(Project::class)->find($id);
-        if (null === $project || !$this->canRead($project, $user)) {
+        $board = $this->em->getRepository(Board::class)->find($id);
+        if (null === $board || !$this->canRead($board, $user)) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
         // Fields are space-owned now; the change log covers the space's fields.
         $definitions = $this->em->getRepository(CustomFieldDefinition::class)
-            ->findBy(['space' => $project->getSpace()]);
+            ->findBy(['space' => $board->getSpace()]);
         $currentIds = array_map(
             static fn (CustomFieldDefinition $d): string => (string) $d->getId(),
             $definitions,
@@ -68,7 +68,7 @@ class CustomFieldDefinitionActivityController extends AbstractController
         // Union current ids with the ids of fields that were deleted from this
         // space (recovered from the audit log via the versioned `space`).
         $objectIds = array_values(array_unique(
-            [...$currentIds, ...$this->deletedDefinitionIds($project)],
+            [...$currentIds, ...$this->deletedDefinitionIds($board)],
         ));
 
         return new JsonResponse(
@@ -78,14 +78,14 @@ class CustomFieldDefinitionActivityController extends AbstractController
 
     /**
      * Object ids of custom field definitions that once belonged to this
-     * project's space but no longer exist — read from the audit log's
+     * board's space but no longer exist — read from the audit log's
      * versioned `space`.
      *
      * @return list<string>
      */
-    private function deletedDefinitionIds(Project $project): array
+    private function deletedDefinitionIds(Board $board): array
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         if (null === $space) {
             return [];
         }
@@ -106,11 +106,11 @@ class CustomFieldDefinitionActivityController extends AbstractController
         ));
     }
 
-    private function canRead(Project $project, User $user): bool
+    private function canRead(Board $board, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        return $project->isAccessibleBy($user);
+        return $board->isAccessibleBy($user);
     }
 }

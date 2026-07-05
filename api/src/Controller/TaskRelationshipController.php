@@ -18,7 +18,7 @@ use Symfony\Component\Uid\Uuid;
  * `GET /tasks/{id}/relationships` — every relationship touching the task, on
  * either side, flattened into the task's own point of view: each row carries
  * the direction-aware label and a summary of the *other* task. Access mirrors
- * the Task GET expression (admin / owner / project-space member); 404 for
+ * the Task GET expression (admin / owner / board-space member); 404 for
  * unreachable ids, matching the rest of the API.
  */
 class TaskRelationshipController extends AbstractController

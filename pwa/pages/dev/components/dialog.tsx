@@ -21,13 +21,13 @@ const DialogPage = () => (
         title: "Confirm action",
         code: `<Dialog>
   <DialogTrigger asChild>
-    <Button variant="outline">Delete project</Button>
+    <Button variant="outline">Delete board</Button>
   </DialogTrigger>
   <DialogContent>
     <DialogHeader>
-      <DialogTitle>Delete this project?</DialogTitle>
+      <DialogTitle>Delete this board?</DialogTitle>
       <DialogDescription>
-        This permanently removes the project and all its tasks.
+        This permanently removes the board and all its tasks.
       </DialogDescription>
     </DialogHeader>
     <DialogFooter>
@@ -41,13 +41,13 @@ const DialogPage = () => (
         preview: (
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="outline">Delete project</Button>
+              <Button variant="outline">Delete board</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Delete this project?</DialogTitle>
+                <DialogTitle>Delete this board?</DialogTitle>
                 <DialogDescription>
-                  This permanently removes the project and all its tasks.
+                  This permanently removes the board and all its tasks.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

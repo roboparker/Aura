@@ -16,7 +16,7 @@ final class ReferenceValueConverter implements CustomFieldTypeConverterInterface
     private const PREFIXES = [
         'user' => '/users/',
         'task' => '/tasks/',
-        'project' => '/projects/',
+        'board' => '/boards/',
         'page' => '/pages/',
         'discussion' => '/discussions/',
     ];

@@ -44,7 +44,7 @@ const Privacy = () => (
               </li>
               <li>
                 <strong className="text-foreground">Content you create.</strong>{" "}
-                Tasks, projects, pages, discussions, comments, attachments,
+                Tasks, boards, pages, discussions, comments, attachments,
                 tags, and other content you submit to the Service.
               </li>
               <li>
@@ -170,7 +170,7 @@ const Privacy = () => (
             <h2 className="text-xl font-semibold mb-2">10. Contact</h2>
             <p className="text-muted-foreground">
               Questions about this policy or your data? Reach out via the
-              project&apos;s{" "}
+              board&apos;s{" "}
               <Link
                 href="https://github.com/roboparker/Aura"
                 target="_blank"

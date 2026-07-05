@@ -23,7 +23,7 @@ const PAGE_PATHS: Record<LandingPage, string> = {
   tasks: "/tasks",
   notifications: "/notifications",
   spaces: "/spaces",
-  space: "/projects",
+  space: "/boards",
 };
 
 /** Short labels for the Settings "Start page" control. */

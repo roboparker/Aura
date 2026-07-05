@@ -237,10 +237,10 @@ const HeroAppMock = () => (
     </div>
 
     <div className="flex h-[332px] bg-card">
-      {/* projects + pages sidebar */}
+      {/* boards + pages sidebar */}
       <div className="hidden w-[168px] shrink-0 overflow-hidden border-r bg-background px-2.5 py-3 sm:block">
         <div className="px-1 pb-1.5 text-[9.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Projects
+          Boards
         </div>
         <div className="mb-3.5 flex flex-col gap-px">
           {HERO_PROJECTS.map((p) => (
@@ -413,7 +413,7 @@ const SpaceShowcaseMock = () => (
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2.5">
-        <SpaceTile icon={Boxes} label="Projects" count={2}>
+        <SpaceTile icon={Boxes} label="Boards" count={2}>
           <TileLine>
             <span className="h-1.5 w-1.5 shrink-0 rounded-[2px] bg-primary" />
             Identity system v2
@@ -505,7 +505,7 @@ const STRIP: { icon: LucideIcon; label: string }[] = [
 const SPACE_BULLETS = [
   {
     b: "One Space, four surfaces.",
-    t: "Projects, tasks, pages, and discussions all live together — not scattered across five disconnected tools.",
+    t: "Boards, tasks, pages, and discussions all live together — not scattered across five disconnected tools.",
   },
   {
     b: "Invite once, see everything.",
@@ -526,7 +526,7 @@ const STEPS = [
   {
     n: "02",
     title: "Invite your team to a Space",
-    desc: "Add people or a group once — they see every project, page, and discussion inside.",
+    desc: "Add people or a group once — they see every board, page, and discussion inside.",
   },
   {
     n: "03",
@@ -554,7 +554,7 @@ const Home = () => {
         <title>Madori — one calm place for your team&apos;s work</title>
         <meta
           name="description"
-          content="Madori organizes tasks, projects, long-form docs, and discussions into shared Spaces. A calm, collaborative workspace for small teams — no bloat, no busywork."
+          content="Madori organizes tasks, boards, long-form docs, and discussions into shared Spaces. A calm, collaborative workspace for small teams — no bloat, no busywork."
         />
       </Head>
 
@@ -597,7 +597,7 @@ const Home = () => {
                 <span className="text-primary">calm</span> place.
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-                Tasks, projects, long-form docs, and discussions — organized
+                Tasks, boards, long-form docs, and discussions — organized
                 into shared Spaces. No bloat, no busywork. Just the work, and the
                 people doing it.
               </p>
@@ -677,7 +677,7 @@ const Home = () => {
                 </h2>
                 <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
                   A Space is a shared home for a team or an effort. It holds the
-                  projects, tasks, pages, and discussions that belong together.
+                  boards, tasks, pages, and discussions that belong together.
                 </p>
                 <div className="mt-6 flex flex-col gap-3.5">
                   {SPACE_BULLETS.map((x) => (
@@ -775,8 +775,8 @@ const Home = () => {
               <div className="mt-7 flex justify-center">
                 {isAuthenticated ? (
                   <Button asChild size="lg" className={GLOW}>
-                    <Link href="/projects">
-                      Open your projects <ArrowRight className="h-4 w-4" />
+                    <Link href="/boards">
+                      Open your boards <ArrowRight className="h-4 w-4" />
                     </Link>
                   </Button>
                 ) : (

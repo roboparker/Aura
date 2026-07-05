@@ -216,7 +216,7 @@ const PageRow = ({
         paddingLeft: depth * INDENT,
       }}
       className={cn(
-        "group/pagerow flex items-center rounded-md",
+        "group/pagerow relative flex items-center rounded-md",
         active && "bg-accent text-accent-foreground",
         isDragging && "opacity-60",
       )}
@@ -237,10 +237,12 @@ const PageRow = ({
         <span className="w-[1.375rem] shrink-0" aria-hidden />
       )}
 
+      {/* Drag handle overlays the right edge on hover so it doesn't indent the
+          row text (which should line up with the other nav sections). */}
       <button
         type="button"
         aria-label={`Reorder ${item.title}`}
-        className="shrink-0 cursor-grab rounded p-0.5 text-muted-foreground/50 opacity-0 hover:text-foreground group-hover/pagerow:opacity-100"
+        className="absolute right-1 top-1/2 z-10 -translate-y-1/2 cursor-grab rounded bg-accent p-0.5 text-muted-foreground/60 opacity-0 hover:text-foreground group-hover/pagerow:opacity-100"
         {...attributes}
         {...listeners}
       >

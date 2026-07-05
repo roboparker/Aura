@@ -24,7 +24,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * The public `/media/...` files served by Caddy are unauthenticated — the
  * UUID-prefixed filename makes URL guessing impractical, but we don't want
- * task attachments (legal docs, financial PDFs, project files) to rely on
+ * task attachments (legal docs, financial PDFs, board files) to rely on
  * obscurity. This endpoint streams the bytes only after re-checking that the
  * caller is allowed to see at least one task that uses the MediaObject, or
  * that they uploaded it themselves.
@@ -140,7 +140,7 @@ class MediaObjectDownloadController extends AbstractController
     private function mediaIsAttachedToReadableTask(MediaObject $media, User $user): bool
     {
         // A task is readable to a non-admin user when they own it OR
-        // they're a member of its project's space (#185). EXISTS
+        // they're a member of its board's space (#185). EXISTS
         // subqueries cover both direct membership and group-inherited
         // membership; same shape as TaskOwnerExtension.
         $directSubquery = sprintf(
@@ -154,7 +154,7 @@ class MediaObjectDownloadController extends AbstractController
         $count = (int) $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->select('COUNT(t.id)')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->where(':media MEMBER OF t.attachments')
             ->andWhere(sprintf('(t.owner = :user OR EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
             ->setParameter('media', $media)

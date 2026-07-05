@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,23 +28,23 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $this->entityManager = $em;
 
         // Order matters: values FK to task + definition; definitions FK
-        // to project. Clear from leaves to roots.
+        // to board. Clear from leaves to roots.
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testMemberCanCreateTaskWithCustomFieldValues(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $severity = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $board = $this->createProject($alice, 'Backend');
+        $severity = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
         $priority = $this->seedField(
-            $project,
+            $board,
             'Priority',
             CustomFieldDefinition::TYPE_DROPDOWN,
             ['Low', 'Medium', 'High'],
@@ -55,7 +55,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Investigate outage',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $severity->getId(), 'value' => 'critical'],
                     ['definition' => '/custom_field_definitions/' . $priority->getId(), 'value' => 'High'],
@@ -88,15 +88,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testNumberFieldRejectsNonNumeric(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $count = $this->seedField($project, 'Count', CustomFieldDefinition::TYPE_NUMBER);
+        $board = $this->createProject($alice, 'Backend');
+        $count = $this->seedField($board, 'Count', CustomFieldDefinition::TYPE_NUMBER);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $count->getId(), 'value' => 'twelve'],
                 ],
@@ -115,15 +115,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testValidationViolationUsesCustomFieldValuesPropertyPath(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $count = $this->seedField($project, 'Count', CustomFieldDefinition::TYPE_NUMBER);
+        $board = $this->createProject($alice, 'Backend');
+        $count = $this->seedField($board, 'Count', CustomFieldDefinition::TYPE_NUMBER);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $count->getId(), 'value' => 'twelve'],
                 ],
@@ -147,15 +147,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testNumberFieldAcceptsIntegerAndFloat(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $count = $this->seedField($project, 'Count', CustomFieldDefinition::TYPE_NUMBER);
+        $board = $this->createProject($alice, 'Backend');
+        $count = $this->seedField($board, 'Count', CustomFieldDefinition::TYPE_NUMBER);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'A',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $count->getId(), 'value' => 12],
                 ],
@@ -167,7 +167,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'B',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $count->getId(), 'value' => 1.5],
                 ],
@@ -180,15 +180,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testCheckboxFieldRejectsNonBool(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $flag = $this->seedField($project, 'Done', CustomFieldDefinition::TYPE_CHECKBOX);
+        $board = $this->createProject($alice, 'Backend');
+        $flag = $this->seedField($board, 'Done', CustomFieldDefinition::TYPE_CHECKBOX);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $flag->getId(), 'value' => 'yes'],
                 ],
@@ -201,15 +201,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testDateFieldRequiresIsoFormat(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $when = $this->seedField($project, 'Sprint Date', CustomFieldDefinition::TYPE_DATE);
+        $board = $this->createProject($alice, 'Backend');
+        $when = $this->seedField($board, 'Sprint Date', CustomFieldDefinition::TYPE_DATE);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $when->getId(), 'value' => '12-04-2026'],
                 ],
@@ -221,7 +221,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'OK task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $when->getId(), 'value' => '2026-04-12'],
                 ],
@@ -234,9 +234,9 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testDropdownRejectsValueOutsideOptions(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $priority = $this->seedField(
-            $project,
+            $board,
             'Priority',
             CustomFieldDefinition::TYPE_DROPDOWN,
             ['Low', 'High'],
@@ -247,7 +247,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $priority->getId(), 'value' => 'Catastrophic'],
                 ],
@@ -260,8 +260,8 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testRequiredFieldEnforcedOnTaskCreate(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $required = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $board = $this->createProject($alice, 'Backend');
+        $required = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
         $required->setRequired(true);
         $this->entityManager->flush();
 
@@ -270,7 +270,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'No severity',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -280,12 +280,12 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testRequiredFieldNotEnforcedOnPersonalTaskWithoutProject(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $required = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $board = $this->createProject($alice, 'Backend');
+        $required = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
         $required->setRequired(true);
         $this->entityManager->flush();
 
-        // A task with no project belongs to no field schema, so the
+        // A task with no board belongs to no field schema, so the
         // required-ness rule on Severity doesn't apply.
         $client = static::createClient();
         $client->loginUser($alice);
@@ -308,7 +308,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Task in A',
-                'project' => '/projects/' . $a->getId(),
+                'board' => '/boards/' . $a->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $foreignField->getId(), 'value' => 'oops'],
                 ],
@@ -321,15 +321,15 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testDuplicateDefinitionRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Some task',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => 'low'],
                     ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => 'high'],
@@ -343,10 +343,10 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testPatchReplacesValuesAndOrphansRemove(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $severity = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
-        $count = $this->seedField($project, 'Count', CustomFieldDefinition::TYPE_NUMBER);
-        $task = $this->createTask($alice, $project, 'Outage');
+        $board = $this->createProject($alice, 'Backend');
+        $severity = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $count = $this->seedField($board, 'Count', CustomFieldDefinition::TYPE_NUMBER);
+        $task = $this->createTask($alice, $board, 'Outage');
         $this->seedValue($task, $severity, 'high');
         $this->seedValue($task, $count, 5);
 
@@ -378,9 +378,9 @@ class TaskCustomFieldValueTest extends ApiTestCase
     public function testDeletingDefinitionCascadesValues(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $severity = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
-        $task = $this->createTask($alice, $project, 'Outage');
+        $board = $this->createProject($alice, 'Backend');
+        $severity = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $task = $this->createTask($alice, $board, 'Outage');
         $this->seedValue($task, $severity, 'high');
 
         $client = static::createClient();
@@ -397,9 +397,9 @@ class TaskCustomFieldValueTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', CustomFieldDefinition::TYPE_TEXT);
-        $task = $this->createTask($alice, $project, 'Private task');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', CustomFieldDefinition::TYPE_TEXT);
+        $task = $this->createTask($alice, $board, 'Private task');
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -411,7 +411,7 @@ class TaskCustomFieldValueTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
-        // TaskOwnerExtension scopes the lookup to {owner ∪ project members},
+        // TaskOwnerExtension scopes the lookup to {owner ∪ board members},
         // so strangers see 404 (matches every other per-task endpoint) rather
         // than the bare 403 that operation-level security would otherwise emit.
         $this->assertResponseStatusCodeSame(404);
@@ -421,13 +421,13 @@ class TaskCustomFieldValueTest extends ApiTestCase
      * @param array<int, string>|null $options
      */
     private function seedField(
-        Project $project,
+        Board $board,
         string $name,
         string $type,
         ?array $options = null,
     ): CustomFieldDefinition {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType($type);
         if (null !== $options) {
@@ -449,22 +449,22 @@ class TaskCustomFieldValueTest extends ApiTestCase
         return $cfv;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();

@@ -128,7 +128,7 @@ class SpaceTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        // Existence-hiding 404, mirroring the project/group pattern.
+        // Existence-hiding 404, mirroring the board/group pattern.
         $client->request('GET', '/spaces/' . $alicePersonal->getId());
 
         $this->assertResponseStatusCodeSame(404);

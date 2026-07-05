@@ -9,7 +9,7 @@ use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Discussion;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\SpaceRole;
@@ -21,7 +21,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * End-to-end coverage for the MCP server (#92): protocol handshake,
  * Bearer auth, and a representative tool call from each surface
- * (task / project / assignment / comment).
+ * (task / board / assignment / comment).
  *
  * Test fixtures must be persisted *before* the first call to
  * {@see static::createClient()} — that boots the test kernel and any
@@ -49,7 +49,7 @@ class McpTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\UserGroupMembership')->execute();
@@ -222,8 +222,8 @@ class McpTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->makeProject($alice, [$alice, $bob], 'Team');
-        $task = $this->makeTaskInProject($alice, $project, 'Joint work');
+        $board = $this->makeProject($alice, [$alice, $bob], 'Team');
+        $task = $this->makeTaskInProject($alice, $board, 'Joint work');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
@@ -321,7 +321,7 @@ class McpTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         // Provision Alice's personal space the way the app does on signup
-        // — persisting a project triggers ProjectSpaceDefaultListener.
+        // — persisting a board triggers BoardSpaceDefaultListener.
         $this->makeProject($alice, [$alice], 'Seed');
         $plain = $this->mintToken($alice, 'CLI');
 
@@ -415,7 +415,7 @@ class McpTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         // Provision Alice's personal space (create_tag defaults to it) the way
-        // the app does on signup — persisting a project triggers the listener.
+        // the app does on signup — persisting a board triggers the listener.
         $this->makeProject($alice, [$alice], 'Seed');
         $plain = $this->mintToken($alice, 'CLI');
 
@@ -444,9 +444,9 @@ class McpTest extends ApiTestCase
     public function testUpdateTaskSetsCustomFieldValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->makeProject($alice, [$alice], 'Fielded');
-        $field = $this->makeCustomFieldDefinition($project, 'Notes', 'text');
-        $task = $this->makeTaskInProject($alice, $project, 'With fields');
+        $board = $this->makeProject($alice, [$alice], 'Fielded');
+        $field = $this->makeCustomFieldDefinition($board, 'Notes', 'text');
+        $task = $this->makeTaskInProject($alice, $board, 'With fields');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
@@ -784,11 +784,11 @@ class McpTest extends ApiTestCase
         return $discussion;
     }
 
-    private function makeTaskInProject(User $owner, Project $project, string $title): Task
+    private function makeTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -798,17 +798,17 @@ class McpTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function makeProject(User $owner, array $members, string $title): Project
+    private function makeProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     /**
@@ -829,10 +829,10 @@ class McpTest extends ApiTestCase
         return $space;
     }
 
-    private function makeCustomFieldDefinition(Project $project, string $name, string $type): CustomFieldDefinition
+    private function makeCustomFieldDefinition(Board $board, string $name, string $type): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType($type);
         $this->entityManager->persist($field);

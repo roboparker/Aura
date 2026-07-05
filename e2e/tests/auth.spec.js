@@ -66,8 +66,8 @@ test.describe("Authentication", () => {
     await page.click('button[type="submit"]');
 
     // A fresh sign-in with no redirect lands on the workspace home
-    // (/projects) with the user's Private space active (#405).
-    await expect(page).toHaveURL(/\/projects/);
+    // (/boards) with the user's Private space active (#405).
+    await expect(page).toHaveURL(/\/boards/);
 
     // Confirm we're signed in as the right account. The email appears in
     // two places (sidebar header + profile identity form), so open the
@@ -95,7 +95,7 @@ test.describe("Authentication", () => {
     await page.click('button[type="submit"]');
 
     // Fresh sign-in lands on the workspace home (#405).
-    await expect(page).toHaveURL(/\/projects/);
+    await expect(page).toHaveURL(/\/boards/);
 
     // Navigate to the admin users page
     await page.goto(`${BASE_URL}/admin/users`);

@@ -77,7 +77,7 @@ export type ImpersonationLevel = "none" | "view" | "edit";
 
 export type ImpersonationCategory =
   | "tasks"
-  | "projects"
+  | "boards"
   | "pages"
   | "discussions"
   | "comments"
@@ -85,7 +85,7 @@ export type ImpersonationCategory =
   | "files";
 
 export type ImpersonationItemType =
-  | "project"
+  | "board"
   | "page"
   | "task"
   | "discussion";

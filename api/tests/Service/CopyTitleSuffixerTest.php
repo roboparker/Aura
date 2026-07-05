@@ -11,12 +11,12 @@ class CopyTitleSuffixerTest extends TestCase
 {
     public function testAppendsSuffix(): void
     {
-        $this->assertSame('My project (copy)', CopyTitleSuffixer::apply('My project', 255));
+        $this->assertSame('My board (copy)', CopyTitleSuffixer::apply('My board', 255));
     }
 
     public function testIsIdempotent(): void
     {
-        $once = CopyTitleSuffixer::apply('My project', 255);
+        $once = CopyTitleSuffixer::apply('My board', 255);
         $this->assertSame($once, CopyTitleSuffixer::apply($once, 255));
     }
 

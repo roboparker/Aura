@@ -1,11 +1,11 @@
-/** Wire shapes + helpers for `/time_entries` (#444). */
+/** Wire shapes + helpers for `/time_entries` (Harvest model). */
 
 export interface TimeEntry {
   "@id": string;
   id: string;
   space: string;
-  project: string | null;
-  task: string | null;
+  engagement: string | null;
+  category: string | null;
   user: string;
   description: string | null;
   startedAt: string;
@@ -22,6 +22,26 @@ export interface TimeEntry {
 export interface TimeEntryCollection {
   member?: TimeEntry[];
   "hydra:member"?: TimeEntry[];
+}
+
+/** A category as returned by the engagement picker. */
+export interface CategoryOption {
+  "@id": string;
+  id: string;
+  name: string;
+  rateAmount: number;
+}
+
+/**
+ * A engagement + its categories from `GET /spaces/{id}/engagement-options`
+ * — the minimal member-facing picker for time tracking (no invoices-gated read).
+ */
+export interface EngagementOption {
+  "@id": string;
+  id: string;
+  name: string;
+  currency: string | null;
+  categories: CategoryOption[];
 }
 
 /** A running timer has no end time yet. */

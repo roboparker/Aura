@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\GlobalCustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,7 +15,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * Task values pointing at an instance-wide global custom field
  * (#global-custom-fields) — the polymorphic `CustomFieldValue.globalDefinition`
- * arm and its per-project opt-in enforcement.
+ * arm and its per-board opt-in enforcement.
  */
 class GlobalCustomFieldValueTest extends ApiTestCase
 {
@@ -32,12 +32,12 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\ProjectFieldVisibility')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\BoardFieldVisibility')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\GlobalCustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -45,16 +45,16 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testSetGlobalValueOnAttachedProject(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
-        $this->attachGlobal($project, $effort);
+        $this->attachGlobal($board, $effort);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Estimate',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['globalDefinition' => '/global_custom_field_definitions/' . $effort->getId(), 'value' => 5],
                 ],
@@ -79,8 +79,8 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testGlobalValueRejectedWhenNotAttached(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        // Global exists but the project has NOT opted into it.
+        $board = $this->createProject($alice, 'Backend');
+        // Global exists but the board has NOT opted into it.
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
 
         $client = static::createClient();
@@ -88,7 +88,7 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Estimate',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     ['globalDefinition' => '/global_custom_field_definitions/' . $effort->getId(), 'value' => 5],
                 ],
@@ -101,17 +101,17 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testBothSourcesOnOneValueRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceField = $this->seedSpaceField($project, 'Severity');
+        $board = $this->createProject($alice, 'Backend');
+        $spaceField = $this->seedSpaceField($board, 'Severity');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
-        $this->attachGlobal($project, $effort);
+        $this->attachGlobal($board, $effort);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Confused',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'customFieldValues' => [
                     [
                         'definition' => '/custom_field_definitions/' . $spaceField->getId(),
@@ -128,18 +128,18 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testRequiredGlobalEnforcedOnCreate(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
         $effort->setNullable(false);
         $this->entityManager->flush();
-        $this->attachGlobal($project, $effort);
+        $this->attachGlobal($board, $effort);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'No effort',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -149,10 +149,10 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testPatchReplacesGlobalValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
-        $this->attachGlobal($project, $effort);
-        $task = $this->createTask($alice, $project, 'Estimate');
+        $this->attachGlobal($board, $effort);
+        $task = $this->createTask($alice, $board, 'Estimate');
         $this->seedGlobalValue($task, $effort, 3);
 
         $client = static::createClient();
@@ -179,20 +179,20 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testFooterAggregatesGlobalField(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
         $effort->setFooter(['kind' => 'sum']);
         $this->entityManager->flush();
-        $this->attachGlobal($project, $effort);
+        $this->attachGlobal($board, $effort);
 
-        $t1 = $this->createTask($alice, $project, 'A');
-        $t2 = $this->createTask($alice, $project, 'B');
+        $t1 = $this->createTask($alice, $board, 'A');
+        $t2 = $this->createTask($alice, $board, 'B');
         $this->seedGlobalValue($t1, $effort, 3);
         $this->seedGlobalValue($t2, $effort, 5);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
 
         $body = $this->body($client);
@@ -208,15 +208,15 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testGlobalFieldAppearsInProjectStats(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
-        $this->attachGlobal($project, $effort);
-        $task = $this->createTask($alice, $project, 'A');
+        $this->attachGlobal($board, $effort);
+        $task = $this->createTask($alice, $board, 'A');
         $this->seedGlobalValue($task, $effort, 4);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_stats');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_stats');
         $this->assertResponseIsSuccessful();
 
         $body = $this->body($client);
@@ -234,15 +234,15 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testGlobalOptionStatsForAdmin(): void
     {
         $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
-        $project = $this->createProject($admin, 'Backend');
+        $board = $this->createProject($admin, 'Backend');
         $status = $this->seedGlobal('Status', 'select', 'single');
         $status->setConfig(['multi' => false, 'options' => [
             ['key' => 'a', 'label' => 'Alpha'],
             ['key' => 'b', 'label' => 'Beta'],
         ]]);
         $this->entityManager->flush();
-        $this->attachGlobal($project, $status);
-        $task = $this->createTask($admin, $project, 'T');
+        $this->attachGlobal($board, $status);
+        $task = $this->createTask($admin, $board, 'T');
         $this->seedGlobalValue($task, $status, 'a');
 
         $client = static::createClient();
@@ -276,15 +276,15 @@ class GlobalCustomFieldValueTest extends ApiTestCase
     public function testPerProjectVisibilityOverrideForGlobalField(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $effort = $this->seedGlobal('Effort', 'numeric', 'int');
-        $this->attachGlobal($project, $effort);
+        $this->attachGlobal($board, $effort);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request(
             'PUT',
-            '/projects/' . $project->getId() . '/global_custom_field_definitions/' . $effort->getId() . '/visibility',
+            '/boards/' . $board->getId() . '/global_custom_field_definitions/' . $effort->getId() . '/visibility',
             [
                 'json' => ['visibility' => 'board'],
                 'headers' => ['Content-Type' => 'application/json'],
@@ -292,10 +292,10 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         );
         $this->assertResponseIsSuccessful();
 
-        // A project-scoped read injects the per-project visibility override.
+        // A board-scoped read injects the per-board visibility override.
         $client->request(
             'GET',
-            '/global_custom_field_definitions?projects=' . urlencode('/projects/' . $project->getId()),
+            '/global_custom_field_definitions?boards=' . urlencode('/boards/' . $board->getId()),
             ['headers' => ['Accept' => 'application/ld+json']],
         );
         $this->assertResponseIsSuccessful();
@@ -312,9 +312,9 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         $this->assertSame('board', $visibility);
     }
 
-    private function attachGlobal(Project $project, GlobalCustomFieldDefinition $global): void
+    private function attachGlobal(Board $board, GlobalCustomFieldDefinition $global): void
     {
-        $project->addGlobalCustomFieldDefinition($global);
+        $board->addGlobalCustomFieldDefinition($global);
         $this->entityManager->flush();
     }
 
@@ -329,10 +329,10 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         return $field;
     }
 
-    private function seedSpaceField(Project $project, string $name): CustomFieldDefinition
+    private function seedSpaceField(Board $board, string $name): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType(CustomFieldDefinition::TYPE_TEXT);
         $this->entityManager->persist($field);
@@ -351,22 +351,22 @@ class GlobalCustomFieldValueTest extends ApiTestCase
         return $cfv;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();

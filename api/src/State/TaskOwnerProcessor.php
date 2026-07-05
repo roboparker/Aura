@@ -48,7 +48,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
         // member, so a new task with no assignees defaults to its creator —
         // saving the repetitive self-assign on a solo board. Shared spaces
         // keep starting unassigned so the team picks who owns the work.
-        $space = $data->getProject()?->getSpace();
+        $space = $data->getBoard()?->getSpace();
         if ($data->getAssignees()->isEmpty() && true === $space?->getIsPersonal()) {
             $data->addAssignee($user);
         }

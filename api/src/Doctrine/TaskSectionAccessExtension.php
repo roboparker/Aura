@@ -8,7 +8,7 @@ use App\Security\Permission\SpacePermission;
 /**
  * Scopes TaskSection queries to spaces the current user belongs to. Uses the
  * denormalised `space` FK so the shared direct-or-via-group membership
- * predicate works without joining through `project`. See
+ * predicate works without joining through `board`. See
  * {@see AbstractSpaceAccessExtension}.
  */
 final class TaskSectionAccessExtension extends AbstractSpaceAccessExtension
@@ -25,14 +25,14 @@ final class TaskSectionAccessExtension extends AbstractSpaceAccessExtension
 
     protected function getImpersonationItemType(): ?string
     {
-        // Sections follow their project's space + the 'projects' category
+        // Sections follow their board's space + the 'boards' category
         // default; they aren't individually addressable for per-item overrides.
         return null;
     }
 
     protected function getPermissionCategory(): string
     {
-        // Sections ride the projects category.
+        // Sections ride the boards category.
         return SpacePermission::PROJECTS;
     }
 }

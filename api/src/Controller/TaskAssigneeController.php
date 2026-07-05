@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Add/remove a single assignee on a task without rewriting the whole list.
- * Mirrors ProjectMemberController's "small targeted endpoint" pattern: the
+ * Mirrors BoardMemberController's "small targeted endpoint" pattern: the
  * standard PATCH /tasks/{id} can still take a full assignees array, but
  * these endpoints make per-row UI optimistic updates simpler.
  *
@@ -56,7 +56,7 @@ class TaskAssigneeController extends AbstractController
 
         if (!$this->isAllowedAssignee($task, $candidate)) {
             return $this->json(
-                ['error' => 'User must be the task owner or a member of its project.'],
+                ['error' => 'User must be the task owner or a member of its board.'],
                 422,
             );
         }
@@ -105,7 +105,7 @@ class TaskAssigneeController extends AbstractController
 
     /**
      * Returns the task only when the current user can edit it (admin, owner,
-     * or project member). Returns null otherwise so callers can respond 404
+     * or board member). Returns null otherwise so callers can respond 404
      * uniformly without leaking task existence.
      */
     private function findEditableTask(string $id, User $user): ?Task
@@ -128,8 +128,8 @@ class TaskAssigneeController extends AbstractController
 
     /**
      * Mirrors the ValidAssignees rule (#185): a task's owner is always
-     * assignable; for project tasks every member of the project's
-     * space is too. Personal tasks (no project) admit only the owner.
+     * assignable; for board tasks every member of the board's
+     * space is too. Personal tasks (no board) admit only the owner.
      */
     private function isAllowedAssignee(Task $task, User $candidate): bool
     {
@@ -137,9 +137,9 @@ class TaskAssigneeController extends AbstractController
         if (null !== $owner && true === $owner->getId()?->equals($candidate->getId())) {
             return true;
         }
-        $project = $task->getProject();
-        if ($project instanceof Project) {
-            return isset($project->getEffectiveMembers()[(string) $candidate->getId()]);
+        $board = $task->getBoard();
+        if ($board instanceof Board) {
+            return isset($board->getEffectiveMembers()[(string) $candidate->getId()]);
         }
         return false;
     }

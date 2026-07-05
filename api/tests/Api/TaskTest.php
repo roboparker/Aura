@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,7 +31,7 @@ class TaskTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -378,7 +378,7 @@ class TaskTest extends ApiTestCase
     /**
      * Completing a recurring task creates a fresh, incomplete task whose due
      * date is advanced per the rule. The original stays completed; tags,
-     * description, project, and assignees carry over.
+     * description, board, and assignees carry over.
      *
      * @dataProvider provideRecurrenceAdvanceCases
      */
@@ -878,29 +878,29 @@ class TaskTest extends ApiTestCase
 
     public function testReorderLetsProjectMemberReorderProjectTasks(): void
     {
-        // Project members can reorder tasks attached to the project even
+        // Board members can reorder tasks attached to the board even
         // when they don't own them — anyone who can add a task to the
-        // project can also reorder its tasks. Bob is the project owner
+        // board can also reorder its tasks. Bob is the board owner
         // and creates a task on it; Alice is a member who reorders.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
 
-        $project = new Project();
-        $project->setOwner($bob);
-        $project->setTitle('Shared');
-        $this->addProjectMember($project, $alice);
-        $this->addProjectMember($project, $bob);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($bob);
+        $board->setTitle('Shared');
+        $this->addBoardMember($board, $alice);
+        $this->addBoardMember($board, $bob);
+        $this->entityManager->persist($board);
 
         $shared1 = new Task();
         $shared1->setOwner($bob);
-        $shared1->setProject($project);
+        $shared1->setBoard($board);
         $shared1->setTitle('Shared 1');
         $this->entityManager->persist($shared1);
 
         $shared2 = new Task();
         $shared2->setOwner($bob);
-        $shared2->setProject($project);
+        $shared2->setBoard($board);
         $shared2->setTitle('Shared 2');
         $this->entityManager->persist($shared2);
 
@@ -934,7 +934,7 @@ class TaskTest extends ApiTestCase
     {
         // Reorder is permissive about extra IRIs in the input — Bob's task
         // is silently ignored so the frontend doesn't have to know which
-        // visible rows belong to the current user (admins, project members,
+        // visible rows belong to the current user (admins, board members,
         // etc. can see tasks they don't own). Bob's `position` must stay
         // exactly where it was.
         $alice = $this->createUser('alice@example.com');
@@ -1055,7 +1055,7 @@ class TaskTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
 
-        // Personal task (no project) — only owner can be assigned. Bob is rejected.
+        // Personal task (no board) — only owner can be assigned. Bob is rejected.
         $this->assertResponseStatusCodeSame(422);
     }
 
@@ -1063,8 +1063,8 @@ class TaskTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Team task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Team task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -1090,8 +1090,8 @@ class TaskTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Team task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Team task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -1107,14 +1107,14 @@ class TaskTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
 
-        $aliceOnly = $this->createTaskInProject($alice, $project, 'Alice only');
+        $aliceOnly = $this->createTaskInProject($alice, $board, 'Alice only');
         $aliceOnly->addAssignee($alice);
-        $bothAssigned = $this->createTaskInProject($alice, $project, 'Both assigned');
+        $bothAssigned = $this->createTaskInProject($alice, $board, 'Both assigned');
         $bothAssigned->addAssignee($alice);
         $bothAssigned->addAssignee($bob);
-        $unassigned = $this->createTaskInProject($alice, $project, 'Unassigned');
+        $unassigned = $this->createTaskInProject($alice, $board, 'Unassigned');
         $this->entityManager->flush();
         $this->entityManager->clear();
 
@@ -1138,8 +1138,8 @@ class TaskTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Team task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Team task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -1196,8 +1196,8 @@ class TaskTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Team task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Team task');
         $task->addAssignee($bob);
         $this->entityManager->flush();
 
@@ -1356,7 +1356,7 @@ class TaskTest extends ApiTestCase
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
         $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        // Carol shares no project with alice — must not appear.
+        // Carol shares no board with alice — must not appear.
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -1381,7 +1381,7 @@ class TaskTest extends ApiTestCase
      * Guards the cross-space information leak fixed alongside this test:
      * a user who is an effective member of a space the caller does NOT
      * belong to must never surface in the caller's assignable-users list.
-     * The old controller did a raw `Project::findAll()` (unscoped by the
+     * The old controller did a raw `Board::findAll()` (unscoped by the
      * access extension), so every effective member of every space in the
      * instance leaked through.
      */
@@ -1420,24 +1420,24 @@ class TaskTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function createSharedProject(User $owner, array $members, string $title): Project
+    private function createSharedProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    private function createTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -1478,28 +1478,28 @@ class TaskTest extends ApiTestCase
         return $task;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     /**
      * @param list<string>|null $options
      */
     private function createCustomFieldDefinition(
-        Project $project,
+        Board $board,
         string $name,
         string $type,
         ?array $options = null,
     ): CustomFieldDefinition {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType($type);
         if (null !== $options) {
@@ -1720,13 +1720,13 @@ class TaskTest extends ApiTestCase
     public function testSearchMatchesTextCustomFieldValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backlog');
-        $hit = $this->createTaskInProject($alice, $project, 'Triage');
-        $miss = $this->createTaskInProject($alice, $project, 'Buy groceries');
+        $board = $this->createProject($alice, 'Backlog');
+        $hit = $this->createTaskInProject($alice, $board, 'Triage');
+        $miss = $this->createTaskInProject($alice, $board, 'Buy groceries');
         $this->assertNotNull($miss->getId());
 
         $severity = $this->createCustomFieldDefinition(
-            $project,
+            $board,
             'Severity',
             CustomFieldDefinition::TYPE_TEXT,
         );
@@ -1751,12 +1751,12 @@ class TaskTest extends ApiTestCase
     public function testSearchMatchesDropdownCustomFieldValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backlog');
-        $hit = $this->createTaskInProject($alice, $project, 'Login redesign');
-        $this->createTaskInProject($alice, $project, 'Cleanup');
+        $board = $this->createProject($alice, 'Backlog');
+        $hit = $this->createTaskInProject($alice, $board, 'Login redesign');
+        $this->createTaskInProject($alice, $board, 'Cleanup');
 
         $stage = $this->createCustomFieldDefinition(
-            $project,
+            $board,
             'Stage',
             CustomFieldDefinition::TYPE_DROPDOWN,
             ['discovery', 'in-review', 'shipped'],

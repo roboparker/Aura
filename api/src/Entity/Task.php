@@ -50,8 +50,8 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            // A standalone task (no project) has no space → the voter allows it
-            // (it's the caller's own). A project task is gated by tasks.create.
+            // A standalone task (no board) has no space → the voter allows it
+            // (it's the caller's own). A board task is gated by tasks.create.
             securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or is_granted('space.tasks.create', object))",
             processor: TaskOwnerProcessor::class,
         ),
@@ -71,11 +71,11 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['task:write']],
     order: ['position' => 'ASC', 'createdOn' => 'DESC'],
 )]
-// `project.space` lets the space detail page list every task across
-// every project in a space without doing a fan-out fetch over each
-// project. Access scoping still goes through TaskOwnerExtension +
+// `board.space` lets the space detail page list every task across
+// every board in a space without doing a fan-out fetch over each
+// board. Access scoping still goes through TaskOwnerExtension +
 // SpaceMembershipDql so this can't widen what the caller can see.
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact', 'project.space' => 'exact', 'assignees' => 'exact', 'tags' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['board' => 'exact', 'board.space' => 'exact', 'assignees' => 'exact', 'tags' => 'exact'])]
 #[ApiFilter(DateFilter::class, properties: ['dueDate'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdOn', 'dueDate', 'title', 'completedOn'], arguments: ['orderParameterName' => 'order'])]
 #[ApiFilter(OverdueFilter::class)]
@@ -85,7 +85,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
-#[ORM\Index(columns: ['project_id'], name: 'idx_task_project')]
+#[ORM\Index(columns: ['board_id'], name: 'idx_task_project')]
 // GIN index over the FTS-only generated column. The `gin` flag is the
 // PostgreSQL DBAL platform's hook for emitting `USING GIN`. Declared
 // here (in addition to the migration) so doctrine:schema:validate
@@ -112,18 +112,18 @@ class Task
     private ?User $owner = null;
 
     /**
-     * Optional project the task belongs to. When set, every project member
+     * Optional board the task belongs to. When set, every board member
      * can read and edit the task alongside its owner. Personal tasks leave
      * this null.
      */
-    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'tasks')]
+    #[ORM\ManyToOne(targetEntity: Board::class, inversedBy: 'tasks')]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    // Versioned so the audit log records which project a task belonged to —
+    // Versioned so the audit log records which board a task belonged to —
     // the board's activity feed keys on this to keep a deleted task's history
     // (ending in its remove event) even after the row is gone.
     #[Gedmo\Versioned]
     #[Groups(['task:read', 'task:write'])]
-    private ?Project $project = null;
+    private ?Board $board = null;
 
     /**
      * Board section the task is grouped under. Null = the implicit default
@@ -244,10 +244,10 @@ class Task
     private Collection $tags;
 
     /**
-     * Users assigned to this task. Always a subset of {owner ∪ project members}
+     * Users assigned to this task. Always a subset of {owner ∪ board members}
      * — enforced by ValidAssignees on persist. Assignment is purely a "who's
      * responsible" label; it grants no extra read/edit privileges (those still
-     * follow owner + project membership).
+     * follow owner + board membership).
      *
      * @var Collection<int, User>
      */
@@ -275,7 +275,7 @@ class Task
     private Collection $attachments;
 
     /**
-     * Per-task values for the project's {@see CustomFieldDefinition}s
+     * Per-task values for the board's {@see CustomFieldDefinition}s
      * (#84). Mutated via the Task write group: clients PATCH a fresh
      * array of `{definition, value}` pairs and orphanRemoval reaps any
      * row whose definition isn't in the new payload. Type/required/scope
@@ -317,14 +317,14 @@ class Task
         return $this;
     }
 
-    public function getProject(): ?Project
+    public function getBoard(): ?Board
     {
-        return $this->project;
+        return $this->board;
     }
 
-    public function setProject(?Project $project): static
+    public function setBoard(?Board $board): static
     {
-        $this->project = $project;
+        $this->board = $board;
         return $this;
     }
 
@@ -342,7 +342,7 @@ class Task
     /**
      * Convenience for security expressions and controllers: a task is
      * readable/editable by its owner, or by any member of the parent
-     * project's space (#185). Standalone tasks (no project) are
+     * board's space (#185). Standalone tasks (no board) are
      * owner-only — there's no space to inherit from.
      */
     public function isAccessibleBy(?User $user): bool
@@ -353,7 +353,7 @@ class Task
         if (null !== $this->owner && $this->owner === $user) {
             return true;
         }
-        return null !== $this->project && $this->project->isAccessibleBy($user);
+        return null !== $this->board && $this->board->isAccessibleBy($user);
     }
 
     public function getTitle(): string

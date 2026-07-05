@@ -8,7 +8,7 @@ use App\CustomField\Footer\FooterAggregator;
 use App\Doctrine\SpaceMembershipDql;
 use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\GlobalCustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,8 +21,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * `GET /projects/{id}/custom_field_footers` — returns the aggregated
- * footer values for every CFD in the project that declared a
+ * `GET /boards/{id}/custom_field_footers` — returns the aggregated
+ * footer values for every CFD in the board that declared a
  * `footer.kind`. Each result row contains the definition IRI, the
  * aggregation kind, the optional client-supplied label, and the
  * computed value (shape per kind — number for numeric, ISO date
@@ -40,10 +40,10 @@ use Symfony\Component\Uid\Uuid;
  * task view, and overzealous param forwarding would let a client
  * pivot the footer endpoint into a leak of unrelated state.
  *
- * Access: caller must be a member of the project's space (matches
- * the `Project` Get security expression); non-members get 404 so the
+ * Access: caller must be a member of the board's space (matches
+ * the `Board` Get security expression); non-members get 404 so the
  * endpoint mirrors the existence-hiding shape of the rest of the
- * project surface.
+ * board surface.
  */
 class CustomFieldFooterController extends AbstractController
 {
@@ -54,8 +54,8 @@ class CustomFieldFooterController extends AbstractController
     }
 
     #[Route(
-        '/projects/{id}/custom_field_footers',
-        name: 'project_custom_field_footers',
+        '/boards/{id}/custom_field_footers',
+        name: 'board_custom_field_footers',
         methods: ['GET'],
     )]
     public function __invoke(string $id, Request $request, #[CurrentUser] ?User $user): Response
@@ -67,16 +67,16 @@ class CustomFieldFooterController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $project = $this->em->getRepository(Project::class)->find($id);
-        if (null === $project || !$this->canRead($project, $user)) {
+        $board = $this->em->getRepository(Board::class)->find($id);
+        if (null === $board || !$this->canRead($board, $user)) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        // The fields this project has opted into — space + global — in
-        // position order (a project's effective field set is the union).
+        // The fields this board has opted into — space + global — in
+        // position order (a board's effective field set is the union).
         $definitions = array_merge(
-            $project->getCustomFieldDefinitions()->toArray(),
-            $project->getGlobalCustomFieldDefinitions()->toArray(),
+            $board->getCustomFieldDefinitions()->toArray(),
+            $board->getGlobalCustomFieldDefinitions()->toArray(),
         );
         usort(
             $definitions,
@@ -94,7 +94,7 @@ class CustomFieldFooterController extends AbstractController
             return new JsonResponse(['footers' => []]);
         }
 
-        $taskIds = $this->scopedTaskIds($project, $user, $request);
+        $taskIds = $this->scopedTaskIds($board, $user, $request);
         $rows = $this->aggregator->aggregate($haveFooters, $taskIds);
 
         return new JsonResponse([
@@ -118,15 +118,15 @@ class CustomFieldFooterController extends AbstractController
     /**
      * @return list<string> UUIDs (rfc4122 strings) of the in-scope task set.
      */
-    private function scopedTaskIds(Project $project, User $user, Request $request): array
+    private function scopedTaskIds(Board $board, User $user, Request $request): array
     {
         $qb = $this->em->createQueryBuilder()
             ->select('t.id')
             ->from(Task::class, 't')
-            ->join('t.project', 'p')
-            ->where('p = :project')
+            ->join('t.board', 'p')
+            ->where('p = :board')
             ->andWhere(SpaceMembershipDql::userBelongsToProjectSpace('p'))
-            ->setParameter('project', $project)
+            ->setParameter('board', $board)
             ->setParameter('user', $user);
 
         $status = $request->query->get('status');
@@ -216,11 +216,11 @@ class CustomFieldFooterController extends AbstractController
         }
     }
 
-    private function canRead(Project $project, User $user): bool
+    private function canRead(Board $board, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        return $project->isAccessibleBy($user);
+        return $board->isAccessibleBy($user);
     }
 }

@@ -47,7 +47,7 @@ const NewTaskRow = ({
   const [description, setDescription] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
   const [dueDate, setDueDate] = useState<string | null>(null);
-  // Personal tasks (no project) only allow the owner. Restrict the picker to
+  // Personal tasks (no board) only allow the owner. Restrict the picker to
   // self so we don't surface teammates the validator would reject.
   const newTaskAssignableUsers = useMemo(
     () => assignableUsers.filter((u) => u["@id"] === currentUserIri),

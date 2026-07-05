@@ -10,7 +10,7 @@ use App\Entity\CustomFieldDefinitionInterface;
  * Strategy for a single (kind, subtype) custom-field type. Each concrete
  * implementation owns its config schema, value validation rules,
  * normalization, search-text projection, multi-value support, and which
- * aggregations the project footer can offer.
+ * aggregations the board footer can offer.
  *
  * Implementations are auto-tagged `app.custom_field_type` via
  * `_instanceof` in services.yaml and resolved by `kind.subtype` key

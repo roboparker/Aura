@@ -22,7 +22,7 @@ test.describe("Comment @-mentions", () => {
     const bobEmail = uniqueEmail();
 
     // Bob signs up first so the email/personal space exist when Alice
-    // adds him to a project.
+    // adds him to a board.
     const bobContext = await browser.newContext({ ignoreHTTPSErrors: true });
     const bobPage = await bobContext.newPage();
     await registerAndSignIn(bobPage, bobEmail);
@@ -31,31 +31,31 @@ test.describe("Comment @-mentions", () => {
     const alicePage = await aliceContext.newPage();
     await registerAndSignIn(alicePage, aliceEmail);
 
-    // Alice creates a project + invites Bob via the
-    // POST /projects/{id}/members shim that adds him to the parent
+    // Alice creates a board + invites Bob via the
+    // POST /boards/{id}/members shim that adds him to the parent
     // space (#185).
-    await alicePage.goto(`${BASE_URL}/projects`);
-    const projectTitle = `Mentions-${Date.now()}`;
-    // The create form lives behind the "New project" toggle; creating
-    // navigates straight to the new project's detail page.
-    await alicePage.getByTestId("new-project-button").click();
-    await alicePage.fill("#title", projectTitle);
+    await alicePage.goto(`${BASE_URL}/boards`);
+    const boardTitle = `Mentions-${Date.now()}`;
+    // The create form lives behind the "New board" toggle; creating
+    // navigates straight to the new board's detail page.
+    await alicePage.getByTestId("new-board-button").click();
+    await alicePage.fill("#title", boardTitle);
     await alicePage.click('button[type="submit"]');
-    await expect(alicePage).toHaveURL(/\/projects\/[a-f0-9-]+/);
+    await expect(alicePage).toHaveURL(/\/boards\/[a-f0-9-]+/);
 
-    // Add Bob to the space via the POST /projects/{id}/members shim.
-    const projectIdMatch = alicePage.url().match(/\/projects\/([a-f0-9-]+)/);
-    if (!projectIdMatch) throw new Error("Couldn't extract project ID from URL.");
-    const projectId = projectIdMatch[1];
+    // Add Bob to the space via the POST /boards/{id}/members shim.
+    const boardIdMatch = alicePage.url().match(/\/boards\/([a-f0-9-]+)/);
+    if (!boardIdMatch) throw new Error("Couldn't extract board ID from URL.");
+    const boardId = boardIdMatch[1];
     await alicePage.request.post(
-      `${BASE_URL}/projects/${projectId}/members`,
+      `${BASE_URL}/boards/${boardId}/members`,
       { data: { email: bobEmail } },
     );
 
-    // Now Alice creates a task **in the project** and posts a comment
-    // that mentions Bob. The task has to belong to the project for
+    // Now Alice creates a task **in the board** and posts a comment
+    // that mentions Bob. The task has to belong to the board for
     // TaskCommentMentionService to consider Bob a mentionable candidate
-    // (collectMentionableUsers = task owner + project's effective space
+    // (collectMentionableUsers = task owner + board's effective space
     // members). Inline-creating from `/tasks` makes a personal task,
     // which silently drops the mention because Bob isn't in scope.
     const taskTitle = `Plan launch ${Date.now()}`;
@@ -63,12 +63,12 @@ test.describe("Comment @-mentions", () => {
       headers: { "Content-Type": "application/ld+json" },
       data: {
         title: taskTitle,
-        project: `/projects/${projectId}`,
+        board: `/boards/${boardId}`,
       },
     });
     expect(taskCreate.ok(), "task POST should succeed").toBeTruthy();
 
-    // /tasks shows every task the user can see, so the project task
+    // /tasks shows every task the user can see, so the board task
     // will be in the list even though it wasn't created inline.
     await alicePage.goto(`${BASE_URL}/tasks`);
 

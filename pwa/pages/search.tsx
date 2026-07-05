@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 // ---- Types ----
 type Status = "" | "open" | "completed";
 type Sort = "relevance" | "recent";
-type Kind = "tasks" | "projects" | "discussions";
+type Kind = "tasks" | "boards" | "discussions";
 
 interface SearchMatch {
   source: string;
@@ -52,11 +52,11 @@ interface TaskHit {
   description: string | null;
   completedOn: string | null;
   dueDate: string | null;
-  project: string | null;
+  board: string | null;
   tags?: TagRef[];
   searchMatches?: SearchMatch[];
 }
-interface ProjectHit {
+interface BoardHit {
   "@id": string;
   id: string;
   title: string;
@@ -82,7 +82,7 @@ interface AssignableUser {
   familyName?: string | null;
   nickname?: string | null;
 }
-interface ProjectRef {
+interface BoardRef {
   "@id": string;
   id: string;
   title: string;
@@ -95,7 +95,7 @@ interface FilterState {
   overdue: boolean;
   dueFrom: string;
   dueTo: string;
-  project: string;
+  board: string;
   assignee: string;
   tags: string[];
   sort: Sort;
@@ -104,10 +104,10 @@ interface FilterState {
 }
 
 const PAGE_SIZE = 20;
-const KINDS: Kind[] = ["tasks", "projects", "discussions"];
+const KINDS: Kind[] = ["tasks", "boards", "discussions"];
 const KIND_LABEL: Record<Kind, string> = {
   tasks: "Tasks",
-  projects: "Projects",
+  boards: "Boards",
   discussions: "Discussions",
 };
 
@@ -137,7 +137,7 @@ const readFilters = (q: Record<string, unknown>): FilterState => {
       : [];
   return {
     q: asString(q.q),
-    kind: (["tasks", "projects", "discussions"] as readonly string[]).includes(kindRaw)
+    kind: (["tasks", "boards", "discussions"] as readonly string[]).includes(kindRaw)
       ? (kindRaw as Kind)
       : "tasks",
     status: (["open", "completed"] as readonly string[]).includes(asString(q.status))
@@ -146,7 +146,7 @@ const readFilters = (q: Record<string, unknown>): FilterState => {
     overdue: q.overdue === "true",
     dueFrom: asString(q.dueFrom),
     dueTo: asString(q.dueTo),
-    project: asString(q.project),
+    board: asString(q.board),
     assignee: asString(q.assignee),
     tags,
     sort: asString(q.sort) === "recent" ? "recent" : "relevance",
@@ -166,7 +166,7 @@ const writeFilters = (f: FilterState): Record<string, string | string[]> => {
     if (f.overdue) out.overdue = "true";
     if (f.dueFrom) out.dueFrom = f.dueFrom;
     if (f.dueTo) out.dueTo = f.dueTo;
-    if (f.project) out.project = f.project;
+    if (f.board) out.board = f.board;
     if (f.assignee) out.assignee = f.assignee;
     if (f.tags.length) out.tags = f.tags;
   }
@@ -175,9 +175,9 @@ const writeFilters = (f: FilterState): Record<string, string | string[]> => {
 
 /**
  * The space IRI to scope a given kind to, or null for global. Tasks are
- * owner-scoped and frequently standalone (no project → no space), so the
+ * owner-scoped and frequently standalone (no board → no space), so the
  * personal space never scopes tasks — that would hide every personal
- * task. Shared spaces scope tasks through `project.space`. Projects and
+ * task. Shared spaces scope tasks through `board.space`. Boards and
  * discussions are space-owned, so they scope to any active space.
  */
 const spaceFor = (kind: Kind, f: FilterState, activeSpace: Space | null): string | null => {
@@ -204,10 +204,10 @@ const buildUrl = (
     if (f.overdue) p.set("overdue", "true");
     if (f.dueFrom) p.set("dueDate[after]", f.dueFrom);
     if (f.dueTo) p.set("dueDate[before]", f.dueTo);
-    if (f.project) p.set("project", f.project);
+    if (f.board) p.set("board", f.board);
     if (f.assignee) p.set("assignees", f.assignee);
     f.tags.forEach((t) => p.append("tags[]", t));
-    if (space) p.set("project.space", space);
+    if (space) p.set("board.space", space);
     return `${ENTRYPOINT}/tasks?${p.toString()}`;
   }
   if (space) p.set("space", space);
@@ -221,7 +221,7 @@ const SearchPage = () => {
   const filters = useMemo<FilterState>(() => readFilters(router.query), [router.query]);
 
   const [tags, setTags] = useState<TagRef[]>([]);
-  const [projects, setProjects] = useState<ProjectRef[]>([]);
+  const [boards, setProjects] = useState<BoardRef[]>([]);
   const [assignables, setAssignables] = useState<AssignableUser[]>([]);
 
   useEffect(() => {
@@ -234,11 +234,11 @@ const SearchPage = () => {
     if (!isAuthenticated) return;
     void Promise.all([
       fetch(`${ENTRYPOINT}/tags?itemsPerPage=100`, { credentials: "include" }),
-      fetch(`${ENTRYPOINT}/projects?itemsPerPage=100`, { credentials: "include" }),
+      fetch(`${ENTRYPOINT}/boards?itemsPerPage=100`, { credentials: "include" }),
       fetch(`${ENTRYPOINT}/me/assignable-users`, { credentials: "include" }),
     ]).then(async ([t, p, a]) => {
       if (t.ok) setTags(collectionMembers<TagRef>(await t.json()));
-      if (p.ok) setProjects(collectionMembers<ProjectRef>(await p.json()));
+      if (p.ok) setProjects(collectionMembers<BoardRef>(await p.json()));
       if (a.ok) {
         const data = await a.json();
         setAssignables(Array.isArray(data) ? data : collectionMembers<AssignableUser>(data));
@@ -246,11 +246,11 @@ const SearchPage = () => {
     });
   }, [isAuthenticated]);
 
-  const projectName = useMemo(() => {
+  const boardName = useMemo(() => {
     const map = new Map<string, string>();
-    projects.forEach((p) => map.set(p["@id"], p.title));
+    boards.forEach((p) => map.set(p["@id"], p.title));
     return map;
-  }, [projects]);
+  }, [boards]);
 
   const replaceFilters = useCallback(
     (patch: Partial<FilterState>) => {
@@ -326,7 +326,7 @@ const SearchPage = () => {
               <FilterBar
                 filters={filters}
                 tags={tags}
-                projects={projects}
+                boards={boards}
                 assignables={assignables}
                 onChange={replaceFilters}
               />
@@ -339,7 +339,7 @@ const SearchPage = () => {
           {filters.kind === "tasks" && (
             <TaskResults
               filters={filters}
-              projectName={projectName}
+              boardName={boardName}
               spaces={spaces}
               activeSpace={activeSpace}
               onPage={(page) => replaceFilters({ page })}
@@ -350,15 +350,15 @@ const SearchPage = () => {
                   overdue: false,
                   dueFrom: "",
                   dueTo: "",
-                  project: "",
+                  board: "",
                   assignee: "",
                   tags: [],
                 })
               }
             />
           )}
-          {filters.kind === "projects" && (
-            <ProjectResults filters={filters} activeSpace={activeSpace} onPage={(page) => replaceFilters({ page })} />
+          {filters.kind === "boards" && (
+            <BoardResults filters={filters} activeSpace={activeSpace} onPage={(page) => replaceFilters({ page })} />
           )}
           {filters.kind === "discussions" && (
             <DiscussionResults
@@ -462,7 +462,7 @@ const KindTabs = ({
 }) => {
   const [counts, setCounts] = useState<Record<Kind, number | null>>({
     tasks: null,
-    projects: null,
+    boards: null,
     discussions: null,
   });
 
@@ -547,24 +547,24 @@ const segClass = (active: boolean) =>
 const FilterBar = ({
   filters,
   tags,
-  projects,
+  boards,
   assignables,
   onChange,
 }: {
   filters: FilterState;
   tags: TagRef[];
-  projects: ProjectRef[];
+  boards: BoardRef[];
   assignables: AssignableUser[];
   onChange: (patch: Partial<FilterState>) => void;
 }) => {
-  const proj = projects.find((p) => p["@id"] === filters.project);
+  const proj = boards.find((p) => p["@id"] === filters.board);
   const assignee = assignables.find((a) => a["@id"] === filters.assignee);
 
   const chips: { key: string; label: string; clear: () => void }[] = [];
   if (filters.status) chips.push({ key: "status", label: `Status: ${filters.status}`, clear: () => onChange({ status: "" }) });
   if (filters.overdue) chips.push({ key: "overdue", label: "Overdue", clear: () => onChange({ overdue: false }) });
   if (filters.dueFrom || filters.dueTo) chips.push({ key: "due", label: "Due range", clear: () => onChange({ dueFrom: "", dueTo: "" }) });
-  if (proj) chips.push({ key: "project", label: `Project: ${proj.title}`, clear: () => onChange({ project: "" }) });
+  if (proj) chips.push({ key: "board", label: `Board: ${proj.title}`, clear: () => onChange({ board: "" }) });
   if (assignee) chips.push({ key: "assignee", label: `@${assignee.email.split("@")[0]}`, clear: () => onChange({ assignee: "" }) });
   filters.tags.forEach((iri) => {
     const t = tags.find((x) => x["@id"] === iri);
@@ -613,14 +613,14 @@ const FilterBar = ({
           data-testid="search-due-to"
         />
         <select
-          value={filters.project}
-          onChange={(e) => onChange({ project: e.target.value })}
-          className={segClass(Boolean(filters.project))}
-          aria-label="Project"
-          data-testid="search-project"
+          value={filters.board}
+          onChange={(e) => onChange({ board: e.target.value })}
+          className={segClass(Boolean(filters.board))}
+          aria-label="Board"
+          data-testid="search-board"
         >
-          <option value="">Project</option>
-          {projects.map((p) => (
+          <option value="">Board</option>
+          {boards.map((p) => (
             <option key={p["@id"]} value={p["@id"]}>
               {p.title}
             </option>
@@ -760,7 +760,7 @@ const ResultShell = ({
 // ---- Task results ----
 const TaskResults = ({
   filters,
-  projectName,
+  boardName,
   spaces,
   activeSpace,
   onPage,
@@ -768,7 +768,7 @@ const TaskResults = ({
   onClearFilters,
 }: {
   filters: FilterState;
-  projectName: Map<string, string>;
+  boardName: Map<string, string>;
   spaces: Space[];
   activeSpace: Space | null;
   onPage: (p: number) => void;
@@ -793,8 +793,8 @@ const TaskResults = ({
           <Link href={`/tasks?search=${encodeURIComponent(filters.q)}`} className="block px-4 py-3 no-underline transition-colors hover:bg-muted/40">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                {t.project && projectName.get(t.project) && (
-                  <p className="font-mono text-xs text-muted-foreground">{projectName.get(t.project)}</p>
+                {t.board && boardName.get(t.board) && (
+                  <p className="font-mono text-xs text-muted-foreground">{boardName.get(t.board)}</p>
                 )}
                 <p className="text-sm font-medium text-foreground">
                   {highlightMatches(t.title, filters.q)}
@@ -828,8 +828,8 @@ const TaskResults = ({
   );
 };
 
-// ---- Project results ----
-const ProjectResults = ({
+// ---- Board results ----
+const BoardResults = ({
   filters,
   activeSpace,
   onPage,
@@ -838,13 +838,13 @@ const ProjectResults = ({
   activeSpace: Space | null;
   onPage: (p: number) => void;
 }) => {
-  const url = buildUrl("projects", filters, activeSpace, filters.page, PAGE_SIZE);
-  const { items, total, loading } = useResults<ProjectHit>(url, true);
+  const url = buildUrl("boards", filters, activeSpace, filters.page, PAGE_SIZE);
+  const { items, total, loading } = useResults<BoardHit>(url, true);
   return (
     <ResultShell loading={loading} count={items.length} total={total} page={filters.page} onPage={onPage} empty={<SimpleEmpty q={filters.q} />}>
       {items.map((p) => (
         <li key={p["@id"]} data-testid="search-result-row">
-          <Link href={`/projects/${p.id}`} className="block px-4 py-3 no-underline transition-colors hover:bg-muted/40">
+          <Link href={`/boards/${p.id}`} className="block px-4 py-3 no-underline transition-colors hover:bg-muted/40">
             <p className="text-sm font-medium text-foreground">{highlightMatches(p.title, filters.q)}</p>
             {p.description && (
               <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{highlightMatches(snippet(p.description), filters.q)}</p>
@@ -932,7 +932,7 @@ const EmptyState = ({
     [
       filters.status && "status",
       filters.overdue && "overdue",
-      filters.project && "project",
+      filters.board && "board",
       filters.assignee && "assignee",
       filters.tags.length > 0 && "tags",
     ].filter(Boolean) as string[]

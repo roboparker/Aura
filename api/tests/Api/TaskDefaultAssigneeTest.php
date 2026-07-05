@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -29,7 +29,7 @@ class TaskDefaultAssigneeTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -39,12 +39,12 @@ class TaskDefaultAssigneeTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, personal: true);
-        $project = $this->createProject($alice, $space, 'Private board');
+        $board = $this->createProject($alice, $space, 'Private board');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
-            'json' => ['title' => 'Solo task', 'project' => '/projects/' . $project->getId()],
+            'json' => ['title' => 'Solo task', 'board' => '/boards/' . $board->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -57,12 +57,12 @@ class TaskDefaultAssigneeTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, personal: false);
-        $project = $this->createProject($alice, $space, 'Team board');
+        $board = $this->createProject($alice, $space, 'Team board');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
-            'json' => ['title' => 'Team task', 'project' => '/projects/' . $project->getId()],
+            'json' => ['title' => 'Team task', 'board' => '/boards/' . $board->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -76,7 +76,7 @@ class TaskDefaultAssigneeTest extends ApiTestCase
         $bob = $this->createUser('bob@example.com');
         $space = $this->createSpace($alice, personal: false);
         $this->ensureSpaceMembership($space, $bob);
-        $project = $this->createProject($alice, $space, 'Board');
+        $board = $this->createProject($alice, $space, 'Board');
 
         // Even though the default would add Alice, an explicit assignee list
         // is respected as-is.
@@ -85,7 +85,7 @@ class TaskDefaultAssigneeTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Assigned to Bob',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'assignees' => ['/users/' . $bob->getId()],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -130,16 +130,16 @@ class TaskDefaultAssigneeTest extends ApiTestCase
         return $space;
     }
 
-    private function createProject(User $owner, Space $space, string $title): Project
+    private function createProject(User $owner, Space $space, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setSpace($space);
-        $project->setTitle($title);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setSpace($space);
+        $board->setTitle($title);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     /**

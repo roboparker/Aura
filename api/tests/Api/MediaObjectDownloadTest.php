@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,7 +32,7 @@ class MediaObjectDownloadTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -84,14 +84,14 @@ class MediaObjectDownloadTest extends ApiTestCase
 
     public function testTaskOwnerCanDownloadAttachmentTheyDidntUpload(): void
     {
-        // Project workflow: Bob uploads a file, attaches it to a task, and
-        // Alice (project teammate / task owner) needs to download it.
+        // Board workflow: Bob uploads a file, attaches it to a task, and
+        // Alice (board teammate / task owner) needs to download it.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, [$bob]);
+        $board = $this->createProject($alice, [$bob]);
 
         $media = $this->seedAttachment($bob, 'shared.pdf', "SHARED");
-        $task = $this->createTask($alice, 'Project task', $project);
+        $task = $this->createTask($alice, 'Board task', $board);
         $task->addAttachment($media);
         $this->entityManager->flush();
 
@@ -105,10 +105,10 @@ class MediaObjectDownloadTest extends ApiTestCase
     {
         $owner = $this->createUser('owner@example.com');
         $member = $this->createUser('member@example.com');
-        $project = $this->createProject($owner, [$member]);
+        $board = $this->createProject($owner, [$member]);
 
         $media = $this->seedAttachment($owner, 'team.pdf', "TEAM");
-        $task = $this->createTask($owner, 'Project task', $project);
+        $task = $this->createTask($owner, 'Board task', $board);
         $task->addAttachment($media);
         $this->entityManager->flush();
 
@@ -141,14 +141,14 @@ class MediaObjectDownloadTest extends ApiTestCase
         //   (:media MEMBER OF t.attachments AND t.owner = :user)
         //     OR EXISTS(space-membership) OR EXISTS(group-membership)
         // so the attachment check only gated the owner branch. Any user who
-        // owned even one project-bound task in a space they belong to (the
+        // owned even one board-bound task in a space they belong to (the
         // normal steady state) satisfied a membership EXISTS for *any* media
         // id and could download another tenant's attachment.
         $attacker = $this->createUser('attacker@example.com');
         $victim = $this->createUser('victim@example.com');
 
         // The precondition that made a membership EXISTS branch true: the
-        // attacker owns a task attached to a project whose space they're in.
+        // attacker owns a task attached to a board whose space they're in.
         $attackerProject = $this->createProject($attacker);
         $this->createTask($attacker, 'Attacker task', $attackerProject);
 
@@ -217,13 +217,13 @@ class MediaObjectDownloadTest extends ApiTestCase
         return $media;
     }
 
-    private function createTask(User $owner, string $title, ?Project $project = null): Task
+    private function createTask(User $owner, string $title, ?Board $board = null): Task
     {
         $task = new Task();
         $task->setOwner($owner);
         $task->setTitle($title);
-        if (null !== $project) {
-            $task->setProject($project);
+        if (null !== $board) {
+            $task->setBoard($board);
         }
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -233,18 +233,18 @@ class MediaObjectDownloadTest extends ApiTestCase
     /**
      * @param User[] $extraMembers
      */
-    private function createProject(User $owner, array $extraMembers = []): Project
+    private function createProject(User $owner, array $extraMembers = []): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle('Test project');
-        $this->addProjectMember($project, $owner);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle('Test board');
+        $this->addBoardMember($board, $owner);
         foreach ($extraMembers as $m) {
-            $this->addProjectMember($project, $m);
+            $this->addBoardMember($board, $m);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

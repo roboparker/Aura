@@ -56,7 +56,7 @@ describe("session expiry detector", () => {
     mod.armSessionExpiry(true);
 
     await window.fetch(`${ORIGIN}/tasks`);
-    await window.fetch(`${ORIGIN}/projects`);
+    await window.fetch(`${ORIGIN}/boards`);
 
     expect(handler).toHaveBeenCalledTimes(1);
   });

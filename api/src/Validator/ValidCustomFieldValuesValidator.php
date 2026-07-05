@@ -5,7 +5,7 @@ namespace App\Validator;
 use App\CustomField\CustomFieldTypeRegistry;
 use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidator;
@@ -20,7 +20,7 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
  * (drop a strategy implementing {@see App\CustomField\Type\CustomFieldTypeInterface}).
  *
  * Top-level invariants still live here because they cross multiple
- * CFVs / the parent task: project-scope, duplicate-definition
+ * CFVs / the parent task: board-scope, duplicate-definition
  * detection, and required-field enforcement.
  */
 final class ValidCustomFieldValuesValidator extends ConstraintValidator
@@ -43,12 +43,12 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         }
 
         $values = $value->getCustomFieldValues();
-        $project = $value->getProject();
+        $board = $value->getBoard();
 
-        // A task without a project can't have custom values — every
-        // definition is project-scoped. Only flag this when the client
-        // actually sent values; bare projectless tasks are fine.
-        if (count($values) > 0 && null === $project) {
+        // A task without a board can't have custom values — every
+        // definition is board-scoped. Only flag this when the client
+        // actually sent values; bare boardless tasks are fine.
+        if (count($values) > 0 && null === $board) {
             $this->context->buildViolation($constraint->messageNoProject)
                 ->atPath('customFieldValues')
                 ->addViolation();
@@ -76,13 +76,13 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
                 continue;
             }
 
-            // A value is only legal for a definition the task's project has
-            // opted into — a space-owned field via the project.customFieldDefinitions
-            // M2M, a global field via project.globalCustomFieldDefinitions.
-            $attached = null !== $project && (
+            // A value is only legal for a definition the task's board has
+            // opted into — a space-owned field via the board.customFieldDefinitions
+            // M2M, a global field via board.globalCustomFieldDefinitions.
+            $attached = null !== $board && (
                 null !== $spaceDefinition
-                    ? $this->projectHasDefinition($project->getCustomFieldDefinitions(), $spaceDefinition)
-                    : $this->projectHasDefinition($project->getGlobalCustomFieldDefinitions(), $definition)
+                    ? $this->boardHasDefinition($board->getCustomFieldDefinitions(), $spaceDefinition)
+                    : $this->boardHasDefinition($board->getGlobalCustomFieldDefinitions(), $definition)
             );
             if (!$attached) {
                 $this->context->buildViolation($constraint->messageWrongProject)
@@ -106,8 +106,8 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
             $this->dispatchToStrategy($cfv, $definition, $constraint, $index);
         }
 
-        if (null !== $project && null !== $project->getId()) {
-            $this->enforceRequired($project, $providedDefinitionIds, $constraint);
+        if (null !== $board && null !== $board->getId()) {
+            $this->enforceRequired($board, $providedDefinitionIds, $constraint);
         }
     }
 
@@ -153,7 +153,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
     /**
      * @param iterable<CustomFieldDefinitionInterface> $collection
      */
-    private function projectHasDefinition(iterable $collection, CustomFieldDefinitionInterface $definition): bool
+    private function boardHasDefinition(iterable $collection, CustomFieldDefinitionInterface $definition): bool
     {
         $target = (string) $definition->getId();
         foreach ($collection as $candidate) {
@@ -169,15 +169,15 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
      * @param array<string, CustomFieldValue> $providedDefinitionIds
      */
     private function enforceRequired(
-        Project $project,
+        Board $board,
         array $providedDefinitionIds,
         ValidCustomFieldValues $constraint,
     ): void {
-        // Required = the project's opted-in fields (space + global) that
+        // Required = the board's opted-in fields (space + global) that
         // aren't nullable. Both sources share the value-set keyed by def id.
         $definitions = array_merge(
-            $project->getCustomFieldDefinitions()->toArray(),
-            $project->getGlobalCustomFieldDefinitions()->toArray(),
+            $board->getCustomFieldDefinitions()->toArray(),
+            $board->getGlobalCustomFieldDefinitions()->toArray(),
         );
 
         foreach ($definitions as $definition) {

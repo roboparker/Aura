@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Shared media container. Owned by the uploading user, referenced by
- * domain entities (User.avatar today; tasks/projects/comments later).
+ * domain entities (User.avatar today; tasks/boards/comments later).
  * `variants` stores a map of variant name to Flysystem path — images get
  * "thumb"/"profile" entries; plain attachments use "original".
  */

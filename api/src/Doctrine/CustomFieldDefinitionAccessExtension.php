@@ -8,7 +8,7 @@ use App\Security\Permission\SpacePermission;
 /**
  * Scopes CustomFieldDefinition queries to spaces the current user belongs
  * to (#185). Uses the denormalised `cfd.space` FK to avoid joining through
- * `project`. See {@see AbstractSpaceAccessExtension} for the shared
+ * `board`. See {@see AbstractSpaceAccessExtension} for the shared
  * direct-or-via-group membership predicate.
  */
 final class CustomFieldDefinitionAccessExtension extends AbstractSpaceAccessExtension
@@ -25,7 +25,7 @@ final class CustomFieldDefinitionAccessExtension extends AbstractSpaceAccessExte
 
     protected function getImpersonationItemType(): ?string
     {
-        // CFDs follow their project's space + the 'projects' category default;
+        // CFDs follow their board's space + the 'boards' category default;
         // they aren't individually addressable for per-item overrides.
         return null;
     }

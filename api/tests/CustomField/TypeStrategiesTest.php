@@ -176,7 +176,7 @@ final class TypeStrategiesTest extends TestCase
         $this->assertCount(1, $s->validateValue('mid', $config, $def));
         $this->assertCount(1, $s->validateValue(['low'], $config, $def)); // not a list
 
-        // searchText projects the user-facing label, not the key.
+        // searchText boards the user-facing label, not the key.
         $this->assertSame('Low priority', $s->searchText('low', $config));
 
         // Config: options required, no duplicate keys, color must be hex.

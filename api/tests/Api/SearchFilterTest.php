@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Discussion;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -13,11 +13,11 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Functional coverage for the Postgres full-text-search collection
- * filters {@see \App\Filter\ProjectSearchFilter} and
+ * filters {@see \App\Filter\BoardSearchFilter} and
  * {@see \App\Filter\DiscussionSearchFilter}.
  *
  * Both filters expose `?search={q}` (their `PARAMETER` constant) on the
- * Project / Discussion collections, run it through `websearch_to_tsquery`
+ * Board / Discussion collections, run it through `websearch_to_tsquery`
  * via the `SEARCH_VECTOR_MATCH` DQL function, and order by `ts_rank`
  * (`SEARCH_VECTOR_RANK`) unless `?sort=recent` is supplied. Rows are
  * space-scoped by the access extensions, so the corpus is seeded inside
@@ -38,7 +38,7 @@ class SearchFilterTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -46,7 +46,7 @@ class SearchFilterTest extends ApiTestCase
     public function testProjectSearchMatchesTitleWordOnly(): void
     {
         $alice = $this->createUser('alice@example.com');
-        // Projects land in the creator's personal space, of which the
+        // Boards land in the creator's personal space, of which the
         // creator is the sole admin — so they're visible to Alice.
         $this->createProject($alice, 'Marketing launch checklist', 'Plan the campaign');
         $this->createProject($alice, 'Engineering backlog', 'Refactor the parser');
@@ -54,8 +54,8 @@ class SearchFilterTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        // `search` is ProjectSearchFilter::PARAMETER.
-        $client->request('GET', '/projects?search=Marketing');
+        // `search` is BoardSearchFilter::PARAMETER.
+        $client->request('GET', '/boards?search=Marketing');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 1]);
 
@@ -79,8 +79,8 @@ class SearchFilterTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        // "parser" only appears in the second project's description.
-        $client->request('GET', '/projects?search=parser');
+        // "parser" only appears in the second board's description.
+        $client->request('GET', '/boards?search=parser');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 1]);
 
@@ -104,7 +104,7 @@ class SearchFilterTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $client->request('GET', '/projects?search=zzzznomatch');
+        $client->request('GET', '/boards?search=zzzznomatch');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 0]);
     }
@@ -118,15 +118,15 @@ class SearchFilterTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        // Default ordering is by relevance (ts_rank). Both projects share
+        // Default ordering is by relevance (ts_rank). Both boards share
         // the search term, so the matched set is the same in either mode.
-        $client->request('GET', '/projects?search=Marketing&sort=relevance');
+        $client->request('GET', '/boards?search=Marketing&sort=relevance');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 2]);
 
         // `sort=recent` swaps the order to createdOn DESC (see
-        // ProjectSearchFilter); the matched set is unchanged.
-        $client->request('GET', '/projects?search=Marketing&sort=recent');
+        // BoardSearchFilter); the matched set is unchanged.
+        $client->request('GET', '/boards?search=Marketing&sort=recent');
         $this->assertResponseIsSuccessful();
         $this->assertJsonContains(['totalItems' => 2]);
 
@@ -233,19 +233,19 @@ class SearchFilterTest extends ApiTestCase
         $this->assertSame('Pinned launch note', $first['title'] ?? null);
     }
 
-    private function createProject(User $owner, string $title, string $description): Project
+    private function createProject(User $owner, string $title, string $description): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $project->setDescription($description);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $board->setDescription($description);
 
-        // ProjectSpaceDefaultListener fills Project.space with the
+        // BoardSpaceDefaultListener fills Board.space with the
         // owner's personal space at PrePersist, so the owner can see it.
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createSpace(User $admin, string $name): Space

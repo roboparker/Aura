@@ -20,7 +20,7 @@ const MarkdownEditorPage = () => (
 <MarkdownEditor
   value={value}
   onChange={setValue}
-  ariaLabel="Project description"
+  ariaLabel="Board description"
 />`,
         preview: <div className="w-full"><Demo /></div>,
       },

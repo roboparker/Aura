@@ -120,7 +120,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
 
     /**
      * Clone the just-completed task into a fresh, incomplete row whose
-     * dueDate is advanced per the recurrence rule. Tags, assignees, project,
+     * dueDate is advanced per the recurrence rule. Tags, assignees, board,
      * description, and title carry over. Position goes to the top of the
      * owner's list to mirror normal task creation. Returns the spawned task
      * (or null when the series has ended).
@@ -157,7 +157,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
 
         $next = new Task();
         $next->setOwner($completed->getOwner());
-        $next->setProject($completed->getProject());
+        $next->setBoard($completed->getBoard());
         $next->setTitle($completed->getTitle());
         $next->setDescription($completed->getDescription());
         $next->setRecurrenceRule($nextRule);

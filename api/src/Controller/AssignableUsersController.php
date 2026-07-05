@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Doctrine\SpaceMembershipDql;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -15,7 +15,7 @@ use Symfony\Component\Serializer\SerializerInterface;
 /**
  * Returns every user the caller may legitimately assign to one of their
  * tasks: themselves plus everyone in a space they share with the
- * caller via at least one project (#185). Matches the ValidAssignees
+ * caller via at least one board (#185). Matches the ValidAssignees
  * rule on Task — feeds the frontend exactly the candidate set the
  * validator will accept.
  *
@@ -39,20 +39,20 @@ class AssignableUsersController extends AbstractController
         }
 
         $byId = [(string) $user->getId() => $user];
-        // ProjectAccessExtension only scopes API Platform's collection data
+        // BoardAccessExtension only scopes API Platform's collection data
         // providers, NOT a raw Doctrine query — a plain findAll() here would
         // leak the effective members of every space in the instance. Scope
-        // explicitly to projects whose space the caller belongs to (directly
-        // or via group), mirroring ProjectAccessExtension's predicate.
-        /** @var list<Project> $projects */
-        $projects = $this->em->getRepository(Project::class)
-            ->createQueryBuilder('project')
-            ->where(SpaceMembershipDql::userBelongsToProjectSpace('project'))
+        // explicitly to boards whose space the caller belongs to (directly
+        // or via group), mirroring BoardAccessExtension's predicate.
+        /** @var list<Board> $boards */
+        $boards = $this->em->getRepository(Board::class)
+            ->createQueryBuilder('board')
+            ->where(SpaceMembershipDql::userBelongsToProjectSpace('board'))
             ->setParameter('user', $user)
             ->getQuery()
             ->getResult();
-        foreach ($projects as $project) {
-            foreach ($project->getEffectiveMembers() as $id => $member) {
+        foreach ($boards as $board) {
+            foreach ($board->getEffectiveMembers() as $id => $member) {
                 $byId[$id] = $member;
             }
         }
@@ -67,7 +67,7 @@ class AssignableUsersController extends AbstractController
         $members = is_array($decoded) ? $decoded : [];
 
         // Wrap in a hydra-shaped collection so the frontend can consume this
-        // the same way it consumes `/tasks` and `/projects`.
+        // the same way it consumes `/tasks` and `/boards`.
         return new JsonResponse([
             '@context' => '/contexts/User',
             '@id' => '/me/assignable-users',

@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\ApiToken;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\SpaceRole;
@@ -30,7 +30,7 @@ class SpaceApiKeyTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        foreach (['ApiToken', 'Task', 'SpaceRole', 'Project', 'Space', 'User'] as $entity) {
+        foreach (['ApiToken', 'Task', 'SpaceRole', 'Board', 'Space', 'User'] as $entity) {
             $this->entityManager->createQuery("DELETE FROM App\\Entity\\$entity")->execute();
         }
     }
@@ -184,7 +184,7 @@ class SpaceApiKeyTest extends ApiTestCase
     }
 
     /**
-     * Build: admin + space + project + task + a scoped key (with the given
+     * Build: admin + space + board + task + a scoped key (with the given
      * permissions) and return [plaintext, admin, task].
      *
      * @param array<string, array<string, bool>> $permissions
@@ -194,8 +194,8 @@ class SpaceApiKeyTest extends ApiTestCase
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSpace($admin);
-        $project = $this->createProject($admin, $space, 'Backend');
-        $task = $this->createTask($admin, $project, 'Task');
+        $board = $this->createProject($admin, $space, 'Backend');
+        $task = $this->createTask($admin, $board, 'Task');
         $role = $this->seedRole($space, $permissions);
 
         $plain = ApiToken::PLAINTEXT_PREFIX . 'testsecret_' . bin2hex(random_bytes(8));
@@ -268,18 +268,18 @@ class SpaceApiKeyTest extends ApiTestCase
         return $space;
     }
 
-    private function createProject(User $owner, Space $space, string $title): Project
+    private function createProject(User $owner, Space $space, string $title): Board
     {
-        $project = (new Project())->setOwner($owner)->setTitle($title)->setSpace($space);
-        $this->entityManager->persist($project);
+        $board = (new Board())->setOwner($owner)->setTitle($title)->setSpace($space);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
-        $task = (new Task())->setOwner($owner)->setProject($project)->setTitle($title);
+        $task = (new Task())->setOwner($owner)->setBoard($board)->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
 

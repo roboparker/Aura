@@ -25,7 +25,7 @@ final class DeleteTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Permanently delete a task. Returns 404 when the task is not visible; the same delete permissions as the PWA apply (owner or project member).';
+        return 'Permanently delete a task. Returns 404 when the task is not visible; the same delete permissions as the PWA apply (owner or board member).';
     }
 
     public function getInputSchema(): array

@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\SpaceRole;
@@ -28,7 +28,7 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        foreach (['Task', 'SpaceRole', 'Project', 'Space', 'User'] as $entity) {
+        foreach (['Task', 'SpaceRole', 'Board', 'Space', 'User'] as $entity) {
             $this->entityManager->createQuery("DELETE FROM App\\Entity\\$entity")->execute();
         }
     }
@@ -38,25 +38,25 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Backend');
-        $this->assignRole($space, $member, ['projects' => ['read' => true]]);
+        $board = $this->createProject($admin, $space, 'Backend');
+        $this->assignRole($space, $member, ['boards' => ['read' => true]]);
 
         $client = static::createClient();
         $client->loginUser($member);
 
-        $client->request('GET', '/projects/' . $project->getId());
+        $client->request('GET', '/boards/' . $board->getId());
         $this->assertResponseStatusCodeSame(200);
 
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/boards/' . $board->getId(), [
             'json' => ['title' => 'Hijacked'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
         $this->assertResponseStatusCodeSame(403);
 
-        $client->request('DELETE', '/projects/' . $project->getId());
+        $client->request('DELETE', '/boards/' . $board->getId());
         $this->assertResponseStatusCodeSame(403);
 
-        $client->request('POST', '/projects', [
+        $client->request('POST', '/boards', [
             'json' => ['title' => 'New', 'space' => '/spaces/' . $space->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -68,14 +68,14 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Secret');
-        // Role grants nothing for projects → read denied.
+        $board = $this->createProject($admin, $space, 'Secret');
+        // Role grants nothing for boards → read denied.
         $this->assignRole($space, $member, ['tasks' => ['read' => true]]);
 
         $client = static::createClient();
         $client->loginUser($member);
 
-        $client->request('GET', '/projects?space=/spaces/' . $space->getId());
+        $client->request('GET', '/boards?space=/spaces/' . $space->getId());
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -84,7 +84,7 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $this->assertIsArray($members);
         $this->assertCount(0, $members);
 
-        $client->request('GET', '/projects/' . $project->getId());
+        $client->request('GET', '/boards/' . $board->getId());
         $this->assertResponseStatusCodeSame(403);
     }
 
@@ -93,8 +93,8 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Backend');
-        $ownTask = $this->createTask($member, $project, 'Mine');
+        $board = $this->createProject($admin, $space, 'Backend');
+        $ownTask = $this->createTask($member, $board, 'Mine');
         // Read-only on tasks, but the member owns this task.
         $this->assignRole($space, $member, ['tasks' => ['read' => true]]);
 
@@ -112,12 +112,12 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Backend');
+        $board = $this->createProject($admin, $space, 'Backend');
         // No role assigned → full access.
 
         $client = static::createClient();
         $client->loginUser($member);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/boards/' . $board->getId(), [
             'json' => ['title' => 'Edited by full-access member'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -131,22 +131,22 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Backend');
+        $board = $this->createProject($admin, $space, 'Backend');
         $role = (new SpaceRole())
             ->setSpace($space)
             ->setName('Member')
             ->setBuiltinKey(SpaceRole::BUILTIN_MEMBER)
-            ->setPermissions(['projects' => ['read' => true]]);
+            ->setPermissions(['boards' => ['read' => true]]);
         $this->entityManager->persist($role);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($member);
 
-        $client->request('GET', '/projects/' . $project->getId());
+        $client->request('GET', '/boards/' . $board->getId());
         $this->assertResponseStatusCodeSame(200);
 
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/boards/' . $board->getId(), [
             'json' => ['title' => 'Nope'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -169,7 +169,7 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         $perms = $response->toArray()['permissions'] ?? [];
         $this->assertIsArray($perms);
         $this->assertSame(['create' => false, 'read' => true, 'update' => false, 'delete' => false], $perms['tasks'] ?? null);
-        $this->assertFalse(is_array($perms['projects'] ?? null) ? $perms['projects']['read'] : null);
+        $this->assertFalse(is_array($perms['boards'] ?? null) ? $perms['boards']['read'] : null);
     }
 
     public function testAdminMyPermissionsAllTrue(): void
@@ -185,7 +185,7 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         self::assertNotNull($response);
         $perms = $response->toArray()['permissions'] ?? [];
         $this->assertIsArray($perms);
-        $this->assertTrue(is_array($perms['projects'] ?? null) ? $perms['projects']['delete'] : null);
+        $this->assertTrue(is_array($perms['boards'] ?? null) ? $perms['boards']['delete'] : null);
     }
 
     public function testNonMemberMyPermissionsIsNotFound(): void
@@ -202,17 +202,17 @@ class SpacePermissionEnforcementTest extends ApiTestCase
 
     public function testRoleCanGrantBeyondBaseline(): void
     {
-        // A role with projects.delete lets a non-creator member delete a
-        // project (Model A — roles grant).
+        // A role with boards.delete lets a non-creator member delete a
+        // board (Model A — roles grant).
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
         $space = $this->createSpace($admin, $member);
-        $project = $this->createProject($admin, $space, 'Backend');
-        $this->assignRole($space, $member, ['projects' => ['read' => true, 'delete' => true]]);
+        $board = $this->createProject($admin, $space, 'Backend');
+        $this->assignRole($space, $member, ['boards' => ['read' => true, 'delete' => true]]);
 
         $client = static::createClient();
         $client->loginUser($member);
-        $client->request('DELETE', '/projects/' . $project->getId());
+        $client->request('DELETE', '/boards/' . $board->getId());
         $this->assertResponseStatusCodeSame(204);
     }
 
@@ -233,18 +233,18 @@ class SpacePermissionEnforcementTest extends ApiTestCase
         return $space;
     }
 
-    private function createProject(User $owner, Space $space, string $title): Project
+    private function createProject(User $owner, Space $space, string $title): Board
     {
-        $project = (new Project())->setOwner($owner)->setTitle($title)->setSpace($space);
-        $this->entityManager->persist($project);
+        $board = (new Board())->setOwner($owner)->setTitle($title)->setSpace($space);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
-        $task = (new Task())->setOwner($owner)->setProject($project)->setTitle($title);
+        $task = (new Task())->setOwner($owner)->setBoard($board)->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
 

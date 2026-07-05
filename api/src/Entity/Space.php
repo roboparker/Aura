@@ -33,9 +33,9 @@ use Symfony\Component\Validator\Constraints as Assert;
  * `createdBy` field is audit-only.
  *
  * PR 1 ships only the Space entity, its memberships, and a backfill
- * that links existing projects/discussions/custom-field-definitions to
+ * that links existing boards/discussions/custom-field-definitions to
  * their creator's personal space. The access-extension rewrite that
- * actually swaps Project/Discussion/CFD permissions over to space
+ * actually swaps Board/Discussion/CFD permissions over to space
  * membership lands in PR 2 (#185).
  */
 #[ApiResource(
@@ -185,7 +185,7 @@ class Space
      * Maintained by Gedmo Timestampable on every UPDATE. Powers the
      * "edited 2h ago" / "updated yesterday" line on the spaces grid
      * — it tracks edits to the space row itself (name, description,
-     * visibility), not activity on its contained projects / pages.
+     * visibility), not activity on its contained boards / pages.
      *
      * Stored as `datetime` rather than `datetime_immutable` so Gedmo
      * can mutate the field in place on update.
@@ -252,8 +252,8 @@ class Space
     /**
      * MediaObjects attached at the space level (cover docs, shared
      * specs, anything not pinned to a specific task). Replaces the
-     * old `project_attachment` join — attachments now live at the
-     * space so they're available to every project + member in it.
+     * old `board_attachment` join — attachments now live at the
+     * space so they're available to every board + member in it.
      * Membership is edited via PATCH on the Space with an
      * `attachments` array of MediaObject IRIs; the PWA uploads via
      * `POST /media-objects` (kind=attachment) first.
@@ -291,24 +291,24 @@ class Space
     private array $invites = [];
 
     /**
-     * Inverse side for projects rooted in this space. EXTRA_LAZY means
+     * Inverse side for boards rooted in this space. EXTRA_LAZY means
      * `->count()` runs a single SELECT COUNT query without hydrating
-     * rows, so {@see getProjectsCount()} stays cheap even on the
+     * rows, so {@see getBoardsCount()} stays cheap even on the
      * spaces-list endpoint. Off the wire — only the count getter is
      * serialized.
      *
-     * @var Collection<int, Project>
+     * @var Collection<int, Board>
      */
     #[ORM\OneToMany(
         mappedBy: 'space',
-        targetEntity: Project::class,
+        targetEntity: Board::class,
         fetch: 'EXTRA_LAZY',
     )]
-    private Collection $projects;
+    private Collection $boards;
 
     /**
      * Inverse side for pages rooted in this space. Same EXTRA_LAZY
-     * shape as {@see $projects} — only the count is exposed.
+     * shape as {@see $boards} — only the count is exposed.
      *
      * @var Collection<int, Page>
      */
@@ -329,7 +329,7 @@ class Space
         $this->userMemberships = new ArrayCollection();
         $this->groups = new ArrayCollection();
         $this->attachments = new ArrayCollection();
-        $this->projects = new ArrayCollection();
+        $this->boards = new ArrayCollection();
         $this->pages = new ArrayCollection();
     }
 
@@ -447,13 +447,13 @@ class Space
     }
 
     /**
-     * Project count rooted in this space. EXTRA_LAZY makes this a
+     * Board count rooted in this space. EXTRA_LAZY makes this a
      * single COUNT query — no row hydration.
      */
     #[Groups(['space:read'])]
-    public function getProjectsCount(): int
+    public function getBoardsCount(): int
     {
-        return $this->projects->count();
+        return $this->boards->count();
     }
 
     /**

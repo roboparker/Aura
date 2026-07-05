@@ -7,7 +7,7 @@ use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Comment;
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
@@ -47,7 +47,7 @@ class McpExtraToolsTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -139,9 +139,9 @@ class McpExtraToolsTest extends ApiTestCase
     public function testListFilesOnSpaceReturnsSeededAttachment(): void
     {
         $alice = $this->createUser('alice@example.com');
-        // A project pins its creator's personal space via the listener.
-        $project = $this->makeProject($alice, [$alice], 'Space holder');
-        $space = $project->getSpace();
+        // A board pins its creator's personal space via the listener.
+        $board = $this->makeProject($alice, [$alice], 'Space holder');
+        $space = $board->getSpace();
         $this->assertNotNull($space);
         $media = $this->seedAttachment($alice, 'shared.pdf');
         $space->addAttachment($media);
@@ -400,17 +400,17 @@ class McpExtraToolsTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function makeProject(User $owner, array $members, string $title): Project
+    private function makeProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function seedAttachment(User $owner, string $name): MediaObject

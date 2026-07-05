@@ -7,7 +7,7 @@ use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -34,7 +34,7 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -42,31 +42,31 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseStatusCodeSame(404);
     }
 
     public function testOverdueFilterRestrictsAggregation(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
         // Overdue task (past due, not completed) counts; future task doesn't.
-        $overdue = $this->seedTaskWithValue($alice, $project, $field, 3);
+        $overdue = $this->seedTaskWithValue($alice, $board, $field, 3);
         $overdue->setDueDate(new \DateTimeImmutable('-2 days'));
-        $future = $this->seedTaskWithValue($alice, $project, $field, 5);
+        $future = $this->seedTaskWithValue($alice, $board, $field, 5);
         $future->setDueDate(new \DateTimeImmutable('+5 days'));
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?overdue=true');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers?overdue=true');
         $this->assertResponseIsSuccessful();
         $first = $this->firstFooter($client);
         $this->assertEqualsCanonicalizing(3, $first['value']);
@@ -75,12 +75,12 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
     public function testDueDateBoundFilter(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
-        $early = $this->seedTaskWithValue($alice, $project, $field, 3);
+        $early = $this->seedTaskWithValue($alice, $board, $field, 3);
         $early->setDueDate(new \DateTimeImmutable('2026-01-01'));
-        $late = $this->seedTaskWithValue($alice, $project, $field, 5);
+        $late = $this->seedTaskWithValue($alice, $board, $field, 5);
         $late->setDueDate(new \DateTimeImmutable('2026-12-31'));
         $this->entityManager->flush();
 
@@ -89,7 +89,7 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         // Only the early task is due on/before mid-year → sum is 3.
         $client->request(
             'GET',
-            '/projects/' . $project->getId() . '/custom_field_footers?dueDate[before]=2026-06-01',
+            '/boards/' . $board->getId() . '/custom_field_footers?dueDate[before]=2026-06-01',
         );
         $this->assertResponseIsSuccessful();
         $first = $this->firstFooter($client);
@@ -99,12 +99,12 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
     public function testSearchFilterRestrictsAggregation(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
-        $matching = $this->seedTaskWithValue($alice, $project, $field, 3);
+        $matching = $this->seedTaskWithValue($alice, $board, $field, 3);
         $matching->setTitle('Pineapple harvest');
-        $other = $this->seedTaskWithValue($alice, $project, $field, 5);
+        $other = $this->seedTaskWithValue($alice, $board, $field, 5);
         $other->setTitle('Mango delivery');
         $this->entityManager->flush();
 
@@ -112,7 +112,7 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request(
             'GET',
-            '/projects/' . $project->getId() . '/custom_field_footers?search=pineapple',
+            '/boards/' . $board->getId() . '/custom_field_footers?search=pineapple',
         );
         $this->assertResponseIsSuccessful();
         $first = $this->firstFooter($client);
@@ -122,17 +122,17 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
     public function testMinAndMaxAggregation(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $minField = $this->seedNumericField($project, 'Low', footerKind: 'min');
-        $maxField = $this->seedNumericField($project, 'High', footerKind: 'max');
+        $board = $this->createProject($alice, 'Backend');
+        $minField = $this->seedNumericField($board, 'Low', footerKind: 'min');
+        $maxField = $this->seedNumericField($board, 'High', footerKind: 'max');
 
-        $this->seedTaskWithValues($alice, $project, [[$minField, 4], [$maxField, 4]]);
-        $this->seedTaskWithValues($alice, $project, [[$minField, 9], [$maxField, 9]]);
+        $this->seedTaskWithValues($alice, $board, [[$minField, 4], [$maxField, 4]]);
+        $this->seedTaskWithValues($alice, $board, [[$minField, 9], [$maxField, 9]]);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -163,15 +163,15 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         return $first;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User
@@ -190,10 +190,10 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         return $user;
     }
 
-    private function seedNumericField(Project $project, string $name, ?string $footerKind): CustomFieldDefinition
+    private function seedNumericField(Board $board, string $name, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::NUMERIC->value)
             ->setSubtype('float')
@@ -206,19 +206,19 @@ class CustomFieldFooterEdgeTest extends ApiTestCase
         return $field;
     }
 
-    private function seedTaskWithValue(User $owner, Project $project, CustomFieldDefinition $field, mixed $value): Task
+    private function seedTaskWithValue(User $owner, Board $board, CustomFieldDefinition $field, mixed $value): Task
     {
-        return $this->seedTaskWithValues($owner, $project, [[$field, $value]]);
+        return $this->seedTaskWithValues($owner, $board, [[$field, $value]]);
     }
 
     /**
      * @param list<array{0: CustomFieldDefinition, 1: mixed}> $pairs
      */
-    private function seedTaskWithValues(User $owner, Project $project, array $pairs): Task
+    private function seedTaskWithValues(User $owner, Board $board, array $pairs): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle('Task');
         $this->entityManager->persist($task);
         foreach ($pairs as [$field, $value]) {

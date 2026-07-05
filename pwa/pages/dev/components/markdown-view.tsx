@@ -1,7 +1,7 @@
 import MarkdownView from "@/components/editor/MarkdownView";
 import ComponentDoc from "@/components/dev/ComponentDoc";
 
-const SAMPLE = `# Project moonshot
+const SAMPLE = `# Board moonshot
 
 A short summary of the **goal**, with a [link](https://example.com) and a list:
 
@@ -23,7 +23,7 @@ const MarkdownViewPage = () => (
     examples={[
       {
         title: "Render stored markdown",
-        code: `<MarkdownView source={project.description} />`,
+        code: `<MarkdownView source={board.description} />`,
         preview: <MarkdownView source={SAMPLE} />,
       },
       {

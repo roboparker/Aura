@@ -769,7 +769,7 @@ const EmptyState = ({ onStart }: { onStart: () => void }) => (
       <h3 className="mt-5 text-lg font-semibold">No discussions in this space yet</h3>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">
         Discussions are <span className="font-medium text-foreground">space-level threads</span> for
-        anything that doesn&apos;t live inside a project — announcements, open questions,
+        anything that doesn&apos;t live inside a board — announcements, open questions,
         half-formed ideas worth a second pair of eyes.
       </p>
       <div className="mt-5">

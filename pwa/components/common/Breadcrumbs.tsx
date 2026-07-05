@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
  * are treated as entity ids — the previous segment names the resource,
  * and we lazy-fetch `/{resource}/{id}` to get the display name. The
  * fetch is cached via react-query so navigating around inside a space
- * or project doesn't re-hit the API on every page.
+ * or board doesn't re-hit the API on every page.
  *
  * Renders nothing on the home page and on auth screens; the Navbar
  * keeps the Madori wordmark visible there instead. On every other
@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 // best-effort prettified version of the segment.
 const SECTION_LABELS: Record<string, string> = {
   spaces: "Spaces",
-  projects: "Projects",
+  boards: "Boards",
   discussions: "Discussions",
   pages: "Pages",
   groups: "Groups",
@@ -50,7 +50,7 @@ const SECTION_LABELS: Record<string, string> = {
 // id (shortened).
 const ENTITY_DISPLAY_FIELD: Record<string, string> = {
   spaces: "name",
-  projects: "title",
+  boards: "title",
   discussions: "title",
   pages: "title",
   groups: "title",

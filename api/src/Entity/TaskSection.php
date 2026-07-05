@@ -19,15 +19,15 @@ use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * A named group of tasks on a project board ("section"). Tasks reference a
+ * A named group of tasks on a board board ("section"). Tasks reference a
  * section via {@see Task::$section}; a task with no section renders under the
  * implicit default "In progress" group, so existing tasks need no backfill.
  *
- * Access mirrors the parent project's space (any space member can read and
+ * Access mirrors the parent board's space (any space member can read and
  * manage sections — they're lightweight board organisation, not structural
  * schema like custom fields). The denormalised `space` FK lets the shared
  * {@see App\Doctrine\AbstractSpaceAccessExtension} scope collections without
- * joining through `project`.
+ * joining through `board`.
  */
 #[ApiResource(
     shortName: 'TaskSection',
@@ -37,27 +37,27 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject() !== null and object.getProject().isAccessibleBy(user) and is_granted('space.projects.update', object)))",
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getBoard() !== null and object.getBoard().isAccessibleBy(user) and is_granted('space.boards.update', object)))",
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject().isAccessibleBy(user) and is_granted('space.projects.read', object)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getBoard().isAccessibleBy(user) and is_granted('space.boards.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject().isAccessibleBy(user) and is_granted('space.projects.update', object)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getBoard().isAccessibleBy(user) and is_granted('space.boards.update', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getProject().isAccessibleBy(user) and is_granted('space.projects.update', object)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getBoard().isAccessibleBy(user) and is_granted('space.boards.update', object)))",
         ),
     ],
     normalizationContext: ['groups' => ['task_section:read']],
     denormalizationContext: ['groups' => ['task_section:write']],
     order: ['position' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['project' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['board' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: TaskSectionRepository::class)]
 #[ORM\Table(name: 'task_section')]
-#[ORM\Index(columns: ['project_id', 'position'], name: 'idx_task_section_project_position')]
+#[ORM\Index(columns: ['board_id', 'position'], name: 'idx_task_section_project_position')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_task_section_space')]
 #[ORM\HasLifecycleCallbacks]
 class TaskSection
@@ -72,11 +72,11 @@ class TaskSection
     private ?Uuid $id = null;
 
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\ManyToOne(targetEntity: Board::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Assert\NotNull(message: 'Project is required.')]
+    #[Assert\NotNull(message: 'Board is required.')]
     #[Groups(['task_section:read', 'task_section:write'])]
-    private ?Project $project = null;
+    private ?Board $board = null;
 
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -97,16 +97,16 @@ class TaskSection
     private int $position = 0;
 
     /**
-     * Denormalise the parent project's space on insert so the access extension
-     * can scope by `space` without joining through `project` (mirrors
+     * Denormalise the parent board's space on insert so the access extension
+     * can scope by `space` without joining through `board` (mirrors
      * CustomFieldDefinition::syncSpaceFromProject).
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
     public function syncSpaceFromProject(): void
     {
-        if (null !== $this->project) {
-            $this->space = $this->project->getSpace();
+        if (null !== $this->board) {
+            $this->space = $this->board->getSpace();
         }
     }
 
@@ -115,14 +115,14 @@ class TaskSection
         return $this->id;
     }
 
-    public function getProject(): ?Project
+    public function getBoard(): ?Board
     {
-        return $this->project;
+        return $this->board;
     }
 
-    public function setProject(?Project $project): self
+    public function setBoard(?Board $board): self
     {
-        $this->project = $project;
+        $this->board = $board;
 
         return $this;
     }

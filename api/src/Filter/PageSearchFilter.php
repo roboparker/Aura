@@ -13,7 +13,7 @@ use Doctrine\ORM\QueryBuilder;
  * Free-text filter for the `Page` collection: `?search={q}` narrows
  * to pages whose title/body tsvector matches the query (#183).
  *
- * Uses the same shape as {@see ProjectSearchFilter} and
+ * Uses the same shape as {@see BoardSearchFilter} and
  * {@see DiscussionSearchFilter}: STORED `search_vector` generated
  * column on `page` (title weighted A, body B), GIN-indexed,
  * `websearch_to_tsquery` so the navbar's typed input passes through

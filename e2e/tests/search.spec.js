@@ -125,7 +125,7 @@ test.describe("Search page + autocomplete", () => {
     await expect(page.getByTestId("search-result-count")).toContainText("2 results");
   });
 
-  test("kind tabs switch between tasks, projects, and discussions", async ({
+  test("kind tabs switch between tasks, boards, and discussions", async ({
     page,
   }) => {
     const email = uniqueEmail("search-kinds");
@@ -133,15 +133,15 @@ test.describe("Search page + autocomplete", () => {
 
     const ldHeaders = { "Content-Type": "application/ld+json" };
     const stamp = Date.now();
-    const projectTitle = `Pinwheel project ${stamp}`;
+    const boardTitle = `Pinwheel board ${stamp}`;
     const taskTitle = `Pinwheel task ${stamp}`;
     const discussionTitle = `Pinwheel discussion ${stamp}`;
 
-    const projectRes = await page.request.post(`${BASE_URL}/projects`, {
+    const boardRes = await page.request.post(`${BASE_URL}/boards`, {
       headers: ldHeaders,
-      data: { title: projectTitle, description: "Spinning the wheel." },
+      data: { title: boardTitle, description: "Spinning the wheel." },
     });
-    expect(projectRes.ok()).toBeTruthy();
+    expect(boardRes.ok()).toBeTruthy();
 
     const taskRes = await page.request.post(`${BASE_URL}/tasks`, {
       headers: ldHeaders,
@@ -172,12 +172,12 @@ test.describe("Search page + autocomplete", () => {
     // Default tab is Tasks.
     await expect(page.getByTestId("search-results")).toContainText(taskTitle);
     await expect(page.getByTestId("search-results")).not.toContainText(
-      projectTitle,
+      boardTitle,
     );
 
-    await page.getByTestId("search-kind-projects").click();
-    await expect(page).toHaveURL(/kind=projects/);
-    await expect(page.getByTestId("search-results")).toContainText(projectTitle);
+    await page.getByTestId("search-kind-boards").click();
+    await expect(page).toHaveURL(/kind=boards/);
+    await expect(page.getByTestId("search-results")).toContainText(boardTitle);
     await expect(page.getByTestId("search-results")).not.toContainText(
       taskTitle,
     );

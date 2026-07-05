@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Security\Permission;
 
+use App\Entity\EngagementCategory;
+use App\Entity\Engagement;
 use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Discussion;
 use App\Entity\Invoice;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
@@ -80,18 +82,20 @@ final class SpacePermissionVoter extends Voter
     private function resolveSpace(mixed $subject): ?Space
     {
         return match (true) {
-            $subject instanceof Project => $subject->getSpace(),
-            $subject instanceof Task => $subject->getProject()?->getSpace(),
+            $subject instanceof Board => $subject->getSpace(),
+            $subject instanceof Task => $subject->getBoard()?->getSpace(),
             $subject instanceof Page => $subject->getSpace(),
             $subject instanceof Discussion => $subject->getSpace(),
             $subject instanceof CustomFieldDefinition => $subject->getSpace(),
             $subject instanceof Tag => $subject->getSpace(),
             $subject instanceof UserGroup => $subject->getSpace(),
-            $subject instanceof TaskSection => $subject->getProject()?->getSpace(),
+            $subject instanceof TaskSection => $subject->getBoard()?->getSpace(),
             $subject instanceof TimeEntry => $subject->getSpace(),
             $subject instanceof Client => $subject->getSpace(),
+            $subject instanceof Engagement => $subject->getSpace(),
+            $subject instanceof EngagementCategory => $subject->getEngagement()?->getSpace(),
             $subject instanceof Invoice => $subject->getSpace(),
-            $subject instanceof TaskRelationship => $subject->getSource()?->getProject()?->getSpace(),
+            $subject instanceof TaskRelationship => $subject->getSource()?->getBoard()?->getSpace(),
             $subject instanceof Comment => $this->commentSpace($subject),
             default => null,
         };
@@ -101,7 +105,7 @@ final class SpacePermissionVoter extends Voter
     {
         $task = $comment->getTask();
         if (null !== $task) {
-            return $task->getProject()?->getSpace();
+            return $task->getBoard()?->getSpace();
         }
         $page = $comment->getPage();
         if (null !== $page) {

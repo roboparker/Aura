@@ -10,8 +10,8 @@ namespace App\Security\Permission;
  * `{category: {action: bool}}` matrix over these; the resolver/voter (Phase 2)
  * read it to decide what a member may do.
  *
- * Riders without their own category: task sections ride `projects`, task
- * relationships ride `tasks`, and per-project custom-field visibility rides
+ * Riders without their own category: task sections ride `boards`, task
+ * relationships ride `tasks`, and per-board custom-field visibility rides
  * `custom_fields`.
  */
 final class SpacePermission
@@ -24,7 +24,7 @@ final class SpacePermission
     /** @var list<string> */
     public const ACTIONS = [self::CREATE, self::READ, self::UPDATE, self::DELETE];
 
-    public const PROJECTS = 'projects';
+    public const PROJECTS = 'boards';
     public const TASKS = 'tasks';
     public const PAGES = 'pages';
     public const DISCUSSIONS = 'discussions';

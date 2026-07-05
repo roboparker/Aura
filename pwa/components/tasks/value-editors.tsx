@@ -70,9 +70,9 @@ export interface ValueEditorProps {
   onChange: (next: unknown) => void;
   error?: string | null;
   disabled?: boolean;
-  /** Project the task belongs to (reference task scope). */
-  projectIri?: string | null;
-  /** Space the project lives in (reference project/page/discussion scope). */
+  /** Board the task belongs to (reference task scope). */
+  boardIri?: string | null;
+  /** Space the board lives in (reference board/page/discussion scope). */
   spaceIri?: string | null;
   /** Space members for reference.user (avoids a fetch). */
   users?: AvatarUser[];
@@ -605,11 +605,11 @@ interface RefOption {
 }
 
 const ReferenceValue = (props: ValueEditorProps) => {
-  const { definition, value, onChange, disabled, users, projectIri, spaceIri } =
+  const { definition, value, onChange, disabled, users, boardIri, spaceIri } =
     props;
   const options = useReferenceOptions(
     definition.subtype,
-    { users, projectIri, spaceIri },
+    { users, boardIri, spaceIri },
   );
   const byIri = useMemo(
     () => new Map(options.map((o) => [o.iri, o])),
@@ -694,7 +694,7 @@ const ReferenceValue = (props: ValueEditorProps) => {
 
 interface RefScope {
   users?: AvatarUser[];
-  projectIri?: string | null;
+  boardIri?: string | null;
   spaceIri?: string | null;
 }
 
@@ -707,13 +707,13 @@ interface CollectionItem {
 /**
  * Load the option set for a reference subtype, scoped to match the
  * server-side validation: users from the space members (passed in), tasks
- * from the current project, projects/pages/discussions from the space.
+ * from the current board, boards/pages/discussions from the space.
  */
 const useReferenceOptions = (
   subtype: string,
   scope: RefScope,
 ): RefOption[] => {
-  const { users, projectIri, spaceIri } = scope;
+  const { users, boardIri, spaceIri } = scope;
   const [fetched, setFetched] = useState<RefOption[]>([]);
 
   const userOptions = useMemo<RefOption[]>(
@@ -728,7 +728,7 @@ const useReferenceOptions = (
 
   useEffect(() => {
     if (subtype === "user") return;
-    const endpoint = referenceEndpoint(subtype, { projectIri, spaceIri });
+    const endpoint = referenceEndpoint(subtype, { boardIri, spaceIri });
     if (!endpoint) {
       setFetched([]);
       return;
@@ -757,25 +757,25 @@ const useReferenceOptions = (
     return () => {
       cancelled = true;
     };
-  }, [subtype, projectIri, spaceIri]);
+  }, [subtype, boardIri, spaceIri]);
 
   return subtype === "user" ? userOptions : fetched;
 };
 
 const referenceEndpoint = (
   subtype: string,
-  scope: { projectIri?: string | null; spaceIri?: string | null },
+  scope: { boardIri?: string | null; spaceIri?: string | null },
 ): string | null => {
   const space = scope.spaceIri
     ? `?space=${encodeURIComponent(scope.spaceIri)}`
     : "";
   switch (subtype) {
     case "task":
-      return scope.projectIri
-        ? `/tasks?project=${encodeURIComponent(scope.projectIri)}`
+      return scope.boardIri
+        ? `/tasks?board=${encodeURIComponent(scope.boardIri)}`
         : null;
-    case "project":
-      return `/projects${space}`;
+    case "board":
+      return `/boards${space}`;
     case "page":
       return `/pages${space}`;
     case "discussion":

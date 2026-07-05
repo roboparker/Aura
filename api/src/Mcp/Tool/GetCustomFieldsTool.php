@@ -3,7 +3,7 @@
 namespace App\Mcp\Tool;
 
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
 use App\Mcp\McpEntitySerializer;
@@ -28,7 +28,7 @@ final class GetCustomFieldsTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List custom field definitions for a project, ordered by position. Returns each field\'s name, kind/subtype (boolean.boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page,discussion}), config, optional footer aggregation descriptor, nullable flag, and visibility (list|board|both).';
+        return 'List custom field definitions for a board, ordered by position. Returns each field\'s name, kind/subtype (boolean.boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page,discussion}), config, optional footer aggregation descriptor, nullable flag, and visibility (list|board|both).';
     }
 
     public function getInputSchema(): array
@@ -36,28 +36,28 @@ final class GetCustomFieldsTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'projectId' => ['type' => 'string'],
+                'boardId' => ['type' => 'string'],
             ],
-            'required' => ['projectId'],
+            'required' => ['boardId'],
             'additionalProperties' => false,
         ];
     }
 
     public function invoke(array $arguments, User $user): array
     {
-        $projectId = $this->input->requireUuid('projectId', $arguments['projectId'] ?? null);
-        $project = $this->em->getRepository(Project::class)->find($projectId);
-        if (null === $project || !$this->authz->canReadProject($project, $user)) {
-            throw McpException::notFound(sprintf('Project %s', $projectId));
+        $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
+        $board = $this->em->getRepository(Board::class)->find($boardId);
+        if (null === $board || !$this->authz->canReadProject($board, $user)) {
+            throw McpException::notFound(sprintf('Board %s', $boardId));
         }
 
-        // Fields are space-owned now (#custom-fields-space) but per-project
-        // shown — list the fields this project has opted into.
+        // Fields are space-owned now (#custom-fields-space) but per-board
+        // shown — list the fields this board has opted into.
         $fields = $this->em->getRepository(CustomFieldDefinition::class)
             ->createQueryBuilder('f')
-            ->innerJoin('f.projects', 'p')
-            ->where('p = :project')
-            ->setParameter('project', $project)
+            ->innerJoin('f.boards', 'p')
+            ->where('p = :board')
+            ->setParameter('board', $board)
             ->orderBy('f.position', 'ASC')
             ->addOrderBy('f.createdAt', 'ASC')
             ->getQuery()

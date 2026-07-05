@@ -5,13 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   ChevronDown,
+  CreditCard,
   Plus,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
   Tag,
-  Clock,
-  Receipt,
   Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,10 +73,10 @@ interface ResourceRow {
  * / `discussions`), scoped by `?space=<iri>` — the same filter the
  * aggregators and SpaceContentTabs use.
  *
- * Keyed under the resource's react-query prefix (e.g. `["projects", …]`)
- * so the aggregators' `invalidateQueries({ queryKey: ["projects"] })`
- * on create/edit/delete refreshes this list too — a project added on
- * `/projects` shows up here without a manual reload.
+ * Keyed under the resource's react-query prefix (e.g. `["boards", …]`)
+ * so the aggregators' `invalidateQueries({ queryKey: ["boards"] })`
+ * on create/edit/delete refreshes this list too — a board added on
+ * `/boards` shows up here without a manual reload.
  */
 function useSpaceResources(
   spaceIri: string | null,
@@ -355,11 +353,13 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
 };
 
 /**
- * Workspace settings as a collapsible nav section, mirroring {@see AdminSection}
- * but visible to every member. Sits under the content sections (below
- * Discussions). Currently just the space-scoped tag manager.
+ * Space membership + access management (Users, Roles, API keys) as a
+ * collapsible nav group, mirroring {@see AdminSection}. Users + Roles are
+ * space-admin only; API keys is gated on the `api_keys` read capability
+ * (admins have it by default, a role can grant it to a member too). The
+ * "General" space settings live in a standalone link above this group.
  */
-const SettingsSection = ({
+const UserManagementSection = ({
   wrap,
 }: {
   wrap: (children: ReactNode) => ReactNode;
@@ -367,7 +367,7 @@ const SettingsSection = ({
   const router = useRouter();
   const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
 
-  const storageKey = "madori.navCollapsed.settings";
+  const storageKey = "madori.navCollapsed.userManagement";
   const [collapsed, setCollapsed] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -386,16 +386,8 @@ const SettingsSection = ({
     });
 
   const links = [
-    // "General" + "Users" edit the active space; both target admin-gated
-    // pages, so only surface them to space admins. Users holds members,
-    // invites, and groups.
     ...(activeSpace && isActiveSpaceAdmin
       ? [
-          {
-            href: `/spaces/${activeSpace.id}/settings`,
-            label: "General",
-            match: "/spaces/[id]/settings",
-          },
           {
             href: `/spaces/${activeSpace.id}/users`,
             label: "Users",
@@ -408,8 +400,6 @@ const SettingsSection = ({
           },
         ]
       : []),
-    // API keys is gated on the `api_keys` permission, not space-admin: admins
-    // have it by default, but a member granted it via a role sees it too.
     ...(activeSpace && can("api_keys", "read")
       ? [
           {
@@ -421,8 +411,6 @@ const SettingsSection = ({
       : []),
   ];
 
-  // Tags + Custom fields moved out to top-level nav items; only space
-  // admins have anything left in this section.
   if (links.length === 0) return null;
 
   return (
@@ -431,11 +419,11 @@ const SettingsSection = ({
         type="button"
         onClick={toggle}
         aria-expanded={!collapsed}
-        aria-label={`${collapsed ? "Expand" : "Collapse"} Settings`}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} User management`}
         className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
       >
-        <Settings className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate">Settings</span>
+        <Users className="size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
+        <span className="truncate">User management</span>
         <ChevronDown
           className={cn(
             "ml-auto size-3.5 transition-transform",
@@ -472,6 +460,176 @@ const SettingsSection = ({
 };
 
 /**
+ * Content taxonomy tools (tags, custom fields) as a collapsible nav group,
+ * mirroring {@see AdminSection}. Both are space-scoped and visible to every
+ * member of the active space.
+ */
+const TaxonomySection = ({
+  wrap,
+}: {
+  wrap: (children: ReactNode) => ReactNode;
+}) => {
+  const router = useRouter();
+
+  const storageKey = "madori.navCollapsed.taxonomy";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  const links = [
+    { href: "/tags", label: "Tags", match: "/tags" },
+    { href: "/custom-fields", label: "Custom fields", match: "/custom-fields" },
+  ];
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Taxonomy`}
+        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        <Tag className="size-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
+        <span className="truncate">Taxonomy</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        links.map((link) => {
+          const active = router.pathname.startsWith(link.match);
+          return (
+            <span key={link.href}>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full min-w-0 justify-start font-normal",
+                    active && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href={link.href}>
+                    <span className="truncate pl-5">{link.label}</span>
+                  </Link>
+                </Button>,
+              )}
+            </span>
+          );
+        })}
+    </div>
+  );
+};
+
+/**
+ * Billing-related workspace tools (time tracking, clients, invoices) as a
+ * collapsible nav group, mirroring {@see AdminSection}. Time is available to
+ * every member; Clients + Invoices require the `invoices` read capability.
+ */
+const BillingSection = ({
+  wrap,
+  canInvoices,
+}: {
+  wrap: (children: ReactNode) => ReactNode;
+  canInvoices: boolean;
+}) => {
+  const router = useRouter();
+
+  const storageKey = "madori.navCollapsed.billing";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  const links = [
+    { href: "/time", label: "Time", match: "/time", show: true },
+    { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
+    { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
+    { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
+  ].filter((l) => l.show);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Billing`}
+        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        <CreditCard className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
+        <span className="truncate">Billing</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        links.map(({ href, label, match }) => {
+          const active = router.pathname.startsWith(match);
+          return (
+            <span key={href}>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full min-w-0 justify-start font-normal",
+                    active && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href={href}>
+                    {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, lining the row
+                        text up under the heading label. */}
+                    <span className="truncate pl-5">{label}</span>
+                  </Link>
+                </Button>,
+              )}
+            </span>
+          );
+        })}
+    </div>
+  );
+};
+
+/**
  * Shared navigation contents used by both the persistent left-side
  * `<Sidebar>` (`md:` and up) and the mobile-only Sheet variant in the
  * navbar. Single source of truth so the space switcher, content
@@ -482,7 +640,7 @@ const SidebarNav = ({
   includeSpaceSwitcher = false,
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
-  const { activeSpace, can } = useActiveSpace();
+  const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
   const router = useRouter();
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const canInvoices = can("invoices", "read");
@@ -532,8 +690,14 @@ const SidebarNav = ({
             />
           ))}
 
-        {activeSpace && (
-          <span>
+        {activeSpace && <TaxonomySection wrap={wrap} />}
+
+        {activeSpace && <BillingSection wrap={wrap} canInvoices={canInvoices} />}
+
+        <UserManagementSection wrap={wrap} />
+
+        {activeSpace && isActiveSpaceAdmin && (
+          <div className="mt-3">
             {wrap(
               <Button
                 asChild
@@ -541,108 +705,18 @@ const SidebarNav = ({
                 size="sm"
                 className={cn(
                   "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/tags") &&
+                  router.pathname === "/spaces/[id]/settings" &&
                     "bg-accent text-accent-foreground",
                 )}
               >
-                <Link href="/tags">
-                  <Tag className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
-                  <span className="truncate">Tags</span>
+                <Link href={`/spaces/${activeSpace.id}/settings`}>
+                  <Settings className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">Settings</span>
                 </Link>
               </Button>,
             )}
-          </span>
+          </div>
         )}
-
-        {activeSpace && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/custom-fields") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/custom-fields">
-                  <SlidersHorizontal className="size-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" />
-                  <span className="truncate">Custom fields</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        {activeSpace && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/time") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/time">
-                  <Clock className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
-                  <span className="truncate">Time</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        {activeSpace && canInvoices && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/clients") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/clients">
-                  <Users className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span className="truncate">Clients</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        {activeSpace && canInvoices && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/invoices") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/invoices">
-                  <Receipt className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span className="truncate">Invoices</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        <SettingsSection wrap={wrap} />
 
         {isAdmin && <AdminSection wrap={wrap} />}
       </nav>

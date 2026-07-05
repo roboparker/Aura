@@ -17,7 +17,7 @@ use Symfony\Component\Intl\Currencies;
  *
  *   - `amount` is in MINOR UNITS (cents for USD, pence for GBP, fils
  *     for KWD, …) so the wire is integer-only and we never accumulate
- *     IEEE-754 rounding drift across a project's task list. Clients do
+ *     IEEE-754 rounding drift across a board's task list. Clients do
  *     their own minor↔major conversion based on the currency's
  *     fraction-digits (Intl knows this).
  *   - `currency` is the ISO-4217 code (uppercased on normalize) — gold
@@ -28,7 +28,7 @@ use Symfony\Component\Intl\Currencies;
  * REQUIRED at field-creation time so every value in the column is
  * commensurate (you can't average USD with EUR). Multi is deliberately
  * disabled: a "list of money values" use case is rare and conflates
- * with the project-footer sum/avg aggregation. If a real use case
+ * with the board-footer sum/avg aggregation. If a real use case
  * surfaces, lift the restriction in a follow-up rather than papering
  * over it here.
  *

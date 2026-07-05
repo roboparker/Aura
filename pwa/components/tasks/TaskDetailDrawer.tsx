@@ -21,7 +21,6 @@ import AttachmentsPanel from "@/components/tasks/AttachmentsPanel";
 import DueDateCell from "@/components/tasks/DueDateCell";
 import RecurrenceEditor from "@/components/tasks/RecurrenceEditor";
 import RemindersEditor from "@/components/tasks/RemindersEditor";
-import TimeTrackingPanel from "@/components/tasks/TimeTrackingPanel";
 import TaskRelationshipsPanel from "@/components/tasks/TaskRelationshipsPanel";
 import CommentsPanel from "@/components/common/CommentsPanel";
 import ActivityPanel from "@/components/activity/ActivityPanel";
@@ -70,7 +69,7 @@ interface DrawerTask {
   attachments: DrawerAttachment[];
   tags: TagOption[];
   assignees: AssigneeOption[];
-  project: string | null;
+  board: string | null;
   customFieldValues: CustomFieldValuePair[];
 }
 
@@ -164,11 +163,11 @@ const TaskDetailDrawer = ({
   }, [open, taskId]);
 
   const taskIri = task?.["@id"] ?? null;
-  const projectIri = task?.project ?? null;
+  const boardIri = task?.board ?? null;
 
-  // Load the project's custom field definitions + parent space.
+  // Load the board's custom field definitions + parent space.
   useEffect(() => {
-    if (!projectIri) {
+    if (!boardIri) {
       setDefinitions([]);
       setSpaceIri(null);
       return;
@@ -178,20 +177,20 @@ const TaskDetailDrawer = ({
       try {
         const [defsRes, globalDefsRes, projRes] = await Promise.all([
           fetch(
-            `${ENTRYPOINT}/custom_field_definitions?project=${encodeURIComponent(projectIri)}`,
+            `${ENTRYPOINT}/custom_field_definitions?board=${encodeURIComponent(boardIri)}`,
             { credentials: "include", headers: { Accept: "application/ld+json" } },
           ),
           fetch(
-            `${ENTRYPOINT}/global_custom_field_definitions?projects=${encodeURIComponent(projectIri)}`,
+            `${ENTRYPOINT}/global_custom_field_definitions?boards=${encodeURIComponent(boardIri)}`,
             { credentials: "include", headers: { Accept: "application/ld+json" } },
           ),
-          fetch(`${ENTRYPOINT}${projectIri}`, {
+          fetch(`${ENTRYPOINT}${boardIri}`, {
             credentials: "include",
             headers: { Accept: "application/ld+json" },
           }),
         ]);
         if (!cancelled && (defsRes.ok || globalDefsRes.ok)) {
-          // Effective field set = the project's space fields ∪ its opted-in
+          // Effective field set = the board's space fields ∪ its opted-in
           // global fields (#global-custom-fields).
           const spaceDefs: CustomFieldDefinition[] = defsRes.ok
             ? membersOf(await defsRes.json())
@@ -216,7 +215,7 @@ const TaskDetailDrawer = ({
     return () => {
       cancelled = true;
     };
-  }, [projectIri]);
+  }, [boardIri]);
 
   // Load comments once the task is known.
   useEffect(() => {
@@ -529,12 +528,12 @@ const TaskDetailDrawer = ({
                 </Row>
               </dl>
 
-              {task.project && definitions.length > 0 && (
+              {task.board && definitions.length > 0 && (
                 <CustomFieldValueList
                   definitions={definitions}
                   values={task.customFieldValues}
                   onSave={saveCustomFields}
-                  projectIri={task.project}
+                  boardIri={task.board}
                   spaceIri={spaceIri}
                   users={assignableUsers}
                 />
@@ -570,13 +569,6 @@ const TaskDetailDrawer = ({
                 dueDate={task.dueDate}
                 onChange={(next) => void patchTask({ reminders: next })}
               />
-
-              <div className="space-y-1.5">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Time
-                </p>
-                <TimeTrackingPanel taskIri={task["@id"]} projectIri={task.project} />
-              </div>
 
               <Tabs defaultValue="comments" className="mt-auto border-t pt-4">
                 <TabsList variant="line">

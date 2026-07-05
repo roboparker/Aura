@@ -23,7 +23,7 @@ const renderMentionsInText = (input: string): ReactNode => {
   let cursor = 0;
   let match: RegExpExecArray | null;
   // Reset and reuse a single regex instance so we don't depend on
-  // matchAll iteration support (the project's TS target is below es2015).
+  // matchAll iteration support (the board's TS target is below es2015).
   MENTION_PATTERN.lastIndex = 0;
   while ((match = MENTION_PATTERN.exec(input)) !== null) {
     const idx = match.index;

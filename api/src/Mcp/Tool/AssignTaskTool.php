@@ -27,7 +27,7 @@ final class AssignTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Add an assignee to a task without disturbing the existing list. Assignee must be the task owner or, for project tasks, a member of the project — same rule the PWA enforces.';
+        return 'Add an assignee to a task without disturbing the existing list. Assignee must be the task owner or, for board tasks, a member of the board — same rule the PWA enforces.';
     }
 
     public function getInputSchema(): array

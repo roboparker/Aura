@@ -107,7 +107,7 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     await expect(item.locator("text=SUM")).toBeVisible();
   });
 
-  test("reference field offers the project target", async ({
+  test("reference field offers the board target", async ({
     page,
   }) => {
     await registerAndSignIn(page, uniqueEmail());
@@ -117,23 +117,23 @@ test.describe("Custom field definitions (kind-aware, #227)", () => {
     const sheet = page.getByTestId("custom-field-sheet");
     await sheet.getByTestId("custom-field-kind-input").selectOption("reference");
 
-    // Target-type cards include Project (the strategy added this round).
-    await sheet.getByTestId("custom-field-reference-project").click();
+    // Target-type cards include Board (the strategy added this round).
+    await sheet.getByTestId("custom-field-reference-board").click();
     await expect(sheet.getByTestId("custom-field-subtype-input")).toHaveValue(
-      "project",
+      "board",
     );
-    await sheet.getByTestId("custom-field-name-input").fill("Related project");
+    await sheet.getByTestId("custom-field-name-input").fill("Related board");
     await sheet.getByTestId("custom-field-save").click();
 
     const item = page.locator('[data-testid="custom-field-item"]', {
-      hasText: "Related project",
+      hasText: "Related board",
     });
     await expect(item).toBeVisible();
-    await expect(item.locator("text=reference · project")).toBeVisible();
+    await expect(item.locator("text=reference · board")).toBeVisible();
   });
 });
 
 // API-side authorization (any space member can write), the reorder endpoint,
-// fill/option stats, and the Loggable change feed (project-scoped) are covered
+// fill/option stats, and the Loggable change feed (board-scoped) are covered
 // by PHPUnit (CustomField* tests under api/tests/Api/). The change-log drawer
-// is only shown in a project context, not on the space-level manager.
+// is only shown in a board context, not on the space-level manager.

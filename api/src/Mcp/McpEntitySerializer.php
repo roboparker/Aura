@@ -8,7 +8,7 @@ use App\Entity\CustomFieldValue;
 use App\Entity\Discussion;
 use App\Entity\MediaObject;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
@@ -40,7 +40,7 @@ final class McpEntitySerializer
             'recurrenceRule' => $task->getRecurrenceRule(),
             'reminders' => $task->getReminders(),
             'owner' => $this->userSummary($task->getOwner()),
-            'project' => null === $task->getProject() ? null : $this->projectSummary($task->getProject()),
+            'board' => null === $task->getBoard() ? null : $this->boardSummary($task->getBoard()),
             'assignees' => array_map(
                 fn (User $u) => $this->userSummary($u),
                 $task->getAssignees()->toArray(),
@@ -68,18 +68,18 @@ final class McpEntitySerializer
     /**
      * @return array<string, mixed>
      */
-    public function project(Project $project, ?int $taskCount = null, ?int $openTaskCount = null): array
+    public function board(Board $board, ?int $taskCount = null, ?int $openTaskCount = null): array
     {
         // Members are derived from the parent space (direct + group)
-        // since #185 — `Project::getEffectiveMembers()` returns a
-        // dedupe-keyed map of every user with access to the project.
-        $members = $project->getEffectiveMembers();
+        // since #185 — `Board::getEffectiveMembers()` returns a
+        // dedupe-keyed map of every user with access to the board.
+        $members = $board->getEffectiveMembers();
         return [
-            'id' => (string) $project->getId(),
-            'title' => $project->getTitle(),
-            'description' => $project->getDescription(),
-            'createdOn' => $project->getCreatedOn()->format(\DateTimeInterface::ATOM),
-            'owner' => $this->userSummary($project->getOwner()),
+            'id' => (string) $board->getId(),
+            'title' => $board->getTitle(),
+            'description' => $board->getDescription(),
+            'createdOn' => $board->getCreatedOn()->format(\DateTimeInterface::ATOM),
+            'owner' => $this->userSummary($board->getOwner()),
             'memberCount' => count($members),
             'members' => array_map(
                 fn (User $u) => $this->userSummary($u),
@@ -106,7 +106,7 @@ final class McpEntitySerializer
             'isPersonal' => $space->getIsPersonal(),
             'visibility' => $space->getVisibility(),
             'role' => $space->isAdmin($viewer) ? Space::ROLE_ADMIN : Space::ROLE_MEMBER,
-            'projectCount' => $space->getProjectsCount(),
+            'boardCount' => $space->getBoardsCount(),
             'pageCount' => $space->getPagesCount(),
             'createdOn' => $space->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
@@ -232,16 +232,16 @@ final class McpEntitySerializer
     }
 
     /**
-     * Compact project label embedded inside Task responses. The full
+     * Compact board label embedded inside Task responses. The full
      * member list is omitted to keep the payload tight.
      *
      * @return array<string, mixed>
      */
-    public function projectSummary(Project $project): array
+    public function boardSummary(Board $board): array
     {
         return [
-            'id' => (string) $project->getId(),
-            'title' => $project->getTitle(),
+            'id' => (string) $board->getId(),
+            'title' => $board->getTitle(),
         ];
     }
 }

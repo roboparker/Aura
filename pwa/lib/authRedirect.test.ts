@@ -3,7 +3,7 @@ import { isSafeNextPath, safeNextPath, signinHrefForCurrent } from "./authRedire
 
 describe("isSafeNextPath", () => {
   it("accepts a plain root-relative path", () => {
-    expect(isSafeNextPath("/projects")).toBe(true);
+    expect(isSafeNextPath("/boards")).toBe(true);
     expect(isSafeNextPath("/tasks?status=open#top")).toBe(true);
   });
 
@@ -15,7 +15,7 @@ describe("isSafeNextPath", () => {
   });
 
   it("rejects values that don't start with a single slash", () => {
-    expect(isSafeNextPath("projects")).toBe(false);
+    expect(isSafeNextPath("boards")).toBe(false);
     expect(isSafeNextPath("https://evil.com")).toBe(false);
     expect(isSafeNextPath("javascript:alert(1)")).toBe(false);
     expect(isSafeNextPath("data:text/html,x")).toBe(false);
@@ -29,7 +29,7 @@ describe("isSafeNextPath", () => {
   it("rejects unresolved dynamic-route patterns", () => {
     // These leak in when router.asPath is read before the router is ready;
     // handed to router.push they throw "missing query values".
-    expect(isSafeNextPath("/projects/[id]")).toBe(false);
+    expect(isSafeNextPath("/boards/[id]")).toBe(false);
     expect(isSafeNextPath("/spaces/[id]?tab=files")).toBe(false);
   });
 });
@@ -40,14 +40,14 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/a/b#frag")).toBe("/a/b#frag");
   });
 
-  it("falls back to /projects for hostile or invalid input", () => {
-    expect(safeNextPath("//evil.com")).toBe("/projects");
-    expect(safeNextPath("https://evil.com/x")).toBe("/projects");
-    expect(safeNextPath(undefined)).toBe("/projects");
-    expect(safeNextPath("")).toBe("/projects");
+  it("falls back to /boards for hostile or invalid input", () => {
+    expect(safeNextPath("//evil.com")).toBe("/boards");
+    expect(safeNextPath("https://evil.com/x")).toBe("/boards");
+    expect(safeNextPath(undefined)).toBe("/boards");
+    expect(safeNextPath("")).toBe("/boards");
     // A captured route pattern must fall back, not crash router.push (the
     // bug where sign-in appeared to do nothing).
-    expect(safeNextPath("/projects/[id]")).toBe("/projects");
+    expect(safeNextPath("/boards/[id]")).toBe("/boards");
   });
 
   it("honours a custom fallback", () => {
@@ -58,8 +58,8 @@ describe("safeNextPath", () => {
 
 describe("signinHrefForCurrent", () => {
   it("preserves a safe current path as ?next=", () => {
-    expect(signinHrefForCurrent("/projects/123")).toBe(
-      "/signin?next=%2Fprojects%2F123",
+    expect(signinHrefForCurrent("/boards/123")).toBe(
+      "/signin?next=%2Fboards%2F123",
     );
   });
 

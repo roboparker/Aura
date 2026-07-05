@@ -29,7 +29,7 @@ final class SpaceKeyAccessListener
 {
     /** First path segment → permission category. Anything else is denied. */
     private const PREFIX_TO_CATEGORY = [
-        'projects' => SpacePermission::PROJECTS,
+        'boards' => SpacePermission::PROJECTS,
         'tasks' => SpacePermission::TASKS,
         'pages' => SpacePermission::PAGES,
         'discussions' => SpacePermission::DISCUSSIONS,

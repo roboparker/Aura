@@ -30,6 +30,9 @@ class ClientInvoiceTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -139,14 +142,15 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
+        [$bpIri, $devCat, $buildCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
 
-        // Two billable completed entries + one non-billable (excluded).
-        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
-        $this->trackTime($client, $spaceIri, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00', true, 8000);
-        $this->trackTime($client, $spaceIri, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00', false, 9000);
+        // Two billable completed entries (distinct category rates) + one non-billable (excluded).
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
+        $this->trackTime($client, $spaceIri, $bpIri, $buildCat, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00', true);
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00', false);
 
         $response = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertSame(201, $response->getStatusCode(), $response->getContent(false));
@@ -158,7 +162,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         // The pulled entries are now billed, so a second run has nothing to bill.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -176,9 +180,10 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
+        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $invoiceIri = $invoice['@id'];
@@ -221,10 +226,11 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $this->trackTime($client, $spaceIri, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true, 6000);
+        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
 
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
 
@@ -236,7 +242,7 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
 
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id']],
+            'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -490,23 +496,69 @@ class ClientInvoiceTest extends ApiTestCase
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
+        string $engagementIri,
+        string $categoryIri,
         string $startedAt,
         string $endedAt,
         bool $billable,
-        int $rateAmount,
     ): void {
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
+                'engagement' => $engagementIri,
+                'category' => $categoryIri,
                 'startedAt' => $startedAt,
                 'endedAt' => $endedAt,
                 'billable' => $billable,
-                'rateAmount' => $rateAmount,
-                'rateCurrency' => 'USD',
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
+    }
+
+    /**
+     * Admin creates a engagement (for $clientIri) with two categories —
+     * "Dev" @ 6000 and "Build" @ 8000 — so tracked-time tests can hit distinct
+     * rates. Returns [engagementIri, devCategoryIri, buildCategoryIri].
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    private function createEngagement(
+        \ApiPlatform\Symfony\Bundle\Test\Client $client,
+        string $spaceIri,
+        string $clientIri,
+    ): array {
+        $row = $client->request('POST', '/engagements', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientIri,
+                'name' => 'Acme Website',
+                'currency' => 'USD',
+                'categories' => [
+                    ['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0],
+                    ['name' => 'Build', 'rateAmount' => 8000, 'position' => 1],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+
+        $bpIri = $this->iri($row);
+        $categories = $row['categories'] ?? [];
+        $this->assertIsArray($categories);
+        $byName = [];
+        foreach ($categories as $category) {
+            $this->assertIsArray($category);
+            $name = $category['name'] ?? null;
+            $iri = $category['@id'] ?? null;
+            if (is_string($name) && is_string($iri)) {
+                $byName[$name] = $iri;
+            }
+        }
+        $this->assertArrayHasKey('Dev', $byName);
+        $this->assertArrayHasKey('Build', $byName);
+
+        return [$bpIri, $byName['Dev'], $byName['Build']];
     }
 
     /**

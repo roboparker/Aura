@@ -10,7 +10,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Created by `POST /spaces/{id}/export`, then processed asynchronously by
  * {@see \App\MessageHandler\GenerateSpaceExportHandler}: the handler builds
- * a zip archive of the space's content (projects, tasks, pages, discussions,
+ * a zip archive of the space's content (boards, tasks, pages, discussions,
  * comments, attachments), stores it under `app.space_export_dir`, stamps a
  * download token, and emails the requester a link.
  *

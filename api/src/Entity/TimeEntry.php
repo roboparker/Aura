@@ -26,7 +26,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 /**
  * A billable (or non-billable) chunk of tracked time (#444). The atomic unit of
  * time tracking: it records who spent how long on what, optionally tied to a
- * project and/or task, at an optional hourly rate. Once pulled onto an invoice
+ * board and/or task, at an optional hourly rate. Once pulled onto an invoice
  * (#445) it is locked via {@see $billedAt} so the same time can't be billed twice.
  *
  * A running timer is a TimeEntry with {@see $endedAt} still null; a partial
@@ -64,7 +64,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['time_entry:write']],
     order: ['startedAt' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'project' => 'exact', 'task' => 'exact', 'user' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'engagement' => 'exact', 'category' => 'exact', 'user' => 'exact'])]
 #[ApiFilter(BooleanFilter::class, properties: ['billable'])]
 #[ApiFilter(ExistsFilter::class, properties: ['endedAt'])]
 #[ApiFilter(DateFilter::class, properties: ['startedAt'])]
@@ -73,7 +73,8 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'time_entry')]
 #[ORM\Index(columns: ['space_id', 'started_at'], name: 'idx_time_entry_space_started')]
 #[ORM\Index(columns: ['user_id', 'started_at'], name: 'idx_time_entry_user_started')]
-#[ORM\Index(columns: ['project_id'], name: 'idx_time_entry_project')]
+#[ORM\Index(columns: ['engagement_id'], name: 'idx_time_entry_engagement')]
+#[ORM\Index(columns: ['category_id'], name: 'idx_time_entry_category')]
 // Partial unique index (at most one running timer per user). Declared here with
 // the `where` option so doctrine:schema:validate matches the migration's
 // CREATE UNIQUE INDEX ... WHERE ended_at IS NULL (mirrors Space's personal-space index).
@@ -101,17 +102,24 @@ class TimeEntry
     #[Groups(['time_entry:read', 'time_entry:write'])]
     private ?Space $space = null;
 
+    /**
+     * The engagement this time is tracked against (Harvest model). Required.
+     * Carries the client; the {@see $category} (which must belong to it) fixes the rate.
+     */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Project::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: Engagement::class)]
+    #[ORM\JoinColumn(name: 'engagement_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A engagement is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?Project $project = null;
+    private ?Engagement $engagement = null;
 
+    /** The category on the engagement — sets the hourly rate. Required. */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Task::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: EngagementCategory::class)]
+    #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A category is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?Task $task = null;
+    private ?EngagementCategory $category = null;
 
     /** The user who tracked the time. Stamped server-side, never from the payload. */
     #[ApiProperty(readableLink: false)]
@@ -144,15 +152,20 @@ class TimeEntry
     #[Groups(['time_entry:read', 'time_entry:write'])]
     private bool $billable = true;
 
-    /** Hourly rate in minor units (e.g. cents); paired with {@see $rateCurrency}. */
+    /**
+     * Hourly rate in minor units, snapshotted from the {@see $category} on save
+     * so a later rate change doesn't retroactively alter logged (or billed) time.
+     * Derived, read-only.
+     */
     #[ORM\Column(type: 'integer', nullable: true)]
     #[Assert\PositiveOrZero]
-    #[Groups(['time_entry:read', 'time_entry:write'])]
+    #[Groups(['time_entry:read'])]
     private ?int $rateAmount = null;
 
+    /** Currency of {@see $rateAmount}, snapshotted from the engagement. Read-only. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
-    #[Groups(['time_entry:read', 'time_entry:write'])]
+    #[Groups(['time_entry:read'])]
     private ?string $rateCurrency = null;
 
     /** Set when the entry is pulled onto an invoice; locks it against re-billing. */
@@ -174,19 +187,23 @@ class TimeEntry
     }
 
     /**
-     * Derive duration + denormalise the space from project/task so the access
-     * extension can scope by `space` alone (mirrors TaskSection::syncSpaceFromProject).
+     * Denormalise the space from the engagement (so the access extension can
+     * scope by `space` alone), snapshot the rate from the category, and derive
+     * duration from started/ended.
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
     public function syncDerived(): void
     {
-        if (null === $this->space) {
-            if (null !== $this->task && null !== $this->task->getProject()) {
-                $this->space = $this->task->getProject()->getSpace();
-            } elseif (null !== $this->project) {
-                $this->space = $this->project->getSpace();
-            }
+        if (null === $this->space && null !== $this->engagement) {
+            $this->space = $this->engagement->getSpace();
+        }
+
+        // Snapshot the rate from the category + board currency so a later rate
+        // change never rewrites already-logged (or billed) time.
+        if (null !== $this->category) {
+            $this->rateAmount = $this->category->getRateAmount();
+            $this->rateCurrency = $this->engagement?->getCurrency();
         }
 
         $this->durationSeconds = null;
@@ -203,28 +220,34 @@ class TimeEntry
                 ->addViolation();
         }
 
+        // No overnight entries — start and end must fall on the same calendar day.
+        // Work spanning midnight is logged as two entries.
         if (
-            null !== $this->project && null !== $this->space
-            && true !== $this->project->getSpace()?->getId()?->equals($this->space->getId())
+            null !== $this->startedAt && null !== $this->endedAt
+            && $this->startedAt->format('Y-m-d') !== $this->endedAt->format('Y-m-d')
         ) {
-            $context->buildViolation('Project must belong to the same space.')
-                ->atPath('project')
+            $context->buildViolation('A time entry cannot span more than one day. Log separate entries per day.')
+                ->atPath('endedAt')
                 ->addViolation();
         }
 
-        $taskSpace = $this->task?->getProject()?->getSpace();
+        // The category must belong to the selected engagement.
         if (
-            null !== $this->task && null !== $this->space
-            && true !== $taskSpace?->getId()?->equals($this->space->getId())
+            null !== $this->category && null !== $this->engagement
+            && true !== $this->category->getEngagement()?->getId()?->equals($this->engagement->getId())
         ) {
-            $context->buildViolation('Task must belong to the same space.')
-                ->atPath('task')
+            $context->buildViolation('Category must belong to the selected engagement.')
+                ->atPath('category')
                 ->addViolation();
         }
 
-        if (null !== $this->rateAmount && null === $this->rateCurrency) {
-            $context->buildViolation('A currency is required when a rate is set.')
-                ->atPath('rateCurrency')
+        // The engagement must live in the entry's space.
+        if (
+            null !== $this->engagement && null !== $this->space
+            && true !== $this->engagement->getSpace()?->getId()?->equals($this->space->getId())
+        ) {
+            $context->buildViolation('Engagement must belong to the same space.')
+                ->atPath('engagement')
                 ->addViolation();
         }
     }
@@ -246,26 +269,26 @@ class TimeEntry
         return $this;
     }
 
-    public function getProject(): ?Project
+    public function getEngagement(): ?Engagement
     {
-        return $this->project;
+        return $this->engagement;
     }
 
-    public function setProject(?Project $project): self
+    public function setEngagement(?Engagement $engagement): self
     {
-        $this->project = $project;
+        $this->engagement = $engagement;
 
         return $this;
     }
 
-    public function getTask(): ?Task
+    public function getCategory(): ?EngagementCategory
     {
-        return $this->task;
+        return $this->category;
     }
 
-    public function setTask(?Task $task): self
+    public function setCategory(?EngagementCategory $category): self
     {
-        $this->task = $task;
+        $this->category = $category;
 
         return $this;
     }

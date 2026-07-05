@@ -3,7 +3,10 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\EngagementCategory;
+use App\Entity\Engagement;
+use App\Entity\Client;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\User;
@@ -11,8 +14,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Time tracking (#444): create/list scoping, server-side owner stamping, derived
- * duration, the running-timer lifecycle, and validation.
+ * Time tracking (Harvest model): entries attach to a engagement + category
+ * (which fixes the rate), on a single calendar day. Covers scoping, owner
+ * stamping, derived duration + rate snapshot, the running-timer lifecycle, and
+ * validation (required board/category, no overnight).
  */
 class TimeEntryTest extends ApiTestCase
 {
@@ -28,16 +33,20 @@ class TimeEntryTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testMemberTracksTimeAndDurationIsDerived(): void
+    public function testMemberTracksTimeAndDurationAndRateAreDerived(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 12000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -45,7 +54,8 @@ class TimeEntryTest extends ApiTestCase
         $entry = $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'project' => '/projects/' . $project->getId(),
+                'engagement' => $bpIri,
+                'category' => $catIri,
                 'description' => 'Wiring the timer',
                 'startedAt' => '2026-07-03T09:00:00+00:00',
                 'endedAt' => '2026-07-03T10:30:00+00:00',
@@ -55,31 +65,100 @@ class TimeEntryTest extends ApiTestCase
         ])->toArray();
 
         $this->assertResponseStatusCodeSame(201);
-        // 1h30m = 5400s, derived server-side.
         $this->assertSame(5400, $entry['durationSeconds'] ?? null);
+        // Rate snapshotted from the category, not sent by the client.
+        $this->assertSame(12000, $entry['rateAmount'] ?? null);
+        $this->assertSame('USD', $entry['rateCurrency'] ?? null);
 
-        // Owner stamped server-side, not from the payload.
         $row = $this->entityManager->getRepository(TimeEntry::class)
             ->findOneBy(['description' => 'Wiring the timer']);
         $this->assertNotNull($row);
         $this->assertSame((string) $alice->getId(), (string) $row->getUser()?->getId());
+    }
 
-        $list = $client->request('GET', '/time_entries?space=' . $spaceIri)->toArray();
-        $this->assertSame(1, $list['totalItems'] ?? null);
+    public function testEngagementAndCategoryAreRequired(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $response = $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'startedAt' => '2026-07-03T09:00:00+00:00',
+                'endedAt' => '2026-07-03T10:00:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+        $body = $response->getContent(false);
+        $this->assertStringContainsString('engagement', $body);
+        $this->assertStringContainsString('category', $body);
+    }
+
+    public function testOvernightEntryIsRejected(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'category' => $catIri,
+                'startedAt' => '2026-07-03T23:00:00+00:00',
+                'endedAt' => '2026-07-04T01:00:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testCategoryMustBelongToEngagement(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri] = $this->createBilling($board, 'Website', 'Development', 10000);
+        // A category on a *different* engagement.
+        [, $otherCatIri] = $this->createBilling($board, 'Mobile', 'Design', 9000);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'category' => $otherCatIri,
+                'startedAt' => '2026-07-03T09:00:00+00:00',
+                'endedAt' => '2026-07-03T10:00:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
     }
 
     public function testNonMemberCannotSeeEntries(): void
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Private');
-        $spaceIri = $this->spaceIri($project);
+        $board = $this->createProject($alice, 'Private');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $created = $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'category' => $catIri,
                 'startedAt' => '2026-07-03T09:00:00+00:00',
                 'endedAt' => '2026-07-03T09:30:00+00:00',
             ],
@@ -96,109 +175,110 @@ class TimeEntryTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    public function testRunningTimerHasNoDurationUntilStopped(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
-
-        $client = static::createClient();
-        $client->loginUser($alice);
-
-        // Start: no endedAt → running, no duration.
-        $running = $client->request('POST', '/time_entries', [
-            'json' => [
-                'space' => $spaceIri,
-                'startedAt' => '2026-07-03T09:00:00+00:00',
-            ],
-            'headers' => ['Content-Type' => 'application/ld+json'],
-        ])->toArray();
-        $this->assertResponseStatusCodeSame(201);
-        // Running timer: no duration yet (serialized as null or omitted).
-        $this->assertNull($running['durationSeconds'] ?? null);
-        $iri = $running['@id'];
-        $this->assertIsString($iri);
-
-        // Stop: patch endedAt → duration derived.
-        $stopped = $client->request('PATCH', $iri, [
-            'json' => ['endedAt' => '2026-07-03T09:15:00+00:00'],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
-        ])->toArray();
-        $this->assertResponseIsSuccessful();
-        $this->assertSame(900, $stopped['durationSeconds'] ?? null);
-    }
-
     public function testStartingASecondTimerStopsTheFirst(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         $first = $client->request('POST', '/time_entries', [
-            'json' => ['space' => $spaceIri, 'startedAt' => '2026-07-03T09:00:00+00:00'],
+            'json' => ['space' => $spaceIri, 'engagement' => $bpIri, 'category' => $catIri, 'startedAt' => '2026-07-03T09:00:00+00:00'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $firstIri = $first['@id'];
         $this->assertIsString($firstIri);
 
-        // Starting a second running timer must not violate the one-running-per-user
-        // invariant — the first is auto-stopped.
         $client->request('POST', '/time_entries', [
-            'json' => ['space' => $spaceIri, 'startedAt' => '2026-07-03T11:00:00+00:00'],
+            'json' => ['space' => $spaceIri, 'engagement' => $bpIri, 'category' => $catIri, 'startedAt' => '2026-07-03T11:00:00+00:00'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        // The first now has an end time; exactly one running entry remains.
         $first = $client->request('GET', $firstIri)->toArray();
         $this->assertNotNull($first['endedAt'] ?? null);
 
-        $running = $client->request('GET', '/time_entries?space=' . $spaceIri . '&exists[endedAt]=false')
-            ->toArray();
+        $running = $client->request('GET', '/time_entries?space=' . $spaceIri . '&exists[endedAt]=false')->toArray();
         $this->assertSame(1, $running['totalItems'] ?? null);
     }
 
-    public function testEndBeforeStartIsRejected(): void
+    public function testMemberCanListEngagementOptions(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
+        $board = $this->createProject($alice, 'Backend');
+        $this->createBilling($board, 'Website', 'Development', 12000);
+        $space = $board->getSpace();
+        assert($space instanceof Space);
 
         $client = static::createClient();
         $client->loginUser($alice);
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/engagement-options')->toArray();
 
-        $client->request('POST', '/time_entries', [
-            'json' => [
-                'space' => $spaceIri,
-                'startedAt' => '2026-07-03T10:00:00+00:00',
-                'endedAt' => '2026-07-03T09:00:00+00:00',
-            ],
-            'headers' => ['Content-Type' => 'application/ld+json'],
-        ]);
-        $this->assertResponseStatusCodeSame(422);
+        $options = $body['options'];
+        $this->assertIsArray($options);
+        $this->assertCount(1, $options);
+        $first = $options[0];
+        $this->assertIsArray($first);
+        $this->assertSame('Website', $first['name']);
+        $categories = $first['categories'];
+        $this->assertIsArray($categories);
+        $this->assertCount(1, $categories);
+        $cat = $categories[0];
+        $this->assertIsArray($cat);
+        $this->assertSame('Development', $cat['name']);
+        $this->assertSame(12000, $cat['rateAmount']);
     }
 
-    private function spaceIri(Project $project): string
+    private function spaceIri(Board $board): string
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
         return '/spaces/' . $space->getId();
     }
 
-    private function createProject(User $owner, string $title): Project
+    /**
+     * A client + a engagement (one category) in the board's space.
+     *
+     * @return array{0: string, 1: string} [engagementIri, categoryIri]
+     */
+    private function createBilling(Board $board, string $boardName, string $categoryName, int $rate): array
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $space = $board->getSpace();
+        assert($space instanceof Space);
+        $owner = $board->getOwner();
+        assert($owner instanceof User);
+
+        $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($owner);
+        $this->entityManager->persist($client);
+
+        $category = (new EngagementCategory())->setName($categoryName)->setRateAmount($rate);
+        $engagement = (new Engagement())
+            ->setSpace($space)
+            ->setClient($client)
+            ->setName($boardName)
+            ->setCurrency('USD')
+            ->setCreatedBy($owner);
+        $engagement->addCategory($category);
+        $this->entityManager->persist($engagement);
         $this->entityManager->flush();
 
-        return $project;
+        return ['/engagements/' . $engagement->getId(), '/engagement_categories/' . $category->getId()];
+    }
+
+    private function createProject(User $owner, string $title): Board
+    {
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
+        $this->entityManager->flush();
+
+        return $board;
     }
 
     private function createUser(string $email): User

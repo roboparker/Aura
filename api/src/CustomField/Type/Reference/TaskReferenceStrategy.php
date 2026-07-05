@@ -9,8 +9,8 @@ use App\Entity\Task;
 
 /**
  * `reference.task` — references one or more tasks. Scope is the
- * field's space; a task is in-scope iff its parent project lives in
- * the same space. Standalone (projectless) tasks are not referenceable
+ * field's space; a task is in-scope iff its parent board lives in
+ * the same space. Standalone (boardless) tasks are not referenceable
  * — they have no space, so the equality check always fails.
  */
 final class TaskReferenceStrategy extends AbstractReferenceStrategy
@@ -40,11 +40,11 @@ final class TaskReferenceStrategy extends AbstractReferenceStrategy
         if (!$target instanceof Task) {
             return false;
         }
-        $project = $target->getProject();
-        if (null === $project) {
+        $board = $target->getBoard();
+        if (null === $board) {
             return false;
         }
-        $targetSpace = $project->getSpace();
+        $targetSpace = $board->getSpace();
         if (null === $targetSpace) {
             return false;
         }

@@ -18,7 +18,7 @@ use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Filters Task queries so users only see tasks they can act on:
- * tasks they own directly, plus any task attached to a project whose
+ * tasks they own directly, plus any task attached to a board whose
  * space they belong to (#185). Applies to both collection and item
  * queries as defense-in-depth against leaks; operation-level `security`
  * already covers item access.
@@ -60,9 +60,9 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
     }
 
     /**
-     * Drop project tasks in spaces where the user's roles deny reading tasks
+     * Drop board tasks in spaces where the user's roles deny reading tasks
      * (#space-roles), keeping the caller's own tasks. No-op for unrestricted
-     * users. Relies on the `tp_access` (project) join added by applyFilter and
+     * users. Relies on the `tp_access` (board) join added by applyFilter and
      * its `:currentUser` parameter.
      */
     private function applyReadScope(QueryBuilder $queryBuilder): void
@@ -104,13 +104,13 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
 
         $rootAlias = $queryBuilder->getRootAliases()[0];
 
-        // Space-scoped API key: only tasks of projects in the key's space
+        // Space-scoped API key: only tasks of boards in the key's space
         // (standalone tasks have no space and are never reachable by a key).
         $key = $this->actor->scopedKey();
         if (null !== $key) {
             $space = $key->getSpace();
             $queryBuilder
-                ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
+                ->leftJoin(sprintf('%s.board', $rootAlias), 'tp_access')
                 ->andWhere('IDENTITY(tp_access.space) = :task_key_space')
                 ->setParameter('task_key_space', null === $space ? null : (string) $space->getId());
 
@@ -123,14 +123,14 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
         }
         // The task is visible when ANY of:
         //  - the caller owns it (covers personal/standalone tasks),
-        //  - the caller is a direct member of the parent project's space,
+        //  - the caller is a direct member of the parent board's space,
         //  - the caller is a member via a group attached to that space.
-        // Standalone tasks (project IS NULL) only match the owner branch.
+        // Standalone tasks (board IS NULL) only match the owner branch.
         //
-        // DQL doesn't accept chained associations like `task.project.space`
-        // in subqueries, so we left-join through `project` and reference
+        // DQL doesn't accept chained associations like `task.board.space`
+        // in subqueries, so we left-join through `board` and reference
         // `tp_access.space` from the joined alias. The LEFT join keeps
-        // standalone tasks visible because their project is NULL — both
+        // standalone tasks visible because their board is NULL — both
         // EXISTS branches simply fail to match for them.
         $directSubquery = sprintf(
             'SELECT 1 FROM %s task_access_direct WHERE task_access_direct.space = tp_access.space AND task_access_direct.user = :currentUser',
@@ -141,7 +141,7 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
             UserGroup::class,
         );
         $queryBuilder
-            ->leftJoin(sprintf('%s.project', $rootAlias), 'tp_access')
+            ->leftJoin(sprintf('%s.board', $rootAlias), 'tp_access')
             ->andWhere(sprintf(
                 '(%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s))',
                 $rootAlias,

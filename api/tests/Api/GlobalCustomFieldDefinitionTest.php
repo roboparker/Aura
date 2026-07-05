@@ -11,7 +11,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * Instance-wide, admin-managed global custom fields (#global-custom-fields).
  * Writes are ROLE_ADMIN; reads are open to any authenticated user so the
- * fields render in the per-project picker.
+ * fields render in the per-board picker.
  */
 class GlobalCustomFieldDefinitionTest extends ApiTestCase
 {

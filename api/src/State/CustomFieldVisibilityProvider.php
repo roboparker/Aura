@@ -7,20 +7,20 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
-use App\Repository\ProjectFieldVisibilityRepository;
+use App\Entity\Board;
+use App\Repository\BoardFieldVisibilityRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Uid\Uuid;
 
 /**
  * Decorates the CustomFieldDefinition collection provider to inject each
- * field's PER-PROJECT visibility (#custom-fields-project) when the collection
- * is fetched in a project context (`?projects={iri}`).
+ * field's PER-PROJECT visibility (#custom-fields-board) when the collection
+ * is fetched in a board context (`?boards={iri}`).
  *
- * Visibility lives on the (project, definition) pair via {@see
- * ProjectFieldVisibility}; the definition's own column is only the default when
- * no override row exists. Outside a single-project context (e.g. the
+ * Visibility lives on the (board, definition) pair via {@see
+ * BoardFieldVisibility}; the definition's own column is only the default when
+ * no override row exists. Outside a single-board context (e.g. the
  * space-level `?space=` listing) nothing is injected and the default stands.
  *
  * @implements ProviderInterface<CustomFieldDefinition>
@@ -34,7 +34,7 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
         #[Autowire(service: 'api_platform.doctrine.orm.state.collection_provider')]
         private readonly ProviderInterface $inner,
         private readonly EntityManagerInterface $em,
-        private readonly ProjectFieldVisibilityRepository $overrides,
+        private readonly BoardFieldVisibilityRepository $overrides,
     ) {
     }
 
@@ -46,9 +46,9 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
     {
         $result = $this->inner->provide($operation, $uriVariables, $context);
 
-        $project = $this->resolveProject($context);
-        if (null !== $project && is_iterable($result)) {
-            $map = $this->overrides->visibilityMapForProject($project);
+        $board = $this->resolveProject($context);
+        if (null !== $board && is_iterable($result)) {
+            $map = $this->overrides->visibilityMapForProject($board);
             foreach ($result as $definition) {
                 $override = $map[(string) $definition->getId()] ?? null;
                 if (null !== $override) {
@@ -61,14 +61,14 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
     }
 
     /**
-     * Resolve a single-project context from the `?projects={iri}` filter.
+     * Resolve a single-board context from the `?boards={iri}` filter.
      *
      * @param array<string, mixed> $context
      */
-    private function resolveProject(array $context): ?Project
+    private function resolveProject(array $context): ?Board
     {
         $filters = $context['filters'] ?? null;
-        $raw = is_array($filters) ? ($filters['projects'] ?? null) : null;
+        $raw = is_array($filters) ? ($filters['boards'] ?? null) : null;
         if (!is_string($raw) || '' === $raw) {
             return null;
         }
@@ -78,6 +78,6 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
             return null;
         }
 
-        return $this->em->getRepository(Project::class)->find($segment);
+        return $this->em->getRepository(Board::class)->find($segment);
     }
 }
