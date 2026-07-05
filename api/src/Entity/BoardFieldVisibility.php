@@ -4,37 +4,37 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
-use App\Repository\ProjectFieldVisibilityRepository;
+use App\Repository\BoardFieldVisibilityRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Per-project visibility override for a custom field (#custom-fields-project).
+ * Per-board visibility override for a custom field (#custom-fields-board).
  *
- * Custom field definitions are shared across the projects that attach them,
+ * Custom field definitions are shared across the boards that attach them,
  * but where a field is shown — the task list, the Kanban board, or both — is a
- * per-project choice. One row per (project, field) pair holds that choice; when
+ * per-board choice. One row per (board, field) pair holds that choice; when
  * no row exists the definition's own `visibility` acts as the default.
- * Server-managed only (not an API resource): written through the per-project
+ * Server-managed only (not an API resource): written through the per-board
  * visibility endpoints.
  *
  * The field is polymorphic like {@see CustomFieldValue}: exactly one of
  * {@see $definition} (space-owned) / {@see $globalDefinition} (instance-wide)
- * is set, so a project can override the visibility of either field source.
+ * is set, so a board can override the visibility of either field source.
  */
-#[ORM\Entity(repositoryClass: ProjectFieldVisibilityRepository::class)]
-#[ORM\Table(name: 'project_field_visibility')]
+#[ORM\Entity(repositoryClass: BoardFieldVisibilityRepository::class)]
+#[ORM\Table(name: 'board_field_visibility')]
 #[ORM\UniqueConstraint(
     name: 'uniq_pfv_project_definition',
-    columns: ['project_id', 'definition_id'],
+    columns: ['board_id', 'definition_id'],
 )]
 #[ORM\UniqueConstraint(
     name: 'uniq_pfv_project_global_definition',
-    columns: ['project_id', 'global_definition_id'],
+    columns: ['board_id', 'global_definition_id'],
 )]
 #[ORM\Index(columns: ['definition_id'], name: 'idx_pfv_definition')]
 #[ORM\Index(columns: ['global_definition_id'], name: 'idx_pfv_global_definition')]
-class ProjectFieldVisibility
+class BoardFieldVisibility
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -42,9 +42,9 @@ class ProjectFieldVisibility
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
     private ?Uuid $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Project::class)]
-    #[ORM\JoinColumn(name: 'project_id', nullable: false, onDelete: 'CASCADE')]
-    private ?Project $project = null;
+    #[ORM\ManyToOne(targetEntity: Board::class)]
+    #[ORM\JoinColumn(name: 'board_id', nullable: false, onDelete: 'CASCADE')]
+    private ?Board $board = null;
 
     #[ORM\ManyToOne(targetEntity: CustomFieldDefinition::class)]
     #[ORM\JoinColumn(name: 'definition_id', nullable: true, onDelete: 'CASCADE')]
@@ -64,14 +64,14 @@ class ProjectFieldVisibility
         return $this->id;
     }
 
-    public function getProject(): ?Project
+    public function getBoard(): ?Board
     {
-        return $this->project;
+        return $this->board;
     }
 
-    public function setProject(Project $project): static
+    public function setBoard(Board $board): static
     {
-        $this->project = $project;
+        $this->board = $board;
 
         return $this;
     }

@@ -2,7 +2,7 @@
 
 namespace App\DataFixtures;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Tag;
@@ -14,13 +14,13 @@ use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 
 /**
- * Demo project + spaces / groups for fixture-driven dev and E2E. Uma
+ * Demo board + spaces / groups for fixture-driven dev and E2E. Uma
  * owns the "Launch team" space along with four team members (Noah,
  * Emma, Liam, Ava). Admin (Ada) is *not* a member of the team space —
  * her data lives in {@see AdminDeskFixtures}. The team setup doubles as
  * the source the invite fixture attaches new signups to.
  */
-class ProjectFixtures extends Fixture implements DependentFixtureInterface
+class BoardFixtures extends Fixture implements DependentFixtureInterface
 {
     public const LAUNCH_SPACE_REFERENCE = 'space-launch';
     public const ENGINEERING_GROUP_REFERENCE = 'group-engineering';
@@ -38,7 +38,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         // Pull the team members in. Uma owns the space; Noah/Emma/Liam/Ava
         // are regular members. Admin (Ada) is intentionally excluded —
         // the "user team space" is for the user side of the demo data
-        // and admin gets a separate space below so /projects still has
+        // and admin gets a separate space below so /boards still has
         // content for an admin sign-in.
         $teamUsers = [];
         foreach (UserFixtures::TEAM_USER_REFERENCES as $reference) {
@@ -115,12 +115,12 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $designCrew->addMember($teamUsers['user-emma']);
         $manager->persist($designCrew);
 
-        $project = new Project();
-        $project->setOwner($uma);
-        $project->setSpace($sharedSpace);
-        $project->setTitle('Launch checklist');
-        $project->setDescription("Things to ship before the **soft launch**.\n\n- Marketing site\n- Onboarding flow\n- Billing");
-        $manager->persist($project);
+        $board = new Board();
+        $board->setOwner($uma);
+        $board->setSpace($sharedSpace);
+        $board->setTitle('Launch checklist');
+        $board->setDescription("Things to ship before the **soft launch**.\n\n- Marketing site\n- Onboarding flow\n- Billing");
+        $manager->persist($board);
 
         // [title, description, tagTitles, assignees]. Mix of solo, joint,
         // and unassigned tasks so the avatar group, "Assigned to me"
@@ -133,7 +133,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         $taskDefinitions = [
             ['Wire up Stripe checkout', 'Hook the pricing page CTA to a Stripe-hosted checkout session.', ['urgent', 'backend'], [$uma]],
             ['Draft onboarding email', 'Three-step welcome series. Tone: friendly, no jargon.', ['docs'], [$emma]],
-            ['Polish empty states', "Replace the placeholder copy on Projects, Tasks, and Tags with the new illustrations.", ['design'], [$uma, $noah]],
+            ['Polish empty states', "Replace the placeholder copy on Boards, Tasks, and Tags with the new illustrations.", ['design'], [$uma, $noah]],
             ['Add password-reset rate limiting', 'Limit to 3 attempts per email per hour.', ['urgent', 'backend'], []],
             ['Write API auth docs', 'Cover login, refresh, and logout end-to-end.', ['docs'], [$liam]],
         ];
@@ -142,7 +142,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
         foreach ($taskDefinitions as [$title, $description, $tagTitles, $assignees]) {
             $task = new Task();
             $task->setOwner($uma);
-            $task->setProject($project);
+            $task->setBoard($board);
             $task->setTitle($title);
             $task->setDescription($description);
             $task->setPosition($position++);
@@ -155,7 +155,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
             $manager->persist($task);
         }
 
-        // One personal (project-less) task and one already-completed task so
+        // One personal (board-less) task and one already-completed task so
         // both states are covered.
         $personal = new Task();
         $personal->setOwner($uma);
@@ -167,7 +167,7 @@ class ProjectFixtures extends Fixture implements DependentFixtureInterface
 
         $done = new Task();
         $done->setOwner($uma);
-        $done->setProject($project);
+        $done->setBoard($board);
         $done->setTitle('Pick a launch date');
         $done->setDescription('Locked in: **May 6**.');
         $done->setPosition($position++);

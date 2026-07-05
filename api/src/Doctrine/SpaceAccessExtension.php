@@ -17,7 +17,7 @@ use Symfony\Bundle\SecurityBundle\Security;
  * Filters Space queries so users only see spaces they belong to —
  * directly via `SpaceMembership` or transitively via a `UserGroup`
  * owned by the space. Item lookups for non-member spaces return 404
- * rather than 403, mirroring ProjectAccessExtension.
+ * rather than 403, mirroring BoardAccessExtension.
  *
  * Instance admins are scoped like everyone else — they reach another
  * user's spaces only by impersonating them (`switch_user`), which works
@@ -26,7 +26,7 @@ use Symfony\Bundle\SecurityBundle\Security;
  * Implemented as an EXISTS subquery on the root query (rather than a
  * join) so the Space's `userMemberships` and `groups`
  * collections are not partially hydrated by the access predicate —
- * the same hazard ProjectAccessExtension documents at length.
+ * the same hazard BoardAccessExtension documents at length.
  */
 final class SpaceAccessExtension implements
     QueryCollectionExtensionInterface,

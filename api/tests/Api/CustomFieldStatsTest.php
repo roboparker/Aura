@@ -6,15 +6,15 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Usage-stats endpoints: per-project "filled" counts
- * (`GET /projects/{id}/custom_field_stats`) and per-option usage
+ * Usage-stats endpoints: per-board "filled" counts
+ * (`GET /boards/{id}/custom_field_stats`) and per-option usage
  * (`GET /custom_field_definitions/{id}/option_stats`).
  */
 class CustomFieldStatsTest extends ApiTestCase
@@ -33,7 +33,7 @@ class CustomFieldStatsTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -41,31 +41,31 @@ class CustomFieldStatsTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_stats');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_stats');
         $this->assertResponseStatusCodeSame(404);
     }
 
     public function testProjectFillStats(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $estimate = $this->seedTextField($project, 'Estimate');
-        $owner = $this->seedTextField($project, 'Owner');
+        $board = $this->createProject($alice, 'Backend');
+        $estimate = $this->seedTextField($board, 'Estimate');
+        $owner = $this->seedTextField($board, 'Owner');
 
         // Three tasks: estimate filled on two (one explicit null = not filled),
         // owner filled on all three.
-        $this->seedTaskWithValues($alice, $project, [[$estimate, '3'], [$owner, 'a']]);
-        $this->seedTaskWithValues($alice, $project, [[$estimate, '5'], [$owner, 'b']]);
-        $this->seedTaskWithValues($alice, $project, [[$estimate, null], [$owner, 'c']]);
+        $this->seedTaskWithValues($alice, $board, [[$estimate, '3'], [$owner, 'a']]);
+        $this->seedTaskWithValues($alice, $board, [[$estimate, '5'], [$owner, 'b']]);
+        $this->seedTaskWithValues($alice, $board, [[$estimate, null], [$owner, 'c']]);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_stats');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_stats');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -88,12 +88,12 @@ class CustomFieldStatsTest extends ApiTestCase
     public function testOptionStatsCountsSelectUsage(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $channel = $this->seedSelectField($project, 'Channel', multi: true, options: ['web', 'email', 'social']);
+        $board = $this->createProject($alice, 'Backend');
+        $channel = $this->seedSelectField($board, 'Channel', multi: true, options: ['web', 'email', 'social']);
 
-        $this->seedTaskWithValues($alice, $project, [[$channel, ['web', 'email']]]);
-        $this->seedTaskWithValues($alice, $project, [[$channel, ['web']]]);
-        $this->seedTaskWithValues($alice, $project, [[$channel, ['web', 'social']]]);
+        $this->seedTaskWithValues($alice, $board, [[$channel, ['web', 'email']]]);
+        $this->seedTaskWithValues($alice, $board, [[$channel, ['web']]]);
+        $this->seedTaskWithValues($alice, $board, [[$channel, ['web', 'social']]]);
         $this->entityManager->flush();
 
         $client = static::createClient();
@@ -120,8 +120,8 @@ class CustomFieldStatsTest extends ApiTestCase
     public function testOptionStatsEmptyForNonSelect(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $text = $this->seedTextField($project, 'Notes');
+        $board = $this->createProject($alice, 'Backend');
+        $text = $this->seedTextField($board, 'Notes');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -132,15 +132,15 @@ class CustomFieldStatsTest extends ApiTestCase
         $this->assertSame(['options' => []], $response->toArray());
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User
@@ -159,10 +159,10 @@ class CustomFieldStatsTest extends ApiTestCase
         return $user;
     }
 
-    private function seedTextField(Project $project, string $name): CustomFieldDefinition
+    private function seedTextField(Board $board, string $name): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')
@@ -175,11 +175,11 @@ class CustomFieldStatsTest extends ApiTestCase
     /**
      * @param list<string> $options
      */
-    private function seedSelectField(Project $project, string $name, bool $multi, array $options): CustomFieldDefinition
+    private function seedSelectField(Board $board, string $name, bool $multi, array $options): CustomFieldDefinition
     {
         $structured = array_map(static fn (string $o): array => ['key' => $o, 'label' => ucfirst($o)], $options);
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::SELECT->value)
             ->setSubtype($multi ? 'multi' : 'single')
@@ -192,11 +192,11 @@ class CustomFieldStatsTest extends ApiTestCase
     /**
      * @param list<array{0: CustomFieldDefinition, 1: mixed}> $pairs
      */
-    private function seedTaskWithValues(User $owner, Project $project, array $pairs): Task
+    private function seedTaskWithValues(User $owner, Board $board, array $pairs): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle('Task');
         $this->entityManager->persist($task);
         foreach ($pairs as [$field, $value]) {

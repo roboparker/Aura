@@ -2,17 +2,17 @@
 
 namespace App\Repository;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * @extends ServiceEntityRepository<Project>
+ * @extends ServiceEntityRepository<Board>
  */
-final class ProjectRepository extends ServiceEntityRepository
+final class BoardRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, Project::class);
+        parent::__construct($registry, Board::class);
     }
 }

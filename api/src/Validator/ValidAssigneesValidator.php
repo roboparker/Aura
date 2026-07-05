@@ -38,9 +38,9 @@ final class ValidAssigneesValidator extends ConstraintValidator
         if (null !== $owner && null !== $owner->getId()) {
             $allowed[(string) $owner->getId()] = true;
         }
-        $project = $value->getProject();
-        if (null !== $project) {
-            foreach ($project->getEffectiveMembers() as $id => $_member) {
+        $board = $value->getBoard();
+        if (null !== $board) {
+            foreach ($board->getEffectiveMembers() as $id => $_member) {
                 $allowed[$id] = true;
             }
         }

@@ -3,15 +3,15 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Change-log endpoint: `GET /projects/{id}/custom_field_definitions/activity`.
+ * Change-log endpoint: `GET /boards/{id}/custom_field_definitions/activity`.
  * Confirms Gedmo Loggable records create + update on a CustomFieldDefinition
- * and that the project-scoped feed surfaces them, while strangers get 404.
+ * and that the board-scoped feed surfaces them, while strangers get 404.
  */
 class CustomFieldDefinitionActivityTest extends ApiTestCase
 {
@@ -27,7 +27,7 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\ActivityLog')->execute();
     }
@@ -35,14 +35,14 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
     public function testActivityRecordsCreateAndUpdate(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         $created = $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -60,7 +60,7 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
         ]);
         $this->assertResponseIsSuccessful();
 
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_definitions/activity');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -84,14 +84,14 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
     public function testActivityRetainsDeletedFieldWithRemoveEvent(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         $created = $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -109,7 +109,7 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
 
         // The change log still surfaces the field's create history plus a
         // remove event, rather than dropping it entirely.
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_definitions/activity');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -130,30 +130,30 @@ class CustomFieldDefinitionActivityTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_definitions/activity');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_definitions/activity');
         $this->assertResponseStatusCodeSame(404);
     }
 
-    private function spaceIri(Project $project): string
+    private function spaceIri(Board $board): string
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         self::assertNotNull($space);
         return '/spaces/' . $space->getId();
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

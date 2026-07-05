@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\BillingProject;
 use App\Entity\Client;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -14,7 +14,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Billing projects (Harvest model): admin-managed (invoices-gated) CRUD with
- * embedded categories, and assigning task-management projects to them.
+ * embedded categories, and assigning task-management boards to them.
  */
 class BillingProjectTest extends ApiTestCase
 {
@@ -31,7 +31,7 @@ class BillingProjectTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\BillingCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\BillingProject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
@@ -100,7 +100,7 @@ class BillingProjectTest extends ApiTestCase
         $space = $this->createSharedSpace($admin);
         $spaceIri = '/spaces/' . $space->getId();
 
-        $taskProject = (new Project())->setOwner($admin)->setTitle('App')->setSpace($space);
+        $taskProject = (new Board())->setOwner($admin)->setTitle('App')->setSpace($space);
         $this->entityManager->persist($taskProject);
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
         $this->entityManager->persist($client);
@@ -110,15 +110,15 @@ class BillingProjectTest extends ApiTestCase
 
         $httpClient = static::createClient();
         $httpClient->loginUser($admin);
-        $httpClient->request('PUT', '/billing_projects/' . $billingProject->getId() . '/projects', [
-            'json' => ['projects' => ['/projects/' . $taskProject->getId()]],
+        $httpClient->request('PUT', '/billing_projects/' . $billingProject->getId() . '/boards', [
+            'json' => ['boards' => ['/boards/' . $taskProject->getId()]],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseIsSuccessful();
 
         $this->entityManager->clear();
-        $reloaded = $this->entityManager->getRepository(Project::class)->find($taskProject->getId());
-        $this->assertInstanceOf(Project::class, $reloaded);
+        $reloaded = $this->entityManager->getRepository(Board::class)->find($taskProject->getId());
+        $this->assertInstanceOf(Board::class, $reloaded);
         $this->assertSame((string) $billingProject->getId(), (string) $reloaded->getBillingProject()?->getId());
     }
 

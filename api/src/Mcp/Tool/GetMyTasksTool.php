@@ -28,7 +28,7 @@ final class GetMyTasksTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List tasks assigned to the authenticated user. Optionally narrow to one project, status (open/completed), or due-before cutoff. Paginated.';
+        return 'List tasks assigned to the authenticated user. Optionally narrow to one board, status (open/completed), or due-before cutoff. Paginated.';
     }
 
     public function getInputSchema(): array
@@ -37,7 +37,7 @@ final class GetMyTasksTool implements McpToolInterface
             'type' => 'object',
             'properties' => [
                 'status' => ['type' => 'string', 'enum' => ['open', 'completed']],
-                'projectId' => ['type' => 'string'],
+                'boardId' => ['type' => 'string'],
                 'dueBefore' => ['type' => 'string', 'description' => 'ISO-8601 datetime cutoff.'],
                 'page' => ['type' => 'integer', 'minimum' => 1],
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => 100],
@@ -64,8 +64,8 @@ final class GetMyTasksTool implements McpToolInterface
                 throw McpException::invalidInput('status must be "open" or "completed".');
             }
         }
-        if (null !== $projectId = $this->input->optionalUuid('projectId', $arguments['projectId'] ?? null)) {
-            $qb->andWhere('t.project = :projectId')->setParameter('projectId', $projectId);
+        if (null !== $boardId = $this->input->optionalUuid('boardId', $arguments['boardId'] ?? null)) {
+            $qb->andWhere('t.board = :boardId')->setParameter('boardId', $boardId);
         }
         if (null !== $dueBefore = $this->input->optionalDateTime($arguments, 'dueBefore')) {
             $qb->andWhere('t.dueDate < :dueBefore')->setParameter('dueBefore', $dueBefore);

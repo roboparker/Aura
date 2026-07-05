@@ -142,7 +142,7 @@ security:
         # global fields render in the per-project field picker and on task values.
         - { path: ^/global_custom_field_definitions, methods: [POST, PUT, PATCH, DELETE], roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
-        - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
+        - { path: ^/boards/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
         - { path: ^/mcp, roles: ROLE_USER }
         # Stripe billing webhook: unauthenticated at the firewall (no Bearer,

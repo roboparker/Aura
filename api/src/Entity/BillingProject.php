@@ -24,11 +24,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
- * A billable project (Harvest-style): the unit that time is tracked against and
+ * A billable board (Harvest-style): the unit that time is tracked against and
  * invoiced from. It belongs to a {@see Client} and defines a set of
  * {@see BillingCategory} rows (named work + hourly rate). Time entries select a
  * billing project + one of its categories, which fixes the rate. Task-management
- * {@see Project}s can be assigned to a billing project (their `billingProject` FK).
+ * {@see Board}s can be assigned to a billing project (their `billingProject` FK).
  *
  * Space-scoped and admin-managed like {@see Client}: the `invoices` permission
  * category gates create/read/update/delete via {@see \App\Doctrine\BillingProjectAccessExtension}.
@@ -94,7 +94,7 @@ class BillingProject
     private ?Client $client = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
-    #[Assert\NotBlank(message: 'A project name is required.')]
+    #[Assert\NotBlank(message: 'A board name is required.')]
     #[Assert\Length(max: self::MAX_NAME_LENGTH)]
     #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
     private string $name = '';
@@ -123,12 +123,12 @@ class BillingProject
     private Collection $categories;
 
     /**
-     * Task-management projects assigned to this billing project (inverse of
-     * {@see Project::$billingProject}). Read-only summary for the detail page.
+     * Task-management boards assigned to this billing project (inverse of
+     * {@see Board::$billingProject}). Read-only summary for the detail page.
      *
-     * @var Collection<int, Project>
+     * @var Collection<int, Board>
      */
-    #[ORM\OneToMany(mappedBy: 'billingProject', targetEntity: Project::class)]
+    #[ORM\OneToMany(mappedBy: 'billingProject', targetEntity: Board::class)]
     private Collection $assignedProjects;
 
     #[ApiProperty(readableLink: false)]
@@ -275,7 +275,7 @@ class BillingProject
     }
 
     /**
-     * @return Collection<int, Project>
+     * @return Collection<int, Board>
      */
     public function getAssignedProjects(): Collection
     {
@@ -283,8 +283,8 @@ class BillingProject
     }
 
     /**
-     * Flattened task-project roster for the detail page (avoids embedding the
-     * full Project resource + a serialization group on it).
+     * Flattened task-board roster for the detail page (avoids embedding the
+     * full Board resource + a serialization group on it).
      *
      * @return list<array{id: string, title: string}>
      */
@@ -292,8 +292,8 @@ class BillingProject
     public function getAssignedProjectList(): array
     {
         $out = [];
-        foreach ($this->assignedProjects as $project) {
-            $out[] = ['id' => (string) $project->getId(), 'title' => $project->getTitle()];
+        foreach ($this->assignedProjects as $board) {
+            $out[] = ['id' => (string) $board->getId(), 'title' => $board->getTitle()];
         }
 
         return $out;

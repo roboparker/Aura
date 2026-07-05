@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -34,7 +34,7 @@ class TaskSearchProvenanceTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -75,9 +75,9 @@ class TaskSearchProvenanceTest extends ApiTestCase
     public function testCustomFieldMatchReportsProvenance(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Marketing');
-        $task = $this->createTaskInProject($alice, $project, 'Untitled task');
-        $field = $this->seedTextField($project, 'Channel');
+        $board = $this->createProject($alice, 'Marketing');
+        $task = $this->createTaskInProject($alice, $board, 'Untitled task');
+        $field = $this->seedTextField($board, 'Channel');
         $this->seedValue($task, $field, 'moonshot newsletter');
 
         $client = static::createClient();
@@ -158,10 +158,10 @@ class TaskSearchProvenanceTest extends ApiTestCase
         $ref->setValue($task, new \DateTimeImmutable($modify));
     }
 
-    private function seedTextField(Project $project, string $name): CustomFieldDefinition
+    private function seedTextField(Board $board, string $name): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType('text');
         $this->entityManager->persist($field);
@@ -182,23 +182,23 @@ class TaskSearchProvenanceTest extends ApiTestCase
         return $cfv;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
-    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    private function createTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();

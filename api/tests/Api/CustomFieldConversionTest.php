@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,16 +33,16 @@ class CustomFieldConversionTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testIntToMoneyScalesAndKeepsValues(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Estimate', 'numeric', 'int');
-        $task = $this->createTask($alice, $project, 'A');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Estimate', 'numeric', 'int');
+        $task = $this->createTask($alice, $board, 'A');
         $cfv = $this->seedValue($task, $field, 5);
 
         $client = static::createClient();
@@ -67,9 +67,9 @@ class CustomFieldConversionTest extends ApiTestCase
     public function testDecimalToIntRoundsToNearest(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Score', 'numeric', 'float');
-        $task = $this->createTask($alice, $project, 'A');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Score', 'numeric', 'float');
+        $task = $this->createTask($alice, $board, 'A');
         $cfv = $this->seedValue($task, $field, 5.7);
 
         $client = static::createClient();
@@ -89,9 +89,9 @@ class CustomFieldConversionTest extends ApiTestCase
     public function testSingleToMultiWrapsValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Tags', 'text', 'text');
-        $task = $this->createTask($alice, $project, 'A');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Tags', 'text', 'text');
+        $task = $this->createTask($alice, $board, 'A');
         $cfv = $this->seedValue($task, $field, 'urgent');
 
         $client = static::createClient();
@@ -111,9 +111,9 @@ class CustomFieldConversionTest extends ApiTestCase
     public function testUnconvertibleWithoutConfirmationIsBlocked(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Notes', 'text', 'text');
-        $task = $this->createTask($alice, $project, 'A');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Notes', 'text', 'text');
+        $task = $this->createTask($alice, $board, 'A');
         $cfv = $this->seedValue($task, $field, 'not a number');
 
         $client = static::createClient();
@@ -140,9 +140,9 @@ class CustomFieldConversionTest extends ApiTestCase
     public function testUnconvertibleWithConfirmationConvertsAndDeletes(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Notes', 'text', 'text');
-        $task = $this->createTask($alice, $project, 'A');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Notes', 'text', 'text');
+        $task = $this->createTask($alice, $board, 'A');
         $cfv = $this->seedValue($task, $field, 'not a number');
 
         $client = static::createClient();
@@ -163,10 +163,10 @@ class CustomFieldConversionTest extends ApiTestCase
     public function testConvertibleAndUnconvertibleMix(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Notes', 'text', 'text');
-        $task1 = $this->createTask($alice, $project, 'A');
-        $task2 = $this->createTask($alice, $project, 'B');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Notes', 'text', 'text');
+        $task1 = $this->createTask($alice, $board, 'A');
+        $task2 = $this->createTask($alice, $board, 'B');
         $keep = $this->seedValue($task1, $field, '42');
         $drop = $this->seedValue($task2, $field, 'banana');
 
@@ -189,14 +189,14 @@ class CustomFieldConversionTest extends ApiTestCase
      * @param array<string, mixed> $config
      */
     private function seedField(
-        Project $project,
+        Board $board,
         string $name,
         string $kind,
         string $subtype,
         array $config = [],
     ): CustomFieldDefinition {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setKind($kind);
         $field->setSubtype($subtype);
@@ -217,22 +217,22 @@ class CustomFieldConversionTest extends ApiTestCase
         return $cfv;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();

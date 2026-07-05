@@ -2,7 +2,7 @@
 
 namespace App\Tests\Api;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -13,10 +13,10 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * @property EntityManagerInterface $entityManager
  *
- * Tests that previously called `$project->addMember($user)` to widen
- * project access now go through space membership. The personal space
- * created on User signup is the default home for projects, so the
- * common pattern "Alice has a project shared with Bob" maps to
+ * Tests that previously called `$board->addMember($user)` to widen
+ * board access now go through space membership. The personal space
+ * created on User signup is the default home for boards, so the
+ * common pattern "Alice has a board shared with Bob" maps to
  * "add Bob as a direct member of Alice's personal space" — admittedly
  * odd at the model level, but functionally indistinguishable from a
  * shared space for the purposes of access checks and avoids forcing
@@ -28,29 +28,29 @@ use Doctrine\ORM\EntityManagerInterface;
 trait SpaceMembershipFixture
 {
     /**
-     * Add a user to the project's space (#185 replacement for the old
-     * `$project->addMember($user)` test helper). If the project hasn't
-     * been persisted yet — `Project.space` is set by
-     * `ProjectSpaceDefaultListener` at PrePersist — we flush it first
+     * Add a user to the board's space (#185 replacement for the old
+     * `$board->addMember($user)` test helper). If the board hasn't
+     * been persisted yet — `Board.space` is set by
+     * `BoardSpaceDefaultListener` at PrePersist — we flush it first
      * so the space exists before we reference it. This lets test
-     * helpers stay terse: `new Project; setOwner; addProjectMember`
+     * helpers stay terse: `new Board; setOwner; addBoardMember`
      * without a manual persist line in between.
      */
-    protected function addProjectMember(
-        Project $project,
+    protected function addBoardMember(
+        Board $board,
         User $user,
         string $role = Space::ROLE_MEMBER,
     ): SpaceMembership {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         if (null === $space) {
             $em = $this->entityManagerForFixture();
-            $em->persist($project);
+            $em->persist($board);
             $em->flush();
-            $space = $project->getSpace();
+            $space = $board->getSpace();
         }
         if (null === $space) {
             throw new \RuntimeException(
-                'Project must have a space after persist — ProjectSpaceDefaultListener should have fired.',
+                'Board must have a space after persist — BoardSpaceDefaultListener should have fired.',
             );
         }
         return $this->ensureSpaceMembership($space, $user, $role);

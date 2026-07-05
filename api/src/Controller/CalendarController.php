@@ -24,18 +24,18 @@ use Symfony\Component\Uid\Uuid;
  * single source of truth for what the calendar renders (issue #442):
  *
  *  - Non-recurring tasks contribute one entry on their due date.
- *  - An *incomplete* recurring task projects its whole series across the
+ *  - An *incomplete* recurring task boards its whole series across the
  *    window via {@see RecurrenceCalculator::occurrencesInRange} (minus its
  *    EXDATE `recurrenceExceptions`) — the model materialises the next instance
- *    only on completion, so the calendar projects the upcoming ones.
+ *    only on completion, so the calendar boards the upcoming ones.
  *  - A *completed* recurring task contributes just its single done occurrence;
- *    its incomplete successor (spawned on completion) projects the rest, so the
+ *    its incomplete successor (spawned on completion) boards the rest, so the
  *    series is never double-counted.
  *
- * Scope mirrors the rest of the app: tasks whose project belongs to the space,
+ * Scope mirrors the rest of the app: tasks whose board belongs to the space,
  * plus the caller's own standalone tasks when the space is their personal one.
  * The caller must be a member of the space (admins bypass); the window is
- * capped so a pathological range can't blow up the projection.
+ * capped so a pathological range can't blow up the boardion.
  */
 final class CalendarController extends AbstractController
 {
@@ -78,20 +78,20 @@ final class CalendarController extends AbstractController
             return $this->json(['error' => 'Requested range is too large.'], 400);
         }
 
-        // Optional narrowing to one project (the project-tab calendar). Only
+        // Optional narrowing to one board (the board-tab calendar). Only
         // the trailing id matters; the query still requires it to live in the
-        // space, so a foreign project id simply yields nothing.
-        $rawProject = $request->query->getString('project');
-        $projectId = null;
+        // space, so a foreign board id simply yields nothing.
+        $rawProject = $request->query->getString('board');
+        $boardId = null;
         if ('' !== $rawProject) {
             $segment = 1 === preg_match('#([0-9a-f-]+)$#i', $rawProject, $m) ? $m[1] : '';
             if (!Uuid::isValid($segment)) {
-                return $this->json(['error' => 'Invalid `project`.'], 400);
+                return $this->json(['error' => 'Invalid `board`.'], 400);
             }
-            $projectId = $segment;
+            $boardId = $segment;
         }
 
-        $tasks = $this->fetchTasks($space, $user, $rangeStart, $rangeEnd, $projectId);
+        $tasks = $this->fetchTasks($space, $user, $rangeStart, $rangeEnd, $boardId);
 
         $entries = [];
         foreach ($tasks as $task) {
@@ -136,10 +136,10 @@ final class CalendarController extends AbstractController
         User $user,
         \DateTimeImmutable $rangeStart,
         \DateTimeImmutable $rangeEnd,
-        ?string $projectId,
+        ?string $boardId,
     ): array {
         $qb = $this->em->getRepository(Task::class)->createQueryBuilder('t')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->andWhere('t.dueDate IS NOT NULL')
             ->andWhere('t.dueDate <= :end')
             ->andWhere('t.recurrenceRule IS NOT NULL OR t.dueDate >= :start')
@@ -147,11 +147,11 @@ final class CalendarController extends AbstractController
             ->setParameter('end', $rangeEnd)
             ->setParameter('space', $space);
 
-        if (null !== $projectId) {
-            // Project-tab calendar: just that project's tasks, still scoped to
-            // the space so a foreign project id resolves to nothing.
-            $qb->andWhere('p.space = :space AND p.id = :projectId')
-                ->setParameter('projectId', $projectId);
+        if (null !== $boardId) {
+            // Board-tab calendar: just that board's tasks, still scoped to
+            // the space so a foreign board id resolves to nothing.
+            $qb->andWhere('p.space = :space AND p.id = :boardId')
+                ->setParameter('boardId', $boardId);
 
             /** @var list<Task> $scoped */
             $scoped = $qb->getQuery()->getResult();
@@ -159,12 +159,12 @@ final class CalendarController extends AbstractController
             return $scoped;
         }
 
-        // Standalone (project-less) tasks are owner-only and only belong on the
+        // Standalone (board-less) tasks are owner-only and only belong on the
         // owner's personal-space calendar.
         $personal = $space->getIsPersonal()
             && true === $space->getCreatedBy()?->getId()?->equals($user->getId());
         if ($personal) {
-            $qb->andWhere('p.space = :space OR (t.project IS NULL AND t.owner = :owner)')
+            $qb->andWhere('p.space = :space OR (t.board IS NULL AND t.owner = :owner)')
                 ->setParameter('owner', $user);
         } else {
             $qb->andWhere('p.space = :space');
@@ -181,7 +181,7 @@ final class CalendarController extends AbstractController
      */
     private function entry(Task $task, \DateTimeImmutable $occurrence, bool $recurring): array
     {
-        $project = $task->getProject();
+        $board = $task->getBoard();
 
         $assignees = [];
         foreach ($task->getAssignees() as $assignee) {
@@ -200,10 +200,10 @@ final class CalendarController extends AbstractController
             'dueDate' => $task->getDueDate()?->format(\DateTimeInterface::ATOM),
             'completedOn' => $task->getCompletedOn()?->format(\DateTimeInterface::ATOM),
             'recurring' => $recurring,
-            'project' => null === $project ? null : [
-                '@id' => '/projects/' . $project->getId(),
-                'id' => (string) $project->getId(),
-                'title' => $project->getTitle(),
+            'board' => null === $board ? null : [
+                '@id' => '/boards/' . $board->getId(),
+                'id' => (string) $board->getId(),
+                'title' => $board->getTitle(),
             ],
             'assignees' => $assignees,
             'tags' => $tags,

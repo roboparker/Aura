@@ -18,7 +18,7 @@ interface McpToolInterface
 {
     /**
      * Stable tool identifier. Lower-snake-case, prefixed by domain
-     * (`task_*`, `project_*`) so the catalog stays scannable.
+     * (`task_*`, `board_*`) so the catalog stays scannable.
      */
     public function getName(): string;
 

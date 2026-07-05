@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Service\SpaceIriResolver;
@@ -15,48 +15,48 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Moves a project into a different space (#182).
+ * Moves a board into a different space (#182).
  *
- * Auth bar: caller must be a member of the project's CURRENT space
+ * Auth bar: caller must be a member of the board's CURRENT space
  * (so they can already write to it) AND of the TARGET space (so
  * they're authorised to drop content there). Same shape as the
- * project edit/delete predicates plus a target-membership check.
+ * board edit/delete predicates plus a target-membership check.
  *
  * Tasks don't carry a denormalised `space` FK — their access is
- * derived through `task.project.space`, so updating the project is
+ * derived through `task.board.space`, so updating the board is
  * enough. Custom fields are space-owned now (#custom-fields-space) and
- * shared across a space's projects, so the project just picks up the
+ * shared across a space's boards, so the board just picks up the
  * target space's fields. Discussions and pages are space-owned too and
  * aren't touched by this move.
  *
- * Audit history is preserved automatically: Project is `Loggable`,
+ * Audit history is preserved automatically: Board is `Loggable`,
  * so the `space` change lands as a regular update entry.
  */
-class ProjectMoveController extends AbstractController
+class BoardMoveController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
     ) {
     }
 
-    #[Route('/projects/{id}/move', name: 'project_move', methods: ['POST'])]
+    #[Route('/boards/{id}/move', name: 'board_move', methods: ['POST'])]
     public function __invoke(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
         if (!Uuid::isValid($id)) {
-            return $this->json(['error' => 'Project not found.'], 404);
+            return $this->json(['error' => 'Board not found.'], 404);
         }
 
-        $project = $this->em->getRepository(Project::class)->find($id);
-        if (null === $project) {
-            return $this->json(['error' => 'Project not found.'], 404);
+        $board = $this->em->getRepository(Board::class)->find($id);
+        if (null === $board) {
+            return $this->json(['error' => 'Board not found.'], 404);
         }
-        if (!$this->isGranted('ROLE_ADMIN') && !$project->isAccessibleBy($user)) {
+        if (!$this->isGranted('ROLE_ADMIN') && !$board->isAccessibleBy($user)) {
             // Hide source-membership failures behind a 404 to match the
             // access-extension's existence-hiding shape.
-            return $this->json(['error' => 'Project not found.'], 404);
+            return $this->json(['error' => 'Board not found.'], 404);
         }
 
         $payload = $request->toArray();
@@ -78,32 +78,32 @@ class ProjectMoveController extends AbstractController
             return $this->json(['error' => 'Target space not found.'], 404);
         }
 
-        $current = $project->getSpace();
+        $current = $board->getSpace();
         if (null !== $current && true === $current->getId()?->equals($target->getId())) {
-            // No-op move — return the project unchanged with 200 rather
+            // No-op move — return the board unchanged with 200 rather
             // than a 304 so the PWA's "Move to" UX gets a consistent
             // response shape even if the user picks the current space.
             return $this->json([
-                '@id' => '/projects/' . $project->getId(),
-                'id' => (string) $project->getId(),
+                '@id' => '/boards/' . $board->getId(),
+                'id' => (string) $board->getId(),
                 'space' => '/spaces/' . $target->getId(),
                 'moved' => false,
             ], 200);
         }
 
-        $project->setSpace($target);
+        $board->setSpace($target);
 
         // Custom fields are space-owned now (#custom-fields-space) and
-        // per-project shown: the project's selected fields belong to the SOURCE
+        // per-board shown: the board's selected fields belong to the SOURCE
         // space, so detach them on move — the target space's own fields can be
         // opted into afterwards. Discussions/pages are space-owned, not moved.
-        $project->getCustomFieldDefinitions()->clear();
+        $board->getCustomFieldDefinitions()->clear();
 
         $this->em->flush();
 
         return $this->json([
-            '@id' => '/projects/' . $project->getId(),
-            'id' => (string) $project->getId(),
+            '@id' => '/boards/' . $board->getId(),
+            'id' => (string) $board->getId(),
             'space' => '/spaces/' . $target->getId(),
             'moved' => true,
         ], 200);

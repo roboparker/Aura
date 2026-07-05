@@ -15,7 +15,7 @@ use App\CustomField\Footer\FooterKind;
  *
  * Concrete strategies override what they need; the defaults err on the
  * conservative side (no multi, count-only aggregation, identity
- * normalization, no search projection) so a strategy that forgets to
+ * normalization, no search boardion) so a strategy that forgets to
  * declare these doesn't accidentally claim capabilities it can't deliver.
  */
 abstract class AbstractTypeStrategy implements CustomFieldTypeInterface

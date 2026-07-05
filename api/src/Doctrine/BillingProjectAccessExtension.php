@@ -8,7 +8,7 @@ use App\Security\Permission\SpacePermission;
 /**
  * Scopes BillingProject queries to the spaces the current user belongs to, via
  * the `billing_project.space` FK, and read-gates on the admin-reserved
- * `invoices` permission category. Members reach projects for time tracking
+ * `invoices` permission category. Members reach boards for time tracking
  * through the minimal picker instead. See {@see AbstractSpaceAccessExtension}.
  */
 final class BillingProjectAccessExtension extends AbstractSpaceAccessExtension

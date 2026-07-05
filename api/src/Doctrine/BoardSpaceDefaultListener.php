@@ -2,7 +2,7 @@
 
 namespace App\Doctrine;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Repository\SpaceRepository;
@@ -11,11 +11,11 @@ use Doctrine\ORM\Event\PrePersistEventArgs;
 use Doctrine\ORM\Events;
 
 /**
- * Defaults `Project.space` to the owner's personal space at insert
+ * Defaults `Board.space` to the owner's personal space at insert
  * time when the caller doesn't provide one (#181).
  *
- * Production code (`POST /projects`) already sets the space via
- * {@see \App\State\ProjectOwnerProcessor}, so this listener mostly
+ * Production code (`POST /boards`) already sets the space via
+ * {@see \App\State\BoardOwnerProcessor}, so this listener mostly
  * covers direct-EM persistence — tests, future fixtures, CLI
  * commands — without forcing every call site to know about spaces.
  *
@@ -25,19 +25,19 @@ use Doctrine\ORM\Events;
  * the unique partial index `uniq_space_personal_per_user` continues
  * to hold.
  */
-#[AsEntityListener(event: Events::prePersist, method: 'prePersist', entity: Project::class)]
-final class ProjectSpaceDefaultListener
+#[AsEntityListener(event: Events::prePersist, method: 'prePersist', entity: Board::class)]
+final class BoardSpaceDefaultListener
 {
     public function __construct(private SpaceRepository $spaceRepository)
     {
     }
 
-    public function prePersist(Project $project, PrePersistEventArgs $args): void
+    public function prePersist(Board $board, PrePersistEventArgs $args): void
     {
-        if (null !== $project->getSpace()) {
+        if (null !== $board->getSpace()) {
             return;
         }
-        $owner = $project->getOwner();
+        $owner = $board->getOwner();
         if (null === $owner) {
             return;
         }
@@ -59,6 +59,6 @@ final class ProjectSpaceDefaultListener
             );
             $args->getObjectManager()->persist($space);
         }
-        $project->setSpace($space);
+        $board->setSpace($space);
     }
 }

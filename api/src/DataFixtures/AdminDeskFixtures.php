@@ -8,7 +8,7 @@ use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Discussion;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Tag;
@@ -23,14 +23,14 @@ use Doctrine\Persistence\ObjectManager;
  * Admin (Ada) demo data — two spaces so an admin sign-in is interesting:
  *
  *  - **Admin desk** — a fully-populated shared space with at least one of
- *    every content type (project + tasks + a custom field & value, a page
+ *    every content type (board + tasks + a custom field & value, a page
  *    with a sub-page, a discussion + comment, tags), plus a few member users
  *    and a couple of groups.
  *  - **Sandbox** — a deliberately empty shared space, so the empty-state UI
  *    is reachable without deleting anything.
  *
  * Admin (Ada) is intentionally not a member of the user-side "Launch team"
- * space ({@see ProjectFixtures}); her data lives here.
+ * space ({@see BoardFixtures}); her data lives here.
  */
 class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
 {
@@ -80,21 +80,21 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
             $tags[$title] = $tag;
         }
 
-        // Project.
-        $project = (new Project())
+        // Board.
+        $board = (new Board())
             ->setOwner($ada)
             ->setSpace($desk)
             ->setTitle('Admin checklist')
             ->setDescription(
-                "Recurring admin chores so /projects isn't empty on an admin "
+                "Recurring admin chores so /boards isn't empty on an admin "
                 . "sign-in.\n\n- Rotate backups\n- Review access\n- Reconcile invoices",
             );
-        $manager->persist($project);
+        $manager->persist($board);
 
-        // Custom field on the project (text). setProject() stamps the space and
-        // attaches the field to the project's many-to-many.
+        // Custom field on the board (text). setBoard() stamps the space and
+        // attaches the field to the board's many-to-many.
         $field = (new CustomFieldDefinition())
-            ->setProject($project)
+            ->setBoard($board)
             ->setName('Owner team')
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')
@@ -104,7 +104,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
 
         // Tasks — open, with a custom-field value, and a completed one.
         $t1 = (new Task())
-            ->setOwner($ada)->setProject($project)
+            ->setOwner($ada)->setBoard($board)
             ->setTitle('Rotate nightly backups')
             ->setDescription('Confirm the pg_dump + media tarball ran and prune to the newest 5.')
             ->setPosition(0);
@@ -114,7 +114,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         $manager->persist($t1);
 
         $t2 = (new Task())
-            ->setOwner($ada)->setProject($project)
+            ->setOwner($ada)->setBoard($board)
             ->setTitle('Reconcile March invoices')
             ->setDescription('Match Stripe payouts against the ledger.')
             ->setPosition(1);
@@ -122,7 +122,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         $manager->persist($t2);
 
         $t3 = (new Task())
-            ->setOwner($ada)->setProject($project)
+            ->setOwner($ada)->setBoard($board)
             ->setTitle('Review who has admin')
             ->setDescription('Quarterly access review — drop anyone who no longer needs it.')
             ->setPosition(2)

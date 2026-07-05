@@ -3,11 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Service\ActivityFeedQuery;
-use App\Service\ProjectActivityScope;
+use App\Service\BoardActivityScope;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Space-level activity feed for the dashboard. Aggregates the audit
  * history of every Loggable entity that lives in the space — its
- * projects, its pages, and the tasks inside those projects — into one
+ * boards, its pages, and the tasks inside those boards — into one
  * chronological stream, reusing {@see ActivityFeedQuery} so the shape
- * matches `/projects/{id}/activity` and `/tasks/{id}/activity`.
+ * matches `/boards/{id}/activity` and `/tasks/{id}/activity`.
  *
  * Access mirrors the Space GET visibility: any space member can read;
  * everyone else gets a 404 so the endpoint never leaks a space's
@@ -34,7 +34,7 @@ class SpaceActivityController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private ActivityFeedQuery $activityFeed,
-        private ProjectActivityScope $scope,
+        private BoardActivityScope $scope,
     ) {
     }
 
@@ -53,12 +53,12 @@ class SpaceActivityController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        // Roll the per-project activity groups (project + tasks + custom-field
-        // definitions, including deleted children) up across every project in
-        // the space, then add the space's pages. Reusing ProjectActivityScope
-        // keeps the hierarchy consistent: a space sees everything its projects
+        // Roll the per-board activity groups (board + tasks + custom-field
+        // definitions, including deleted children) up across every board in
+        // the space, then add the space's pages. Reusing BoardActivityScope
+        // keeps the hierarchy consistent: a space sees everything its boards
         // see, one level down — the same way space membership cascades.
-        $projects = $this->em->getRepository(Project::class)->findBy(['space' => $space]);
+        $boards = $this->em->getRepository(Board::class)->findBy(['space' => $space]);
         $pages = $this->em->getRepository(Page::class)->findBy(['space' => $space]);
 
         /** @var array<class-string, list<string>> $groups */
@@ -66,8 +66,8 @@ class SpaceActivityController extends AbstractController
             static fn (Page $p): string => (string) $p->getId(),
             $pages,
         ))];
-        foreach ($projects as $project) {
-            foreach ($this->scope->groupsForProject($project) as $class => $ids) {
+        foreach ($boards as $board) {
+            foreach ($this->scope->groupsForProject($board) as $class => $ids) {
                 $groups[$class] = array_values(array_unique([
                     ...($groups[$class] ?? []),
                     ...$ids,

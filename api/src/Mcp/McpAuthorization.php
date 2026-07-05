@@ -4,7 +4,7 @@ namespace App\Mcp;
 
 use App\Entity\Discussion;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Security\Permission\SpacePermission;
@@ -12,7 +12,7 @@ use App\Security\Permission\SpacePermissionResolver;
 
 /**
  * Authorization rules duplicated from the API Platform `security:`
- * expressions on Task and Project, so MCP tools can re-check access in
+ * expressions on Task and Board, so MCP tools can re-check access in
  * pure PHP without going through the HTTP layer.
  *
  * Keeping them in one helper means future rule changes need to land here as
@@ -30,31 +30,31 @@ final class McpAuthorization
     {
         return $this->ownsTask($task, $user)
             || ($task->isAccessibleBy($user)
-                && $this->permissions->can($user, $task->getProject()?->getSpace(), SpacePermission::TASKS, SpacePermission::READ));
+                && $this->permissions->can($user, $task->getBoard()?->getSpace(), SpacePermission::TASKS, SpacePermission::READ));
     }
 
     /**
      * Tasks share read and write rules — every space member can edit a
-     * project task alongside its owner. Mirrors the Patch security
+     * board task alongside its owner. Mirrors the Patch security
      * expression on the Task entity (#185), now role-gated.
      */
     public function canEditTask(Task $task, User $user): bool
     {
         return $this->ownsTask($task, $user)
             || ($task->isAccessibleBy($user)
-                && $this->permissions->can($user, $task->getProject()?->getSpace(), SpacePermission::TASKS, SpacePermission::UPDATE));
+                && $this->permissions->can($user, $task->getBoard()?->getSpace(), SpacePermission::TASKS, SpacePermission::UPDATE));
     }
 
-    public function canReadProject(Project $project, User $user): bool
+    public function canReadProject(Board $board, User $user): bool
     {
-        return $project->isAccessibleBy($user)
-            && $this->permissions->can($user, $project->getSpace(), SpacePermission::PROJECTS, SpacePermission::READ);
+        return $board->isAccessibleBy($user)
+            && $this->permissions->can($user, $board->getSpace(), SpacePermission::PROJECTS, SpacePermission::READ);
     }
 
-    public function canEditProject(Project $project, User $user): bool
+    public function canEditProject(Board $board, User $user): bool
     {
-        return $project->isAccessibleBy($user)
-            && $this->permissions->can($user, $project->getSpace(), SpacePermission::PROJECTS, SpacePermission::UPDATE);
+        return $board->isAccessibleBy($user)
+            && $this->permissions->can($user, $board->getSpace(), SpacePermission::PROJECTS, SpacePermission::UPDATE);
     }
 
     private function ownsTask(Task $task, User $user): bool
@@ -64,12 +64,12 @@ final class McpAuthorization
 
     /**
      * Retained as a thin alias so any external callers don't break with
-     * the rename. New code should call `Project::isAccessibleBy()`
+     * the rename. New code should call `Board::isAccessibleBy()`
      * directly.
      */
-    public function isProjectMember(Project $project, User $user): bool
+    public function isProjectMember(Board $board, User $user): bool
     {
-        return $project->isAccessibleBy($user);
+        return $board->isAccessibleBy($user);
     }
 
     /**

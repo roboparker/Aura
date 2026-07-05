@@ -17,7 +17,7 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Minimal billing-project picker for time tracking. Any member of a space may
  * list its active billing projects with their categories + rates — enough to
- * *select* a project + category on a time entry — without the full
+ * *select* a board + category on a time entry — without the full
  * read/edit access the admin-reserved `invoices` permission gates on the
  * BillingProject resource. Bypasses {@see \App\Doctrine\BillingProjectAccessExtension}
  * by querying the repository directly after a membership check.
@@ -44,13 +44,13 @@ class BillingProjectOptionsController extends AbstractController
             return $this->json(['error' => 'Space not found.'], 404);
         }
 
-        $projects = $this->em->getRepository(BillingProject::class)
+        $boards = $this->em->getRepository(BillingProject::class)
             ->findBy(['space' => $space, 'archived' => false], ['name' => 'ASC']);
 
         $options = array_map(
-            static function (BillingProject $project): array {
+            static function (BillingProject $board): array {
                 $categories = [];
-                foreach ($project->getCategories() as $category) {
+                foreach ($board->getCategories() as $category) {
                     $categories[] = [
                         '@id' => '/billing_categories/' . $category->getId(),
                         'id' => (string) $category->getId(),
@@ -60,14 +60,14 @@ class BillingProjectOptionsController extends AbstractController
                 }
 
                 return [
-                    '@id' => '/billing_projects/' . $project->getId(),
-                    'id' => (string) $project->getId(),
-                    'name' => $project->getName(),
-                    'currency' => $project->getCurrency(),
+                    '@id' => '/billing_projects/' . $board->getId(),
+                    'id' => (string) $board->getId(),
+                    'name' => $board->getName(),
+                    'currency' => $board->getCurrency(),
                     'categories' => $categories,
                 ];
             },
-            $projects,
+            $boards,
         );
 
         return $this->json(['options' => $options]);

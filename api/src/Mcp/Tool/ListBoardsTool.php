@@ -2,14 +2,14 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpInputHelper;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 
-final class ListProjectsTool implements McpToolInterface
+final class ListBoardsTool implements McpToolInterface
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -25,7 +25,7 @@ final class ListProjectsTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List projects the user is a member of, paginated and ordered newest first. Each entry includes the member list and a count of attached tasks.';
+        return 'List boards the user is a member of, paginated and ordered newest first. Each entry includes the member list and a count of attached tasks.';
     }
 
     public function getInputSchema(): array
@@ -44,7 +44,7 @@ final class ListProjectsTool implements McpToolInterface
     {
         ['page' => $page, 'limit' => $limit] = $this->input->pagination($arguments);
 
-        $qb = $this->em->getRepository(Project::class)
+        $qb = $this->em->getRepository(Board::class)
             ->createQueryBuilder('p')
             ->where(\App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_projects'))
             ->setParameter('user', $user)
@@ -54,9 +54,9 @@ final class ListProjectsTool implements McpToolInterface
 
         $paginator = new Paginator($qb->getQuery(), fetchJoinCollection: true);
         $items = [];
-        foreach ($paginator as $project) {
-            /** @var Project $project */
-            $items[] = $this->serializer->project($project);
+        foreach ($paginator as $board) {
+            /** @var Board $board */
+            $items[] = $this->serializer->board($board);
         }
 
         return [

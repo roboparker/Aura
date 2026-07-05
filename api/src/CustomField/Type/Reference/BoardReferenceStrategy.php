@@ -4,38 +4,38 @@ declare(strict_types=1);
 
 namespace App\CustomField\Type\Reference;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 
 /**
- * `reference.project` — references one or more projects. Scope is the
- * field's space; a project is in-scope iff it lives in the same space.
+ * `reference.board` — references one or more boards. Scope is the
+ * field's space; a board is in-scope iff it lives in the same space.
  */
-final class ProjectReferenceStrategy extends AbstractReferenceStrategy
+final class BoardReferenceStrategy extends AbstractReferenceStrategy
 {
     public function subtype(): string
     {
-        return 'project';
+        return 'board';
     }
 
     protected function targetClass(): string
     {
-        return Project::class;
+        return Board::class;
     }
 
     protected function iriPrefix(): string
     {
-        return '/projects/';
+        return '/boards/';
     }
 
     protected function displayLabel(object $target): string
     {
-        return $target instanceof Project ? $target->getTitle() : '';
+        return $target instanceof Board ? $target->getTitle() : '';
     }
 
     protected function isInScope(object $target, Space $space): bool
     {
-        if (!$target instanceof Project) {
+        if (!$target instanceof Board) {
             return false;
         }
         $targetSpace = $target->getSpace();

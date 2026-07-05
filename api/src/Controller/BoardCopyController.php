@@ -3,13 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
-use App\Entity\ProjectFieldVisibility;
+use App\Entity\Board;
+use App\Entity\BoardFieldVisibility;
 use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
-use App\Repository\ProjectFieldVisibilityRepository;
+use App\Repository\BoardFieldVisibilityRepository;
 use App\Service\CopyTitleSuffixer;
 use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
@@ -21,11 +21,11 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Deep-clones a project into a target space (#182). Useful as a
- * "duplicate this project as a template" workflow.
+ * Deep-clones a board into a target space (#182). Useful as a
+ * "duplicate this board as a template" workflow.
  *
  * Scope:
- *  - The project metadata (title, description) carries over. Title gets
+ *  - The board metadata (title, description) carries over. Title gets
  *    a " (copy)" suffix so the source and clone are distinguishable at
  *    a glance.
  *  - Custom fields are space-owned now (#custom-fields-space); the copy keeps
@@ -42,38 +42,38 @@ use Symfony\Component\Uid\Uuid;
  *    custom field values are deliberately dropped — those are
  *    user-specific state, and CFV would need an old-CFD→new-CFD
  *    mapping that's a heavier slice on its own.
- *  - Discussions live at the space level — not project — so they're
- *    never carried along on a project copy.
+ *  - Discussions live at the space level — not board — so they're
+ *    never carried along on a board copy.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults
  * to the source's space when no `space` is supplied on the body, so
  * "copy here" is a one-click operation.
  */
-class ProjectCopyController extends AbstractController
+class BoardCopyController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private ProjectFieldVisibilityRepository $fieldVisibility,
+        private BoardFieldVisibilityRepository $fieldVisibility,
     ) {
     }
 
-    #[Route('/projects/{id}/copy', name: 'project_copy', methods: ['POST'])]
+    #[Route('/boards/{id}/copy', name: 'board_copy', methods: ['POST'])]
     public function __invoke(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
         if (!Uuid::isValid($id)) {
-            return $this->json(['error' => 'Project not found.'], 404);
+            return $this->json(['error' => 'Board not found.'], 404);
         }
 
-        $source = $this->em->getRepository(Project::class)->find($id);
+        $source = $this->em->getRepository(Board::class)->find($id);
         if (null === $source) {
-            return $this->json(['error' => 'Project not found.'], 404);
+            return $this->json(['error' => 'Board not found.'], 404);
         }
         if (!$this->isGranted('ROLE_ADMIN') && !$source->isAccessibleBy($user)) {
-            return $this->json(['error' => 'Project not found.'], 404);
+            return $this->json(['error' => 'Board not found.'], 404);
         }
 
         $payload = $request->toArray();
@@ -94,28 +94,28 @@ class ProjectCopyController extends AbstractController
                 return $this->json(['error' => 'Target space not found.'], 404);
             }
         } elseif (null === $target) {
-            // Defensive: every persisted project has a space, but if
+            // Defensive: every persisted board has a space, but if
             // somehow not, we can't materialise a copy without one.
-            return $this->json(['error' => 'Source project has no space and no target supplied.'], 400);
+            return $this->json(['error' => 'Source board has no space and no target supplied.'], 400);
         }
 
-        $copy = (new Project())
+        $copy = (new Board())
             ->setTitle(CopyTitleSuffixer::apply($source->getTitle(), self::TITLE_MAX))
             ->setDescription($source->getDescription())
             ->setOwner($user)
             ->setSpace($target);
 
-        // Persist the project first so its id is generated and child
+        // Persist the board first so its id is generated and child
         // CFDs can reference it.
         $this->em->persist($copy);
         $this->em->flush();
 
-        // Carry the source project's field SELECTION onto the copy. Fields are
+        // Carry the source board's field SELECTION onto the copy. Fields are
         // space-owned now (#custom-fields-space): a same-space copy opts into
         // the same definitions; a cross-space copy reuses a same-named field in
         // the target space or clones it there.
-        // Per-project visibility (#custom-fields-project) carries over too: the
-        // clone keeps the source's per-project visibility for each field.
+        // Per-board visibility (#custom-fields-board) carries over too: the
+        // clone keeps the source's per-board visibility for each field.
         $sourceVisibility = $this->fieldVisibility->visibilityMapForProject($source);
         foreach ($source->getCustomFieldDefinitions() as $sourceDefinition) {
             $effective = $sourceVisibility[(string) $sourceDefinition->getId()]
@@ -152,13 +152,13 @@ class ProjectCopyController extends AbstractController
 
         // Global fields (#global-custom-fields) are instance-wide — a copy in
         // any space opts into the same definitions (nothing to clone), keeping
-        // each field's per-project visibility override.
+        // each field's per-board visibility override.
         foreach ($source->getGlobalCustomFieldDefinitions() as $sourceGlobal) {
             $effective = $sourceVisibility[(string) $sourceGlobal->getId()]
                 ?? $sourceGlobal->getVisibility();
             $copy->addGlobalCustomFieldDefinition($sourceGlobal);
-            $row = (new ProjectFieldVisibility())
-                ->setProject($copy)
+            $row = (new BoardFieldVisibility())
+                ->setBoard($copy)
                 ->setGlobalDefinition($sourceGlobal)
                 ->setVisibility($effective);
             $this->em->persist($row);
@@ -180,11 +180,11 @@ class ProjectCopyController extends AbstractController
         $tasksCloned = 0;
         if (true === ($payload['includeTasks'] ?? false)) {
             $sourceTasks = $this->em->getRepository(Task::class)
-                ->findBy(['project' => $source], ['position' => 'ASC']);
+                ->findBy(['board' => $source], ['position' => 'ASC']);
             foreach ($sourceTasks as $sourceTask) {
                 $cloneTask = (new Task())
                     ->setOwner($user)
-                    ->setProject($copy)
+                    ->setBoard($copy)
                     ->setTitle($sourceTask->getTitle())
                     ->setDescription($sourceTask->getDescription())
                     ->setDueDate($sourceTask->getDueDate())
@@ -203,7 +203,7 @@ class ProjectCopyController extends AbstractController
         $this->em->flush();
 
         return $this->json([
-            '@id' => '/projects/' . $copy->getId(),
+            '@id' => '/boards/' . $copy->getId(),
             'id' => (string) $copy->getId(),
             'title' => $copy->getTitle(),
             'space' => '/spaces/' . $target->getId(),
@@ -212,17 +212,17 @@ class ProjectCopyController extends AbstractController
     }
 
     private function copyFieldVisibility(
-        Project $project,
+        Board $board,
         CustomFieldDefinition $definition,
         string $visibility,
     ): void {
-        $row = (new ProjectFieldVisibility())
-            ->setProject($project)
+        $row = (new BoardFieldVisibility())
+            ->setBoard($board)
             ->setDefinition($definition)
             ->setVisibility($visibility);
         $this->em->persist($row);
     }
 
-    /** Project's `title` column width — the clone must fit it after suffixing. */
+    /** Board's `title` column width — the clone must fit it after suffixing. */
     private const TITLE_MAX = 255;
 }

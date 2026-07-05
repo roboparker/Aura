@@ -12,7 +12,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Coverage for App\Controller\PageActivityController — `GET /pages/{id}/activity`
- * (#183). Mirrors the Task/Project activity controllers: any space member can
+ * (#183). Mirrors the Task/Board activity controllers: any space member can
  * read the audit feed; non-members and unknown ids get 404 (existence-hiding).
  */
 class PageActivityTest extends ApiTestCase

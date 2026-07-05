@@ -27,7 +27,7 @@ final class GetTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Fetch one task by id, including assignees, tags, project, and attachments. Returns 404 when the task is not visible to the caller.';
+        return 'Fetch one task by id, including assignees, tags, board, and attachments. Returns 404 when the task is not visible to the caller.';
     }
 
     public function getInputSchema(): array

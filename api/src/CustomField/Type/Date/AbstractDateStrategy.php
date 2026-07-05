@@ -15,7 +15,7 @@ use App\Entity\CustomFieldDefinitionInterface;
  * Shared validation + normalization for date-flavoured kinds. Each
  * subtype declares its expected wire format via {@see format()}; this
  * class drives the multi walk, the min/max bound check, and the FTS
- * search-text projection on top of that.
+ * search-text boardion on top of that.
  *
  * Config: `{min?, max?, multi}`.
  *   - `min` / `max` are inclusive bounds in the subtype's wire format

@@ -8,7 +8,7 @@ use App\Entity\CustomFieldValue;
 use App\Entity\Discussion;
 use App\Entity\MediaObject;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\SpaceExport;
 use App\Entity\Tag;
 use App\Entity\Task;
@@ -23,8 +23,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Layout inside the archive:
  *
  *   space.json        — space metadata + member roster
- *   projects.json     — projects with their custom field definitions
- *   tasks.json        — tasks of the space's projects (values, tags,
+ *   boards.json     — boards with their custom field definitions
+ *   tasks.json        — tasks of the space's boards (values, tags,
  *                       assignees, comments, attachment references)
  *   pages.json        — pages with their comment threads
  *   discussions.json  — discussions with their comment threads
@@ -72,10 +72,10 @@ final class SpaceExportBuilder
             throw new \RuntimeException(sprintf('Export staging directory "%s" could not be created.', $partsDir));
         }
 
-        $projects = $this->em->getRepository(Project::class)
+        $boards = $this->em->getRepository(Board::class)
             ->findBy(['space' => $space], ['createdOn' => 'ASC']);
-        $tasks = [] === $projects ? [] : $this->em->getRepository(Task::class)
-            ->findBy(['project' => $projects], ['createdOn' => 'ASC']);
+        $tasks = [] === $boards ? [] : $this->em->getRepository(Task::class)
+            ->findBy(['board' => $boards], ['createdOn' => 'ASC']);
         $pages = $this->em->getRepository(Page::class)
             ->findBy(['space' => $space], ['createdAt' => 'ASC']);
         $discussions = $this->em->getRepository(Discussion::class)
@@ -105,7 +105,7 @@ final class SpaceExportBuilder
             $discussionComments = $this->commentsFor($discussions, 'discussion');
 
             $this->archive->addJson($zip, 'space.json', $this->spaceData($export));
-            $this->archive->addJson($zip, 'projects.json', array_map($this->projectData(...), $projects));
+            $this->archive->addJson($zip, 'boards.json', array_map($this->boardData(...), $boards));
             $this->archive->addJson($zip, 'tasks.json', array_map(
                 fn (Task $t): array => $this->taskData($t, $taskComments),
                 $tasks,
@@ -175,10 +175,10 @@ final class SpaceExportBuilder
     /**
      * @return array<string, mixed>
      */
-    private function projectData(Project $project): array
+    private function boardData(Board $board): array
     {
-        // Fields are space-owned; export the ones this project has opted into.
-        $definitions = $project->getCustomFieldDefinitions()->toArray();
+        // Fields are space-owned; export the ones this board has opted into.
+        $definitions = $board->getCustomFieldDefinitions()->toArray();
         usort(
             $definitions,
             static fn (CustomFieldDefinition $a, CustomFieldDefinition $b): int
@@ -186,11 +186,11 @@ final class SpaceExportBuilder
         );
 
         return [
-            'id' => (string) $project->getId(),
-            'title' => $project->getTitle(),
-            'description' => $project->getDescription(),
-            'createdOn' => $project->getCreatedOn()->format(\DateTimeInterface::ATOM),
-            'createdBy' => $this->userRef($project->getOwner()),
+            'id' => (string) $board->getId(),
+            'title' => $board->getTitle(),
+            'description' => $board->getDescription(),
+            'createdOn' => $board->getCreatedOn()->format(\DateTimeInterface::ATOM),
+            'createdBy' => $this->userRef($board->getOwner()),
             'customFieldDefinitions' => array_map(static fn (CustomFieldDefinition $d): array => [
                 'id' => (string) $d->getId(),
                 'name' => $d->getName(),
@@ -212,7 +212,7 @@ final class SpaceExportBuilder
     {
         return [
             'id' => (string) $task->getId(),
-            'projectId' => null !== $task->getProject() ? (string) $task->getProject()->getId() : null,
+            'boardId' => null !== $task->getBoard() ? (string) $task->getBoard()->getId() : null,
             'title' => $task->getTitle(),
             'description' => $task->getDescription(),
             'dueDate' => $task->getDueDate()?->format(\DateTimeInterface::ATOM),

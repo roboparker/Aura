@@ -12,7 +12,7 @@ use Doctrine\DBAL\Connection;
 
 /**
  * Computes per-CFD footer aggregations across a precomputed list of
- * task IDs. The caller scopes the task set (project membership +
+ * task IDs. The caller scopes the task set (board membership +
  * filter chain) and hands the IDs in; this service runs one
  * aggregation query per footer-configured CFD against that scope.
  *

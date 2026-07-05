@@ -18,7 +18,7 @@ use Doctrine\ORM\Events;
  * Each strategy decides how its value renders to plain searchable text
  * (text strategies trim + join, money emits "<amount> <currency>",
  * references dereference and emit the target's display label), so
- * concentrating the projection here means the FTS index always
+ * concentrating the boardion here means the FTS index always
  * reflects the strategy's choice without duplicating the rules in SQL
  * or in entity lifecycle hooks.
  *

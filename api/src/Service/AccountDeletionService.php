@@ -9,7 +9,7 @@ use App\Entity\Discussion;
 use App\Entity\Feedback;
 use App\Entity\MediaObject;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Task;
@@ -21,7 +21,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Hard-deletes a user account while preserving the content they authored.
  *
  * Every authorship FK on User is `onDelete: CASCADE` and non-null, so a naive
- * `EntityManager::remove($user)` would erase their tasks, projects, pages,
+ * `EntityManager::remove($user)` would erase their tasks, boards, pages,
  * discussions, comments, feedback tickets and media. Instead we reassign those
  * FKs to a reserved
  * "Former member" sentinel inside a transaction *before* removing the user, so
@@ -52,7 +52,7 @@ final class AccountDeletionService
             // Reassign authored content to the sentinel (bulk UPDATE keeps it
             // cheap and avoids materialising large collections).
             $this->reassign(Task::class, 'owner', $user, $sentinel);
-            $this->reassign(Project::class, 'owner', $user, $sentinel);
+            $this->reassign(Board::class, 'owner', $user, $sentinel);
             $this->reassign(Page::class, 'createdBy', $user, $sentinel);
             $this->reassign(Discussion::class, 'author', $user, $sentinel);
             $this->reassign(Comment::class, 'author', $user, $sentinel);

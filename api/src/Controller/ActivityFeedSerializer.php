@@ -4,14 +4,14 @@ namespace App\Controller;
 
 use App\Entity\ActivityLog;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Shared shape for `/tasks/{id}/activity` and `/projects/{id}/activity`.
+ * Shared shape for `/tasks/{id}/activity` and `/boards/{id}/activity`.
  * Returns the page of ActivityLog rows plus a small actor map keyed by
  * `username` (which we set to the user IRI in `LoggableUserListener`),
  * so the PWA can render avatars inline without N+1 user fetches.
@@ -27,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Where `ActivityRow` shape mirrors a flattened Gedmo log entry —
  * action, loggedAt (ISO 8601), objectClass (short name: "Task" /
- * "Project"), objectId, version, actor (the username IRI), and `data`
+ * "Board"), objectId, version, actor (the username IRI), and `data`
  * (associative array of changed-field → new value).
  */
 final class ActivityFeedSerializer
@@ -128,7 +128,7 @@ final class ActivityFeedSerializer
     {
         return match (true) {
             $fqcn === Task::class => 'Task',
-            $fqcn === Project::class => 'Project',
+            $fqcn === Board::class => 'Board',
             $fqcn === CustomFieldDefinition::class => 'CustomFieldDefinition',
             default => substr($fqcn, (int) strrpos($fqcn, '\\') + 1),
         };

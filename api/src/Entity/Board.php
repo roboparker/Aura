@@ -10,9 +10,9 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Filter\ProjectSearchFilter;
-use App\Repository\ProjectRepository;
-use App\State\ProjectOwnerProcessor;
+use App\Filter\BoardSearchFilter;
+use App\Repository\BoardRepository;
+use App\State\BoardOwnerProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\Criteria;
@@ -26,14 +26,14 @@ use Symfony\Component\Validator\Constraints as Assert;
  * Shared container for tasks. Lives inside a {@see Space} (#181), and
  * access is determined by membership in that space — every space member
  * can read, edit, and (subject to admin/author rules) delete the
- * project and its tasks. The `owner` field records who created the
- * project for display/audit — it does not grant extra privileges
+ * board and its tasks. The `owner` field records who created the
+ * board for display/audit — it does not grant extra privileges
  * beyond what space membership already provides.
  *
  * Per #185:
  *  - read/list/create: any space member
- *  - edit: any space member (project metadata is shared state)
- *  - delete: project creator (owner) or space admin
+ *  - edit: any space member (board metadata is shared state)
+ *  - delete: board creator (owner) or space admin
  *  - Post requires the caller to be a member of the target space
  *    (enforced via securityPostDenormalize so the validator runs after
  *    the IRI denormalises into a Space entity).
@@ -46,56 +46,56 @@ use Symfony\Component\Validator\Constraints as Assert;
         new Post(
             security: "is_granted('ROLE_USER')",
             // Allow `space === null` so the existing PWA — which doesn't
-            // know about spaces yet — can keep posting projects without
-            // an explicit IRI; ProjectOwnerProcessor will default it to
+            // know about spaces yet — can keep posting boards without
+            // an explicit IRI; BoardOwnerProcessor will default it to
             // the caller's personal space (where they're admin) before
             // persist. When the client DOES pick a space, they must be a
             // member of it.
-            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace() === null or (object.isAccessibleBy(user) and is_granted('space.projects.create', object)))",
-            securityPostDenormalizeMessage: 'You can only create projects in a space you belong to.',
-            processor: ProjectOwnerProcessor::class,
+            securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace() === null or (object.isAccessibleBy(user) and is_granted('space.boards.create', object)))",
+            securityPostDenormalizeMessage: 'You can only create boards in a space you belong to.',
+            processor: BoardOwnerProcessor::class,
         ),
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.projects.read', object)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.boards.read', object)))",
         ),
         new Patch(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.projects.update', object)))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.boards.update', object)))",
         ),
         new Delete(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user) or (object.isAccessibleBy(user) and is_granted('space.projects.delete', object)))",
-            securityMessage: 'Only the project creator or a space admin can delete a project.',
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user) or (object.isAccessibleBy(user) and is_granted('space.boards.delete', object)))",
+            securityMessage: 'Only the board creator or a space admin can delete a board.',
         ),
     ],
-    normalizationContext: ['groups' => ['project:read']],
-    denormalizationContext: ['groups' => ['project:write']],
+    normalizationContext: ['groups' => ['board:read']],
+    denormalizationContext: ['groups' => ['board:write']],
     order: ['createdOn' => 'DESC'],
 )]
-#[ORM\Entity(repositoryClass: ProjectRepository::class)]
-#[ORM\Table(name: 'project')]
+#[ORM\Entity(repositoryClass: BoardRepository::class)]
+#[ORM\Table(name: 'board')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_project_owner')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_project_space')]
 // Mirror the GIN index on `search_vector` from Version20260506010000 so
 // doctrine:schema:validate doesn't try to drop it on every CI run.
 #[ORM\Index(columns: ['search_vector'], name: 'idx_project_search_vector', flags: ['gin'])]
-#[ApiFilter(ProjectSearchFilter::class)]
+#[ApiFilter(BoardSearchFilter::class)]
 #[ApiFilter(\ApiPlatform\Doctrine\Orm\Filter\SearchFilter::class, properties: ['space' => 'exact'])]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
-class Project
+class Board
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['project:read', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'task:read', 'discussion:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     private ?User $owner = null;
 
     /**
-     * The space this project lives in (#181). Set by ProjectOwnerProcessor
+     * The space this board lives in (#181). Set by BoardOwnerProcessor
      * to the creator's personal space when the client doesn't specify
      * one — keeps the existing PWA, which is unaware of spaces, working
      * unchanged. Made non-null at the DB level once the migration's
@@ -104,32 +104,32 @@ class Project
      * Owner-based access is still in force in PR 1; PR 2 (#185) swaps
      * the access predicates to scope by space membership.
      */
-    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'projects')]
+    #[ORM\ManyToOne(targetEntity: Space::class, inversedBy: 'boards')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['project:read', 'project:write'])]
+    #[Groups(['board:read', 'board:write'])]
     private ?Space $space = null;
 
     /**
-     * The billing project this task-management project rolls up to (Harvest
+     * The billing project this task-management board rolls up to (Harvest
      * model). Nullable — set from the billing project's page. `SET NULL` so
-     * deleting a billing project just unassigns its projects.
+     * deleting a billing project just unassigns its boards.
      */
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: BillingProject::class, inversedBy: 'assignedProjects')]
     #[ORM\JoinColumn(name: 'billing_project_id', nullable: true, onDelete: 'SET NULL')]
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     private ?BillingProject $billingProject = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
-    #[Groups(['project:read', 'project:write', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'board:write', 'task:read', 'discussion:read'])]
     #[Gedmo\Versioned]
     private string $title = '';
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Assert\Length(max: 100000, maxMessage: 'Description cannot be longer than {{ limit }} characters.')]
-    #[Groups(['project:read', 'project:write'])]
+    #[Groups(['board:read', 'board:write'])]
     #[Gedmo\Versioned]
     private ?string $description = null;
 
@@ -143,45 +143,45 @@ class Project
     private ?string $searchVector = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     private \DateTimeImmutable $createdOn;
 
     /**
      * @var Collection<int, Task>
      */
-    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, fetch: 'EXTRA_LAZY')]
+    #[ORM\OneToMany(mappedBy: 'board', targetEntity: Task::class, fetch: 'EXTRA_LAZY')]
     private Collection $tasks;
 
     /**
-     * Custom-field definitions (owned by this project's space) this project
+     * Custom-field definitions (owned by this board's space) this board
      * shows on its tasks. Owning side of the M2M (#custom-fields-space);
-     * exposed as IRIs so the project Settings picker can read/set the subset.
+     * exposed as IRIs so the board Settings picker can read/set the subset.
      *
      * @var Collection<int, CustomFieldDefinition>
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToMany(targetEntity: CustomFieldDefinition::class, inversedBy: 'projects')]
-    #[ORM\JoinTable(name: 'project_custom_field_definition')]
-    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\ManyToMany(targetEntity: CustomFieldDefinition::class, inversedBy: 'boards')]
+    #[ORM\JoinTable(name: 'board_custom_field_definition')]
+    #[ORM\JoinColumn(name: 'board_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'custom_field_definition_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['project:read', 'project:write'])]
+    #[Groups(['board:read', 'board:write'])]
     private Collection $customFieldDefinitions;
 
     /**
-     * Instance-wide global custom-field definitions this project opts into
-     * (#global-custom-fields). Same per-project chooser as the space fields
-     * above, but a separate join table — a project's effective field set is
-     * the union of the two. Global definitions are admin-managed; a project
+     * Instance-wide global custom-field definitions this board opts into
+     * (#global-custom-fields). Same per-board chooser as the space fields
+     * above, but a separate join table — a board's effective field set is
+     * the union of the two. Global definitions are admin-managed; a board
      * member can only toggle them on/off here (write) — never edit them.
      *
      * @var Collection<int, GlobalCustomFieldDefinition>
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToMany(targetEntity: GlobalCustomFieldDefinition::class, inversedBy: 'projects')]
-    #[ORM\JoinTable(name: 'project_global_custom_field_definition')]
-    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\ManyToMany(targetEntity: GlobalCustomFieldDefinition::class, inversedBy: 'boards')]
+    #[ORM\JoinTable(name: 'board_global_custom_field_definition')]
+    #[ORM\JoinColumn(name: 'board_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'global_custom_field_definition_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['project:read', 'project:write'])]
+    #[Groups(['board:read', 'board:write'])]
     private Collection $globalCustomFieldDefinitions;
 
     public function __construct()
@@ -314,7 +314,7 @@ class Project
      * EXTRA_LAZY makes this a COUNT query rather than hydrating the
      * whole collection.
      */
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     public function getTaskCount(): int
     {
         return $this->tasks->count();
@@ -325,7 +325,7 @@ class Project
      * Criteria on an EXTRA_LAZY collection runs a filtered COUNT in SQL
      * without loading the rows.
      */
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     public function getCompletedTaskCount(): int
     {
         return $this->tasks
@@ -334,7 +334,7 @@ class Project
     }
 
     /**
-     * Convenience for security expressions: project access is determined
+     * Convenience for security expressions: board access is determined
      * by the user's membership in the parent space (directly or via
      * group). Tolerates a transient null space for entities still being
      * constructed — falls through to "not accessible".
@@ -345,7 +345,7 @@ class Project
     }
 
     /**
-     * Convenience for security expressions: admin actions on a project
+     * Convenience for security expressions: admin actions on a board
      * (e.g. delete, manage members) require the user to be an admin of
      * the parent space.
      */
@@ -355,7 +355,7 @@ class Project
     }
 
     /**
-     * Deduplicated list of users with access to this project, derived
+     * Deduplicated list of users with access to this board, derived
      * from the parent space's direct + group memberships. Used by code
      * that needs the full member universe (assignee picker, mention
      * parsing, attachment uploader gate).
@@ -369,9 +369,9 @@ class Project
 
     /**
      * Backward-compatible serialization shim (#185 → PR 4): the
-     * existing PWA reads `project.members` to render member chips
+     * existing PWA reads `board.members` to render member chips
      * and to check "is the user a member?". The underlying property
-     * is gone (`project_member` was dropped) — this getter projects
+     * is gone (`board_member` was dropped) — this getter boards
      * the parent space's effective members onto a plain User[] so
      * the JSON-LD response continues to expose a `members` array.
      * Will be removed once PR 4 (#187) updates the PWA to read
@@ -379,7 +379,7 @@ class Project
      *
      * @return list<User>
      */
-    #[Groups(['project:read'])]
+    #[Groups(['board:read'])]
     public function getMembers(): array
     {
         return array_values($this->getEffectiveMembers());

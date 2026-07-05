@@ -11,14 +11,14 @@ use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Shared query + pagination for the audit-history endpoints
- * (`/tasks|projects|pages|spaces/{id}/activity` and the custom-field
+ * (`/tasks|boards|pages|spaces/{id}/activity` and the custom-field
  * change log). Every one of those controllers parsed `page`/`itemsPerPage`
  * the same way, ran the same newest-first count + select over
  * `ActivityLog`, and handed the page to {@see ActivityFeedSerializer}.
  *
  * The only thing that varied was which (objectClass, objectIds) groups
- * scope the feed — a single entity (task/page), one project's whole tree
- * (project + its tasks), or a space's content (its projects + pages +
+ * scope the feed — a single entity (task/page), one board's whole tree
+ * (board + its tasks), or a space's content (its boards + pages +
  * tasks). Callers pass that as a `class => ids` map; empty id lists are
  * skipped, and a feed with no groups serialises as an empty page.
  */

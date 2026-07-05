@@ -5,18 +5,18 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * `reference.project` custom field (the strategy added for the schema
- * redesign). A project reference is valid only when the target project
+ * `reference.board` custom field (the strategy added for the schema
+ * redesign). A board reference is valid only when the target board
  * lives in the field's space; cross-space targets are rejected behind
  * the same "does not exist" message the other reference kinds use.
  */
-class ReferenceProjectFieldTest extends ApiTestCase
+class ReferenceBoardFieldTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -32,7 +32,7 @@ class ReferenceProjectFieldTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -48,9 +48,9 @@ class ReferenceProjectFieldTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Linked task',
-                'project' => '/projects/' . $home->getId(),
+                'board' => '/boards/' . $home->getId(),
                 'customFieldValues' => [
-                    ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => '/projects/' . $sibling->getId()],
+                    ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => '/boards/' . $sibling->getId()],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -71,9 +71,9 @@ class ReferenceProjectFieldTest extends ApiTestCase
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Linked task',
-                'project' => '/projects/' . $home->getId(),
+                'board' => '/boards/' . $home->getId(),
                 'customFieldValues' => [
-                    ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => '/projects/' . $foreign->getId()],
+                    ['definition' => '/custom_field_definitions/' . $field->getId(), 'value' => '/boards/' . $foreign->getId()],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -81,15 +81,15 @@ class ReferenceProjectFieldTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User
@@ -108,13 +108,13 @@ class ReferenceProjectFieldTest extends ApiTestCase
         return $user;
     }
 
-    private function seedProjectReference(Project $project, string $name): CustomFieldDefinition
+    private function seedProjectReference(Board $board, string $name): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::REFERENCE->value)
-            ->setSubtype('project')
+            ->setSubtype('board')
             ->setConfig(['multi' => false])
             ->setNullable(true);
         $this->entityManager->persist($field);

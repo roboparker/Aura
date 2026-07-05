@@ -25,7 +25,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 /**
  * Long-form, hierarchical Notion-style document owned by a `Space`
  * (#183). Title + markdown body + optional parent page form a tree;
- * audit history flows through Gedmo `Loggable` like Project/Task.
+ * audit history flows through Gedmo `Loggable` like Board/Task.
  *
  * Access mirrors the parent space (#185 access matrix):
  *  - read/list/create: any space member

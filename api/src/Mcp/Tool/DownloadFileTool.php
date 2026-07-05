@@ -87,7 +87,7 @@ final class DownloadFileTool implements McpToolInterface
         $taskHit = (int) $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->select('COUNT(t.id)')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->where(':media MEMBER OF t.attachments')
             ->andWhere('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'mcp_dl_task'))
             ->setParameter('media', $media)

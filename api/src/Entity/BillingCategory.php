@@ -42,7 +42,7 @@ class BillingCategory
     #[Groups(['billing_project:read', 'time_entry:read'])]
     private ?Uuid $id = null;
 
-    /** Owning project. Set by {@see BillingProject::addCategory} — never from the payload. */
+    /** Owning board. Set by {@see BillingProject::addCategory} — never from the payload. */
     #[ORM\ManyToOne(targetEntity: BillingProject::class, inversedBy: 'categories')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?BillingProject $billingProject = null;
@@ -53,7 +53,7 @@ class BillingCategory
     #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
     private string $name = '';
 
-    /** Hourly rate in minor units (e.g. cents) of the project's currency. */
+    /** Hourly rate in minor units (e.g. cents) of the board's currency. */
     #[ORM\Column(type: 'integer')]
     #[Assert\PositiveOrZero(message: 'A rate cannot be negative.')]
     #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]

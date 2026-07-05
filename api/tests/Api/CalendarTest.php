@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
@@ -11,7 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Covers GET /calendar (occurrence projection, space scoping) and
+ * Covers GET /calendar (occurrence boardion, space scoping) and
  * POST /tasks/{id}/detach-occurrence (issue #442).
  */
 class CalendarTest extends ApiTestCase
@@ -30,7 +30,7 @@ class CalendarTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -43,13 +43,13 @@ class CalendarTest extends ApiTestCase
     public function testCalendarReturnsProjectAndStandaloneTasksInRange(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch');
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Launch');
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
-        $this->createTask($alice, 'In range', $project, '2026-06-15T09:00:00+00:00');
-        $this->createTask($alice, 'Out of range', $project, '2026-07-20T09:00:00+00:00');
-        // Standalone (no project) — shows because it's the owner's personal space.
+        $this->createTask($alice, 'In range', $board, '2026-06-15T09:00:00+00:00');
+        $this->createTask($alice, 'Out of range', $board, '2026-07-20T09:00:00+00:00');
+        // Standalone (no board) — shows because it's the owner's personal space.
         $this->createTask($alice, 'Standalone', null, '2026-06-16T09:00:00+00:00');
 
         $client = static::createClient();
@@ -66,11 +66,11 @@ class CalendarTest extends ApiTestCase
     public function testCalendarExpandsRecurringSeries(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch');
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Launch');
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
-        $task = $this->createTask($alice, 'Daily standup', $project, '2026-06-15T09:00:00+00:00');
+        $task = $this->createTask($alice, 'Daily standup', $board, '2026-06-15T09:00:00+00:00');
         $task->setRecurrenceRule([
             'frequency' => 'daily',
             'interval' => 1,
@@ -103,7 +103,7 @@ class CalendarTest extends ApiTestCase
         $client->loginUser($alice);
         $response = $client->request(
             'GET',
-            $this->url($space, '2026-06-01', '2026-06-30') . '&project=' . $one->getId(),
+            $this->url($space, '2026-06-01', '2026-06-30') . '&board=' . $one->getId(),
         );
         $this->assertResponseIsSuccessful();
 
@@ -117,8 +117,8 @@ class CalendarTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Launch');
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Launch');
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
         $client = static::createClient();
@@ -130,11 +130,11 @@ class CalendarTest extends ApiTestCase
     public function testDetachOccurrenceSplitsTheSeries(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch');
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Launch');
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
-        $task = $this->createTask($alice, 'Standup', $project, '2026-06-15T09:00:00+00:00');
+        $task = $this->createTask($alice, 'Standup', $board, '2026-06-15T09:00:00+00:00');
         $task->setRecurrenceRule(['frequency' => 'daily', 'interval' => 1]);
         $this->entityManager->flush();
 
@@ -152,7 +152,7 @@ class CalendarTest extends ApiTestCase
         $dates = $this->occurrenceDatesFor($response->toArray(), 'Standup');
 
         // 06-16 is now an EXDATE (gone from the series); the detached copy
-        // lands on 06-20; the rest of the series still projects.
+        // lands on 06-20; the rest of the series still boards.
         $this->assertContains('2026-06-15', $dates);
         $this->assertNotContains('2026-06-16', $dates);
         $this->assertContains('2026-06-20', $dates);
@@ -161,8 +161,8 @@ class CalendarTest extends ApiTestCase
     public function testDetachRejectsNonRecurringTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Launch');
-        $task = $this->createTask($alice, 'One-off', $project, '2026-06-15T09:00:00+00:00');
+        $board = $this->createProject($alice, 'Launch');
+        $task = $this->createTask($alice, 'One-off', $board, '2026-06-15T09:00:00+00:00');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -245,28 +245,28 @@ class CalendarTest extends ApiTestCase
         return $user;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createTask(
         User $owner,
         string $title,
-        ?Project $project,
+        ?Board $board,
         string $dueDate,
     ): Task {
         $task = new Task();
         $task->setOwner($owner);
         $task->setTitle($title);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setDueDate(new \DateTimeImmutable($dueDate));
         $this->entityManager->persist($task);
         $this->entityManager->flush();

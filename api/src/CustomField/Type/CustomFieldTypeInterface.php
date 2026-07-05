@@ -9,8 +9,8 @@ use App\Entity\CustomFieldDefinitionInterface;
 /**
  * Strategy for a single (kind, subtype) custom-field type. Each concrete
  * implementation owns its config schema, value validation rules,
- * normalization, search-text projection, multi-value support, and which
- * aggregations the project footer can offer.
+ * normalization, search-text boardion, multi-value support, and which
+ * aggregations the board footer can offer.
  *
  * Implementations are auto-tagged `app.custom_field_type` via
  * `_instanceof` in services.yaml and resolved by `kind.subtype` key
@@ -23,7 +23,7 @@ use App\Entity\CustomFieldDefinitionInterface;
 interface CustomFieldTypeInterface
 {
     /**
-     * Top-level family. Drives PWA editor dispatch and FTS projection.
+     * Top-level family. Drives PWA editor dispatch and FTS boardion.
      * One of: boolean, text, numeric, date, select, reference.
      */
     public function kind(): string;
@@ -70,7 +70,7 @@ interface CustomFieldTypeInterface
     public function normalize(mixed $value, array $config): mixed;
 
     /**
-     * Plain-text projection for the FTS index. Null/empty means the
+     * Plain-text boardion for the FTS index. Null/empty means the
      * value contributes nothing searchable. Reference strategies
      * dereference the IRI and emit the target's display label so users
      * can search by name rather than UUID.

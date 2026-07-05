@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceRole;
 use App\Entity\Task;
@@ -11,7 +11,7 @@ use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-class ProjectTest extends ApiTestCase
+class BoardTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -24,20 +24,20 @@ class ProjectTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        // task.project_id, space.created_by_id cascade/SET-NULL via FK,
+        // task.board_id, space.created_by_id cascade/SET-NULL via FK,
         // so deleting parents is enough to clean state between tests.
-        // Spaces are deleted last because Project.space FK is non-null
-        // and CASCADEs from Space — deleting projects first lets Space
+        // Spaces are deleted last because Board.space FK is non-null
+        // and CASCADEs from Space — deleting boards first lets Space
         // delete cleanly without dragging unrelated rows.
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testListProjectsUnauthenticated(): void
     {
-        static::createClient()->request('GET', '/projects');
+        static::createClient()->request('GET', '/boards');
         $this->assertResponseStatusCodeSame(401);
     }
 
@@ -47,7 +47,7 @@ class ProjectTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($user);
-        $client->request('POST', '/projects', [
+        $client->request('POST', '/boards', [
             'json' => [
                 'title' => 'Launch plan',
                 'description' => 'Q3 marketing push',
@@ -57,21 +57,21 @@ class ProjectTest extends ApiTestCase
 
         $this->assertResponseStatusCodeSame(201);
         $this->assertJsonContains([
-            '@type' => 'Project',
+            '@type' => 'Board',
             'title' => 'Launch plan',
             'description' => 'Q3 marketing push',
         ]);
 
-        $project = $this->reloadProjectByTitle('Launch plan');
-        $this->assertTrue($user->getId()?->equals($project->getOwner()?->getId()));
-        // Project lands in the creator's personal space (via
-        // ProjectOwnerProcessor's default), and the creator is the
+        $board = $this->reloadProjectByTitle('Launch plan');
+        $this->assertTrue($user->getId()?->equals($board->getOwner()?->getId()));
+        // Board lands in the creator's personal space (via
+        // BoardOwnerProcessor's default), and the creator is the
         // sole admin of that space — so they show up in
         // getEffectiveMembers without any extra wiring.
-        $this->assertNotNull($project->getSpace());
-        $this->assertCount(1, $project->getEffectiveMembers());
-        $this->assertArrayHasKey((string) $user->getId(), $project->getEffectiveMembers());
-        $this->assertTrue($project->isSpaceAdmin($user));
+        $this->assertNotNull($board->getSpace());
+        $this->assertCount(1, $board->getEffectiveMembers());
+        $this->assertArrayHasKey((string) $user->getId(), $board->getEffectiveMembers());
+        $this->assertTrue($board->isSpaceAdmin($user));
     }
 
     public function testCreateProjectRequiresTitle(): void
@@ -80,7 +80,7 @@ class ProjectTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($user);
-        $client->request('POST', '/projects', [
+        $client->request('POST', '/boards', [
             'json' => ['title' => ''],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -90,24 +90,24 @@ class ProjectTest extends ApiTestCase
 
     public function testListProjectsOnlyShowsSpaceMemberProjects(): void
     {
-        // After #185 a project's visibility is determined by membership
+        // After #185 a board's visibility is determined by membership
         // in its parent space, so the test setup needs three distinct
         // spaces: Alice's private, Bob's private, and a shared space
         // that Bob belongs to. Using `createProject(alice, …, [alice, bob])`
         // would dump everything into Alice's personal space and would
-        // implicitly share Alice's "private" project too.
+        // implicitly share Alice's "private" board too.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
 
-        // Alice's solo project lives in her personal space (Bob never
+        // Alice's solo board lives in her personal space (Bob never
         // joins it).
         $this->createProject($alice, 'Alice solo', [$alice]);
 
-        // Bob's solo project lives in his personal space.
+        // Bob's solo board lives in his personal space.
         $this->createProject($bob, 'Bob solo', [$bob]);
 
-        // Shared project: a fresh shared space with both users as
-        // members. Alice creates the project; the helper auto-fills
+        // Shared board: a fresh shared space with both users as
+        // members. Alice creates the board; the helper auto-fills
         // her personal space, so we re-home it onto the shared space
         // and make sure Bob is a member.
         $sharedSpace = (new Space())
@@ -123,11 +123,11 @@ class ProjectTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('GET', '/projects');
+        $client->request('GET', '/boards');
 
         $this->assertResponseIsSuccessful();
-        // Bob sees his personal project + the shared one, NOT
-        // Alice's solo project that lives in her private space.
+        // Bob sees his personal board + the shared one, NOT
+        // Alice's solo board that lives in her private space.
         $this->assertJsonContains(['totalItems' => 2]);
     }
 
@@ -140,8 +140,8 @@ class ProjectTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         // Mirrors the task extension: 404 rather than 403 so the endpoint
-        // doesn't confirm the project exists.
-        $client->request('GET', '/projects/' . $bobsProject->getId());
+        // doesn't confirm the board exists.
+        $client->request('GET', '/boards/' . $bobsProject->getId());
 
         $this->assertResponseStatusCodeSame(404);
     }
@@ -150,11 +150,11 @@ class ProjectTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        $client->request('PATCH', '/boards/' . $board->getId(), [
             'json' => ['description' => 'Updated by non-owner member'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -164,18 +164,18 @@ class ProjectTest extends ApiTestCase
 
     public function testMemberCanAddAnotherMemberViaProjectMembersEndpoint(): void
     {
-        // POST /projects/{id}/members is the existing PWA's seam for
+        // POST /boards/{id}/members is the existing PWA's seam for
         // adding a teammate. Under the space model (#185) the controller
-        // grants space membership rather than project membership; the
+        // grants space membership rather than board membership; the
         // user shows up in `getEffectiveMembers` immediately.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('POST', '/projects/' . $project->getId() . '/members', [
+        $client->request('POST', '/boards/' . $board->getId() . '/members', [
             'json' => ['email' => 'carol@example.com'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -183,7 +183,7 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
 
         $this->entityManager->clear();
-        $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
+        $reloaded = $this->entityManager->getRepository(Board::class)->find($board->getId());
         $this->assertNotNull($reloaded);
         $this->assertCount(3, $reloaded->getEffectiveMembers());
     }
@@ -191,16 +191,16 @@ class ProjectTest extends ApiTestCase
     public function testRegularMemberCannotDeleteProject(): void
     {
         // Delete requires the creator, a space admin, OR a role granting
-        // projects.delete (#space-roles). Bob has a role without it, so 403.
+        // boards.delete (#space-roles). Bob has a role without it, so 403.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $space = $board->getSpace();
         self::assertNotNull($space);
         $role = (new SpaceRole())
             ->setSpace($space)
             ->setName('Restricted')
-            ->setPermissions(['projects' => ['read' => true, 'update' => true]]);
+            ->setPermissions(['boards' => ['read' => true, 'update' => true]]);
         $this->entityManager->persist($role);
         foreach ($space->getUserMemberships() as $membership) {
             if ($membership->getUser() === $bob) {
@@ -211,7 +211,7 @@ class ProjectTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('DELETE', '/projects/' . $project->getId());
+        $client->request('DELETE', '/boards/' . $board->getId());
 
         $this->assertResponseStatusCodeSame(403);
     }
@@ -220,11 +220,11 @@ class ProjectTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('DELETE', '/projects/' . $project->getId());
+        $client->request('DELETE', '/boards/' . $board->getId());
 
         $this->assertResponseStatusCodeSame(204);
     }
@@ -233,12 +233,12 @@ class ProjectTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
 
-        // Alice's personal task should not leak to Bob; the project task
-        // should. This is the key behavior change vs. pre-Projects Tasks.
+        // Alice's personal task should not leak to Bob; the board task
+        // should. This is the key behavior change vs. pre-Boards Tasks.
         $this->createTask($alice, 'Alice personal', null);
-        $this->createTask($alice, 'Alice project task', $project);
+        $this->createTask($alice, 'Alice board task', $board);
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -254,7 +254,7 @@ class ProjectTest extends ApiTestCase
             static fn (mixed $t): mixed => is_array($t) ? $t['title'] ?? null : null,
             $members,
         );
-        $this->assertSame(['Alice project task'], $titles);
+        $this->assertSame(['Alice board task'], $titles);
     }
 
     public function testNonMemberCannotSeeProjectTask(): void
@@ -262,8 +262,8 @@ class ProjectTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createProject($alice, 'Alice+Bob', [$alice, $bob]);
-        $task = $this->createTask($alice, 'Private project task', $project);
+        $board = $this->createProject($alice, 'Alice+Bob', [$alice, $bob]);
+        $task = $this->createTask($alice, 'Private board task', $board);
 
         $client = static::createClient();
         $client->loginUser($carol);
@@ -276,8 +276,8 @@ class ProjectTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Shared', [$alice, $bob]);
-        $task = $this->createTask($alice, 'Alice owns this', $project);
+        $board = $this->createProject($alice, 'Shared', [$alice, $bob]);
+        $task = $this->createTask($alice, 'Alice owns this', $board);
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -296,14 +296,14 @@ class ProjectTest extends ApiTestCase
     public function testCreateTaskWithProject(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Mine', [$alice]);
+        $board = $this->createProject($alice, 'Mine', [$alice]);
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
-                'title' => 'In the project',
-                'project' => '/projects/' . $project->getId(),
+                'title' => 'In the board',
+                'board' => '/boards/' . $board->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -311,11 +311,11 @@ class ProjectTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
 
         $this->entityManager->clear();
-        $task = $this->entityManager->getRepository(Task::class)->findOneBy(['title' => 'In the project']);
+        $task = $this->entityManager->getRepository(Task::class)->findOneBy(['title' => 'In the board']);
         $this->assertNotNull($task);
-        $taskProject = $task->getProject();
+        $taskProject = $task->getBoard();
         $this->assertNotNull($taskProject);
-        $this->assertTrue($project->getId()?->equals($taskProject->getId()));
+        $this->assertTrue($board->getId()?->equals($taskProject->getId()));
     }
 
     public function testPersonalTasksStillOwnerScopedForCreator(): void
@@ -356,40 +356,40 @@ class ProjectTest extends ApiTestCase
     }
 
     /**
-     * Persists a project owned by `$owner` and grants every other
-     * `$members` entry direct membership in the project's space (which
+     * Persists a board owned by `$owner` and grants every other
+     * `$members` entry direct membership in the board's space (which
      * is `$owner`'s personal space by default — set by
-     * ProjectSpaceDefaultListener at PrePersist). The owner is left
+     * BoardSpaceDefaultListener at PrePersist). The owner is left
      * out of the membership loop because they're already an admin of
      * their personal space from signup.
      *
      * @param User[] $members
      */
-    private function createProject(User $owner, string $title, array $members): Project
+    private function createProject(User $owner, string $title, array $members): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
 
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
         foreach ($members as $member) {
             if ($member === $owner) {
                 continue;
             }
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
 
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, string $title, ?Project $project): Task
+    private function createTask(User $owner, string $title, ?Board $board): Task
     {
         $task = new Task();
         $task->setOwner($owner);
         $task->setTitle($title);
-        $task->setProject($project);
+        $task->setBoard($board);
 
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -397,11 +397,11 @@ class ProjectTest extends ApiTestCase
         return $task;
     }
 
-    private function reloadProjectByTitle(string $title): Project
+    private function reloadProjectByTitle(string $title): Board
     {
         $this->entityManager->clear();
-        $project = $this->entityManager->getRepository(Project::class)->findOneBy(['title' => $title]);
-        self::assertNotNull($project, sprintf('Expected to find Project with title "%s".', $title));
-        return $project;
+        $board = $this->entityManager->getRepository(Board::class)->findOneBy(['title' => $title]);
+        self::assertNotNull($board, sprintf('Expected to find Board with title "%s".', $title));
+        return $board;
     }
 }

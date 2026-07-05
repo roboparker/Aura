@@ -2,29 +2,29 @@
 
 namespace App\Doctrine;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Security\Permission\SpacePermission;
 
 /**
- * Filters Project queries so non-admin users only see projects in spaces
+ * Filters Board queries so non-admin users only see boards in spaces
  * they belong to (#185). See {@see AbstractSpaceAccessExtension} for the
  * shared direct-or-via-group membership predicate.
  */
-final class ProjectAccessExtension extends AbstractSpaceAccessExtension
+final class BoardAccessExtension extends AbstractSpaceAccessExtension
 {
     protected function getResourceClass(): string
     {
-        return Project::class;
+        return Board::class;
     }
 
     protected function getAliasPrefix(): string
     {
-        return 'project_access';
+        return 'board_access';
     }
 
     protected function getImpersonationItemType(): string
     {
-        return 'project';
+        return 'board';
     }
 
     protected function getPermissionCategory(): string

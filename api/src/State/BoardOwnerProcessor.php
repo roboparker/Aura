@@ -4,22 +4,22 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Repository\SpaceRepository;
 use App\Security\AuthenticatedUserResolver;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Stamps the creator as owner of a new Project and adds them to the member
+ * Stamps the creator as owner of a new Board and adds them to the member
  * set, so access checks can rely solely on `members` without a special case
  * for the owner.
  *
- * @implements ProcessorInterface<Project, Project>
+ * @implements ProcessorInterface<Board, Board>
  */
-final class ProjectOwnerProcessor implements ProcessorInterface
+final class BoardOwnerProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<Project, Project> $persistProcessor
+     * @param ProcessorInterface<Board, Board> $persistProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
@@ -30,11 +30,11 @@ final class ProjectOwnerProcessor implements ProcessorInterface
     }
 
     /**
-     * @param Project $data
+     * @param Board $data
      */
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Project
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Board
     {
-        $user = $this->auth->requireUser('create a project');
+        $user = $this->auth->requireUser('create a board');
 
         $data->setOwner($user);
 
@@ -45,7 +45,7 @@ final class ProjectOwnerProcessor implements ProcessorInterface
         if (null === $data->getSpace()) {
             $data->setSpace($this->spaceRepository->findPersonalSpaceFor($user));
         }
-        // No project-local membership to set up: access flows from the
+        // No board-local membership to set up: access flows from the
         // user's membership in `data.space` (#185). The personal space
         // already lists the creator as admin from signup; for shared
         // spaces, the securityPostDenormalize check ensures the caller

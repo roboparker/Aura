@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
 use App\Mcp\McpEntitySerializer;
@@ -10,7 +10,7 @@ use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
 use Doctrine\ORM\EntityManagerInterface;
 
-final class UpdateProjectTool implements McpToolInterface
+final class UpdateBoardTool implements McpToolInterface
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -27,7 +27,7 @@ final class UpdateProjectTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Update a project\'s title or description. Any project member may rename — same as the PWA.';
+        return 'Update a board\'s title or description. Any board member may rename — same as the PWA.';
     }
 
     public function getInputSchema(): array
@@ -35,33 +35,33 @@ final class UpdateProjectTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'projectId' => ['type' => 'string'],
+                'boardId' => ['type' => 'string'],
                 'title' => ['type' => 'string'],
                 'description' => ['type' => 'string'],
             ],
-            'required' => ['projectId'],
+            'required' => ['boardId'],
             'additionalProperties' => false,
         ];
     }
 
     public function invoke(array $arguments, User $user): array
     {
-        $projectId = $this->input->requireUuid('projectId', $arguments['projectId'] ?? null);
-        $project = $this->em->getRepository(Project::class)->find($projectId);
-        if (null === $project || !$this->authz->canEditProject($project, $user)) {
-            throw McpException::notFound(sprintf('Project %s', $projectId));
+        $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
+        $board = $this->em->getRepository(Board::class)->find($boardId);
+        if (null === $board || !$this->authz->canEditProject($board, $user)) {
+            throw McpException::notFound(sprintf('Board %s', $boardId));
         }
 
         if (array_key_exists('title', $arguments)) {
-            $project->setTitle($this->input->requireString($arguments, 'title'));
+            $board->setTitle($this->input->requireString($arguments, 'title'));
         }
         if (array_key_exists('description', $arguments)) {
-            $project->setDescription($this->input->optionalString($arguments, 'description'));
+            $board->setDescription($this->input->optionalString($arguments, 'description'));
         }
 
-        $this->input->assertValid($project);
+        $this->input->assertValid($board);
         $this->em->flush();
 
-        return $this->serializer->project($project);
+        return $this->serializer->board($board);
     }
 }

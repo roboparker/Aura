@@ -157,7 +157,7 @@ class ImpersonationAccessTest extends ApiTestCase
         // what stops an impersonator from editing the very consent matrix.
         $this->createImpersonableUser('member@example.com', [
             'tasks' => 'edit',
-            'projects' => 'edit',
+            'boards' => 'edit',
             'pages' => 'edit',
             'discussions' => 'edit',
             'comments' => 'edit',

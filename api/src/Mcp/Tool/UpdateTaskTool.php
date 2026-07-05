@@ -5,7 +5,7 @@ namespace App\Mcp\Tool;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
@@ -33,7 +33,7 @@ final class UpdateTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Patch one or more fields on a task. Only fields included in the call are changed; pass status="completed" to mark done or "open" to reopen. Editable by the owner and any project member.';
+        return 'Patch one or more fields on a task. Only fields included in the call are changed; pass status="completed" to mark done or "open" to reopen. Editable by the owner and any board member.';
     }
 
     public function getInputSchema(): array
@@ -49,7 +49,7 @@ final class UpdateTaskTool implements McpToolInterface
                     'enum' => ['open', 'completed'],
                     'description' => 'open clears completedOn; completed stamps it to now.',
                 ],
-                'projectId' => ['type' => ['string', 'null'], 'description' => 'Move the task to a different project, or null to detach.'],
+                'boardId' => ['type' => ['string', 'null'], 'description' => 'Move the task to a different board, or null to detach.'],
                 'assigneeIds' => [
                     'type' => 'array',
                     'items' => ['type' => 'string'],
@@ -63,12 +63,12 @@ final class UpdateTaskTool implements McpToolInterface
                 ],
                 'customFieldValues' => [
                     'type' => 'array',
-                    'description' => 'Replaces the whole set of custom field values on the task. Each entry sets one field defined on the task\'s project (see get_custom_fields). Omit a definition to leave it unset; pass an empty array to clear all values.',
+                    'description' => 'Replaces the whole set of custom field values on the task. Each entry sets one field defined on the task\'s board (see get_custom_fields). Omit a definition to leave it unset; pass an empty array to clear all values.',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
-                            'definitionId' => ['type' => 'string', 'description' => 'UUID of a CustomFieldDefinition on the task\'s project. Provide this OR globalDefinitionId, not both.'],
-                            'globalDefinitionId' => ['type' => 'string', 'description' => 'UUID of a GlobalCustomFieldDefinition (instance-wide) opted into by the task\'s project. Provide this OR definitionId, not both.'],
+                            'definitionId' => ['type' => 'string', 'description' => 'UUID of a CustomFieldDefinition on the task\'s board. Provide this OR globalDefinitionId, not both.'],
+                            'globalDefinitionId' => ['type' => 'string', 'description' => 'UUID of a GlobalCustomFieldDefinition (instance-wide) opted into by the task\'s board. Provide this OR definitionId, not both.'],
                             'value' => ['description' => 'The value, shaped to the field\'s kind/subtype (string, number, bool, ISO date, {amount,currency} for money, an IRI for references, or an array when the field is multi).'],
                         ],
                         'required' => ['value'],
@@ -112,16 +112,16 @@ final class UpdateTaskTool implements McpToolInterface
                 $task->setDueDate($this->input->optionalDateTime($arguments, 'dueDate'));
             }
         }
-        if (array_key_exists('projectId', $arguments)) {
-            if (null === $arguments['projectId']) {
-                $task->setProject(null);
+        if (array_key_exists('boardId', $arguments)) {
+            if (null === $arguments['boardId']) {
+                $task->setBoard(null);
             } else {
-                $projectId = $this->input->requireUuid('projectId', $arguments['projectId']);
-                $project = $this->em->getRepository(Project::class)->find($projectId);
-                if (null === $project || !$this->authz->canEditProject($project, $user)) {
-                    throw McpException::notFound(sprintf('Project %s', $projectId));
+                $boardId = $this->input->requireUuid('boardId', $arguments['boardId']);
+                $board = $this->em->getRepository(Board::class)->find($boardId);
+                if (null === $board || !$this->authz->canEditProject($board, $user)) {
+                    throw McpException::notFound(sprintf('Board %s', $boardId));
                 }
-                $task->setProject($project);
+                $task->setBoard($board);
             }
         }
         if (array_key_exists('assigneeIds', $arguments)) {
@@ -159,7 +159,7 @@ final class UpdateTaskTool implements McpToolInterface
      * dropped (orphanRemoval reaps them) and rebuilt from the payload;
      * the deferrable `(task_id, definition_id)` unique constraint lets
      * the delete-then-insert collapse in one flush. Per-value shape,
-     * project-scope, and required-ness are policed by
+     * board-scope, and required-ness are policed by
      * {@see \App\Validator\ValidCustomFieldValues} via assertValid().
      */
     private function applyCustomFieldValues(Task $task, mixed $raw): void

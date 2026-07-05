@@ -11,7 +11,7 @@ use Symfony\Component\Uid\Uuid;
  * Created by `POST /me/export`, then processed asynchronously by
  * {@see \App\MessageHandler\GenerateAccountExportHandler}: the handler builds
  * a zip archive of the requester's own content (profile, preferences, tasks,
- * projects, pages, discussions, comments, tags, API tokens, and the files
+ * boards, pages, discussions, comments, tags, API tokens, and the files
  * they uploaded), stores it under `app.account_export_dir`, stamps a download
  * token, and emails the requester a link.
  *

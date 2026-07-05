@@ -74,8 +74,8 @@ class UserPreferencesController extends AbstractController
                 $value = array_merge($existing, $value);
             }
             // Same shallow-merge guard for per-item overrides, but only at the
-            // item-type level: a patch carrying `{ project: {...} }` replaces
-            // the whole project map (so omitting an id removes that override)
+            // item-type level: a patch carrying `{ board: {...} }` replaces
+            // the whole board map (so omitting an id removes that override)
             // while leaving the other item types intact.
             if ('impersonationItemAccess' === $key && is_array($value)) {
                 $existing = is_array($current['impersonationItemAccess'] ?? null)

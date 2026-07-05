@@ -14,7 +14,7 @@ class UserImpersonationTest extends TestCase
     {
         $user = new User();
         $user->setPreferences([
-            'impersonationAccess' => ['tasks' => 'view', 'projects' => 'edit', 'bad' => 'nonsense'],
+            'impersonationAccess' => ['tasks' => 'view', 'boards' => 'edit', 'bad' => 'nonsense'],
             'impersonationItemAccess' => [
                 'task' => ['uuid-1' => 'none', 'uuid-2' => 'edit', 'uuid-3' => 'bogus'],
             ],
@@ -27,7 +27,7 @@ class UserImpersonationTest extends TestCase
     {
         $user = $this->user();
         $this->assertSame('view', $user->getImpersonationLevel('tasks'));
-        $this->assertSame('edit', $user->getImpersonationLevel('projects'));
+        $this->assertSame('edit', $user->getImpersonationLevel('boards'));
         // Invalid stored value → safe default.
         $this->assertSame('none', $user->getImpersonationLevel('bad'));
         // Unset category → default none.
@@ -55,7 +55,7 @@ class UserImpersonationTest extends TestCase
 
     public function testPartitionEmptyForUnknownType(): void
     {
-        $partition = $this->user()->impersonationItemPartition('project');
+        $partition = $this->user()->impersonationItemPartition('board');
         $this->assertSame(['none' => [], 'visible' => []], $partition);
     }
 }

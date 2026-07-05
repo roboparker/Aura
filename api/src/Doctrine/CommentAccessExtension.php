@@ -20,7 +20,7 @@ use Symfony\Bundle\SecurityBundle\Security;
  * rules now that both surfaces flow through one comment table:
  *
  *  - Task comments: visible to the task owner OR a member of the task
- *    project's space (#185). Standalone (projectless) tasks fall back
+ *    board's space (#185). Standalone (boardless) tasks fall back
  *    to owner-only.
  *  - Page comments: visible to any member of the page's space.
  *  - Discussion comments: visible to any member of the discussion's
@@ -81,7 +81,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             $space = $key->getSpace();
             $queryBuilder
                 ->leftJoin(sprintf('%s.task', $rootAlias), 'ck_task')
-                ->leftJoin('ck_task.project', 'ck_project')
+                ->leftJoin('ck_task.board', 'ck_project')
                 ->leftJoin(sprintf('%s.page', $rootAlias), 'ck_page')
                 ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ck_discussion')
                 ->andWhere(
@@ -95,7 +95,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         }
 
         // Task branch: comment is on a task whose owner is the caller
-        // OR whose project space contains the caller (direct or via
+        // OR whose board space contains the caller (direct or via
         // group). LEFT joins so a page comment (no task FK) just
         // doesn't match this branch rather than blowing up the row.
         $taskOwnerCheck = 'ca_task.owner = :currentUser';
@@ -135,7 +135,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         // ticket's comments — the branch just needs the FK to be set.
         $queryBuilder
             ->leftJoin(sprintf('%s.task', $rootAlias), 'ca_task')
-            ->leftJoin('ca_task.project', 'ca_project')
+            ->leftJoin('ca_task.board', 'ca_project')
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
             ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ca_discussion')
             ->leftJoin(sprintf('%s.feedback', $rootAlias), 'ca_feedback')

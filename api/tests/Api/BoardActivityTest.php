@@ -5,17 +5,17 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Board activity feed: `GET /projects/{id}/activity`. Merges the project's own
+ * Board activity feed: `GET /boards/{id}/activity`. Merges the board's own
  * history with its tasks', and keeps a deleted task's history (ending in a
- * remove event) by recovering it from the versioned `project` on the log rows.
+ * remove event) by recovering it from the versioned `board` on the log rows.
  */
-class ProjectActivityTest extends ApiTestCase
+class BoardActivityTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -29,7 +29,7 @@ class ProjectActivityTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\ActivityLog')->execute();
     }
@@ -37,7 +37,7 @@ class ProjectActivityTest extends ApiTestCase
     public function testDeletedTaskStaysInBoardActivity(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -45,7 +45,7 @@ class ProjectActivityTest extends ApiTestCase
         $created = $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Ship it',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
@@ -59,7 +59,7 @@ class ProjectActivityTest extends ApiTestCase
 
         // The board's activity still surfaces the task's create history plus a
         // remove event, rather than dropping it with the row.
-        $client->request('GET', '/projects/' . $project->getId() . '/activity');
+        $client->request('GET', '/boards/' . $board->getId() . '/activity');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -81,12 +81,12 @@ class ProjectActivityTest extends ApiTestCase
     public function testCustomFieldActivityAppearsInBoardActivity(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         // A custom-field definition's lifecycle is Gedmo-logged with the
-        // versioned project, so it should surface on the board's activity feed.
+        // versioned board, so it should surface on the board's activity feed.
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName('Priority')
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')
@@ -98,7 +98,7 @@ class ProjectActivityTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $client->request('GET', '/projects/' . $project->getId() . '/activity');
+        $client->request('GET', '/boards/' . $board->getId() . '/activity');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -116,16 +116,16 @@ class ProjectActivityTest extends ApiTestCase
         $this->assertContains('create', $cfdActions, 'custom-field activity is folded into the board feed');
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

@@ -40,17 +40,17 @@ final class McpToolPolicy
         'list_files' => ['category' => 'files', 'write' => false],
         'download_file' => ['category' => 'files', 'write' => false],
         'upload_file' => ['category' => 'files', 'write' => true],
-        // projects (incl. custom field schema)
-        'list_projects' => ['category' => 'projects', 'write' => false],
-        'get_project' => ['category' => 'projects', 'write' => false],
-        'get_custom_fields' => ['category' => 'projects', 'write' => false],
-        'create_project' => ['category' => 'projects', 'write' => true],
-        'update_project' => ['category' => 'projects', 'write' => true],
-        'delete_project' => ['category' => 'projects', 'write' => true],
+        // boards (incl. custom field schema)
+        'list_projects' => ['category' => 'boards', 'write' => false],
+        'get_project' => ['category' => 'boards', 'write' => false],
+        'get_custom_fields' => ['category' => 'boards', 'write' => false],
+        'create_project' => ['category' => 'boards', 'write' => true],
+        'update_project' => ['category' => 'boards', 'write' => true],
+        'delete_project' => ['category' => 'boards', 'write' => true],
         // spaces — no dedicated AccessPolicy category; spaces are the
-        // container for projects, so listing them rides the projects
+        // container for boards, so listing them rides the boards
         // read scope (it's read-only metadata either way).
-        'list_spaces' => ['category' => 'projects', 'write' => false],
+        'list_spaces' => ['category' => 'boards', 'write' => false],
         // pages
         'list_pages' => ['category' => 'pages', 'write' => false],
         'get_page' => ['category' => 'pages', 'write' => false],

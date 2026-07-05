@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\BillingCategory;
 use App\Entity\BillingProject;
 use App\Entity\Client;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\User;
@@ -17,7 +17,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Time tracking (Harvest model): entries attach to a billing project + category
  * (which fixes the rate), on a single calendar day. Covers scoping, owner
  * stamping, derived duration + rate snapshot, the running-timer lifecycle, and
- * validation (required project/category, no overnight).
+ * validation (required board/category, no overnight).
  */
 class TimeEntryTest extends ApiTestCase
 {
@@ -37,16 +37,16 @@ class TimeEntryTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\BillingProject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testMemberTracksTimeAndDurationAndRateAreDerived(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
-        [$bpIri, $catIri] = $this->createBilling($project, 'Website', 'Development', 12000);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 12000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -79,8 +79,8 @@ class TimeEntryTest extends ApiTestCase
     public function testBillingProjectAndCategoryAreRequired(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -101,9 +101,9 @@ class TimeEntryTest extends ApiTestCase
     public function testOvernightEntryIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
-        [$bpIri, $catIri] = $this->createBilling($project, 'Website', 'Development', 10000);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -123,11 +123,11 @@ class TimeEntryTest extends ApiTestCase
     public function testCategoryMustBelongToBillingProject(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
-        [$bpIri] = $this->createBilling($project, 'Website', 'Development', 10000);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri] = $this->createBilling($board, 'Website', 'Development', 10000);
         // A category on a *different* billing project.
-        [, $otherCatIri] = $this->createBilling($project, 'Mobile', 'Design', 9000);
+        [, $otherCatIri] = $this->createBilling($board, 'Mobile', 'Design', 9000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -148,9 +148,9 @@ class TimeEntryTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Private');
-        $spaceIri = $this->spaceIri($project);
-        [$bpIri, $catIri] = $this->createBilling($project, 'Website', 'Development', 10000);
+        $board = $this->createProject($alice, 'Private');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -178,9 +178,9 @@ class TimeEntryTest extends ApiTestCase
     public function testStartingASecondTimerStopsTheFirst(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $spaceIri = $this->spaceIri($project);
-        [$bpIri, $catIri] = $this->createBilling($project, 'Website', 'Development', 10000);
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 10000);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -208,9 +208,9 @@ class TimeEntryTest extends ApiTestCase
     public function testMemberCanListBillingProjectOptions(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->createBilling($project, 'Website', 'Development', 12000);
-        $space = $project->getSpace();
+        $board = $this->createProject($alice, 'Backend');
+        $this->createBilling($board, 'Website', 'Development', 12000);
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
         $client = static::createClient();
@@ -232,24 +232,24 @@ class TimeEntryTest extends ApiTestCase
         $this->assertSame(12000, $cat['rateAmount']);
     }
 
-    private function spaceIri(Project $project): string
+    private function spaceIri(Board $board): string
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         assert($space instanceof Space);
 
         return '/spaces/' . $space->getId();
     }
 
     /**
-     * A client + a billing project (one category) in the project's space.
+     * A client + a billing project (one category) in the board's space.
      *
      * @return array{0: string, 1: string} [billingProjectIri, categoryIri]
      */
-    private function createBilling(Project $project, string $projectName, string $categoryName, int $rate): array
+    private function createBilling(Board $board, string $boardName, string $categoryName, int $rate): array
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         assert($space instanceof Space);
-        $owner = $project->getOwner();
+        $owner = $board->getOwner();
         assert($owner instanceof User);
 
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($owner);
@@ -259,7 +259,7 @@ class TimeEntryTest extends ApiTestCase
         $billingProject = (new BillingProject())
             ->setSpace($space)
             ->setClient($client)
-            ->setName($projectName)
+            ->setName($boardName)
             ->setCurrency('USD')
             ->setCreatedBy($owner);
         $billingProject->addCategory($category);
@@ -269,16 +269,16 @@ class TimeEntryTest extends ApiTestCase
         return ['/billing_projects/' . $billingProject->getId(), '/billing_categories/' . $category->getId()];
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

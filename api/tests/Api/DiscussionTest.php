@@ -25,7 +25,7 @@ class DiscussionTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }

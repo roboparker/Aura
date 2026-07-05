@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Tag;
@@ -14,10 +14,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * `POST /projects/{id}/copy` — clones a project (+ CFDs) into a
+ * `POST /boards/{id}/copy` — clones a board (+ CFDs) into a
  * target space (#182).
  */
-class ProjectCopyTest extends ApiTestCase
+class BoardCopyTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -33,14 +33,14 @@ class ProjectCopyTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testRequiresAuth(): void
     {
-        static::createClient()->request('POST', '/projects/' . str_repeat('0', 36) . '/copy', [
+        static::createClient()->request('POST', '/boards/' . str_repeat('0', 36) . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -51,13 +51,13 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Template', $source);
-        $this->seedDefinition($project, 'Severity', 'dropdown', ['low', 'med', 'high'], 0);
-        $this->seedDefinition($project, 'Notes', 'text', null, 1);
+        $board = $this->createProject($alice, 'Template', $source);
+        $this->seedDefinition($board, 'Severity', 'dropdown', ['low', 'med', 'high'], 0);
+        $this->seedDefinition($board, 'Notes', 'text', null, 1);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -71,12 +71,12 @@ class ProjectCopyTest extends ApiTestCase
 
         $this->entityManager->clear();
         $copyId = $body['id'];
-        $copy = $this->entityManager->getRepository(Project::class)->find($copyId);
+        $copy = $this->entityManager->getRepository(Board::class)->find($copyId);
         $this->assertNotNull($copy);
         $this->assertSame((string) $source->getId(), (string) $copy->getSpace()?->getId());
         $this->assertSame((string) $alice->getId(), (string) $copy->getOwner()?->getId());
 
-        // CFDs cloned with same shape, attached to the new project.
+        // CFDs cloned with same shape, attached to the new board.
         $defs = $this->definitionsForProjectId((string) $copy->getId());
         $this->assertCount(2, $defs);
         $this->assertSame('Severity', $defs[0]->getName());
@@ -92,8 +92,8 @@ class ProjectCopyTest extends ApiTestCase
         );
         $this->assertSame('Notes', $defs[1]->getName());
 
-        // Source project is untouched (its 2 CFDs still there).
-        $sourceDefs = $this->definitionsForProjectId((string) $project->getId());
+        // Source board is untouched (its 2 CFDs still there).
+        $sourceDefs = $this->definitionsForProjectId((string) $board->getId());
         $this->assertCount(2, $sourceDefs);
     }
 
@@ -102,11 +102,11 @@ class ProjectCopyTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($alice, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['space' => '/spaces/' . $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -118,7 +118,7 @@ class ProjectCopyTest extends ApiTestCase
         $this->assertSame('/spaces/' . $target->getId(), $body['space']);
 
         $this->entityManager->clear();
-        $copy = $this->entityManager->getRepository(Project::class)->find($body['id']);
+        $copy = $this->entityManager->getRepository(Board::class)->find($body['id']);
         $this->assertNotNull($copy);
         $this->assertSame((string) $target->getId(), (string) $copy->getSpace()?->getId());
     }
@@ -127,11 +127,11 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Template (copy)', $source);
+        $board = $this->createProject($alice, 'Template (copy)', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -147,11 +147,11 @@ class ProjectCopyTest extends ApiTestCase
         $bob = $this->createUser('bob@example.com');
         $source = $this->createSpace($alice, 'Shared');
         $this->ensureSpaceMembership($source, $bob);
-        $project = $this->createProject($alice, 'Alice template', $source);
+        $board = $this->createProject($alice, 'Alice template', $source);
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -160,7 +160,7 @@ class ProjectCopyTest extends ApiTestCase
         $this->entityManager->clear();
         $response = $client->getResponse();
         self::assertNotNull($response);
-        $copy = $this->entityManager->getRepository(Project::class)
+        $copy = $this->entityManager->getRepository(Board::class)
             ->find($response->toArray()['id']);
         $this->assertNotNull($copy);
         $this->assertSame((string) $bob->getId(), (string) $copy->getOwner()?->getId());
@@ -171,11 +171,11 @@ class ProjectCopyTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($stranger);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -189,11 +189,11 @@ class ProjectCopyTest extends ApiTestCase
         $source = $this->createSpace($alice, 'Source');
         $this->ensureSpaceMembership($source, $bob);
         $target = $this->createSpace($alice, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['space' => '/spaces/' . $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -204,11 +204,11 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['space' => 'not-a-real-iri'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -220,11 +220,11 @@ class ProjectCopyTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($alice, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['space' => (string) $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -238,13 +238,13 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
-        $this->seedTask($alice, $project, 'Buy milk', 0);
-        $this->seedTask($alice, $project, 'Buy eggs', 1);
+        $board = $this->createProject($alice, 'Backend', $source);
+        $this->seedTask($alice, $board, 'Buy milk', 0);
+        $this->seedTask($alice, $board, 'Buy eggs', 1);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -258,7 +258,7 @@ class ProjectCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copyId = $response->toArray()['id'];
         $copyTasks = $this->entityManager->getRepository(Task::class)
-            ->findBy(['project' => $copyId]);
+            ->findBy(['board' => $copyId]);
         $this->assertCount(0, $copyTasks);
     }
 
@@ -266,9 +266,9 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
         $dueDate = new \DateTimeImmutable('2026-12-01T00:00:00Z');
-        $task = $this->seedTask($alice, $project, 'Plan launch', 0);
+        $task = $this->seedTask($alice, $board, 'Plan launch', 0);
         $task->setDescription('Quarterly');
         $task->setDueDate($dueDate);
         $task->setRecurrenceRule(['frequency' => 'weekly', 'interval' => 1]);
@@ -277,7 +277,7 @@ class ProjectCopyTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['includeTasks' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -292,7 +292,7 @@ class ProjectCopyTest extends ApiTestCase
         $copyId = $response->toArray()['id'];
         /** @var Task[] $cloned */
         $cloned = $this->entityManager->getRepository(Task::class)
-            ->findBy(['project' => $copyId]);
+            ->findBy(['board' => $copyId]);
         $this->assertCount(1, $cloned);
         $this->assertSame('Plan launch', $cloned[0]->getTitle());
         $this->assertSame('Quarterly', $cloned[0]->getDescription());
@@ -315,10 +315,10 @@ class ProjectCopyTest extends ApiTestCase
         $bob = $this->createUser('bob@example.com');
         $source = $this->createSpace($alice, 'Shared');
         $this->ensureSpaceMembership($source, $bob);
-        $project = $this->createProject($alice, 'P', $source);
+        $board = $this->createProject($alice, 'P', $source);
         $aliceTag = $this->seedTag($alice, 'alice-tag', $source);
         $bobTag = $this->seedTag($bob, 'bob-tag', $source);
-        $task = $this->seedTask($alice, $project, 'Tagged task', 0);
+        $task = $this->seedTask($alice, $board, 'Tagged task', 0);
         $task->addTag($aliceTag);
         $task->addTag($bobTag);
         $this->entityManager->flush();
@@ -327,7 +327,7 @@ class ProjectCopyTest extends ApiTestCase
         // bob-tag isn't hers, so the clone only keeps alice-tag.
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['includeTasks' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -339,7 +339,7 @@ class ProjectCopyTest extends ApiTestCase
         $copyId = $response->toArray()['id'];
         /** @var Task[] $cloned */
         $cloned = $this->entityManager->getRepository(Task::class)
-            ->findBy(['project' => $copyId]);
+            ->findBy(['board' => $copyId]);
         $this->assertCount(1, $cloned);
         $tagTitles = array_map(
             fn (Tag $t) => $t->getTitle(),
@@ -352,14 +352,14 @@ class ProjectCopyTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'P', $source);
-        $this->seedTask($alice, $project, 'C', 2);
-        $this->seedTask($alice, $project, 'A', 0);
-        $this->seedTask($alice, $project, 'B', 1);
+        $board = $this->createProject($alice, 'P', $source);
+        $this->seedTask($alice, $board, 'C', 2);
+        $this->seedTask($alice, $board, 'A', 0);
+        $this->seedTask($alice, $board, 'B', 1);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/copy', [
+        $client->request('POST', '/boards/' . $board->getId() . '/copy', [
             'json' => ['includeTasks' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -373,23 +373,23 @@ class ProjectCopyTest extends ApiTestCase
         self::assertNotNull($response);
         $copyId = $response->toArray()['id'];
         $cloned = $this->entityManager->getRepository(Task::class)
-            ->findBy(['project' => $copyId], ['position' => 'ASC']);
+            ->findBy(['board' => $copyId], ['position' => 'ASC']);
         $titlesByPosition = array_map(fn (Task $t) => $t->getTitle(), $cloned);
         $this->assertSame(['A', 'B', 'C'], $titlesByPosition);
     }
 
     /**
-     * Definitions attached to a project via the (space-owned) many-to-many.
+     * Definitions attached to a board via the (space-owned) many-to-many.
      *
      * @return list<CustomFieldDefinition>
      */
-    private function definitionsForProjectId(string $projectId): array
+    private function definitionsForProjectId(string $boardId): array
     {
         /** @var list<CustomFieldDefinition> $defs */
         $defs = $this->entityManager->createQuery(
             'SELECT d FROM App\Entity\CustomFieldDefinition d '
-            . 'JOIN d.projects p WHERE p.id = :id ORDER BY d.position ASC',
-        )->setParameter('id', $projectId)->getResult();
+            . 'JOIN d.boards p WHERE p.id = :id ORDER BY d.position ASC',
+        )->setParameter('id', $boardId)->getResult();
         return $defs;
     }
 
@@ -398,10 +398,10 @@ class ProjectCopyTest extends ApiTestCase
      *
      * @param list<string>|null $options
      */
-    private function seedDefinition(Project $project, string $name, string $type, ?array $options = null, int $position = 0): CustomFieldDefinition
+    private function seedDefinition(Board $board, string $name, string $type, ?array $options = null, int $position = 0): CustomFieldDefinition
     {
         $def = new CustomFieldDefinition();
-        $def->setProject($project);
+        $def->setBoard($board);
         $def->setName($name);
         $def->setType($type);
         if (null !== $options) {
@@ -413,11 +413,11 @@ class ProjectCopyTest extends ApiTestCase
         return $def;
     }
 
-    private function seedTask(User $owner, Project $project, string $title, int $position = 0): Task
+    private function seedTask(User $owner, Board $board, string $title, int $position = 0): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $task->setPosition($position);
         $this->entityManager->persist($task);
@@ -437,15 +437,15 @@ class ProjectCopyTest extends ApiTestCase
         return $tag;
     }
 
-    private function createProject(User $owner, string $title, Space $space): Project
+    private function createProject(User $owner, string $title, Space $space): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $project->setSpace($space);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $board->setSpace($space);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createSpace(User $owner, string $name): Space

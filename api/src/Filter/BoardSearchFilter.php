@@ -6,15 +6,15 @@ use ApiPlatform\Doctrine\Orm\Filter\AbstractFilter;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\OpenApi\Model\Parameter;
-use App\Entity\Project;
+use App\Entity\Board;
 use Doctrine\ORM\QueryBuilder;
 
 /**
- * Free-text filter for the `Project` collection: `?search={q}` narrows
- * to projects whose title/description tsvector matches the query.
+ * Free-text filter for the `Board` collection: `?search={q}` narrows
+ * to boards whose title/description tsvector matches the query.
  *
  * Mirrors {@see TaskSearchFilter}: uses the `search_vector` STORED
- * generated column on `project` (Version20260506010000), GIN-indexed,
+ * generated column on `board` (Version20260506010000), GIN-indexed,
  * with `websearch_to_tsquery` so users can paste the same kind of
  * query they'd type into Google. When the param is present, results
  * are ordered by `ts_rank` desc with `createdOn` as tiebreaker —
@@ -24,7 +24,7 @@ use Doctrine\ORM\QueryBuilder;
  * navbar search bar can leave the param attached without breaking
  * the listing when the field is cleared.
  */
-final class ProjectSearchFilter extends AbstractFilter
+final class BoardSearchFilter extends AbstractFilter
 {
     public const PARAMETER = 'search';
 
@@ -42,7 +42,7 @@ final class ProjectSearchFilter extends AbstractFilter
         ?Operation $operation = null,
         array $context = [],
     ): void {
-        if (self::PARAMETER !== $property || Project::class !== $resourceClass) {
+        if (self::PARAMETER !== $property || Board::class !== $resourceClass) {
             return;
         }
         if (!is_string($value)) {
@@ -91,7 +91,7 @@ final class ProjectSearchFilter extends AbstractFilter
 
     public function getDescription(string $resourceClass): array
     {
-        if (Project::class !== $resourceClass) {
+        if (Board::class !== $resourceClass) {
             return [];
         }
 
@@ -100,7 +100,7 @@ final class ProjectSearchFilter extends AbstractFilter
                 'property' => self::PARAMETER,
                 'type' => 'string',
                 'required' => false,
-                'description' => 'Postgres full-text search across project title and description. Ranked by relevance.',
+                'description' => 'Postgres full-text search across board title and description. Ranked by relevance.',
                 'openapi' => new Parameter(
                     name: self::PARAMETER,
                     in: 'query',

@@ -242,7 +242,7 @@ class UserPreferencesTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
-            'json' => ['impersonationItemAccess' => ['project' => [$uuid => 'view']]],
+            'json' => ['impersonationItemAccess' => ['board' => [$uuid => 'view']]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
@@ -251,9 +251,9 @@ class UserPreferencesTest extends ApiTestCase
         self::assertNotNull($response);
         $itemAccess = $response->toArray()['impersonationItemAccess'];
         $this->assertIsArray($itemAccess);
-        $project = $itemAccess['project'];
-        $this->assertIsArray($project);
-        $this->assertSame('view', $project[$uuid]);
+        $board = $itemAccess['board'];
+        $this->assertIsArray($board);
+        $this->assertSame('view', $board[$uuid]);
         // Other item types keep their (empty) defaults.
         $this->assertSame([], $itemAccess['task']);
     }
@@ -279,7 +279,7 @@ class UserPreferencesTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('PATCH', '/me/preferences', [
-            'json' => ['impersonationItemAccess' => ['project' => ['not-a-uuid' => 'view']]],
+            'json' => ['impersonationItemAccess' => ['board' => ['not-a-uuid' => 'view']]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 

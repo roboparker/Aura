@@ -2,14 +2,14 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use App\Mcp\McpAuthorization;
 use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
 use Doctrine\ORM\EntityManagerInterface;
 
-final class DeleteProjectTool implements McpToolInterface
+final class DeleteBoardTool implements McpToolInterface
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -25,7 +25,7 @@ final class DeleteProjectTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Permanently delete a project and detach its tasks (tasks survive — `project` becomes null on each, mirroring the PWA delete).';
+        return 'Permanently delete a board and detach its tasks (tasks survive — `board` becomes null on each, mirroring the PWA delete).';
     }
 
     public function getInputSchema(): array
@@ -33,22 +33,22 @@ final class DeleteProjectTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'projectId' => ['type' => 'string'],
+                'boardId' => ['type' => 'string'],
             ],
-            'required' => ['projectId'],
+            'required' => ['boardId'],
             'additionalProperties' => false,
         ];
     }
 
     public function invoke(array $arguments, User $user): array
     {
-        $projectId = $this->input->requireUuid('projectId', $arguments['projectId'] ?? null);
-        $project = $this->em->getRepository(Project::class)->find($projectId);
-        if (null === $project || !$this->authz->canEditProject($project, $user)) {
-            throw McpException::notFound(sprintf('Project %s', $projectId));
+        $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
+        $board = $this->em->getRepository(Board::class)->find($boardId);
+        if (null === $board || !$this->authz->canEditProject($board, $user)) {
+            throw McpException::notFound(sprintf('Board %s', $boardId));
         }
-        $this->em->remove($project);
+        $this->em->remove($board);
         $this->em->flush();
-        return ['deleted' => true, 'projectId' => (string) $projectId];
+        return ['deleted' => true, 'boardId' => (string) $boardId];
     }
 }

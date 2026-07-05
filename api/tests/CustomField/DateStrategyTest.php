@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  * Coverage for the date-flavoured strategies and their shared abstract
  * base (#227). Direct construction — no kernel, no DB. Complements
  * TypeStrategiesTest by exercising the multi walk, config bounds, the
- * search-text projection, and the per-subtype scalar overrides.
+ * search-text boardion, and the per-subtype scalar overrides.
  */
 final class DateStrategyTest extends TestCase
 {
@@ -89,7 +89,7 @@ final class DateStrategyTest extends TestCase
 
         $this->assertNull($date->searchText(null, []));
         $this->assertSame('2026-06-15', $date->searchText('2026-06-15', []));
-        // Invalid string projects nothing.
+        // Invalid string boards nothing.
         $this->assertNull($date->searchText('garbage', []));
         // Multi: only the parseable elements survive.
         $this->assertSame(

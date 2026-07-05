@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -12,10 +12,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * `POST /projects/{id}/move` — relocates a project (plus its
+ * `POST /boards/{id}/move` — relocates a board (plus its
  * denormalised child rows) into a different space (#182).
  */
-class ProjectMoveTest extends ApiTestCase
+class BoardMoveTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -29,14 +29,14 @@ class ProjectMoveTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testRequiresAuth(): void
     {
-        static::createClient()->request('POST', '/projects/' . str_repeat('0', 36) . '/move', [
+        static::createClient()->request('POST', '/boards/' . str_repeat('0', 36) . '/move', [
             'json' => ['space' => '/spaces/x'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -48,12 +48,12 @@ class ProjectMoveTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($alice, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
-        $this->seedDefinition($project, 'Severity');
+        $board = $this->createProject($alice, 'Backend', $source);
+        $this->seedDefinition($board, 'Severity');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => '/spaces/' . $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -63,20 +63,20 @@ class ProjectMoveTest extends ApiTestCase
         $this->assertTrue($response->toArray()['moved']);
 
         $this->entityManager->clear();
-        $reloaded = $this->entityManager->getRepository(Project::class)->find($project->getId());
+        $reloaded = $this->entityManager->getRepository(Board::class)->find($board->getId());
         $this->assertNotNull($reloaded);
         $this->assertSame((string) $target->getId(), (string) $reloaded->getSpace()?->getId());
 
-        // Custom fields are space-owned (#custom-fields-space): a project's
+        // Custom fields are space-owned (#custom-fields-space): a board's
         // field selections belong to the SOURCE space, so the move detaches
-        // them — the project starts fresh in the target and opts into the
+        // them — the board starts fresh in the target and opts into the
         // target's own fields afterwards. The field itself stays in the
         // source space. Discussions live on the space directly and are
-        // unaffected by project moves.
+        // unaffected by board moves.
         /** @var list<CustomFieldDefinition> $attached */
         $attached = $this->entityManager->createQuery(
-            'SELECT d FROM App\Entity\CustomFieldDefinition d JOIN d.projects p WHERE p = :project',
-        )->setParameter('project', $reloaded)->getResult();
+            'SELECT d FROM App\Entity\CustomFieldDefinition d JOIN d.boards p WHERE p = :board',
+        )->setParameter('board', $reloaded)->getResult();
         $this->assertCount(0, $attached);
 
         $sourceFields = $this->entityManager->getRepository(CustomFieldDefinition::class)
@@ -90,15 +90,15 @@ class ProjectMoveTest extends ApiTestCase
         $stranger = $this->createUser('stranger@example.com');
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($stranger, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($stranger);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => '/spaces/' . $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        // Stranger can't see the project at all — same shape as the
+        // Stranger can't see the board at all — same shape as the
         // access extension hiding it from listings.
         $this->assertResponseStatusCodeSame(404);
     }
@@ -111,11 +111,11 @@ class ProjectMoveTest extends ApiTestCase
         $this->ensureSpaceMembership($source, $bob);
         $target = $this->createSpace($alice, 'Target');
         // Bob is in the source but not the target.
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => '/spaces/' . $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -126,11 +126,11 @@ class ProjectMoveTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => [],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -141,11 +141,11 @@ class ProjectMoveTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => 'not-an-iri-or-uuid'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -156,11 +156,11 @@ class ProjectMoveTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => '/spaces/' . $source->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -175,11 +175,11 @@ class ProjectMoveTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $source = $this->createSpace($alice, 'Source');
         $target = $this->createSpace($alice, 'Target');
-        $project = $this->createProject($alice, 'Backend', $source);
+        $board = $this->createProject($alice, 'Backend', $source);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/move', [
+        $client->request('POST', '/boards/' . $board->getId() . '/move', [
             'json' => ['space' => (string) $target->getId()],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -189,21 +189,21 @@ class ProjectMoveTest extends ApiTestCase
         $this->assertTrue($response->toArray()['moved']);
     }
 
-    private function createProject(User $owner, string $title, Space $space): Project
+    private function createProject(User $owner, string $title, Space $space): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $project->setSpace($space);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $board->setSpace($space);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function seedDefinition(Project $project, string $name): CustomFieldDefinition
+    private function seedDefinition(Board $board, string $name): CustomFieldDefinition
     {
         $def = new CustomFieldDefinition();
-        $def->setProject($project);
+        $def->setBoard($board);
         $def->setName($name);
         $def->setType('text');
         $def->setPosition(0);

@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -12,7 +12,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * Custom fields are space-owned (#custom-fields-space): definitions belong to
  * a Space and any member of that space can create / edit / delete them.
- * Creation POSTs a `space` IRI; projects opt in to a field separately via
+ * Creation POSTs a `space` IRI; boards opt in to a field separately via
  * their `customFieldDefinitions` many-to-many.
  */
 class CustomFieldDefinitionTest extends ApiTestCase
@@ -29,7 +29,7 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -42,13 +42,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testMemberCanCreateTextField(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -63,15 +63,15 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project, $bob);
+        $board = $this->createProject($alice, 'Backend');
+        $this->addBoardMember($board, $bob);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($bob);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -86,13 +86,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($stranger);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -109,13 +109,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testVisibilityDefaultsToBoth(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -130,59 +130,59 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testProjectVisibilityOverrideAppliesInProjectContext(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
-        $projectIri = '/projects/' . $project->getId();
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
+        $boardIri = '/boards/' . $board->getId();
 
         $client = static::createClient();
         $client->loginUser($alice);
 
-        // Defaults to 'both' when no per-project override exists.
-        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        // Defaults to 'both' when no per-board override exists.
+        $client->request('GET', '/custom_field_definitions?boards=' . $boardIri);
         $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'both']]]);
 
-        // Set this project's visibility to board only.
-        $client->request('PUT', $projectIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+        // Set this board's visibility to board only.
+        $client->request('PUT', $boardIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
             'json' => ['visibility' => 'board'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
 
-        // The project-context read now reports the override.
-        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        // The board-context read now reports the override.
+        $client->request('GET', '/custom_field_definitions?boards=' . $boardIri);
         $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'board']]]);
     }
 
     public function testProjectVisibilityAcceptsSurfaceSet(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
-        $projectIri = '/projects/' . $project->getId();
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
+        $boardIri = '/boards/' . $board->getId();
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         // A comma-joined set including the calendar surface round-trips.
-        $client->request('PUT', $projectIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+        $client->request('PUT', $boardIri . '/custom_field_definitions/' . $field->getId() . '/visibility', [
             'json' => ['visibility' => 'board,calendar'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
 
-        $client->request('GET', '/custom_field_definitions?projects=' . $projectIri);
+        $client->request('GET', '/custom_field_definitions?boards=' . $boardIri);
         $this->assertJsonContains(['member' => [['name' => 'Severity', 'visibility' => 'board,calendar']]]);
     }
 
     public function testInvalidProjectVisibilityIsRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('PUT', '/projects/' . $project->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+        $client->request('PUT', '/boards/' . $board->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
             'json' => ['visibility' => 'sidebar'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -193,12 +193,12 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('PUT', '/projects/' . $project->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
+        $client->request('PUT', '/boards/' . $board->getId() . '/custom_field_definitions/' . $field->getId() . '/visibility', [
             'json' => ['visibility' => 'board'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -209,8 +209,8 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -247,13 +247,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testDropdownRequiresOptions(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Priority',
                 'kind' => 'select',
                 'subtype' => 'single',
@@ -267,13 +267,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testDropdownHappyPath(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Priority',
                 'kind' => 'select',
                 'subtype' => 'single',
@@ -303,13 +303,13 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testInvalidKindRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Mystery',
                 'kind' => 'mystery-shape',
                 'subtype' => 'mystery-shape',
@@ -323,14 +323,14 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testDuplicateNameInSpaceRejected(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/custom_field_definitions', [
             'json' => [
-                'space' => $this->spaceIri($project),
+                'space' => $this->spaceIri($board),
                 'name' => 'Severity',
                 'kind' => 'text',
                 'subtype' => 'text',
@@ -349,8 +349,8 @@ class CustomFieldDefinitionTest extends ApiTestCase
     public function testOwnerCanDelete(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -362,10 +362,10 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->addProjectMember($project, $bob);
+        $board = $this->createProject($alice, 'Backend');
+        $this->addBoardMember($board, $bob);
         $this->entityManager->flush();
-        $field = $this->seedField($project, 'Severity', 'text');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -377,8 +377,8 @@ class CustomFieldDefinitionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedField($project, 'Severity', 'text');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedField($board, 'Severity', 'text');
 
         $client = static::createClient();
         $client->loginUser($stranger);
@@ -388,17 +388,17 @@ class CustomFieldDefinitionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    private function spaceIri(Project $project): string
+    private function spaceIri(Board $board): string
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         self::assertNotNull($space);
         return '/spaces/' . $space->getId();
     }
 
-    private function seedField(Project $project, string $name, string $type): CustomFieldDefinition
+    private function seedField(Board $board, string $name, string $type): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project);
+        $field->setBoard($board);
         $field->setName($name);
         $field->setType($type);
         $this->entityManager->persist($field);
@@ -406,15 +406,15 @@ class CustomFieldDefinitionTest extends ApiTestCase
         return $field;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     /**

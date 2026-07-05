@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
 use App\Entity\Discussion;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\SpaceExport;
@@ -43,7 +43,7 @@ class SpaceExportTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceExport')->execute();
@@ -65,8 +65,8 @@ class SpaceExportTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Team Rocket');
-        $project = $this->createProject($alice, 'Launch plan', $space);
-        $task = $this->createTask($alice, $project, 'Book the venue');
+        $board = $this->createProject($alice, 'Launch plan', $space);
+        $task = $this->createTask($alice, $board, 'Book the venue');
         $this->createComment($alice, $task, 'Deposit paid.');
         $this->createDiscussion($alice, $space, 'Kickoff thread');
         $this->createPage($alice, $space, 'Runbook');
@@ -108,7 +108,7 @@ class SpaceExportTest extends ApiTestCase
         $this->assertNotNull($path);
         $this->assertFileExists($path);
         $this->assertZipContains($path, 'space.json', 'Team Rocket');
-        $this->assertZipContains($path, 'projects.json', 'Launch plan');
+        $this->assertZipContains($path, 'boards.json', 'Launch plan');
         $this->assertZipContains($path, 'tasks.json', 'Book the venue');
         $this->assertZipContains($path, 'tasks.json', 'Deposit paid.');
         $this->assertZipContains($path, 'discussions.json', 'Kickoff thread');
@@ -384,23 +384,23 @@ class SpaceExportTest extends ApiTestCase
         return $space;
     }
 
-    private function createProject(User $owner, string $title, Space $space): Project
+    private function createProject(User $owner, string $title, Space $space): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $project->setSpace($space);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $board->setSpace($space);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
-    private function createTask(User $owner, Project $project, string $title): Task
+    private function createTask(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
         $task->setTitle($title);
-        $task->setProject($project);
+        $task->setBoard($board);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
         return $task;

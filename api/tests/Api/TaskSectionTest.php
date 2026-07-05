@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,14 +28,14 @@ class TaskSectionTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TaskSection')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testMemberCreatesSectionAndAssignsTask(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -43,7 +43,7 @@ class TaskSectionTest extends ApiTestCase
         // Create a section.
         $section = $client->request('POST', '/task_sections', [
             'json' => [
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'title' => 'Up next',
                 'position' => 0,
             ],
@@ -53,8 +53,8 @@ class TaskSectionTest extends ApiTestCase
         $sectionIri = $section['@id'];
         $this->assertIsString($sectionIri);
 
-        // It shows up in the project-scoped collection.
-        $list = $client->request('GET', '/task_sections?project=/projects/' . $project->getId())
+        // It shows up in the board-scoped collection.
+        $list = $client->request('GET', '/task_sections?board=/boards/' . $board->getId())
             ->toArray();
         $this->assertSame(1, $list['totalItems'] ?? null);
 
@@ -62,7 +62,7 @@ class TaskSectionTest extends ApiTestCase
         $task = $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Wire it up',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'section' => $sectionIri,
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -75,12 +75,12 @@ class TaskSectionTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->createProject($alice, 'Private');
+        $board = $this->createProject($alice, 'Private');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $created = $client->request('POST', '/task_sections', [
-            'json' => ['project' => '/projects/' . $project->getId(), 'title' => 'Secret'],
+            'json' => ['board' => '/boards/' . $board->getId(), 'title' => 'Secret'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $iri = $created['@id'];
@@ -88,7 +88,7 @@ class TaskSectionTest extends ApiTestCase
 
         // The stranger's scoped list is empty and the item lookup 404s.
         $client->loginUser($stranger);
-        $list = $client->request('GET', '/task_sections?project=/projects/' . $project->getId())
+        $list = $client->request('GET', '/task_sections?board=/boards/' . $board->getId())
             ->toArray();
         $this->assertSame(0, $list['totalItems'] ?? null);
 
@@ -96,16 +96,16 @@ class TaskSectionTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

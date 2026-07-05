@@ -39,7 +39,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  * Tickets survive their author's account deletion:
  * {@see \App\Service\AccountDeletionService} reassigns {@see $owner} to
  * the never-deletable "Former member" sentinel, exactly like tasks /
- * projects / pages, so the board's history stays intact.
+ * boards / pages, so the board's history stays intact.
  *
  * Reads are enriched by {@see FeedbackAggregateProvider} with the vote
  * {@see $score}, the caller's own {@see $myVote}, and the

@@ -18,8 +18,8 @@ use Symfony\Component\Uid\Uuid;
  * we can round-trip every supported field type without column gymnastics.
  * Per-type shape and required-ness are policed by
  * {@see App\Validator\ValidCustomFieldValues} on the parent Task — keeping
- * the rules in one place means they see the task's project and can
- * reject definitions from other projects.
+ * the rules in one place means they see the task's board and can
+ * reject definitions from other boards.
  */
 #[ORM\Entity(repositoryClass: CustomFieldValueRepository::class)]
 #[ORM\Table(name: 'custom_field_value')]
@@ -55,7 +55,7 @@ class CustomFieldValue
      *
      * Bare IRI on read — embedding the full definition would balloon every
      * task payload by N fields. Clients already fetched the definitions when
-     * rendering the project's field schema.
+     * rendering the board's field schema.
      */
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: CustomFieldDefinition::class)]
@@ -89,7 +89,7 @@ class CustomFieldValue
     private mixed $value = null;
 
     /**
-     * Plain-text projection of `value` for the FTS index. Written by the
+     * Plain-text boardion of `value` for the FTS index. Written by the
      * type strategies on persist — references dereference the target's
      * display label, dates render as `Y-m-d`, money renders the amount
      * + currency, references emit the target's name so FTS hits work
@@ -104,7 +104,7 @@ class CustomFieldValue
     private ?string $valueSearch = null;
 
     /**
-     * Postgres-managed tsvector projection of {@see $valueSearch},
+     * Postgres-managed tsvector boardion of {@see $valueSearch},
      * populated by a STORED generated column — see Version20260513000000.
      * Mapped here so DQL can reference `cfv.searchVector` from the task
      * search filter's EXISTS subquery; never written from PHP, never

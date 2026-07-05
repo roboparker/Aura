@@ -26,7 +26,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 /**
  * A billable (or non-billable) chunk of tracked time (#444). The atomic unit of
  * time tracking: it records who spent how long on what, optionally tied to a
- * project and/or task, at an optional hourly rate. Once pulled onto an invoice
+ * board and/or task, at an optional hourly rate. Once pulled onto an invoice
  * (#445) it is locked via {@see $billedAt} so the same time can't be billed twice.
  *
  * A running timer is a TimeEntry with {@see $endedAt} still null; a partial
@@ -199,7 +199,7 @@ class TimeEntry
             $this->space = $this->billingProject->getSpace();
         }
 
-        // Snapshot the rate from the category + project currency so a later rate
+        // Snapshot the rate from the category + board currency so a later rate
         // change never rewrites already-logged (or billed) time.
         if (null !== $this->category) {
             $this->rateAmount = $this->category->getRateAmount();
