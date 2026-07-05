@@ -40,7 +40,7 @@ interface CategoryRow {
   rateAmount: number;
   position: number;
 }
-interface BillingProject {
+interface Engagement {
   "@id": string;
   id: string;
   name: string;
@@ -62,13 +62,13 @@ const toMajor = (minor: number): string => (minor / 100).toFixed(2);
 const money = (minor: number, currency: string | null): string =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(minor / 100);
 
-const BillingProjectsPage = () => {
+const EngagementsPage = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace } = useActiveSpace();
   const router = useRouter();
 
   const spaceIri = activeSpace?.["@id"] ?? null;
-  const [projects, setProjects] = useState<BillingProject[]>([]);
+  const [projects, setProjects] = useState<Engagement[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [taskBoards, setTaskBoards] = useState<BoardRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +76,7 @@ const BillingProjectsPage = () => {
 
   // Editor dialog state (create + edit share it).
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<BillingProject | null>(null);
+  const [editing, setEditing] = useState<Engagement | null>(null);
   const [name, setName] = useState("");
   const [clientIri, setClientIri] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -98,7 +98,7 @@ const BillingProjectsPage = () => {
     try {
       const q = `?space=${encodeURIComponent(spaceIri)}`;
       const [bps, cls, prj] = await Promise.all([
-        apiGetCollection<BillingProject>(`/billing_projects${q}`),
+        apiGetCollection<Engagement>(`/engagements${q}`),
         apiGetCollection<ClientRow>(`/clients${q}`),
         apiGetCollection<BoardRow>(`/boards${q}`),
       ]);
@@ -108,8 +108,8 @@ const BillingProjectsPage = () => {
     } catch (e) {
       setLoadError(
         e instanceof ApiError && e.status === 403
-          ? "Billing projects are managed by space admins."
-          : "Failed to load billing projects.",
+          ? "Engagements are managed by space admins."
+          : "Failed to load engagements.",
       );
     } finally {
       setLoading(false);
@@ -131,7 +131,7 @@ const BillingProjectsPage = () => {
     setOpen(true);
   };
 
-  const openEdit = (bp: BillingProject) => {
+  const openEdit = (bp: Engagement) => {
     setEditing(bp);
     setName(bp.name);
     setClientIri(bp.client);
@@ -163,11 +163,11 @@ const BillingProjectsPage = () => {
     try {
       const payload = { space: spaceIri, client: clientIri, name: name.trim(), currency, categories };
       const saved = editing
-        ? await apiSend<BillingProject>("PATCH", editing["@id"], {
+        ? await apiSend<Engagement>("PATCH", editing["@id"], {
             body: { name: name.trim(), client: clientIri, currency, categories },
             contentType: "application/merge-patch+json",
           })
-        : await apiSend<BillingProject>("POST", "/billing_projects", { body: payload });
+        : await apiSend<Engagement>("POST", "/engagements", { body: payload });
       const bpIri = saved?.["@id"] ?? editing?.["@id"];
       if (bpIri) {
         await apiSend("PUT", `${bpIri}/boards`, { body: { boards: assigned } });
@@ -181,7 +181,7 @@ const BillingProjectsPage = () => {
     }
   };
 
-  const toggleArchive = async (bp: BillingProject) => {
+  const toggleArchive = async (bp: Engagement) => {
     try {
       await apiSend("PATCH", bp["@id"], {
         body: { archived: !bp.archived },
@@ -193,7 +193,7 @@ const BillingProjectsPage = () => {
     }
   };
 
-  const remove = async (bp: BillingProject) => {
+  const remove = async (bp: Engagement) => {
     try {
       await apiSend("DELETE", bp["@id"]);
       await load();
@@ -219,13 +219,13 @@ const BillingProjectsPage = () => {
   return (
     <>
       <Head>
-        <title>Billing projects — Madori</title>
+        <title>Engagements — Madori</title>
       </Head>
       <main className="px-6 py-8 max-w-4xl mx-auto">
         <PageHeader
-          title="Billing projects"
+          title="Engagements"
           icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
-          subtitle="A billing project has a client and a set of categories, each with an hourly rate. Time is tracked against a project + category."
+          subtitle="A engagement has a client and a set of categories, each with an hourly rate. Time is tracked against a project + category."
           count={projects.length}
           actions={
             <Button
@@ -235,7 +235,7 @@ const BillingProjectsPage = () => {
               disabled={clients.length === 0}
             >
               <Plus className="h-3.5 w-3.5" />
-              New billing project
+              New engagement
             </Button>
           }
         />
@@ -248,7 +248,7 @@ const BillingProjectsPage = () => {
         {!loadError && clients.length === 0 && !loading && (
           <Alert className="mb-4">
             <AlertDescription>
-              Add a client first — billing projects bill to a client.
+              Add a client first — engagements bill to a client.
             </AlertDescription>
           </Alert>
         )}
@@ -257,7 +257,7 @@ const BillingProjectsPage = () => {
           <p className="text-muted-foreground">Loading…</p>
         ) : projects.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-            No billing projects yet.
+            No engagements yet.
           </div>
         ) : (
           <ul className="space-y-3">
@@ -297,7 +297,7 @@ const BillingProjectsPage = () => {
                       size="sm"
                       className="text-muted-foreground hover:text-destructive"
                       onClick={() => void remove(bp)}
-                      aria-label="Delete billing project"
+                      aria-label="Delete engagement"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -312,7 +312,7 @@ const BillingProjectsPage = () => {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editing ? "Edit billing project" : "New billing project"}</DialogTitle>
+            <DialogTitle>{editing ? "Edit engagement" : "New engagement"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
@@ -437,4 +437,4 @@ const BillingProjectsPage = () => {
   );
 };
 
-export default BillingProjectsPage;
+export default EngagementsPage;

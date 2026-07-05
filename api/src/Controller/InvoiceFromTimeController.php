@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Entity\Invoice;
 use App\Entity\InvoiceLineItem;
 use App\Entity\TimeEntry;
@@ -19,13 +19,13 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Generates a draft {@see Invoice} from a {@see BillingProject}'s unbilled,
+ * Generates a draft {@see Invoice} from a {@see Engagement}'s unbilled,
  * billable, completed {@see TimeEntry} rows (Harvest model). The client + currency
- * come from the billing project; one line item per entry (hours × the entry's
+ * come from the engagement; one line item per entry (hours × the entry's
  * snapshotted category rate), each back-linking its source entry, and every
  * pulled entry stamped `billedAt` so the same time can't be billed twice.
  *
- * Body: `{ billingProject }` (IRI or UUID). Auth: creating invoices is
+ * Body: `{ engagement }` (IRI or UUID). Auth: creating invoices is
  * admin-reserved — the caller must be a space admin or hold an explicit
  * invoicing role.
  */
@@ -48,10 +48,10 @@ class InvoiceFromTimeController extends AbstractController
         }
 
         $payload = $request->toArray();
-        $billingProject = $this->resolve($payload['billingProject'] ?? null);
-        $space = $billingProject?->getSpace();
-        if (null === $billingProject || null === $space || (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user))) {
-            return $this->json(['error' => 'Billing project not found.'], 404);
+        $engagement = $this->resolve($payload['engagement'] ?? null);
+        $space = $engagement?->getSpace();
+        if (null === $engagement || null === $space || (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user))) {
+            return $this->json(['error' => 'Engagement not found.'], 404);
         }
         if (
             !$this->isGranted('ROLE_ADMIN')
@@ -61,18 +61,18 @@ class InvoiceFromTimeController extends AbstractController
             return $this->json(['error' => 'You cannot create invoices in this space.'], 403);
         }
 
-        $client = $billingProject->getClient();
+        $client = $engagement->getClient();
         if (null === $client) {
-            return $this->json(['error' => 'This billing project has no client.'], 422);
+            return $this->json(['error' => 'This engagement has no client.'], 422);
         }
 
-        $entries = $this->timeEntries->findInvoiceableForBillingProject($billingProject);
+        $entries = $this->timeEntries->findInvoiceableForEngagement($engagement);
         if (0 === count($entries)) {
             return $this->json(['error' => 'No unbilled billable time to invoice.'], 422);
         }
 
         $now = new \DateTimeImmutable();
-        $currency = $billingProject->getCurrency() ?? $client->getCurrency() ?? 'USD';
+        $currency = $engagement->getCurrency() ?? $client->getCurrency() ?? 'USD';
         $invoice = (new Invoice())
             ->setSpace($space)
             ->setClient($client)
@@ -134,7 +134,7 @@ class InvoiceFromTimeController extends AbstractController
         return mb_substr($label, 0, InvoiceLineItem::MAX_DESCRIPTION_LENGTH);
     }
 
-    private function resolve(mixed $iri): ?BillingProject
+    private function resolve(mixed $iri): ?Engagement
     {
         if (!is_string($iri) || '' === trim($iri)) {
             return null;
@@ -145,6 +145,6 @@ class InvoiceFromTimeController extends AbstractController
             return null;
         }
 
-        return $this->em->getRepository(BillingProject::class)->find($id);
+        return $this->em->getRepository(Engagement::class)->find($id);
     }
 }

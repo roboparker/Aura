@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Entity\Client;
 use App\Entity\Board;
 use App\Entity\Space;
@@ -13,10 +13,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Billing projects (Harvest model): admin-managed (invoices-gated) CRUD with
+ * Engagements (Harvest model): admin-managed (invoices-gated) CRUD with
  * embedded categories, and assigning task-management boards to them.
  */
-class BillingProjectTest extends ApiTestCase
+class EngagementTest extends ApiTestCase
 {
     private EntityManagerInterface $entityManager;
 
@@ -28,8 +28,8 @@ class BillingProjectTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\BillingCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\BillingProject')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
@@ -37,7 +37,7 @@ class BillingProjectTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testAdminCreatesBillingProjectWithCategories(): void
+    public function testAdminCreatesEngagementWithCategories(): void
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
@@ -50,7 +50,7 @@ class BillingProjectTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $body = $client->request('POST', '/billing_projects', [
+        $body = $client->request('POST', '/engagements', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientRow['@id'],
@@ -87,14 +87,14 @@ class BillingProjectTest extends ApiTestCase
         ])->toArray();
 
         $adminClient->loginUser($member);
-        $adminClient->request('POST', '/billing_projects', [
+        $adminClient->request('POST', '/engagements', [
             'json' => ['space' => $spaceIri, 'client' => $clientRow['@id'], 'name' => 'Sneaky'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(403);
     }
 
-    public function testAssignProjectsToBillingProject(): void
+    public function testAssignProjectsToEngagement(): void
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
@@ -104,13 +104,13 @@ class BillingProjectTest extends ApiTestCase
         $this->entityManager->persist($taskProject);
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
         $this->entityManager->persist($client);
-        $billingProject = (new BillingProject())->setSpace($space)->setClient($client)->setName('Website')->setCreatedBy($admin);
-        $this->entityManager->persist($billingProject);
+        $engagement = (new Engagement())->setSpace($space)->setClient($client)->setName('Website')->setCreatedBy($admin);
+        $this->entityManager->persist($engagement);
         $this->entityManager->flush();
 
         $httpClient = static::createClient();
         $httpClient->loginUser($admin);
-        $httpClient->request('PUT', '/billing_projects/' . $billingProject->getId() . '/boards', [
+        $httpClient->request('PUT', '/engagements/' . $engagement->getId() . '/boards', [
             'json' => ['boards' => ['/boards/' . $taskProject->getId()]],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -119,7 +119,7 @@ class BillingProjectTest extends ApiTestCase
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Board::class)->find($taskProject->getId());
         $this->assertInstanceOf(Board::class, $reloaded);
-        $this->assertSame((string) $billingProject->getId(), (string) $reloaded->getBillingProject()?->getId());
+        $this->assertSame((string) $engagement->getId(), (string) $reloaded->getEngagement()?->getId());
     }
 
     private function createSharedSpace(User $admin, ?User $member = null): Space

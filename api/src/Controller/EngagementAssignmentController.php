@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Entity\Board;
 use App\Entity\User;
 use App\Security\Permission\SpacePermission;
@@ -18,14 +18,14 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Assign task-management {@see Board}s to a {@see BillingProject} from the
- * billing project's page. `PUT /billing_projects/{id}/boards` replaces the
+ * Assign task-management {@see Board}s to a {@see Engagement} from the
+ * engagement's page. `PUT /engagements/{id}/boards` replaces the
  * whole assigned set (body `{ boards: [iri|uuid, ...] }`): boards in the
- * list are pointed at this billing project, and any previously-assigned board
+ * list are pointed at this engagement, and any previously-assigned board
  * not in the list is unassigned. Space-admin / invoices-update gated; every
  * board must live in the same space.
  */
-class BillingProjectAssignmentController extends AbstractController
+class EngagementAssignmentController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
@@ -33,25 +33,25 @@ class BillingProjectAssignmentController extends AbstractController
     ) {
     }
 
-    #[Route('/billing_projects/{id}/boards', name: 'billing_project_assign', methods: ['PUT'])]
+    #[Route('/engagements/{id}/boards', name: 'engagement_assign', methods: ['PUT'])]
     public function __invoke(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
 
-        $billingProject = $this->em->getRepository(BillingProject::class)->find($id);
-        $space = $billingProject?->getSpace();
+        $engagement = $this->em->getRepository(Engagement::class)->find($id);
+        $space = $engagement?->getSpace();
         // Existence-hiding: unknown board / non-members get 404.
-        if (null === $billingProject || null === $space || !($this->isGranted('ROLE_ADMIN') || $space->hasMember($user))) {
-            return $this->json(['error' => 'Billing project not found.'], 404);
+        if (null === $engagement || null === $space || !($this->isGranted('ROLE_ADMIN') || $space->hasMember($user))) {
+            return $this->json(['error' => 'Engagement not found.'], 404);
         }
         if (
             !$this->isGranted('ROLE_ADMIN')
             && !$space->isAdmin($user)
             && !$this->permissions->canByExplicitGrant($user, $space, SpacePermission::INVOICES, SpacePermission::UPDATE)
         ) {
-            return $this->json(['error' => 'You cannot manage this billing project.'], 403);
+            return $this->json(['error' => 'You cannot manage this engagement.'], 403);
         }
 
         $payload = $request->toArray();
@@ -76,15 +76,15 @@ class BillingProjectAssignmentController extends AbstractController
             $wanted[(string) $board->getId()] = $board;
         }
 
-        // Unassign boards currently on this billing project but no longer wanted.
-        foreach ($billingProject->getAssignedProjects() as $current) {
+        // Unassign boards currently on this engagement but no longer wanted.
+        foreach ($engagement->getAssignedProjects() as $current) {
             if (!isset($wanted[(string) $current->getId()])) {
-                $current->setBillingProject(null);
+                $current->setEngagement(null);
             }
         }
-        // Assign the wanted set (idempotent; steals a board from another billing project).
+        // Assign the wanted set (idempotent; steals a board from another engagement).
         foreach ($wanted as $board) {
-            $board->setBillingProject($billingProject);
+            $board->setEngagement($engagement);
         }
 
         $this->em->flush();

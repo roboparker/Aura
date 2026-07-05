@@ -2,7 +2,7 @@
 
 namespace App\Repository;
 
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Entity\TimeEntry;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -38,19 +38,19 @@ class TimeEntryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Completed, billable, not-yet-billed entries on a billing project — the pool
+     * Completed, billable, not-yet-billed entries on a engagement — the pool
      * an invoice draws from. Ordered by category then start so line items group.
      *
      * @return list<TimeEntry>
      */
-    public function findInvoiceableForBillingProject(BillingProject $billingProject): array
+    public function findInvoiceableForEngagement(Engagement $engagement): array
     {
         return $this->createQueryBuilder('t')
-            ->andWhere('t.billingProject = :bp')
+            ->andWhere('t.engagement = :bp')
             ->andWhere('t.billable = true')
             ->andWhere('t.endedAt IS NOT NULL')
             ->andWhere('t.billedAt IS NULL')
-            ->setParameter('bp', $billingProject)
+            ->setParameter('bp', $engagement)
             ->leftJoin('t.category', 'c')
             ->orderBy('c.position', 'ASC')
             ->addOrderBy('t.startedAt', 'ASC')

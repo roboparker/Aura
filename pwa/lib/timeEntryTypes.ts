@@ -4,7 +4,7 @@ export interface TimeEntry {
   "@id": string;
   id: string;
   space: string;
-  billingProject: string | null;
+  engagement: string | null;
   category: string | null;
   user: string;
   description: string | null;
@@ -24,7 +24,7 @@ export interface TimeEntryCollection {
   "hydra:member"?: TimeEntry[];
 }
 
-/** A category as returned by the billing-project picker. */
+/** A category as returned by the engagement picker. */
 export interface CategoryOption {
   "@id": string;
   id: string;
@@ -33,10 +33,10 @@ export interface CategoryOption {
 }
 
 /**
- * A billing project + its categories from `GET /spaces/{id}/billing-project-options`
+ * A engagement + its categories from `GET /spaces/{id}/engagement-options`
  * — the minimal member-facing picker for time tracking (no invoices-gated read).
  */
-export interface BillingProjectOption {
+export interface EngagementOption {
   "@id": string;
   id: string;
   name: string;

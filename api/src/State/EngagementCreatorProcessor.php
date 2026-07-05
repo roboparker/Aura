@@ -4,21 +4,21 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Security\AuthenticatedUserResolver;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Stamps the creator on a new {@see BillingProject}, defaults its currency from
+ * Stamps the creator on a new {@see Engagement}, defaults its currency from
  * the client, and back-fills its space from the client when the payload omits it
  * — server-side, mirroring {@see ClientCreatorProcessor}.
  *
- * @implements ProcessorInterface<BillingProject, BillingProject>
+ * @implements ProcessorInterface<Engagement, Engagement>
  */
-final class BillingProjectCreatorProcessor implements ProcessorInterface
+final class EngagementCreatorProcessor implements ProcessorInterface
 {
     /**
-     * @param ProcessorInterface<BillingProject, BillingProject> $persistProcessor
+     * @param ProcessorInterface<Engagement, Engagement> $persistProcessor
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.persist_processor')]
@@ -28,11 +28,11 @@ final class BillingProjectCreatorProcessor implements ProcessorInterface
     }
 
     /**
-     * @param BillingProject $data
+     * @param Engagement $data
      */
-    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): BillingProject
+    public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Engagement
     {
-        $user = $this->auth->requireUser('manage billing projects');
+        $user = $this->auth->requireUser('manage engagements');
 
         if (null === $data->getCreatedBy()) {
             $data->setCreatedBy($user);

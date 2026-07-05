@@ -4,34 +4,34 @@ namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
-use App\Repository\BillingCategoryRepository;
+use App\Repository\EngagementCategoryRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * A billable category on a {@see BillingProject} (Harvest-style): a named kind of
+ * A billable category on a {@see Engagement} (Harvest-style): a named kind of
  * work (e.g. "Design", "Development") with an hourly rate. Managed as an embedded
- * collection on {@see BillingProject::$categories} — clients create/edit/delete
- * categories exclusively through `POST /billing_projects` and
- * `PATCH /billing_projects/{id}`. The lone read-only `Get` operation exists so a
+ * collection on {@see Engagement::$categories} — clients create/edit/delete
+ * categories exclusively through `POST /engagements` and
+ * `PATCH /engagements/{id}`. The lone read-only `Get` operation exists so a
  * {@see TimeEntry}'s `category` IRI resolves (it points at one category, which
  * fixes its rate).
  */
 #[ApiResource(
-    shortName: 'BillingCategory',
+    shortName: 'EngagementCategory',
     operations: [
         new Get(
-            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getBillingProject().getSpace().hasMember(user))",
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getEngagement().getSpace().hasMember(user))",
         ),
     ],
-    normalizationContext: ['groups' => ['billing_project:read']],
+    normalizationContext: ['groups' => ['engagement:read']],
 )]
-#[ORM\Entity(repositoryClass: BillingCategoryRepository::class)]
-#[ORM\Table(name: 'billing_category')]
-#[ORM\Index(columns: ['billing_project_id'], name: 'idx_billing_category_project')]
-class BillingCategory
+#[ORM\Entity(repositoryClass: EngagementCategoryRepository::class)]
+#[ORM\Table(name: 'engagement_category')]
+#[ORM\Index(columns: ['engagement_id'], name: 'idx_engagement_category_project')]
+class EngagementCategory
 {
     public const MAX_NAME_LENGTH = 120;
 
@@ -39,28 +39,28 @@ class BillingCategory
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['billing_project:read', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'time_entry:read'])]
     private ?Uuid $id = null;
 
-    /** Owning board. Set by {@see BillingProject::addCategory} — never from the payload. */
-    #[ORM\ManyToOne(targetEntity: BillingProject::class, inversedBy: 'categories')]
+    /** Owning board. Set by {@see Engagement::addCategory} — never from the payload. */
+    #[ORM\ManyToOne(targetEntity: Engagement::class, inversedBy: 'categories')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private ?BillingProject $billingProject = null;
+    private ?Engagement $engagement = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'A category name is required.')]
     #[Assert\Length(max: self::MAX_NAME_LENGTH)]
-    #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private string $name = '';
 
     /** Hourly rate in minor units (e.g. cents) of the board's currency. */
     #[ORM\Column(type: 'integer')]
     #[Assert\PositiveOrZero(message: 'A rate cannot be negative.')]
-    #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private int $rateAmount = 0;
 
     #[ORM\Column(type: 'integer')]
-    #[Groups(['billing_project:read', 'billing_project:write'])]
+    #[Groups(['engagement:read', 'engagement:write'])]
     private int $position = 0;
 
     public function getId(): ?Uuid
@@ -68,14 +68,14 @@ class BillingCategory
         return $this->id;
     }
 
-    public function getBillingProject(): ?BillingProject
+    public function getEngagement(): ?Engagement
     {
-        return $this->billingProject;
+        return $this->engagement;
     }
 
-    public function setBillingProject(?BillingProject $billingProject): self
+    public function setEngagement(?Engagement $engagement): self
     {
-        $this->billingProject = $billingProject;
+        $this->engagement = $engagement;
 
         return $this;
     }

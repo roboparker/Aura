@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use App\Entity\Space;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,20 +15,20 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Minimal billing-project picker for time tracking. Any member of a space may
- * list its active billing projects with their categories + rates — enough to
+ * Minimal engagement picker for time tracking. Any member of a space may
+ * list its active engagements with their categories + rates — enough to
  * *select* a board + category on a time entry — without the full
  * read/edit access the admin-reserved `invoices` permission gates on the
- * BillingProject resource. Bypasses {@see \App\Doctrine\BillingProjectAccessExtension}
+ * Engagement resource. Bypasses {@see \App\Doctrine\EngagementAccessExtension}
  * by querying the repository directly after a membership check.
  */
-class BillingProjectOptionsController extends AbstractController
+class EngagementOptionsController extends AbstractController
 {
     public function __construct(private EntityManagerInterface $em)
     {
     }
 
-    #[Route('/spaces/{spaceId}/billing-project-options', name: 'space_billing_project_options', methods: ['GET'])]
+    #[Route('/spaces/{spaceId}/engagement-options', name: 'space_engagement_options', methods: ['GET'])]
     public function __invoke(string $spaceId, #[CurrentUser] ?User $user): JsonResponse
     {
         if (null === $user) {
@@ -44,15 +44,15 @@ class BillingProjectOptionsController extends AbstractController
             return $this->json(['error' => 'Space not found.'], 404);
         }
 
-        $boards = $this->em->getRepository(BillingProject::class)
+        $boards = $this->em->getRepository(Engagement::class)
             ->findBy(['space' => $space, 'archived' => false], ['name' => 'ASC']);
 
         $options = array_map(
-            static function (BillingProject $board): array {
+            static function (Engagement $board): array {
                 $categories = [];
                 foreach ($board->getCategories() as $category) {
                     $categories[] = [
-                        '@id' => '/billing_categories/' . $category->getId(),
+                        '@id' => '/engagement_categories/' . $category->getId(),
                         'id' => (string) $category->getId(),
                         'name' => $category->getName(),
                         'rateAmount' => $category->getRateAmount(),
@@ -60,7 +60,7 @@ class BillingProjectOptionsController extends AbstractController
                 }
 
                 return [
-                    '@id' => '/billing_projects/' . $board->getId(),
+                    '@id' => '/engagements/' . $board->getId(),
                     'id' => (string) $board->getId(),
                     'name' => $board->getName(),
                     'currency' => $board->getCurrency(),

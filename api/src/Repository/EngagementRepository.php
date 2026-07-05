@@ -2,17 +2,17 @@
 
 namespace App\Repository;
 
-use App\Entity\BillingProject;
+use App\Entity\Engagement;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * @extends ServiceEntityRepository<BillingProject>
+ * @extends ServiceEntityRepository<Engagement>
  */
-class BillingProjectRepository extends ServiceEntityRepository
+class EngagementRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, BillingProject::class);
+        parent::__construct($registry, Engagement::class);
     }
 }

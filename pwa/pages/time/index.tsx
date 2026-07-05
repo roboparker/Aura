@@ -9,7 +9,7 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
-  BillingProjectOption,
+  EngagementOption,
   TimeEntry,
   elapsedSeconds,
   formatClock,
@@ -90,13 +90,13 @@ const TimePage = () => {
   const running = entries.find(isRunning) ?? null;
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["time_entries"] });
 
-  // Billing projects + categories the member may pick from.
+  // Engagements + categories the member may pick from.
   const projectsQuery = useQuery({
     queryKey: ["billing_project_options", spaceId],
     enabled: isAuthenticated && !!spaceId,
     queryFn: () =>
-      apiGet<{ options: BillingProjectOption[] }>(`/spaces/${spaceId}/billing-project-options`, {
-        errorMessage: "Failed to load billing projects.",
+      apiGet<{ options: EngagementOption[] }>(`/spaces/${spaceId}/engagement-options`, {
+        errorMessage: "Failed to load engagements.",
       }).then((r) => r.options ?? []),
   });
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
@@ -127,7 +127,7 @@ const TimePage = () => {
   }, [running]);
 
   const projectCategoryBody = () => ({
-    billingProject: projectIri,
+    engagement: projectIri,
     category: categoryIri,
     ...(spaceIri ? { space: spaceIri } : {}),
   });
@@ -211,7 +211,7 @@ const TimePage = () => {
   const projectCategoryPickers = (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label htmlFor="te-project">Billing project</Label>
+        <Label htmlFor="te-project">Engagement</Label>
         <select
           id="te-project"
           value={projectIri}
@@ -220,7 +220,7 @@ const TimePage = () => {
           className={SELECT_CLASS}
         >
           {noProjects ? (
-            <option value="">No billing projects</option>
+            <option value="">No engagements</option>
           ) : (
             projects.map((p) => (
               <option key={p["@id"]} value={p["@id"]}>
@@ -276,8 +276,8 @@ const TimePage = () => {
           {canCreate && noProjects && (
             <Alert className="mb-4">
               <AlertDescription>
-                You need a billing project to track time.{" "}
-                <Link href="/billing-projects" className="underline">
+                You need a engagement to track time.{" "}
+                <Link href="/engagements" className="underline">
                   Set one up
                 </Link>{" "}
                 (or ask a space admin).
@@ -428,8 +428,8 @@ const TimePage = () => {
                               hour: "numeric",
                               minute: "2-digit",
                             })}
-                            {entry.billingProject && projectName.has(entry.billingProject) && (
-                              <> · {projectName.get(entry.billingProject)}</>
+                            {entry.engagement && projectName.has(entry.engagement) && (
+                              <> · {projectName.get(entry.engagement)}</>
                             )}
                           </p>
                         </div>

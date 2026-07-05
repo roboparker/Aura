@@ -64,7 +64,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['time_entry:write']],
     order: ['startedAt' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'billingProject' => 'exact', 'category' => 'exact', 'user' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'engagement' => 'exact', 'category' => 'exact', 'user' => 'exact'])]
 #[ApiFilter(BooleanFilter::class, properties: ['billable'])]
 #[ApiFilter(ExistsFilter::class, properties: ['endedAt'])]
 #[ApiFilter(DateFilter::class, properties: ['startedAt'])]
@@ -73,7 +73,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'time_entry')]
 #[ORM\Index(columns: ['space_id', 'started_at'], name: 'idx_time_entry_space_started')]
 #[ORM\Index(columns: ['user_id', 'started_at'], name: 'idx_time_entry_user_started')]
-#[ORM\Index(columns: ['billing_project_id'], name: 'idx_time_entry_billing_project')]
+#[ORM\Index(columns: ['engagement_id'], name: 'idx_time_entry_engagement')]
 #[ORM\Index(columns: ['category_id'], name: 'idx_time_entry_category')]
 // Partial unique index (at most one running timer per user). Declared here with
 // the `where` option so doctrine:schema:validate matches the migration's
@@ -103,23 +103,23 @@ class TimeEntry
     private ?Space $space = null;
 
     /**
-     * The billing project this time is tracked against (Harvest model). Required.
+     * The engagement this time is tracked against (Harvest model). Required.
      * Carries the client; the {@see $category} (which must belong to it) fixes the rate.
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: BillingProject::class)]
-    #[ORM\JoinColumn(name: 'billing_project_id', nullable: true, onDelete: 'SET NULL')]
-    #[Assert\NotNull(message: 'A billing project is required.')]
+    #[ORM\ManyToOne(targetEntity: Engagement::class)]
+    #[ORM\JoinColumn(name: 'engagement_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A engagement is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?BillingProject $billingProject = null;
+    private ?Engagement $engagement = null;
 
-    /** The category on the billing project — sets the hourly rate. Required. */
+    /** The category on the engagement — sets the hourly rate. Required. */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: BillingCategory::class)]
+    #[ORM\ManyToOne(targetEntity: EngagementCategory::class)]
     #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'SET NULL')]
     #[Assert\NotNull(message: 'A category is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?BillingCategory $category = null;
+    private ?EngagementCategory $category = null;
 
     /** The user who tracked the time. Stamped server-side, never from the payload. */
     #[ApiProperty(readableLink: false)]
@@ -162,7 +162,7 @@ class TimeEntry
     #[Groups(['time_entry:read'])]
     private ?int $rateAmount = null;
 
-    /** Currency of {@see $rateAmount}, snapshotted from the billing project. Read-only. */
+    /** Currency of {@see $rateAmount}, snapshotted from the engagement. Read-only. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
     #[Groups(['time_entry:read'])]
@@ -187,7 +187,7 @@ class TimeEntry
     }
 
     /**
-     * Denormalise the space from the billing project (so the access extension can
+     * Denormalise the space from the engagement (so the access extension can
      * scope by `space` alone), snapshot the rate from the category, and derive
      * duration from started/ended.
      */
@@ -195,15 +195,15 @@ class TimeEntry
     #[ORM\PreUpdate]
     public function syncDerived(): void
     {
-        if (null === $this->space && null !== $this->billingProject) {
-            $this->space = $this->billingProject->getSpace();
+        if (null === $this->space && null !== $this->engagement) {
+            $this->space = $this->engagement->getSpace();
         }
 
         // Snapshot the rate from the category + board currency so a later rate
         // change never rewrites already-logged (or billed) time.
         if (null !== $this->category) {
             $this->rateAmount = $this->category->getRateAmount();
-            $this->rateCurrency = $this->billingProject?->getCurrency();
+            $this->rateCurrency = $this->engagement?->getCurrency();
         }
 
         $this->durationSeconds = null;
@@ -231,23 +231,23 @@ class TimeEntry
                 ->addViolation();
         }
 
-        // The category must belong to the selected billing project.
+        // The category must belong to the selected engagement.
         if (
-            null !== $this->category && null !== $this->billingProject
-            && true !== $this->category->getBillingProject()?->getId()?->equals($this->billingProject->getId())
+            null !== $this->category && null !== $this->engagement
+            && true !== $this->category->getEngagement()?->getId()?->equals($this->engagement->getId())
         ) {
-            $context->buildViolation('Category must belong to the selected billing project.')
+            $context->buildViolation('Category must belong to the selected engagement.')
                 ->atPath('category')
                 ->addViolation();
         }
 
-        // The billing project must live in the entry's space.
+        // The engagement must live in the entry's space.
         if (
-            null !== $this->billingProject && null !== $this->space
-            && true !== $this->billingProject->getSpace()?->getId()?->equals($this->space->getId())
+            null !== $this->engagement && null !== $this->space
+            && true !== $this->engagement->getSpace()?->getId()?->equals($this->space->getId())
         ) {
-            $context->buildViolation('Billing project must belong to the same space.')
-                ->atPath('billingProject')
+            $context->buildViolation('Engagement must belong to the same space.')
+                ->atPath('engagement')
                 ->addViolation();
         }
     }
@@ -269,24 +269,24 @@ class TimeEntry
         return $this;
     }
 
-    public function getBillingProject(): ?BillingProject
+    public function getEngagement(): ?Engagement
     {
-        return $this->billingProject;
+        return $this->engagement;
     }
 
-    public function setBillingProject(?BillingProject $billingProject): self
+    public function setEngagement(?Engagement $engagement): self
     {
-        $this->billingProject = $billingProject;
+        $this->engagement = $engagement;
 
         return $this;
     }
 
-    public function getCategory(): ?BillingCategory
+    public function getCategory(): ?EngagementCategory
     {
         return $this->category;
     }
 
-    public function setCategory(?BillingCategory $category): self
+    public function setCategory(?EngagementCategory $category): self
     {
         $this->category = $category;
 

@@ -13,8 +13,8 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Repository\BillingProjectRepository;
-use App\State\BillingProjectCreatorProcessor;
+use App\Repository\EngagementRepository;
+use App\State\EngagementCreatorProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -26,17 +26,17 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 /**
  * A billable board (Harvest-style): the unit that time is tracked against and
  * invoiced from. It belongs to a {@see Client} and defines a set of
- * {@see BillingCategory} rows (named work + hourly rate). Time entries select a
- * billing project + one of its categories, which fixes the rate. Task-management
- * {@see Board}s can be assigned to a billing project (their `billingProject` FK).
+ * {@see EngagementCategory} rows (named work + hourly rate). Time entries select a
+ * engagement + one of its categories, which fixes the rate. Task-management
+ * {@see Board}s can be assigned to a engagement (their `engagement` FK).
  *
  * Space-scoped and admin-managed like {@see Client}: the `invoices` permission
- * category gates create/read/update/delete via {@see \App\Doctrine\BillingProjectAccessExtension}.
+ * category gates create/read/update/delete via {@see \App\Doctrine\EngagementAccessExtension}.
  * Members select from it through the minimal picker
- * ({@see \App\Controller\BillingProjectOptionsController}).
+ * ({@see \App\Controller\EngagementOptionsController}).
  */
 #[ApiResource(
-    shortName: 'BillingProject',
+    shortName: 'Engagement',
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
@@ -44,7 +44,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         new Post(
             security: "is_granted('ROLE_USER')",
             securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user) and is_granted('space.invoices.create', object)))",
-            processor: BillingProjectCreatorProcessor::class,
+            processor: EngagementCreatorProcessor::class,
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.invoices.read', object)))",
@@ -56,20 +56,20 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.invoices.delete', object)))",
         ),
     ],
-    normalizationContext: ['groups' => ['billing_project:read']],
-    denormalizationContext: ['groups' => ['billing_project:write']],
+    normalizationContext: ['groups' => ['engagement:read']],
+    denormalizationContext: ['groups' => ['engagement:write']],
     order: ['name' => 'ASC'],
 )]
 #[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'client' => 'exact', 'name' => 'partial'])]
 #[ApiFilter(BooleanFilter::class, properties: ['archived'])]
 #[ApiFilter(OrderFilter::class, properties: ['name', 'createdAt'])]
-#[ORM\Entity(repositoryClass: BillingProjectRepository::class)]
-#[ORM\Table(name: 'billing_project')]
-#[ORM\Index(columns: ['space_id', 'name'], name: 'idx_billing_project_space_name')]
-#[ORM\Index(columns: ['client_id'], name: 'idx_billing_project_client')]
+#[ORM\Entity(repositoryClass: EngagementRepository::class)]
+#[ORM\Table(name: 'engagement')]
+#[ORM\Index(columns: ['space_id', 'name'], name: 'idx_engagement_space_name')]
+#[ORM\Index(columns: ['client_id'], name: 'idx_engagement_client')]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback('validateConsistency')]
-class BillingProject
+class Engagement
 {
     public const MAX_NAME_LENGTH = 200;
 
@@ -77,72 +77,72 @@ class BillingProject
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['billing_project:read', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'time_entry:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Space is required.')]
-    #[Groups(['billing_project:read', 'billing_project:write'])]
+    #[Groups(['engagement:read', 'engagement:write'])]
     private ?Space $space = null;
 
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: Client::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'A client is required.')]
-    #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private ?Client $client = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'A board name is required.')]
     #[Assert\Length(max: self::MAX_NAME_LENGTH)]
-    #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private string $name = '';
 
     /** ISO 4217 currency for every category rate; defaults to the client's on create. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
-    #[Groups(['billing_project:read', 'billing_project:write', 'time_entry:read'])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private ?string $currency = null;
 
     #[ORM\Column(type: 'boolean')]
-    #[Groups(['billing_project:read', 'billing_project:write'])]
+    #[Groups(['engagement:read', 'engagement:write'])]
     private bool $archived = false;
 
     /**
-     * @var Collection<int, BillingCategory>
+     * @var Collection<int, EngagementCategory>
      */
     #[ORM\OneToMany(
-        mappedBy: 'billingProject',
-        targetEntity: BillingCategory::class,
+        mappedBy: 'engagement',
+        targetEntity: EngagementCategory::class,
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
     #[ORM\OrderBy(['position' => 'ASC', 'name' => 'ASC'])]
-    #[Groups(['billing_project:read', 'billing_project:write'])]
+    #[Groups(['engagement:read', 'engagement:write'])]
     private Collection $categories;
 
     /**
-     * Task-management boards assigned to this billing project (inverse of
-     * {@see Board::$billingProject}). Read-only summary for the detail page.
+     * Task-management boards assigned to this engagement (inverse of
+     * {@see Board::$engagement}). Read-only summary for the detail page.
      *
      * @var Collection<int, Board>
      */
-    #[ORM\OneToMany(mappedBy: 'billingProject', targetEntity: Board::class)]
+    #[ORM\OneToMany(mappedBy: 'engagement', targetEntity: Board::class)]
     private Collection $assignedProjects;
 
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['billing_project:read'])]
+    #[Groups(['engagement:read'])]
     private ?User $createdBy = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['billing_project:read'])]
+    #[Groups(['engagement:read'])]
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['billing_project:read'])]
+    #[Groups(['engagement:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
@@ -250,24 +250,24 @@ class BillingProject
     }
 
     /**
-     * @return Collection<int, BillingCategory>
+     * @return Collection<int, EngagementCategory>
      */
     public function getCategories(): Collection
     {
         return $this->categories;
     }
 
-    public function addCategory(BillingCategory $category): self
+    public function addCategory(EngagementCategory $category): self
     {
         if (!$this->categories->contains($category)) {
             $this->categories->add($category);
-            $category->setBillingProject($this);
+            $category->setEngagement($this);
         }
 
         return $this;
     }
 
-    public function removeCategory(BillingCategory $category): self
+    public function removeCategory(EngagementCategory $category): self
     {
         $this->categories->removeElement($category);
 
@@ -288,7 +288,7 @@ class BillingProject
      *
      * @return list<array{id: string, title: string}>
      */
-    #[Groups(['billing_project:read'])]
+    #[Groups(['engagement:read'])]
     public function getAssignedProjectList(): array
     {
         $out = [];
