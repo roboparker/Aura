@@ -11,7 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Covers GET /calendar (occurrence boardion, space scoping) and
+ * Covers GET /calendar (occurrence projection, space scoping) and
  * POST /tasks/{id}/detach-occurrence (issue #442).
  */
 class CalendarTest extends ApiTestCase

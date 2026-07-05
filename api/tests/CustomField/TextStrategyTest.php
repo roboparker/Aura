@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  * Coverage for the text-flavoured strategies and their shared abstract
  * base (#227). Direct construction — no kernel, no DB. Complements
  * TypeStrategiesTest by exercising config bounds, normalization, the
- * search boardion, and the URL scheme override.
+ * search projection, and the URL scheme override.
  */
 final class TextStrategyTest extends TestCase
 {

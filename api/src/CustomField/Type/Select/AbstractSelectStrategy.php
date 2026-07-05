@@ -14,7 +14,7 @@ use App\Entity\CustomFieldDefinitionInterface;
  * Shared validation + normalization for select kinds. The (single,
  * multi) subtypes diverge only in whether the value is one key or a
  * list of keys — every other rule (option-shape validation, key
- * membership, search boardion) is identical.
+ * membership, search projection) is identical.
  *
  * Config: `{options: [{key, label, color?}], multi}`. We upgraded
  * the legacy flat `string[]` to a structured object list so labels

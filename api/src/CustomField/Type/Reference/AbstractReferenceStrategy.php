@@ -67,8 +67,8 @@ abstract class AbstractReferenceStrategy extends AbstractTypeStrategy
 
     /**
      * Plain-text display label for a resolved target. Drives the FTS
-     * search-text boardion — emitting "Alice Example" rather than a
-     * UUID is the whole point of the strategy-owned boardion.
+     * search-text projection — emitting "Alice Example" rather than a
+     * UUID is the whole point of the strategy-owned projection.
      */
     abstract protected function displayLabel(object $target): string;
 

@@ -9,7 +9,7 @@ use App\CustomField\Type\CustomFieldTypeInterface;
 /**
  * Lookup table over the tagged `app.custom_field_type` services. Resolves
  * a definition's `<kind>.<subtype>` key to the strategy that owns
- * validation, normalization, FTS boardion, and footer aggregations
+ * validation, normalization, FTS projection, and footer aggregations
  * for that type.
  *
  * Boots from a `!tagged_iterator` so adding a new strategy is wiring-free

@@ -14,7 +14,7 @@ use Symfony\Component\Uid\Uuid;
  * Both speak the same (kind, subtype, config, footer, nullable) shape and
  * resolve to the same {@see App\CustomField\Type\CustomFieldTypeInterface}
  * strategy through the registry, so validation, normalization, FTS
- * boardion, and footer aggregation are written once against this
+ * projection, and footer aggregation are written once against this
  * interface and reused for either source. A {@see CustomFieldValue} can
  * therefore point at either definition (a nullable second FK + XOR) and
  * every consumer reaches its live definition through

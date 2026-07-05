@@ -89,7 +89,7 @@ class CustomFieldValue
     private mixed $value = null;
 
     /**
-     * Plain-text boardion of `value` for the FTS index. Written by the
+     * Plain-text projection of `value` for the FTS index. Written by the
      * type strategies on persist — references dereference the target's
      * display label, dates render as `Y-m-d`, money renders the amount
      * + currency, references emit the target's name so FTS hits work
@@ -104,7 +104,7 @@ class CustomFieldValue
     private ?string $valueSearch = null;
 
     /**
-     * Postgres-managed tsvector boardion of {@see $valueSearch},
+     * Postgres-managed tsvector projection of {@see $valueSearch},
      * populated by a STORED generated column — see Version20260513000000.
      * Mapped here so DQL can reference `cfv.searchVector` from the task
      * search filter's EXISTS subquery; never written from PHP, never

@@ -74,7 +74,7 @@ final class TypeStrategiesTest extends TestCase
         $s = new RichTextStrategy();
         $this->assertSame('text.rich_text', $s->key());
         // Same validation rules — covered by parent. Sanity-check the
-        // search boardion so a rich-text field's body still
+        // search projection so a rich-text field's body still
         // contributes searchable tokens.
         $this->assertSame('hello', $s->searchText(' hello ', ['multi' => false]));
     }

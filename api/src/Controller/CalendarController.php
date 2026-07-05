@@ -27,15 +27,15 @@ use Symfony\Component\Uid\Uuid;
  *  - An *incomplete* recurring task boards its whole series across the
  *    window via {@see RecurrenceCalculator::occurrencesInRange} (minus its
  *    EXDATE `recurrenceExceptions`) — the model materialises the next instance
- *    only on completion, so the calendar boards the upcoming ones.
+ *    only on completion, so the calendar projects the upcoming ones.
  *  - A *completed* recurring task contributes just its single done occurrence;
- *    its incomplete successor (spawned on completion) boards the rest, so the
+ *    its incomplete successor (spawned on completion) projects the rest, so the
  *    series is never double-counted.
  *
  * Scope mirrors the rest of the app: tasks whose board belongs to the space,
  * plus the caller's own standalone tasks when the space is their personal one.
  * The caller must be a member of the space (admins bypass); the window is
- * capped so a pathological range can't blow up the boardion.
+ * capped so a pathological range can't blow up the projection.
  */
 final class CalendarController extends AbstractController
 {

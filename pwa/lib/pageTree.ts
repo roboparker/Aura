@@ -1,7 +1,7 @@
 /**
  * Tree helpers for the sidebar Pages navigator (nest + rearrange). Pages carry
  * a self-referential `parent` (IRI) and an integer `position`; these functions
- * flatten / rebuild that tree and compute the drop boardion for the dnd-kit
+ * flatten / rebuild that tree and compute the drop projection for the dnd-kit
  * drag interaction (drag vertically to reorder, horizontally to nest/outdent).
  *
  * The algorithm mirrors dnd-kit's canonical "SortableTree" example, adapted to
@@ -88,13 +88,13 @@ export const flattenTree = (
 const clamp = (n: number, min: number, max: number): number =>
   Math.min(Math.max(n, min), max);
 
-export interface Boardion {
+export interface Projection {
   depth: number;
   parentId: string | null;
 }
 
 /**
- * Where the dragged page would land: its boarded depth (clamped so it can
+ * Where the dragged page would land: its projected depth (clamped so it can
  * only nest under the row above or sit between siblings) and resolved parent.
  */
 export const getProjection = (
@@ -103,7 +103,7 @@ export const getProjection = (
   overIri: string,
   dragOffsetX: number,
   indentationWidth: number,
-): Boardion => {
+): Projection => {
   const overIndex = items.findIndex((i) => i["@id"] === overIri);
   const activeIndex = items.findIndex((i) => i["@id"] === activeIri);
   const activeItem = items[activeIndex];
@@ -112,10 +112,10 @@ export const getProjection = (
   const nextItem = newItems[overIndex + 1];
 
   const dragDepth = Math.round(dragOffsetX / indentationWidth);
-  const boardedDepth = (activeItem?.depth ?? 0) + dragDepth;
+  const projectedDepth = (activeItem?.depth ?? 0) + dragDepth;
   const maxDepth = previousItem ? previousItem.depth + 1 : 0;
   const minDepth = nextItem ? nextItem.depth : 0;
-  const depth = clamp(boardedDepth, minDepth, maxDepth);
+  const depth = clamp(projectedDepth, minDepth, maxDepth);
 
   const parentId = (): string | null => {
     if (depth === 0 || !previousItem) return null;
@@ -141,14 +141,14 @@ export interface PageOrderUpdate {
 /**
  * Apply a drop to the full page set and return the pages whose `parent` or
  * `position` changed — the minimal PATCH set to persist. `activeIri` is moved
- * to `overIri`'s slot at the boarded `parentId`; siblings are renumbered
+ * to `overIri`'s slot at the projected `parentId`; siblings are renumbered
  * contiguously from 0.
  */
 export const applyMove = (
   pages: PageNode[],
   activeIri: string,
   overIri: string,
-  boardion: Boardion,
+  projection: Projection,
 ): { next: PageNode[]; updates: PageOrderUpdate[] } => {
   const flat = flattenTree(pages); // full order, nothing collapsed
   const activeIndex = flat.findIndex((i) => i["@id"] === activeIri);
@@ -158,7 +158,7 @@ export const applyMove = (
   const reordered = arrayMove(flat, activeIndex, overIndex);
   const nextParent = new Map<string, string | null>();
   for (const item of reordered) nextParent.set(item["@id"], item.parentId);
-  nextParent.set(activeIri, boardion.parentId);
+  nextParent.set(activeIri, projection.parentId);
 
   // Renumber each sibling group from its order of appearance in `reordered`.
   const counters = new Map<string, number>();

@@ -15,7 +15,7 @@ use App\Entity\CustomFieldDefinitionInterface;
  * (plain text, rich markdown, URL). The three subtypes diverge only in
  * their per-scalar rule (`validateScalar()` / pattern enforcement) —
  * everything else (multi shape, min/max length, normalization, search
- * boardion) is identical, so it lives here.
+ * projection) is identical, so it lives here.
  *
  * Config shape: `{minLength?, maxLength?, pattern?, multi}`.
  *

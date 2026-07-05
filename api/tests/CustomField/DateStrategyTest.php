@@ -13,7 +13,7 @@ use PHPUnit\Framework\TestCase;
  * Coverage for the date-flavoured strategies and their shared abstract
  * base (#227). Direct construction — no kernel, no DB. Complements
  * TypeStrategiesTest by exercising the multi walk, config bounds, the
- * search-text boardion, and the per-subtype scalar overrides.
+ * search-text projection, and the per-subtype scalar overrides.
  */
 final class DateStrategyTest extends TestCase
 {

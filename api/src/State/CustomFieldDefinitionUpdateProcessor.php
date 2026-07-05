@@ -110,7 +110,7 @@ final class CustomFieldDefinitionUpdateProcessor implements ProcessorInterface
                     // one path that fires the search subscriber's preUpdate
                     // (task edits delete + re-insert instead), and that
                     // path can't add `valueSearch` to the change-set on its
-                    // own — pre-setting it keeps the boardion consistent.
+                    // own — pre-setting it keeps the projection consistent.
                     $cfv->setValueSearch($this->searchText($to, $converted));
                 }
             } else {
@@ -143,7 +143,7 @@ final class CustomFieldDefinitionUpdateProcessor implements ProcessorInterface
     }
 
     /**
-     * The FTS boardion for a converted value under the new type — mirrors
+     * The FTS projection for a converted value under the new type — mirrors
      * {@see \App\CustomField\EventSubscriber\CustomFieldValueSearchSubscriber}'s
      * empty-string-to-null normalization.
      */

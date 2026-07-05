@@ -1041,7 +1041,7 @@ const Tasks = () => {
         ? assignableUsers.filter((u) => memberIris.has(u["@id"]))
         : assignableUsers;
       // Guarantee the owner is offered even if the board's member list
-      // hasn't caught up (e.g. a private space with no member boardion).
+      // hasn't caught up (e.g. a private space with no member projection).
       if (self && ownsTask && !base.some((u) => u["@id"] === self["@id"])) {
         return [self, ...base];
       }

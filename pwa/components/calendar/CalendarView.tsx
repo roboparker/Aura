@@ -11,7 +11,7 @@ import FilterMultiSelect from "@/components/common/FilterMultiSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface CalendarViewProps {
-  /** Space whose tasks the calendar boards (`/spaces/{id}` IRI). */
+  /** Space whose tasks the calendar projects (`/spaces/{id}` IRI). */
   spaceIri: string;
   /** When set, narrow to one board (the board-tab calendar) and hide the
    *  board filter. */
