@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
 use App\Repository\BillingCategoryRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -10,12 +12,22 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * A billable category on a {@see BillingProject} (Harvest-style): a named kind of
- * work (e.g. "Design", "Development") with an hourly rate. Embedded as a
- * collection on {@see BillingProject::$categories}; not a standalone API resource
- * — clients manage categories exclusively through `POST /billing_projects` and
- * `PATCH /billing_projects/{id}`. A {@see TimeEntry} points at one category, which
- * fixes its rate.
+ * work (e.g. "Design", "Development") with an hourly rate. Managed as an embedded
+ * collection on {@see BillingProject::$categories} — clients create/edit/delete
+ * categories exclusively through `POST /billing_projects` and
+ * `PATCH /billing_projects/{id}`. The lone read-only `Get` operation exists so a
+ * {@see TimeEntry}'s `category` IRI resolves (it points at one category, which
+ * fixes its rate).
  */
+#[ApiResource(
+    shortName: 'BillingCategory',
+    operations: [
+        new Get(
+            security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getBillingProject().getSpace().hasMember(user))",
+        ),
+    ],
+    normalizationContext: ['groups' => ['billing_project:read']],
+)]
 #[ORM\Entity(repositoryClass: BillingCategoryRepository::class)]
 #[ORM\Table(name: 'billing_category')]
 #[ORM\Index(columns: ['billing_project_id'], name: 'idx_billing_category_project')]

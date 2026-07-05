@@ -109,6 +109,17 @@ class Project
     #[Groups(['project:read', 'project:write'])]
     private ?Space $space = null;
 
+    /**
+     * The billing project this task-management project rolls up to (Harvest
+     * model). Nullable — set from the billing project's page. `SET NULL` so
+     * deleting a billing project just unassigns its projects.
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: BillingProject::class, inversedBy: 'assignedProjects')]
+    #[ORM\JoinColumn(name: 'billing_project_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['project:read'])]
+    private ?BillingProject $billingProject = null;
+
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
@@ -205,6 +216,17 @@ class Project
     public function setSpace(?Space $space): static
     {
         $this->space = $space;
+        return $this;
+    }
+
+    public function getBillingProject(): ?BillingProject
+    {
+        return $this->billingProject;
+    }
+
+    public function setBillingProject(?BillingProject $billingProject): static
+    {
+        $this->billingProject = $billingProject;
         return $this;
     }
 

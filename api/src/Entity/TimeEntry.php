@@ -64,7 +64,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['time_entry:write']],
     order: ['startedAt' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'project' => 'exact', 'task' => 'exact', 'user' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'billingProject' => 'exact', 'category' => 'exact', 'user' => 'exact'])]
 #[ApiFilter(BooleanFilter::class, properties: ['billable'])]
 #[ApiFilter(ExistsFilter::class, properties: ['endedAt'])]
 #[ApiFilter(DateFilter::class, properties: ['startedAt'])]
@@ -73,7 +73,8 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: 'time_entry')]
 #[ORM\Index(columns: ['space_id', 'started_at'], name: 'idx_time_entry_space_started')]
 #[ORM\Index(columns: ['user_id', 'started_at'], name: 'idx_time_entry_user_started')]
-#[ORM\Index(columns: ['project_id'], name: 'idx_time_entry_project')]
+#[ORM\Index(columns: ['billing_project_id'], name: 'idx_time_entry_billing_project')]
+#[ORM\Index(columns: ['category_id'], name: 'idx_time_entry_category')]
 // Partial unique index (at most one running timer per user). Declared here with
 // the `where` option so doctrine:schema:validate matches the migration's
 // CREATE UNIQUE INDEX ... WHERE ended_at IS NULL (mirrors Space's personal-space index).
@@ -101,17 +102,24 @@ class TimeEntry
     #[Groups(['time_entry:read', 'time_entry:write'])]
     private ?Space $space = null;
 
+    /**
+     * The billing project this time is tracked against (Harvest model). Required.
+     * Carries the client; the {@see $category} (which must belong to it) fixes the rate.
+     */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Project::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: BillingProject::class)]
+    #[ORM\JoinColumn(name: 'billing_project_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A billing project is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?Project $project = null;
+    private ?BillingProject $billingProject = null;
 
+    /** The category on the billing project — sets the hourly rate. Required. */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Task::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: BillingCategory::class)]
+    #[ORM\JoinColumn(name: 'category_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A category is required.')]
     #[Groups(['time_entry:read', 'time_entry:write'])]
-    private ?Task $task = null;
+    private ?BillingCategory $category = null;
 
     /** The user who tracked the time. Stamped server-side, never from the payload. */
     #[ApiProperty(readableLink: false)]
@@ -144,15 +152,20 @@ class TimeEntry
     #[Groups(['time_entry:read', 'time_entry:write'])]
     private bool $billable = true;
 
-    /** Hourly rate in minor units (e.g. cents); paired with {@see $rateCurrency}. */
+    /**
+     * Hourly rate in minor units, snapshotted from the {@see $category} on save
+     * so a later rate change doesn't retroactively alter logged (or billed) time.
+     * Derived, read-only.
+     */
     #[ORM\Column(type: 'integer', nullable: true)]
     #[Assert\PositiveOrZero]
-    #[Groups(['time_entry:read', 'time_entry:write'])]
+    #[Groups(['time_entry:read'])]
     private ?int $rateAmount = null;
 
+    /** Currency of {@see $rateAmount}, snapshotted from the billing project. Read-only. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
-    #[Groups(['time_entry:read', 'time_entry:write'])]
+    #[Groups(['time_entry:read'])]
     private ?string $rateCurrency = null;
 
     /** Set when the entry is pulled onto an invoice; locks it against re-billing. */
@@ -174,19 +187,23 @@ class TimeEntry
     }
 
     /**
-     * Derive duration + denormalise the space from project/task so the access
-     * extension can scope by `space` alone (mirrors TaskSection::syncSpaceFromProject).
+     * Denormalise the space from the billing project (so the access extension can
+     * scope by `space` alone), snapshot the rate from the category, and derive
+     * duration from started/ended.
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
     public function syncDerived(): void
     {
-        if (null === $this->space) {
-            if (null !== $this->task && null !== $this->task->getProject()) {
-                $this->space = $this->task->getProject()->getSpace();
-            } elseif (null !== $this->project) {
-                $this->space = $this->project->getSpace();
-            }
+        if (null === $this->space && null !== $this->billingProject) {
+            $this->space = $this->billingProject->getSpace();
+        }
+
+        // Snapshot the rate from the category + project currency so a later rate
+        // change never rewrites already-logged (or billed) time.
+        if (null !== $this->category) {
+            $this->rateAmount = $this->category->getRateAmount();
+            $this->rateCurrency = $this->billingProject?->getCurrency();
         }
 
         $this->durationSeconds = null;
@@ -203,28 +220,34 @@ class TimeEntry
                 ->addViolation();
         }
 
+        // No overnight entries — start and end must fall on the same calendar day.
+        // Work spanning midnight is logged as two entries.
         if (
-            null !== $this->project && null !== $this->space
-            && true !== $this->project->getSpace()?->getId()?->equals($this->space->getId())
+            null !== $this->startedAt && null !== $this->endedAt
+            && $this->startedAt->format('Y-m-d') !== $this->endedAt->format('Y-m-d')
         ) {
-            $context->buildViolation('Project must belong to the same space.')
-                ->atPath('project')
+            $context->buildViolation('A time entry cannot span more than one day. Log separate entries per day.')
+                ->atPath('endedAt')
                 ->addViolation();
         }
 
-        $taskSpace = $this->task?->getProject()?->getSpace();
+        // The category must belong to the selected billing project.
         if (
-            null !== $this->task && null !== $this->space
-            && true !== $taskSpace?->getId()?->equals($this->space->getId())
+            null !== $this->category && null !== $this->billingProject
+            && true !== $this->category->getBillingProject()?->getId()?->equals($this->billingProject->getId())
         ) {
-            $context->buildViolation('Task must belong to the same space.')
-                ->atPath('task')
+            $context->buildViolation('Category must belong to the selected billing project.')
+                ->atPath('category')
                 ->addViolation();
         }
 
-        if (null !== $this->rateAmount && null === $this->rateCurrency) {
-            $context->buildViolation('A currency is required when a rate is set.')
-                ->atPath('rateCurrency')
+        // The billing project must live in the entry's space.
+        if (
+            null !== $this->billingProject && null !== $this->space
+            && true !== $this->billingProject->getSpace()?->getId()?->equals($this->space->getId())
+        ) {
+            $context->buildViolation('Billing project must belong to the same space.')
+                ->atPath('billingProject')
                 ->addViolation();
         }
     }
@@ -246,26 +269,26 @@ class TimeEntry
         return $this;
     }
 
-    public function getProject(): ?Project
+    public function getBillingProject(): ?BillingProject
     {
-        return $this->project;
+        return $this->billingProject;
     }
 
-    public function setProject(?Project $project): self
+    public function setBillingProject(?BillingProject $billingProject): self
     {
-        $this->project = $project;
+        $this->billingProject = $billingProject;
 
         return $this;
     }
 
-    public function getTask(): ?Task
+    public function getCategory(): ?BillingCategory
     {
-        return $this->task;
+        return $this->category;
     }
 
-    public function setTask(?Task $task): self
+    public function setCategory(?BillingCategory $category): self
     {
-        $this->task = $task;
+        $this->category = $category;
 
         return $this;
     }

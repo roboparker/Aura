@@ -2,8 +2,7 @@
 
 namespace App\Repository;
 
-use App\Entity\Project;
-use App\Entity\Space;
+use App\Entity\BillingProject;
 use App\Entity\TimeEntry;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -39,24 +38,23 @@ class TimeEntryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Completed, billable, not-yet-billed entries in a space — the pool an
-     * invoice draws from. Optionally narrowed to one project.
+     * Completed, billable, not-yet-billed entries on a billing project — the pool
+     * an invoice draws from. Ordered by category then start so line items group.
      *
      * @return list<TimeEntry>
      */
-    public function findInvoiceable(Space $space, ?Project $project = null): array
+    public function findInvoiceableForBillingProject(BillingProject $billingProject): array
     {
-        $qb = $this->createQueryBuilder('t')
-            ->andWhere('t.space = :space')
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.billingProject = :bp')
             ->andWhere('t.billable = true')
             ->andWhere('t.endedAt IS NOT NULL')
             ->andWhere('t.billedAt IS NULL')
-            ->setParameter('space', $space)
-            ->orderBy('t.startedAt', 'ASC');
-        if (null !== $project) {
-            $qb->andWhere('t.project = :project')->setParameter('project', $project);
-        }
-
-        return $qb->getQuery()->getResult();
+            ->setParameter('bp', $billingProject)
+            ->leftJoin('t.category', 'c')
+            ->orderBy('c.position', 'ASC')
+            ->addOrderBy('t.startedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 }
