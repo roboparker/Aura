@@ -5,14 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   ChevronDown,
+  CreditCard,
   Plus,
   Settings,
   ShieldCheck,
   SlidersHorizontal,
   Tag,
-  Clock,
-  Receipt,
-  Users,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
@@ -472,6 +470,94 @@ const SettingsSection = ({
 };
 
 /**
+ * Billing-related workspace tools (time tracking, clients, invoices) as a
+ * collapsible nav group, mirroring {@see AdminSection}. Time is available to
+ * every member; Clients + Invoices require the `invoices` read capability.
+ */
+const BillingSection = ({
+  wrap,
+  canInvoices,
+}: {
+  wrap: (children: ReactNode) => ReactNode;
+  canInvoices: boolean;
+}) => {
+  const router = useRouter();
+
+  const storageKey = "madori.navCollapsed.billing";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  const links = [
+    { href: "/time", label: "Time", match: "/time", show: true },
+    { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
+    { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
+  ].filter((l) => l.show);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Billing`}
+        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+      >
+        <CreditCard className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className="truncate">Billing</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        links.map(({ href, label, match }) => {
+          const active = router.pathname.startsWith(match);
+          return (
+            <span key={href}>
+              {wrap(
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "w-full min-w-0 justify-start font-normal",
+                    active && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <Link href={href}>
+                    {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, lining the row
+                        text up under the heading label. */}
+                    <span className="truncate pl-5">{label}</span>
+                  </Link>
+                </Button>,
+              )}
+            </span>
+          );
+        })}
+    </div>
+  );
+};
+
+/**
  * Shared navigation contents used by both the persistent left-side
  * `<Sidebar>` (`md:` and up) and the mobile-only Sheet variant in the
  * navbar. Single source of truth so the space switcher, content
@@ -576,71 +662,7 @@ const SidebarNav = ({
           </span>
         )}
 
-        {activeSpace && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/time") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/time">
-                  <Clock className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
-                  <span className="truncate">Time</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        {activeSpace && canInvoices && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/clients") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/clients">
-                  <Users className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span className="truncate">Clients</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
-
-        {activeSpace && canInvoices && (
-          <span>
-            {wrap(
-              <Button
-                asChild
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  router.pathname.startsWith("/invoices") &&
-                    "bg-accent text-accent-foreground",
-                )}
-              >
-                <Link href="/invoices">
-                  <Receipt className="size-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-                  <span className="truncate">Invoices</span>
-                </Link>
-              </Button>,
-            )}
-          </span>
-        )}
+        {activeSpace && <BillingSection wrap={wrap} canInvoices={canInvoices} />}
 
         <SettingsSection wrap={wrap} />
 
