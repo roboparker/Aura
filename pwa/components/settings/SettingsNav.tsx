@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   Bell,
   CalendarSync,
+  CreditCard,
   KeyRound,
   Shield,
   TriangleAlert,
@@ -14,6 +15,7 @@ export type SettingsSectionKey =
   | "security"
   | "notifications"
   | "calendar-sync"
+  | "billing"
   | "api-tokens"
   | "danger";
 
@@ -44,6 +46,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     label: "Calendar sync",
     href: "/settings/calendar-sync",
     Icon: CalendarSync,
+  },
+  {
+    key: "billing",
+    label: "Billing",
+    href: "/settings/billing",
+    Icon: CreditCard,
   },
   {
     key: "api-tokens",

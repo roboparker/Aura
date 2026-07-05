@@ -2,7 +2,7 @@ import Head from "next/head";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, Check, MoreHorizontal, Trash2, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Check, MoreHorizontal, Settings, Trash2, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { apiGet, apiSend, ApiError } from "@/lib/apiClient";
@@ -177,7 +177,7 @@ const OrganizationDetail = () => {
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-cyan-600/10 text-cyan-700">
                 <Building2 className="h-6 w-6" aria-hidden />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <h1 className="truncate text-xl font-semibold">{org.name}</h1>
                   {myRole && (
@@ -191,6 +191,14 @@ const OrganizationDetail = () => {
                   {org.memberList.length === 1 ? "member" : "members"}
                 </p>
               </div>
+              {isAdmin && (
+                <Button asChild variant="outline" size="sm" className="gap-1.5 shrink-0">
+                  <Link href={`/organizations/${org.id}/settings`}>
+                    <Settings className="h-3.5 w-3.5" />
+                    Settings
+                  </Link>
+                </Button>
+              )}
             </div>
 
             {error && (
