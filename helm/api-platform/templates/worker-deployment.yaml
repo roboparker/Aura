@@ -77,6 +77,23 @@ spec:
                 configMapKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: messenger-transport-dsn
+            # The worker sends digest/reminder/notification email, so it needs
+            # the same transport + link config as the web container.
+            - name: MAILER_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: mailer-dsn
+            - name: MAILER_FROM
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: mailer-from
+            - name: APP_FRONTEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: app-frontend-url
             - name: MERCURE_URL
               valueFrom:
                 configMapKeyRef:
