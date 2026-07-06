@@ -202,6 +202,75 @@ class EngagementTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
+    public function testStrangerUploadCannotBeAttached(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $stranger = $this->createUser('stranger@example.com');
+        $space = $this->createSharedSpace($admin);
+        $engagementIri = $this->seedEngagement($admin, $space);
+        $media = $this->createMediaObject($stranger);
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('PATCH', $engagementIri, [
+            'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testAvatarKindCannotBeAttached(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $engagementIri = $this->seedEngagement($admin, $space);
+        $avatar = $this->createMediaObject($admin, MediaObject::KIND_AVATAR);
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('PATCH', $engagementIri, [
+            'json' => ['attachments' => ['/media-objects/' . $avatar->getId()]],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testGlobalAdminCanDownloadEngagementContract(): void
+    {
+        // A ROLE_ADMIN who isn't a member of the space can still download an
+        // engagement contract (mirrors the Engagement GET admin bypass).
+        $owner = $this->createUser('owner@example.com');
+        $superAdmin = $this->createUser('super@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
+        $space = $this->createSharedSpace($owner);
+        $media = $this->createMediaObject($owner);
+
+        $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($owner);
+        $this->entityManager->persist($client);
+        $engagement = (new Engagement())
+            ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($owner);
+        $engagement->addAttachment($media);
+        $this->entityManager->persist($engagement);
+        $this->entityManager->flush();
+
+        $httpClient = static::createClient();
+        $httpClient->loginUser($superAdmin);
+        $httpClient->request('GET', '/media-objects/' . $media->getId() . '/download');
+        $this->assertResponseIsSuccessful();
+    }
+
+    /** Creates a client + engagement for $admin in $space; returns the engagement IRI. */
+    private function seedEngagement(User $admin, Space $space): string
+    {
+        $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
+        $this->entityManager->persist($client);
+        $engagement = (new Engagement())
+            ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($admin);
+        $this->entityManager->persist($engagement);
+        $this->entityManager->flush();
+
+        return '/engagements/' . $engagement->getId();
+    }
+
     private function createMediaObject(User $owner, string $kind = MediaObject::KIND_ATTACHMENT): MediaObject
     {
         $bytes = 'CONTRACT-PDF';
@@ -246,12 +315,15 @@ class EngagementTest extends ApiTestCase
         return $space;
     }
 
-    private function createUser(string $email): User
+    /**
+     * @param list<string> $roles
+     */
+    private function createUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
         $user = new User();
         $user->setEmail($email);
-        $user->setRoles(['ROLE_USER']);
+        $user->setRoles($roles);
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');
