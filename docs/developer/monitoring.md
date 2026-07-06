@@ -28,6 +28,22 @@ the environment (exactly like the VAPID keys and the calendar-webhook URL).
   `Sentry.init` sets `enableLogs: true` + `consoleLoggingIntegration` so
   `console.*` (log/info/warn/error) is mirrored while still printing normally.
   Logs count against a separate free-tier quota from errors/traces.
+- **Metrics** — the PWA's product-event catalog is mirrored into Sentry Metrics:
+  `trackEvent()` (`pwa/lib/analytics.ts`) emits one `Sentry.metrics.count(name, 1)`
+  per event alongside the Umami call, so the same coarse events (signup,
+  `task-create`, …) show up in Sentry dashboards/alerts. Application metrics are
+  included on all Sentry plans (free tier too); the call no-ops without a DSN.
+  Add more with `Sentry.metrics.count/gauge/distribution` (JS) or
+  `\Sentry\metrics()` (PHP) — there's no config flag, the SDK version is enough.
+- **Releases** — every event/log/trace is tagged with the deployed release (the
+  image tag = commit SHA). `scripts/deploy.sh` exports `SENTRY_RELEASE=$IMAGES_TAG`
+  so the `${SENTRY_RELEASE:-}` refs in `compose.yaml` pick it up; Sentry then
+  groups issues by release and flags regressions. Releases are free. (The PWA's
+  `NEXT_PUBLIC_SENTRY_RELEASE` is baked at build and is wired when its DSN lands.)
+- **Profiling is intentionally NOT enabled.** The free Developer plan has no
+  profile-hours quota (profiling is pay-as-you-go only), and the PHP profiler
+  additionally needs the `excimer` extension (not in our image). Revisit if we
+  ever move off the free tier.
 
 ## API + worker (Symfony)
 
