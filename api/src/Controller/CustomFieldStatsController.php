@@ -9,7 +9,7 @@ use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldDefinitionInterface;
 use App\Entity\CustomFieldValue;
 use App\Entity\GlobalCustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
@@ -24,13 +24,13 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Read-only usage stats for the custom-fields schema editor:
  *
- *   - `GET /projects/{id}/custom_field_stats` — per-definition "filled"
- *     counts (how many of the project's tasks carry a non-null value)
- *     plus the project's total task count, so the editor can show "6/8".
+ *   - `GET /boards/{id}/custom_field_stats` — per-definition "filled"
+ *     counts (how many of the board's tasks carry a non-null value)
+ *     plus the board's total task count, so the editor can show "6/8".
  *   - `GET /custom_field_definitions/{id}/option_stats` — per-option
  *     usage counts for a select field (the "Web · 168" numbers).
  *
- * Access mirrors the rest of the project surface: caller must be a member
+ * Access mirrors the rest of the board surface: caller must be a member
  * of the field's space; non-members get 404 to keep the existence-hiding
  * shape consistent.
  */
@@ -42,11 +42,11 @@ class CustomFieldStatsController extends AbstractController
     }
 
     #[Route(
-        '/projects/{id}/custom_field_stats',
-        name: 'project_custom_field_stats',
+        '/boards/{id}/custom_field_stats',
+        name: 'board_custom_field_stats',
         methods: ['GET'],
     )]
-    public function projectStats(string $id, #[CurrentUser] ?User $user): Response
+    public function boardStats(string $id, #[CurrentUser] ?User $user): Response
     {
         if (null === $user) {
             return new JsonResponse(['error' => 'Not authenticated.'], 401);
@@ -55,16 +55,16 @@ class CustomFieldStatsController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        $project = $this->em->getRepository(Project::class)->find($id);
-        if (null === $project || !$this->canRead($project, $user)) {
+        $board = $this->em->getRepository(Board::class)->find($id);
+        if (null === $board || !$this->canRead($board, $user)) {
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
         $total = (int) $this->em->createQueryBuilder()
             ->select('COUNT(t.id)')
             ->from(Task::class, 't')
-            ->where('t.project = :project')
-            ->setParameter('project', $project)
+            ->where('t.board = :board')
+            ->setParameter('board', $board)
             ->getQuery()
             ->getSingleScalarResult();
 
@@ -74,14 +74,14 @@ class CustomFieldStatsController extends AbstractController
         // space definition or a global one — count both, keyed by def UUID
         // (space and global UUIDs never collide).
         $filledByDef = array_merge(
-            $this->filledCounts($project, 'definition'),
-            $this->filledCounts($project, 'globalDefinition'),
+            $this->filledCounts($board, 'definition'),
+            $this->filledCounts($board, 'globalDefinition'),
         );
 
-        // The fields this project has opted into — space + global — in order.
+        // The fields this board has opted into — space + global — in order.
         $definitions = array_merge(
-            $project->getCustomFieldDefinitions()->toArray(),
-            $project->getGlobalCustomFieldDefinitions()->toArray(),
+            $board->getCustomFieldDefinitions()->toArray(),
+            $board->getGlobalCustomFieldDefinitions()->toArray(),
         );
         usort(
             $definitions,
@@ -157,23 +157,23 @@ class CustomFieldStatsController extends AbstractController
     }
 
     /**
-     * Filled (non-null) value counts for a project's fields, keyed by the
+     * Filled (non-null) value counts for a board's fields, keyed by the
      * definition UUID string. `$association` is the CustomFieldValue side to
      * group on — `definition` (space) or `globalDefinition`.
      *
      * @return array<string, int>
      */
-    private function filledCounts(Project $project, string $association): array
+    private function filledCounts(Board $board, string $association): array
     {
         /** @var list<array{did: Uuid|string|null, filled: int|string}> $rows */
         $rows = $this->em->createQueryBuilder()
             ->select(sprintf('IDENTITY(cfv.%s) AS did', $association), 'COUNT(cfv.id) AS filled')
             ->from(CustomFieldValue::class, 'cfv')
             ->join('cfv.task', 't')
-            ->where('t.project = :project')
+            ->where('t.board = :board')
             ->andWhere('cfv.value IS NOT NULL')
             ->andWhere(sprintf('cfv.%s IS NOT NULL', $association))
-            ->setParameter('project', $project)
+            ->setParameter('board', $board)
             ->groupBy(sprintf('cfv.%s', $association))
             ->getQuery()
             ->getArrayResult();
@@ -250,12 +250,12 @@ class CustomFieldStatsController extends AbstractController
         return [];
     }
 
-    private function canRead(Project $project, User $user): bool
+    private function canRead(Board $board, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {
             return true;
         }
-        return $project->isAccessibleBy($user);
+        return $board->isAccessibleBy($user);
     }
 
     private function canReadSpace(Space $space, User $user): bool

@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tool;
 
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
@@ -33,7 +33,7 @@ final class CreateTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Create a new task owned by the authenticated user. Use when capturing a new piece of work; pass a projectId to attach the task to a shared project the user is a member of.';
+        return 'Create a new task owned by the authenticated user. Use when capturing a new piece of work; pass a boardId to attach the task to a shared board the user is a member of.';
     }
 
     public function getInputSchema(): array
@@ -43,11 +43,11 @@ final class CreateTaskTool implements McpToolInterface
             'properties' => [
                 'title' => ['type' => 'string', 'description' => 'Short title for the task.'],
                 'description' => ['type' => 'string', 'description' => 'Optional Markdown body.'],
-                'projectId' => ['type' => 'string', 'description' => 'UUID of a project the user is a member of. Omit for a personal task.'],
+                'boardId' => ['type' => 'string', 'description' => 'UUID of a board the user is a member of. Omit for a personal task.'],
                 'assigneeIds' => [
                     'type' => 'array',
                     'items' => ['type' => 'string'],
-                    'description' => 'UUIDs of users to assign. Each must be the owner or a project member.',
+                    'description' => 'UUIDs of users to assign. Each must be the owner or a board member.',
                 ],
                 'dueDate' => ['type' => 'string', 'description' => 'Due date as an ISO-8601 datetime.'],
                 'tagIds' => [
@@ -65,7 +65,7 @@ final class CreateTaskTool implements McpToolInterface
     {
         $title = $this->input->requireString($arguments, 'title');
         $description = $this->input->optionalString($arguments, 'description');
-        $projectId = $this->input->optionalUuid('projectId', $arguments['projectId'] ?? null);
+        $boardId = $this->input->optionalUuid('boardId', $arguments['boardId'] ?? null);
         $dueDate = $this->input->optionalDateTime($arguments, 'dueDate');
 
         $task = new Task();
@@ -78,12 +78,12 @@ final class CreateTaskTool implements McpToolInterface
             $task->setDueDate($dueDate);
         }
 
-        if (null !== $projectId) {
-            $project = $this->em->getRepository(Project::class)->find($projectId);
-            if (null === $project || !$this->authz->canEditProject($project, $user)) {
-                throw McpException::notFound(sprintf('Project %s', $projectId));
+        if (null !== $boardId) {
+            $board = $this->em->getRepository(Board::class)->find($boardId);
+            if (null === $board || !$this->authz->canEditProject($board, $user)) {
+                throw McpException::notFound(sprintf('Board %s', $boardId));
             }
-            $task->setProject($project);
+            $task->setBoard($board);
         }
 
         $assigneeIds = $this->input->optionalStringArray($arguments, 'assigneeIds') ?? [];

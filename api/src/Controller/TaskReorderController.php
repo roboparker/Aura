@@ -19,9 +19,9 @@ use Symfony\Component\Uid\Uuid;
  * Task IRIs and renumbers `position` (0, 1, 2, ...) on each reorderable
  * task in the input.
  *
- * "Reorderable" matches the project-member edit rule on Task: the user
- * can reorder tasks they own plus any task in a project they belong to
- * (anyone who can add a task to the project can also reorder its tasks).
+ * "Reorderable" matches the board-member edit rule on Task: the user
+ * can reorder tasks they own plus any task in a board they belong to
+ * (anyone who can add a task to the board can also reorder its tasks).
  * Tasks outside that set — e.g. another user's personal tasks an admin's
  * unfiltered view turns up — are silently skipped, so the frontend can
  * send the full visible list without classifying rows up-front.

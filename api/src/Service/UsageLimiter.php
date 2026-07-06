@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Billing\PlanGate;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -34,6 +35,7 @@ final class UsageLimiter
     public function __construct(
         private Connection $connection,
         private SubscriptionRepository $subscriptions,
+        private PlanGate $planGate,
         private int $freeMcpDailyLimit,
         private int $freeSpaceMemberLimit,
         private bool $enforcementEnabled,
@@ -75,13 +77,16 @@ final class UsageLimiter
     }
 
     /**
-     * Whether the user's MCP throughput is uncapped: an entitled (paid Team)
-     * member or a platform admin. Distinct from {@see $enforcementEnabled},
-     * which suppresses the cap globally while the gate ships dark.
+     * The user's daily MCP allowance from their best plan (null = unlimited).
+     * Platform admins are always unlimited.
      */
-    private function hasUnlimitedMcp(User $user): bool
+    private function mcpLimit(User $user): ?int
     {
-        return $this->isUserEntitled($user) || $this->isAdmin($user);
+        if ($this->isAdmin($user)) {
+            return null;
+        }
+
+        return $this->planGate->userEntitlements($user)->limit('mcp_calls_per_day');
     }
 
     /**
@@ -115,11 +120,15 @@ final class UsageLimiter
      */
     public function remainingMcpCalls(User $user): ?int
     {
-        if (!$this->enforcementEnabled || $this->hasUnlimitedMcp($user)) {
+        if (!$this->enforcementEnabled) {
+            return null;
+        }
+        $limit = $this->mcpLimit($user);
+        if (null === $limit) {
             return null;
         }
 
-        return max(0, $this->freeMcpDailyLimit - $this->mcpCallsToday($user));
+        return max(0, $limit - $this->mcpCallsToday($user));
     }
 
     /**
@@ -128,11 +137,15 @@ final class UsageLimiter
      */
     public function isMcpCallAllowed(User $user): bool
     {
-        if (!$this->enforcementEnabled || $this->hasUnlimitedMcp($user)) {
+        if (!$this->enforcementEnabled) {
+            return true;
+        }
+        $limit = $this->mcpLimit($user);
+        if (null === $limit) {
             return true;
         }
 
-        return $this->mcpCallsToday($user) < $this->freeMcpDailyLimit;
+        return $this->mcpCallsToday($user) < $limit;
     }
 
     /**
@@ -145,12 +158,14 @@ final class UsageLimiter
         if (!$this->enforcementEnabled || $space->getIsPersonal()) {
             return true;
         }
-        if (null !== $this->subscriptions->findActiveForSpace($space)) {
+        // The space's plan sets the member ceiling; paid plans lift it entirely.
+        $limit = $this->planGate->spaceEntitlements($space)->limit('space_members');
+        if (null === $limit) {
             return true;
         }
 
         $current = \count($space->getEffectiveUsers());
 
-        return ($current + $count) <= $this->freeSpaceMemberLimit;
+        return ($current + $count) <= $limit;
     }
 }

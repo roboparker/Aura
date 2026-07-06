@@ -8,7 +8,7 @@ use Gedmo\Loggable\Entity\Repository\LogEntryRepository;
 
 /**
  * Activity log row backing the audit trail for Loggable entities (Task,
- * Project, …). Thin subclass of Gedmo's `AbstractLogEntry` so the entry
+ * Board, …). Thin subclass of Gedmo's `AbstractLogEntry` so the entry
  * lives in `App\Entity` alongside our own model — which means it's
  * picked up by the `App` Doctrine mapping without extra configuration,
  * and we don't need to map Gedmo's vendor namespace separately. The

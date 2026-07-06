@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Comment;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -40,7 +40,7 @@ class McpReadToolsTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -150,13 +150,13 @@ class McpReadToolsTest extends ApiTestCase
     public function testGetProjectReturnsTitle(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->makeProject($alice, [$alice], 'Roadmap');
+        $board = $this->makeProject($alice, [$alice], 'Roadmap');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'get_project',
-            'arguments' => ['projectId' => (string) $project->getId()],
+            'arguments' => ['boardId' => (string) $board->getId()],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
@@ -167,13 +167,13 @@ class McpReadToolsTest extends ApiTestCase
     public function testGetCustomFieldsReturnsShape(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->makeProject($alice, [$alice], 'With fields');
+        $board = $this->makeProject($alice, [$alice], 'With fields');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'get_custom_fields',
-            'arguments' => ['projectId' => (string) $project->getId()],
+            'arguments' => ['boardId' => (string) $board->getId()],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
@@ -290,17 +290,17 @@ class McpReadToolsTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function makeProject(User $owner, array $members, string $title): Project
+    private function makeProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

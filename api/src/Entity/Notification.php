@@ -391,7 +391,7 @@ class Notification
         return $this->resolveTarget()['label'];
     }
 
-    /** Breadcrumb context — the parent project or space name. */
+    /** Breadcrumb context — the parent board or space name. */
     #[Groups(['notification:read'])]
     public function getContextLabel(): ?string
     {
@@ -432,12 +432,12 @@ class Notification
      */
     private function taskTarget(Task $task): array
     {
-        $project = $task->getProject();
+        $board = $task->getBoard();
 
         return [
             'url' => '/tasks',
             'label' => $task->getTitle(),
-            'context' => null === $project ? 'Tasks' : $project->getTitle(),
+            'context' => null === $board ? 'Tasks' : $board->getTitle(),
         ];
     }
 

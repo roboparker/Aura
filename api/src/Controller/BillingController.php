@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Billing\BillingException;
+use App\Billing\Plan;
+use App\Billing\PlanGate;
 use App\Billing\StripeGatewayInterface;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\CancellationFeedback;
+use App\Entity\Invoice;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -47,14 +51,43 @@ class BillingController extends AbstractController
         private SubscriptionRepository $subscriptions,
         private UsageLimiter $usageLimiter,
         private CancellationFeedbackRecorder $feedback,
+        private PlanGate $planGate,
         private LoggerInterface $logger,
-        #[Autowire('%env(default::STRIPE_PRICE_TEAM_MONTHLY)%')]
-        private string $priceMonthly,
-        #[Autowire('%env(default::STRIPE_PRICE_TEAM_YEARLY)%')]
-        private string $priceYearly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_MONTHLY)%')]
+        private string $proMonthly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_YEARLY)%')]
+        private string $proYearly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_MONTHLY)%')]
+        private string $businessMonthly,
+        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_YEARLY)%')]
+        private string $businessYearly,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
     ) {
+    }
+
+    /**
+     * The Stripe price id for a self-serve plan × interval, or '' when that
+     * plan isn't configured on this instance. Enterprise is sales-led (no
+     * self-serve price).
+     */
+    private function priceFor(Plan $plan, string $interval): string
+    {
+        $yearly = Subscription::INTERVAL_YEAR === $interval;
+
+        return match ($plan) {
+            Plan::Pro => $yearly ? $this->proYearly : $this->proMonthly,
+            Plan::Business => $yearly ? $this->businessYearly : $this->businessMonthly,
+            default => '',
+        };
+    }
+
+    /** Self-serve plan from the request body (pro | business); defaults to Pro. */
+    private function readPlan(Request $request): Plan
+    {
+        $body = $this->readBody($request);
+
+        return 'business' === ($body['plan'] ?? null) ? Plan::Business : Plan::Pro;
     }
 
     #[Route('/spaces/{id}/billing/checkout', name: 'billing_checkout', methods: ['POST'])]
@@ -72,7 +105,8 @@ class BillingController extends AbstractController
         }
 
         $interval = $this->readInterval($request);
-        $priceId = Subscription::INTERVAL_YEAR === $interval ? $this->priceYearly : $this->priceMonthly;
+        $plan = $this->readPlan($request);
+        $priceId = $this->priceFor($plan, $interval);
         if ('' === $priceId) {
             return $this->json(['error' => 'The selected plan is not configured.'], 503);
         }
@@ -92,7 +126,8 @@ class BillingController extends AbstractController
                 cancelUrl: $this->frontendUrl . '/spaces/' . $id . '/settings?billing=cancelled',
                 customerId: $customerId,
                 customerEmail: null !== $customerId ? null : $user?->getEmail(),
-                metadata: ['space_id' => $id],
+                // Stamp the plan so the webhook records which tier was bought.
+                metadata: ['space_id' => $id, 'plan' => $plan->value],
             );
         } catch (BillingException $e) {
             $this->logger->error('Stripe checkout session failed', ['exception' => $e, 'space' => $id]);
@@ -205,9 +240,11 @@ class BillingController extends AbstractController
         }
 
         $subscription = $this->subscriptions->findActiveForSpace($space);
+        $entitlements = $this->planGate->spaceEntitlements($space);
 
         return $this->json([
-            'plan' => $subscription?->getPlan() ?? 'free',
+            'plan' => $entitlements->plan->value,
+            'planLabel' => $entitlements->plan->label(),
             'status' => $subscription?->getStatus(),
             'active' => null !== $subscription,
             'billingAvailable' => $this->stripe->isConfigured(),
@@ -216,9 +253,13 @@ class BillingController extends AbstractController
             'currentPeriodEnd' => $subscription?->getCurrentPeriodEnd()?->format(\DateTimeInterface::ATOM),
             'cancelAtPeriodEnd' => $subscription?->getCancelAtPeriodEnd() ?? false,
             'isAdmin' => $space->isAdmin($user) || $this->isGranted('ROLE_ADMIN'),
-            'limits' => [
-                'freeSpaceMemberLimit' => $this->usageLimiter->freeSpaceMemberLimit(),
+            // The full entitlement matrix for this space's plan — drives the
+            // upgrade/feature-gating UI.
+            'features' => $entitlements->features,
+            'limits' => $entitlements->limits + [
                 'memberCount' => \count($space->getEffectiveUsers()),
+                // Back-compat keys the current PWA card still reads.
+                'freeSpaceMemberLimit' => $this->usageLimiter->freeSpaceMemberLimit(),
                 'freeMcpDailyLimit' => $this->usageLimiter->freeMcpDailyLimit(),
             ],
         ]);
@@ -246,10 +287,42 @@ class BillingController extends AbstractController
             $this->syncSubscription($object, true);
         } elseif ('customer.subscription.created' === $type || 'customer.subscription.updated' === $type) {
             $this->syncSubscription($object, false);
+        } elseif ('checkout.session.completed' === $type) {
+            $this->markInvoicePaid($object);
         }
         // Any other event type is acknowledged and ignored.
 
         return new Response('', Response::HTTP_OK);
+    }
+
+    /**
+     * Mark one of our client invoices (#445) paid off a completed one-off
+     * Checkout Session. Idempotent + safe: only acts on sessions carrying our
+     * `invoice_id` metadata with payment_status=paid, and never resurrects a
+     * void invoice.
+     *
+     * @param array<mixed, mixed> $session
+     */
+    private function markInvoicePaid(array $session): void
+    {
+        $invoiceId = $this->stringAt($session, ['metadata', 'invoice_id']);
+        if (null === $invoiceId) {
+            return; // Not an invoice checkout (e.g. a subscription session).
+        }
+        if ('paid' !== $this->stringAt($session, ['payment_status'])) {
+            return;
+        }
+        $invoice = $this->em->getRepository(Invoice::class)->find($invoiceId);
+        if (!$invoice instanceof Invoice) {
+            $this->logger->warning('Invoice payment webhook could not resolve invoice.', ['invoice_id' => $invoiceId]);
+            return;
+        }
+        if (Invoice::STATUS_PAID === $invoice->getStatus() || Invoice::STATUS_VOID === $invoice->getStatus()) {
+            return;
+        }
+        $invoice->setStatus(Invoice::STATUS_PAID);
+        $invoice->setPaidAt(new \DateTimeImmutable());
+        $this->em->flush();
     }
 
     /**
@@ -270,22 +343,48 @@ class BillingController extends AbstractController
 
         $row = $this->subscriptions->findByStripeSubscriptionId($stripeSubId);
         if (null === $row) {
+            // Resolve the billing account: an organization (#billing Phase 1b),
+            // falling back to the legacy per-space id.
+            $orgId = $this->stringAt($sub, ['metadata', 'organization_id']);
+            $userId = $this->stringAt($sub, ['metadata', 'user_id']);
             $spaceId = $this->stringAt($sub, ['metadata', 'space_id']);
-            $space = null !== $spaceId ? $this->em->getRepository(Space::class)->find($spaceId) : null;
-            if (!$space instanceof Space) {
-                $this->logger->warning('Stripe subscription webhook could not resolve space.', [
-                    'subscription' => $stripeSubId,
-                    'space_id' => $spaceId,
-                ]);
+            $row = (new Subscription())->setStripeSubscriptionId($stripeSubId);
+            if (null !== $orgId) {
+                $org = $this->em->getRepository(Organization::class)->find($orgId);
+                if (!$org instanceof Organization) {
+                    $this->logger->warning('Stripe webhook could not resolve organization.', ['subscription' => $stripeSubId, 'organization_id' => $orgId]);
+                    return;
+                }
+                $row->setOrganization($org);
+            } elseif (null !== $userId) {
+                $account = $this->em->getRepository(User::class)->find($userId);
+                if (!$account instanceof User) {
+                    $this->logger->warning('Stripe webhook could not resolve personal account.', ['subscription' => $stripeSubId, 'user_id' => $userId]);
+                    return;
+                }
+                $row->setOwnerUser($account);
+            } elseif (null !== $spaceId) {
+                $space = $this->em->getRepository(Space::class)->find($spaceId);
+                if (!$space instanceof Space) {
+                    $this->logger->warning('Stripe webhook could not resolve space.', ['subscription' => $stripeSubId, 'space_id' => $spaceId]);
+                    return;
+                }
+                $row->setSpace($space);
+            } else {
+                $this->logger->warning('Stripe webhook carried no billing account.', ['subscription' => $stripeSubId]);
                 return;
             }
-            $row = new Subscription();
-            $row->setSpace($space)->setStripeSubscriptionId($stripeSubId);
             $this->em->persist($row);
         }
 
         $status = $deleted ? Subscription::STATUS_CANCELED : ($this->stringAt($sub, ['status']) ?? Subscription::STATUS_INCOMPLETE);
         $row->setStatus($status);
+
+        // The tier bought, carried on the subscription metadata from checkout.
+        $planMeta = $this->stringAt($sub, ['metadata', 'plan']);
+        if (null !== $planMeta) {
+            $row->setPlan($planMeta);
+        }
 
         $customerId = $this->stringAt($sub, ['customer']);
         if (null !== $customerId) {

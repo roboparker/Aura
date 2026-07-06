@@ -66,8 +66,8 @@ interface Props {
    *  `/custom_field_definitions`; the global admin manager passes
    *  `/global_custom_field_definitions`. */
   collectionPath?: string;
-  /** Optional project context, used to scope reference-field option lists. */
-  projectIri?: string;
+  /** Optional board context, used to scope reference-field option lists. */
+  boardIri?: string;
   spaceName?: string;
   /** Present when editing an existing field. */
   initial?: CustomFieldDefinition;
@@ -146,7 +146,7 @@ const CustomFieldSheet = ({
   onOpenChange,
   spaceIri,
   collectionPath = "/custom_field_definitions",
-  projectIri,
+  boardIri,
   spaceName,
   initial,
   initialKind,
@@ -680,7 +680,7 @@ const CustomFieldSheet = ({
                     definition={previewDefinition}
                     value={previewValue}
                     onChange={setPreviewValue}
-                    projectIri={projectIri}
+                    boardIri={boardIri}
                   />
                 </div>
               </div>

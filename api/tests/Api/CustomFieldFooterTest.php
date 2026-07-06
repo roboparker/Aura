@@ -6,16 +6,16 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Footer aggregation endpoint (#227): `GET /projects/{id}/custom_field_footers`.
+ * Footer aggregation endpoint (#227): `GET /boards/{id}/custom_field_footers`.
  * Covers each strategy-supported aggregation kind (count, sum, avg,
- * min, max), plus the access scoping that hides cross-space projects
+ * min, max), plus the access scoping that hides cross-space boards
  * behind a 404 and the task-filter pass-through (status / search).
  */
 class CustomFieldFooterTest extends ApiTestCase
@@ -34,7 +34,7 @@ class CustomFieldFooterTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldValue')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -42,23 +42,23 @@ class CustomFieldFooterTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($bob);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseStatusCodeSame(404);
     }
 
     public function testEmptyResponseWhenNoFieldsHaveFooters(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->seedNumericField($project, 'Estimate', footerKind: null);
+        $board = $this->createProject($alice, 'Backend');
+        $this->seedNumericField($board, 'Estimate', footerKind: null);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -68,17 +68,17 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testNumericSumOverAllTasks(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
-        $this->seedTaskWithValue($alice, $project, $field, 3);
-        $this->seedTaskWithValue($alice, $project, $field, 5);
-        $this->seedTaskWithValue($alice, $project, $field, null);
+        $this->seedTaskWithValue($alice, $board, $field, 3);
+        $this->seedTaskWithValue($alice, $board, $field, 5);
+        $this->seedTaskWithValue($alice, $board, $field, null);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -96,22 +96,22 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testCountAndAvg(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $countField = $this->seedTextField($project, 'Owner', footerKind: 'count');
-        $avgField = $this->seedNumericField($project, 'Hours', footerKind: 'avg');
+        $board = $this->createProject($alice, 'Backend');
+        $countField = $this->seedTextField($board, 'Owner', footerKind: 'count');
+        $avgField = $this->seedNumericField($board, 'Hours', footerKind: 'avg');
 
-        $this->seedTaskWithValues($alice, $project, [
+        $this->seedTaskWithValues($alice, $board, [
             [$countField, 'alice'],
             [$avgField, 4],
         ]);
-        $this->seedTaskWithValues($alice, $project, [
+        $this->seedTaskWithValues($alice, $board, [
             [$avgField, 8],
         ]);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -130,20 +130,20 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testFilterChainHonouredViaStatus(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedNumericField($project, 'Estimate', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedNumericField($board, 'Estimate', footerKind: 'sum');
 
         // Two open tasks (3, 5) and one completed (7); status=open
         // should aggregate to 8.
-        $this->seedTaskWithValue($alice, $project, $field, 3);
-        $this->seedTaskWithValue($alice, $project, $field, 5);
-        $completed = $this->seedTaskWithValue($alice, $project, $field, 7);
+        $this->seedTaskWithValue($alice, $board, $field, 3);
+        $this->seedTaskWithValue($alice, $board, $field, 5);
+        $completed = $this->seedTaskWithValue($alice, $board, $field, 7);
         $completed->setCompletedOn(new \DateTimeImmutable());
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?status=open');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers?status=open');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -154,7 +154,7 @@ class CustomFieldFooterTest extends ApiTestCase
         $this->assertIsArray($first);
         $this->assertEqualsCanonicalizing(8, $first['value']);
 
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers?status=completed');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers?status=completed');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -169,21 +169,21 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testSelectBreakdownCountsPerOption(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $status = $this->seedSelectField($project, 'Status', [
+        $board = $this->createProject($alice, 'Backend');
+        $status = $this->seedSelectField($board, 'Status', [
             ['key' => 'backlog', 'label' => 'Backlog'],
             ['key' => 'in_progress', 'label' => 'In progress'],
             ['key' => 'done', 'label' => 'Done'],
         ], footerKind: 'breakdown');
 
-        $this->seedTaskWithValue($alice, $project, $status, 'backlog');
-        $this->seedTaskWithValue($alice, $project, $status, 'done');
-        $this->seedTaskWithValue($alice, $project, $status, 'done');
+        $this->seedTaskWithValue($alice, $board, $status, 'backlog');
+        $this->seedTaskWithValue($alice, $board, $status, 'done');
+        $this->seedTaskWithValue($alice, $board, $status, 'done');
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -204,20 +204,20 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testMultiSelectBreakdownUnrollsEachValue(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $labels = $this->seedMultiSelectField($project, 'Labels', [
+        $board = $this->createProject($alice, 'Backend');
+        $labels = $this->seedMultiSelectField($board, 'Labels', [
             ['key' => 'bug', 'label' => 'Bug'],
             ['key' => 'chore', 'label' => 'Chore'],
         ], footerKind: 'breakdown');
 
         // One task tagged both, one tagged just bug → bug=2, chore=1.
-        $this->seedTaskWithValue($alice, $project, $labels, ['bug', 'chore']);
-        $this->seedTaskWithValue($alice, $project, $labels, ['bug']);
+        $this->seedTaskWithValue($alice, $board, $labels, ['bug', 'chore']);
+        $this->seedTaskWithValue($alice, $board, $labels, ['bug']);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $this->assertResponseIsSuccessful();
         $response = $client->getResponse();
         self::assertNotNull($response);
@@ -236,16 +236,16 @@ class CustomFieldFooterTest extends ApiTestCase
     public function testMoneyFooterEmitsAmountCurrencyShape(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $field = $this->seedMoneyField($project, 'Budget', currency: 'USD', footerKind: 'sum');
+        $board = $this->createProject($alice, 'Backend');
+        $field = $this->seedMoneyField($board, 'Budget', currency: 'USD', footerKind: 'sum');
 
-        $this->seedTaskWithValue($alice, $project, $field, ['amount' => 1000, 'currency' => 'USD']);
-        $this->seedTaskWithValue($alice, $project, $field, ['amount' => 2500, 'currency' => 'USD']);
+        $this->seedTaskWithValue($alice, $board, $field, ['amount' => 1000, 'currency' => 'USD']);
+        $this->seedTaskWithValue($alice, $board, $field, ['amount' => 2500, 'currency' => 'USD']);
         $this->entityManager->flush();
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('GET', '/projects/' . $project->getId() . '/custom_field_footers');
+        $client->request('GET', '/boards/' . $board->getId() . '/custom_field_footers');
         $response = $client->getResponse();
         self::assertNotNull($response);
         $body = $response->toArray();
@@ -256,15 +256,15 @@ class CustomFieldFooterTest extends ApiTestCase
         $this->assertSame(['amount' => 3500, 'currency' => 'USD'], $first['value']);
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User
@@ -283,10 +283,10 @@ class CustomFieldFooterTest extends ApiTestCase
         return $user;
     }
 
-    private function seedNumericField(Project $project, string $name, ?string $footerKind): CustomFieldDefinition
+    private function seedNumericField(Board $board, string $name, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::NUMERIC->value)
             ->setSubtype('float')
@@ -299,10 +299,10 @@ class CustomFieldFooterTest extends ApiTestCase
         return $field;
     }
 
-    private function seedTextField(Project $project, string $name, ?string $footerKind): CustomFieldDefinition
+    private function seedTextField(Board $board, string $name, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')
@@ -315,10 +315,10 @@ class CustomFieldFooterTest extends ApiTestCase
         return $field;
     }
 
-    private function seedMoneyField(Project $project, string $name, string $currency, ?string $footerKind): CustomFieldDefinition
+    private function seedMoneyField(Board $board, string $name, string $currency, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::NUMERIC->value)
             ->setSubtype('money')
@@ -334,10 +334,10 @@ class CustomFieldFooterTest extends ApiTestCase
     /**
      * @param list<array{key: string, label: string}> $options
      */
-    private function seedSelectField(Project $project, string $name, array $options, ?string $footerKind): CustomFieldDefinition
+    private function seedSelectField(Board $board, string $name, array $options, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::SELECT->value)
             ->setSubtype('single')
@@ -353,10 +353,10 @@ class CustomFieldFooterTest extends ApiTestCase
     /**
      * @param list<array{key: string, label: string}> $options
      */
-    private function seedMultiSelectField(Project $project, string $name, array $options, ?string $footerKind): CustomFieldDefinition
+    private function seedMultiSelectField(Board $board, string $name, array $options, ?string $footerKind): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::SELECT->value)
             ->setSubtype('multi')
@@ -369,19 +369,19 @@ class CustomFieldFooterTest extends ApiTestCase
         return $field;
     }
 
-    private function seedTaskWithValue(User $owner, Project $project, CustomFieldDefinition $field, mixed $value): Task
+    private function seedTaskWithValue(User $owner, Board $board, CustomFieldDefinition $field, mixed $value): Task
     {
-        return $this->seedTaskWithValues($owner, $project, [[$field, $value]]);
+        return $this->seedTaskWithValues($owner, $board, [[$field, $value]]);
     }
 
     /**
      * @param list<array{0: CustomFieldDefinition, 1: mixed}> $pairs
      */
-    private function seedTaskWithValues(User $owner, Project $project, array $pairs): Task
+    private function seedTaskWithValues(User $owner, Board $board, array $pairs): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle('Task');
         $this->entityManager->persist($task);
         foreach ($pairs as [$field, $value]) {

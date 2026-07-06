@@ -51,14 +51,14 @@ abstract class AbstractSpaceAccessExtension implements
 
     /**
      * The per-item impersonation override type for this resource (e.g.
-     * 'project'), or null when the resource has no item-level overrides
+     * 'board'), or null when the resource has no item-level overrides
      * (CustomFieldDefinition). Drives AccessPolicyItemScope filtering.
      */
     abstract protected function getImpersonationItemType(): ?string;
 
     /**
      * The space-role permission category this resource belongs to (e.g.
-     * 'projects'), or null when it isn't role-gated. Drives collection
+     * 'boards'), or null when it isn't role-gated. Drives collection
      * read-filtering (#space-roles): rows in spaces where the user lacks read
      * for this category are dropped.
      */

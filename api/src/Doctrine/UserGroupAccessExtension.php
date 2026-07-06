@@ -18,7 +18,7 @@ use Symfony\Bundle\SecurityBundle\Security;
  * Filters UserGroup queries so users only see groups whose owning space
  * they belong to (#groups-space) — directly or via another group in that
  * space. Item lookups for inaccessible groups return 404 rather than 403,
- * matching the existence-hiding behavior used elsewhere (Project, Task).
+ * matching the existence-hiding behavior used elsewhere (Board, Task).
  *
  * Instance admins are scoped like everyone else — they reach another
  * user's groups only by impersonating them (`switch_user`), which works

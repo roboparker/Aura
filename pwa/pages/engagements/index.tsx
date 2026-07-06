@@ -1,0 +1,573 @@
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Briefcase, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { apiGet, apiGetCollection, apiSend, ApiError } from "@/lib/apiClient";
+import { signinHrefForCurrent } from "@/lib/authRedirect";
+import PageHeader from "@/components/common/PageHeader";
+import MarkdownEditor from "@/components/editor/MarkdownEditor";
+import AttachmentsPanel, { type Attachment } from "@/components/tasks/AttachmentsPanel";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
+const SELECT_CLASS =
+  "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+const COL_COUNT = 4;
+
+interface ClientRow {
+  "@id": string;
+  id: string;
+  name: string;
+  currency?: string | null;
+}
+interface BoardRow {
+  "@id": string;
+  id: string;
+  title: string;
+}
+interface CategoryRow {
+  "@id"?: string;
+  name: string;
+  rateAmount: number;
+  position: number;
+  billable: boolean;
+}
+interface Engagement {
+  "@id": string;
+  id: string;
+  name: string;
+  currency: string | null;
+  description: string | null;
+  archived: boolean;
+  client: string;
+  categories: CategoryRow[];
+  attachments: Attachment[];
+  assignedProjectList: { id: string; title: string }[];
+}
+
+/** A form category with the rate as a decimal string for editing. */
+interface DraftCategory {
+  name: string;
+  rate: string;
+  billable: boolean;
+}
+
+const toMinor = (rate: string): number => Math.round((parseFloat(rate) || 0) * 100);
+const toMajor = (minor: number): string => (minor / 100).toFixed(2);
+const money = (minor: number, currency: string | null): string =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(minor / 100);
+
+const NEW = "new";
+
+const EngagementsPage = () => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace } = useActiveSpace();
+  const router = useRouter();
+
+  const spaceIri = activeSpace?.["@id"] ?? null;
+  const [projects, setProjects] = useState<Engagement[]>([]);
+  const [clients, setClients] = useState<ClientRow[]>([]);
+  const [taskBoards, setTaskBoards] = useState<BoardRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Which engagement the side panel is showing: null (closed) | NEW (create) |
+  // an engagement IRI (view/edit that one).
+  const [sheetFor, setSheetFor] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [clientIri, setClientIri] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [description, setDescription] = useState("");
+  const [cats, setCats] = useState<DraftCategory[]>([{ name: "", rate: "", billable: true }]);
+  const [assigned, setAssigned] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace(signinHrefForCurrent(router.asPath));
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  const load = useCallback(async () => {
+    if (!spaceIri) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const q = `?space=${encodeURIComponent(spaceIri)}`;
+      const [bps, cls, prj] = await Promise.all([
+        apiGetCollection<Engagement>(`/engagements${q}`),
+        apiGetCollection<ClientRow>(`/clients${q}`),
+        apiGetCollection<BoardRow>(`/boards${q}`),
+      ]);
+      setProjects(bps);
+      setClients(cls);
+      setTaskBoards(prj);
+    } catch (e) {
+      setLoadError(
+        e instanceof ApiError && e.status === 403
+          ? "Engagements are managed by space admins."
+          : "Failed to load engagements.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [spaceIri]);
+
+  useEffect(() => {
+    if (isAuthenticated && spaceIri) void load();
+  }, [isAuthenticated, spaceIri, load]);
+
+  const editing = useMemo(
+    () => (sheetFor && sheetFor !== NEW ? projects.find((p) => p["@id"] === sheetFor) ?? null : null),
+    [sheetFor, projects],
+  );
+
+  const openCreate = () => {
+    setName("");
+    setClientIri(clients[0]?.["@id"] ?? "");
+    setCurrency(clients[0]?.currency ?? "USD");
+    setDescription("");
+    setCats([{ name: "", rate: "", billable: true }]);
+    setAssigned([]);
+    setAttachments([]);
+    setFormError(null);
+    setSheetFor(NEW);
+  };
+
+  const openEdit = (bp: Engagement) => {
+    setName(bp.name);
+    setClientIri(bp.client);
+    setCurrency(bp.currency ?? "USD");
+    setDescription(bp.description ?? "");
+    setCats(
+      bp.categories.length > 0
+        ? bp.categories.map((c) => ({ name: c.name, rate: toMajor(c.rateAmount), billable: c.billable }))
+        : [{ name: "", rate: "", billable: true }],
+    );
+    setAssigned(bp.assignedProjectList.map((p) => `/boards/${p.id}`));
+    setAttachments(bp.attachments ?? []);
+    setFormError(null);
+    setSheetFor(bp["@id"]);
+  };
+
+  const closeSheet = () => setSheetFor(null);
+
+  const save = async () => {
+    if (!name.trim()) {
+      setFormError("A name is required.");
+      return;
+    }
+    if (!clientIri) {
+      setFormError("A client is required.");
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    const categories = cats
+      .filter((c) => c.name.trim())
+      .map((c, i) => ({
+        name: c.name.trim(),
+        rateAmount: toMinor(c.rate),
+        position: i,
+        billable: c.billable,
+      }));
+    const attachmentIris = attachments.map((a) => a["@id"]);
+    const editingIri = sheetFor && sheetFor !== NEW ? sheetFor : null;
+    try {
+      const shared = {
+        client: clientIri,
+        name: name.trim(),
+        currency,
+        description: description.trim() || null,
+        categories,
+        attachments: attachmentIris,
+      };
+      const saved = editingIri
+        ? await apiSend<Engagement>("PATCH", editingIri, {
+            body: shared,
+            contentType: "application/merge-patch+json",
+          })
+        : await apiSend<Engagement>("POST", "/engagements", { body: { space: spaceIri, ...shared } });
+      const bpIri = saved?.["@id"] ?? editingIri;
+      if (bpIri) {
+        await apiSend("PUT", `${bpIri}/boards`, { body: { boards: assigned } });
+      }
+      closeSheet();
+      await load();
+    } catch (e) {
+      setFormError(e instanceof ApiError ? e.message : "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleArchive = async (bp: Engagement) => {
+    try {
+      await apiSend("PATCH", bp["@id"], {
+        body: { archived: !bp.archived },
+        contentType: "application/merge-patch+json",
+      });
+      await load();
+    } catch {
+      /* surfaced on next load */
+    }
+  };
+
+  const remove = async (bp: Engagement) => {
+    try {
+      await apiSend("DELETE", bp["@id"]);
+      closeSheet();
+      await load();
+    } catch {
+      /* surfaced on next load */
+    }
+  };
+
+  // Hydrate a freshly-uploaded MediaObject into the buffered attachment list so
+  // the panel can render it; the link is persisted on Save.
+  const onAttach = async (iri: string) => {
+    const att = await apiGet<Attachment>(iri, { errorMessage: "Failed to load the upload." });
+    setAttachments((prev) => [...prev, att]);
+  };
+  const onDetach = async (att: Attachment) => {
+    setAttachments((prev) => prev.filter((a) => a["@id"] !== att["@id"]));
+  };
+
+  const clientName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of clients) m.set(c["@id"], c.name);
+    return m;
+  }, [clients]);
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Head>
+        <title>Engagements — Madori</title>
+      </Head>
+      <main className="mx-auto max-w-4xl px-6 py-8">
+        <PageHeader
+          title="Engagements"
+          icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
+          subtitle="A engagement has a client and a set of categories, each with an hourly rate. Time is tracked against an engagement + category."
+        />
+
+        {loadError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{loadError}</AlertDescription>
+          </Alert>
+        )}
+        {!loadError && clients.length === 0 && !loading && (
+          <Alert className="mb-4">
+            <AlertDescription>Add a client first — engagements bill to a client.</AlertDescription>
+          </Alert>
+        )}
+
+        {loading ? (
+          <p className="text-muted-foreground">Loading…</p>
+        ) : (
+          <Card>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <th className="px-4 py-2 font-medium">Name</th>
+                    <th className="px-4 py-2 font-medium">Client</th>
+                    <th className="px-4 py-2 font-medium">Categories</th>
+                    <th className="px-4 py-2 font-medium">Files</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/* Inline "Add engagement" row, pinned to the top. */}
+                  <tr className="border-b">
+                    <td colSpan={COL_COUNT} className="px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={openCreate}
+                        disabled={clients.length === 0}
+                        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      >
+                        <Plus className="h-4 w-4" /> Add engagement
+                      </button>
+                    </td>
+                  </tr>
+
+                  {projects.length === 0 ? (
+                    <tr>
+                      <td colSpan={COL_COUNT} className="px-4 py-10 text-center text-muted-foreground">
+                        No engagements yet. Use “Add engagement” to create one.
+                      </td>
+                    </tr>
+                  ) : (
+                    projects.map((bp) => (
+                      <tr
+                        key={bp["@id"]}
+                        onClick={() => openEdit(bp)}
+                        className="cursor-pointer border-b align-middle last:border-0 hover:bg-accent/40"
+                      >
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{bp.name}</span>
+                            {bp.archived && <Badge variant="secondary">Archived</Badge>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {clientName.get(bp.client) ?? "Client"}
+                        </td>
+                        <td className="px-4 py-3">
+                          {bp.categories.length === 0 ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {bp.categories.map((c) => (
+                                <Badge key={c.name} variant="outline" className="font-normal">
+                                  {c.name} · {money(c.rateAmount, bp.currency)}
+                                  {!c.billable && " · non-billable"}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {bp.attachments.length > 0 ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Paperclip className="h-3.5 w-3.5" />
+                              {bp.attachments.length}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </main>
+
+      <Sheet open={sheetFor !== null} onOpenChange={(o) => !o && closeSheet()} modal={false}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
+          onInteractOutside={(e) => {
+            const target = e.detail.originalEvent.target as HTMLElement | null;
+            if (
+              target?.closest(
+                '[data-slot="combobox-content"],[data-slot="popover-content"],[data-radix-popper-content-wrapper],.bn-container',
+              )
+            ) {
+              e.preventDefault();
+            }
+          }}
+        >
+          <SheetHeader className="border-b px-5 py-4">
+            <SheetTitle className="pr-9">
+              {sheetFor === NEW ? "New engagement" : name || "Engagement"}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="bp-name">Name</Label>
+              <Input id="bp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Website redesign" />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="bp-client">Client</Label>
+                <select
+                  id="bp-client"
+                  value={clientIri}
+                  onChange={(e) => {
+                    setClientIri(e.target.value);
+                    const c = clients.find((x) => x["@id"] === e.target.value);
+                    if (c?.currency) setCurrency(c.currency);
+                  }}
+                  className={SELECT_CLASS}
+                >
+                  {clients.map((c) => (
+                    <option key={c["@id"]} value={c["@id"]}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="bp-currency">Currency</Label>
+                <Input
+                  id="bp-currency"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value.toUpperCase().slice(0, 3))}
+                  className="uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>
+                Description{" "}
+                <span className="font-normal text-muted-foreground">(optional, markdown)</span>
+              </Label>
+              <MarkdownEditor value={description} onChange={setDescription} ariaLabel="Engagement description" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Categories &amp; rates</Label>
+              <p className="text-xs text-muted-foreground">
+                Billability is set per category — time tracked on a non-billable category
+                is excluded from invoices.
+              </p>
+              {cats.map((c, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input
+                    value={c.name}
+                    onChange={(e) =>
+                      setCats((prev) => prev.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))
+                    }
+                    placeholder="Category (e.g. Development)"
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={c.rate}
+                    onChange={(e) =>
+                      setCats((prev) => prev.map((x, j) => (j === i ? { ...x, rate: e.target.value } : x)))
+                    }
+                    placeholder="Rate/hr"
+                    className="w-24"
+                  />
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Switch
+                      checked={c.billable}
+                      onCheckedChange={(v) =>
+                        setCats((prev) => prev.map((x, j) => (j === i ? { ...x, billable: v } : x)))
+                      }
+                      aria-label={`${c.name || "Category"} is billable`}
+                    />
+                    Billable
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCats((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label="Remove category"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setCats((prev) => [...prev, { name: "", rate: "", billable: true }])}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add category
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Contract files</Label>
+              <AttachmentsPanel
+                taskTitle={name || "this engagement"}
+                attachments={attachments}
+                canDeleteAll
+                onAttach={onAttach}
+                onDetach={onDetach}
+              />
+            </div>
+
+            {taskBoards.length > 0 && (
+              <div className="space-y-2">
+                <Label>Assigned boards</Label>
+                <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border p-2">
+                  {taskBoards.map((p) => {
+                    const checked = assigned.includes(p["@id"]);
+                    return (
+                      <label key={p["@id"]} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) =>
+                            setAssigned((prev) =>
+                              e.target.checked ? [...prev, p["@id"]] : prev.filter((x) => x !== p["@id"]),
+                            )
+                          }
+                        />
+                        {p.title}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {formError && <p className="text-sm text-destructive">{formError}</p>}
+          </div>
+
+          <SheetFooter className="flex-row items-center justify-between border-t px-5 py-3">
+            <div className="flex items-center gap-1.5">
+              {editing && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => void toggleArchive(editing)}>
+                    {editing.archived ? "Unarchive" : "Archive"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => void remove(editing)}
+                    aria-label="Delete engagement"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={closeSheet} disabled={saving}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => void save()} disabled={saving}>
+                {saving ? "Saving…" : sheetFor === NEW ? "Create" : "Save changes"}
+              </Button>
+            </div>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+};
+
+export default EngagementsPage;

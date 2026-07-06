@@ -8,7 +8,7 @@ use Symfony\Component\Validator\Constraint;
  * Class-level constraint on {@see App\Entity\Task}. Polices the
  * per-task custom-field values payload:
  *   - every {@see App\Entity\CustomFieldValue} references a definition
- *     that belongs to the task's project (no cross-project IRIs),
+ *     that belongs to the task's board (no cross-board IRIs),
  *   - no two values reference the same definition (uniqueness mirrors
  *     the DB constraint, raised as a clean 422 instead of leaking the
  *     constraint name),
@@ -28,9 +28,9 @@ use Symfony\Component\Validator\Constraint;
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final class ValidCustomFieldValues extends Constraint
 {
-    public string $messageNoProject = 'Custom fields require the task to belong to a project.';
+    public string $messageNoProject = 'Custom fields require the task to belong to a board.';
     public string $messageDefinitionSource = 'A custom field value must reference exactly one definition (space or global).';
-    public string $messageWrongProject = 'Custom field "{{ name }}" does not belong to this task\'s project.';
+    public string $messageWrongProject = 'Custom field "{{ name }}" does not belong to this task\'s board.';
     public string $messageDuplicate = 'Custom field "{{ name }}" is set more than once.';
     public string $messageRequired = 'Custom field "{{ name }}" is required.';
     public string $messageUnknownType = 'Custom field "{{ name }}" has an unknown type "{{ key }}".';

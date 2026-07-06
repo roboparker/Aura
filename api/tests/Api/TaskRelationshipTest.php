@@ -4,7 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -28,19 +28,19 @@ class TaskRelationshipTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TaskRelationship')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
     public function testCreateReadFromBothSidesAndDelete(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $a = $this->createTask($client, $project, 'Design API');
-        $b = $this->createTask($client, $project, 'Build endpoint');
+        $a = $this->createTask($client, $board, 'Design API');
+        $b = $this->createTask($client, $board, 'Build endpoint');
 
         // A is parent of B.
         $relationship = $client->request('POST', '/task_relationships', [
@@ -83,12 +83,12 @@ class TaskRelationshipTest extends ApiTestCase
     public function testRejectsSelfAndDuplicate(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
         $client = static::createClient();
         $client->loginUser($alice);
 
-        $a = $this->createTask($client, $project, 'A');
-        $b = $this->createTask($client, $project, 'B');
+        $a = $this->createTask($client, $board, 'A');
+        $b = $this->createTask($client, $board, 'B');
 
         // Self-relationship → 422.
         $client->request('POST', '/task_relationships', [
@@ -112,10 +112,10 @@ class TaskRelationshipTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
-    private function createTask(Client $client, Project $project, string $title): string
+    private function createTask(Client $client, Board $board, string $title): string
     {
         $task = $client->request('POST', '/tasks', [
-            'json' => ['title' => $title, 'project' => '/projects/' . $project->getId()],
+            'json' => ['title' => $title, 'board' => '/boards/' . $board->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $iri = $task['@id'];
@@ -124,16 +124,16 @@ class TaskRelationshipTest extends ApiTestCase
         return $iri;
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

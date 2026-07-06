@@ -74,7 +74,7 @@ class ApiTokenApiTest extends ApiTestCase
         $client->request('PATCH', $iri, [
             'json' => [
                 'name' => 'ci-renamed',
-                'accessPolicy' => ['categories' => ['tasks' => 'edit', 'projects' => 'view'], 'items' => []],
+                'accessPolicy' => ['categories' => ['tasks' => 'edit', 'boards' => 'view'], 'items' => []],
             ],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -88,7 +88,7 @@ class ApiTokenApiTest extends ApiTestCase
         $categories = $policy['categories'];
         $this->assertIsArray($categories);
         $this->assertSame('edit', $categories['tasks']);
-        $this->assertSame('view', $categories['projects']);
+        $this->assertSame('view', $categories['boards']);
 
         // The POST response must never echo the plaintext on a later read.
         $this->assertArrayNotHasKey('plainToken', $body);

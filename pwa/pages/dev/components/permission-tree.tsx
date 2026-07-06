@@ -15,10 +15,10 @@ const NODES: PermissionNode[] = [
   {
     key: "content",
     label: "Content",
-    description: "tasks, projects, pages",
+    description: "tasks, boards, pages",
     children: [
       { key: "tasks", label: "Tasks" },
-      { key: "projects", label: "Projects" },
+      { key: "boards", label: "Boards" },
       { key: "pages", label: "Pages" },
     ],
   },
@@ -29,7 +29,7 @@ const NODES: PermissionNode[] = [
 const Basic = () => {
   const [values, setValues] = useState<Record<string, string>>({
     tasks: "view",
-    projects: "none",
+    boards: "none",
     pages: "edit",
     notifications: "none",
     files: "view",
@@ -58,7 +58,7 @@ const PermissionTreePage = () => (
         description:
           "The Content group shows 'Custom' because its leaves disagree; expand it to set each. Master + group rows bulk-set their subtree.",
         code: `const [values, setValues] = useState({
-  tasks: "view", projects: "none", pages: "edit",
+  tasks: "view", boards: "none", pages: "edit",
   notifications: "none", files: "view",
 });
 
@@ -71,7 +71,7 @@ const PermissionTreePage = () => (
   nodes={[
     { key: "content", label: "Content", children: [
       { key: "tasks", label: "Tasks" },
-      { key: "projects", label: "Projects" },
+      { key: "boards", label: "Boards" },
       { key: "pages", label: "Pages" },
     ]},
     { key: "notifications", label: "Notifications" },

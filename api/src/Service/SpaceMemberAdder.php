@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\SpaceInvite;
 use App\Entity\SpaceMembership;
+use App\Entity\SpaceRole;
 use App\Entity\User;
 use App\Entity\UserInvite;
 use App\Repository\SpaceInviteRepository;
@@ -65,7 +67,14 @@ final class SpaceMemberAdder
 
             $membership = (new SpaceMembership())
                 ->setUser($candidate)
-                ->setRole($role);
+                ->setRole($this->guestCappedRole($space, $candidate, $role));
+            // Org guests are confined to the restricted guest space-role — the
+            // seat invariant (#billing Phase 1c): a free guest can never be
+            // elevated into a paying seat's capabilities.
+            $guestRole = $this->guestRoleFor($space, $candidate);
+            if (null !== $guestRole) {
+                $membership->addRole($guestRole);
+            }
             $space->addUserMembership($membership);
             $this->em->persist($membership);
 
@@ -77,6 +86,34 @@ final class SpaceMemberAdder
         }
 
         return $this->upsertInvite($space, $email, $invitedBy, $role);
+    }
+
+    /**
+     * True when the space is org-owned and the user is a Guest of that org, so
+     * they may only ever hold the restricted guest space-role.
+     */
+    public function isOrgGuest(Space $space, User $user): bool
+    {
+        $org = $space->getOrganization();
+
+        return null !== $org && Organization::ROLE_GUEST === $org->roleFor($user);
+    }
+
+    /** Downgrade an org guest's requested space role — they can't be admins. */
+    private function guestCappedRole(Space $space, User $user, string $requested): string
+    {
+        return $this->isOrgGuest($space, $user) ? Space::ROLE_MEMBER : $requested;
+    }
+
+    /** The space's built-in guest role, when the user is an org guest. */
+    private function guestRoleFor(Space $space, User $user): ?SpaceRole
+    {
+        if (!$this->isOrgGuest($space, $user)) {
+            return null;
+        }
+
+        return $this->em->getRepository(SpaceRole::class)
+            ->findOneBy(['space' => $space, 'builtinKey' => SpaceRole::BUILTIN_GUEST]);
     }
 
     /**

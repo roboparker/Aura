@@ -212,16 +212,16 @@ class NotificationTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = new \App\Entity\Project();
-        $project->setOwner($alice);
-        $project->setTitle('Team');
-        $this->addProjectMember($project, $alice);
-        $this->addProjectMember($project, $bob);
-        $this->entityManager->persist($project);
+        $board = new \App\Entity\Board();
+        $board->setOwner($alice);
+        $board->setTitle('Team');
+        $this->addBoardMember($board, $alice);
+        $this->addBoardMember($board, $bob);
+        $this->entityManager->persist($board);
 
         $task = new Task();
         $task->setOwner($alice);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle('Standup');
         $task->setDueDate((new \DateTimeImmutable())->modify('+30 minutes'));
         $task->setReminders([['type' => 'relative', 'value' => 1, 'unit' => 'hours', 'repeat' => false]]);

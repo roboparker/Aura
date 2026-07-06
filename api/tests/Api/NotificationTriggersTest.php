@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\Comment;
 use App\Entity\Notification;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -33,7 +33,7 @@ class NotificationTriggersTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
@@ -42,8 +42,8 @@ class NotificationTriggersTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         $this->postComment(static::createClient(), $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Looks good.']);
 
@@ -57,8 +57,8 @@ class NotificationTriggersTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         // Comment emails are off by default in the matrix — opt alice in so we
         // exercise the realtime-email path.
@@ -86,8 +86,8 @@ class NotificationTriggersTest extends ApiTestCase
         $bob = $this->createUser('bob@example.com');
         $alice->setPreferences(['notificationFrequency' => 'daily']);
         $this->entityManager->flush();
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         $this->postComment(static::createClient(), $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Looks good.']);
 
@@ -102,8 +102,8 @@ class NotificationTriggersTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         $client = static::createClient();
         $this->postComment($client, $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'First.']);
@@ -120,8 +120,8 @@ class NotificationTriggersTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         // bob comments first (so he's a prior participant), then carol
         // both replies-to-thread AND @mentions bob — mention must win.
@@ -138,14 +138,14 @@ class NotificationTriggersTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
 
         $client = static::createClient();
         $client->loginUser($alice);
         $client->request('POST', '/tasks', [
             'json' => [
                 'title' => 'Draft the brief',
-                'project' => '/projects/' . $project->getId(),
+                'board' => '/boards/' . $board->getId(),
                 'assignees' => ['/users/' . $bob->getId()],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -163,8 +163,8 @@ class NotificationTriggersTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
         $task->addAssignee($bob);
         $this->entityManager->flush();
 
@@ -189,8 +189,8 @@ class NotificationTriggersTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Ship it');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Ship it');
         $task->addAssignee($bob);
         $this->entityManager->flush();
 
@@ -215,8 +215,8 @@ class NotificationTriggersTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Acme');
-        $task = $this->createTaskInProject($alice, $project, 'Final hero selects');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Acme');
+        $task = $this->createTaskInProject($alice, $board, 'Final hero selects');
 
         $client = static::createClient();
         $this->postComment($client, $bob, ['task' => '/tasks/' . $task->getId(), 'body' => 'Pulled my top three.']);
@@ -312,11 +312,11 @@ class NotificationTriggersTest extends ApiTestCase
         return $note;
     }
 
-    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    private function createTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -327,18 +327,18 @@ class NotificationTriggersTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function createSharedProject(User $owner, array $members, string $title): Project
+    private function createSharedProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
 
-        return $project;
+        return $board;
     }
 
     /**

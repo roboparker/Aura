@@ -20,7 +20,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import CalendarView from "@/components/calendar/CalendarView";
-import TasksProjectBoard from "@/components/tasks/TasksProjectBoard";
+import TasksBoardView from "@/components/tasks/TasksBoardView";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { trackEvent } from "@/lib/analytics";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
@@ -72,7 +72,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-interface ProjectMembership {
+interface BoardMembership {
   "@id": string;
   title: string;
   members: Array<{ "@id": string }>;
@@ -175,13 +175,13 @@ const Tasks = () => {
   }, [tasks]);
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [assignableUsers, setAssignableUsers] = useState<AssigneeOption[]>([]);
-  // Map of project IRI → set of member IRIs. Used to filter the assignee
-  // picker per task (project tasks accept only that project's members; the
+  // Map of board IRI → set of member IRIs. Used to filter the assignee
+  // picker per task (board tasks accept only that board's members; the
   // server-side validator enforces the same rule).
-  const [projectMembers, setProjectMembers] = useState<Map<string, Set<string>>>(
+  const [boardMembers, setProjectMembers] = useState<Map<string, Set<string>>>(
     new Map(),
   );
-  const [projectTitles, setProjectTitles] = useState<Map<string, string>>(
+  const [boardTitles, setProjectTitles] = useState<Map<string, string>>(
     new Map(),
   );
   const [isLoading, setIsLoading] = useState(true);
@@ -240,9 +240,9 @@ const Tasks = () => {
     const tasksSnapshot = tasksRef.current;
     setError(null);
     try {
-      // Tasks, tags, the assignable-users universe, and the projects-with-
-      // members set all load in parallel — the page needs the projects to
-      // know which assignable users are valid for each project task.
+      // Tasks, tags, the assignable-users universe, and the boards-with-
+      // members set all load in parallel — the page needs the boards to
+      // know which assignable users are valid for each board task.
       //
       // The optional AbortSignal lets callers cancel an in-flight fan-out
       // when they re-fire (the auth useEffect cleans up an outgoing call
@@ -260,11 +260,11 @@ const Tasks = () => {
         headers: { Accept: "application/ld+json" },
         signal,
       };
-      const [tasksRes, tagsRes, assignablesRes, projectsRes] = await Promise.all([
+      const [tasksRes, tagsRes, assignablesRes, boardsRes] = await Promise.all([
         fetch(tasksUrl, init),
         fetch(`${ENTRYPOINT}/tags`, init),
         fetch(`${ENTRYPOINT}/me/assignable-users`, init),
-        fetch(`${ENTRYPOINT}/projects`, init),
+        fetch(`${ENTRYPOINT}/boards`, init),
       ]);
       if (!tasksRes.ok) {
         throw new Error("Failed to load tasks.");
@@ -275,13 +275,13 @@ const Tasks = () => {
       if (!assignablesRes.ok) {
         throw new Error("Failed to load assignable users.");
       }
-      if (!projectsRes.ok) {
-        throw new Error("Failed to load projects.");
+      if (!boardsRes.ok) {
+        throw new Error("Failed to load boards.");
       }
       const tasksData: Collection<Task> = await tasksRes.json();
       const tagsData: Collection<Tag> = await tagsRes.json();
       const assignablesData: Collection<AssigneeOption> = await assignablesRes.json();
-      const projectsData: Collection<ProjectMembership> = await projectsRes.json();
+      const boardsData: Collection<BoardMembership> = await boardsRes.json();
       // One last guard against the strict-mode cleanup landing between
       // the JSON parses and the setStates: if the signal aborted while
       // we were parsing, drop the responses on the floor.
@@ -290,7 +290,7 @@ const Tasks = () => {
       }
       // Identity guard — see comment at the top of this callback. If a
       // local mutation slipped in while we were waiting, skip stomping the
-      // tasks list; the tag / assignable-user / project-member lists below
+      // tasks list; the tag / assignable-user / board-member lists below
       // are still safe to refresh since none carry optimistic UI state.
       if (tasksRef.current === tasksSnapshot) {
         setTasks(tasksData.member ?? tasksData["hydra:member"] ?? []);
@@ -299,17 +299,17 @@ const Tasks = () => {
       setAssignableUsers(
         assignablesData.member ?? assignablesData["hydra:member"] ?? [],
       );
-      const projectMap = new Map<string, Set<string>>();
+      const boardMap = new Map<string, Set<string>>();
       const titleMap = new Map<string, string>();
-      const projects = projectsData.member ?? projectsData["hydra:member"] ?? [];
-      for (const project of projects) {
-        projectMap.set(
-          project["@id"],
-          new Set(project.members.map((m) => m["@id"])),
+      const boards = boardsData.member ?? boardsData["hydra:member"] ?? [];
+      for (const board of boards) {
+        boardMap.set(
+          board["@id"],
+          new Set(board.members.map((m) => m["@id"])),
         );
-        titleMap.set(project["@id"], project.title);
+        titleMap.set(board["@id"], board.title);
       }
-      setProjectMembers(projectMap);
+      setProjectMembers(boardMap);
       setProjectTitles(titleMap);
     } catch (err) {
       // AbortError is a normal control-flow signal here, not a failure —
@@ -1024,11 +1024,11 @@ const Tasks = () => {
           : undefined;
       // The current user is always a valid assignee for a task they own —
       // mirrors the server's ValidAssignees rule (owner is always allowed),
-      // which matters on a personal / private board where the project lists
+      // which matters on a personal / private board where the board lists
       // no other members.
       const ownsTask = task.owner["@id"] === currentUserIri;
 
-      if (!task.project) {
+      if (!task.board) {
         // Personal task — only the owner is assignable. For an admin viewing
         // someone else's personal task, fall back to its current assignees
         // (already known-valid).
@@ -1036,18 +1036,18 @@ const Tasks = () => {
         return task.assignees;
       }
 
-      const memberIris = projectMembers.get(task.project);
+      const memberIris = boardMembers.get(task.board);
       const base = memberIris
         ? assignableUsers.filter((u) => memberIris.has(u["@id"]))
         : assignableUsers;
-      // Guarantee the owner is offered even if the project's member list
+      // Guarantee the owner is offered even if the board's member list
       // hasn't caught up (e.g. a private space with no member projection).
       if (self && ownsTask && !base.some((u) => u["@id"] === self["@id"])) {
         return [self, ...base];
       }
       return base;
     },
-    [assignableUsers, projectMembers, currentUserIri],
+    [assignableUsers, boardMembers, currentUserIri],
   );
 
   // Users that have ever been assigned to a task on the page — drives the
@@ -1231,9 +1231,9 @@ const Tasks = () => {
               <p className="text-sm text-muted-foreground">Loading space…</p>
             )
           ) : view === "board" ? (
-            <TasksProjectBoard
+            <TasksBoardView
               tasks={filteredTasks}
-              projectTitles={projectTitles}
+              boardTitles={boardTitles}
               onOpen={openTaskDetail}
             />
           ) : (

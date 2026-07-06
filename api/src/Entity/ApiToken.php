@@ -116,7 +116,7 @@ class ApiToken
     /**
      * Optional capability narrowing for this token, in the shared
      * {@see AccessPolicy} shape: `{ categories: { tasks: 'view', … },
-     * items: { project: { '<uuid>': 'edit' } } }`. `null` = unrestricted
+     * items: { board: { '<uuid>': 'edit' } } }`. `null` = unrestricted
      * (acts exactly as the owner). Validated by {@see validateAccessPolicy()}.
      *
      * @var array<string, mixed>|null

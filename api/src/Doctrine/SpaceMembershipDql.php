@@ -12,7 +12,7 @@ use App\Entity\UserGroup;
  * tools, the media-download controller, and the task repository.
  *
  * The fragment expects the caller to:
- *  - alias the project (or any entity holding a `space` association)
+ *  - alias the board (or any entity holding a `space` association)
  *    in their query and pass the alias in,
  *  - bind `:user` (or the parameter name they pass in) to the User.
  *
@@ -29,7 +29,7 @@ final class SpaceMembershipDql
     }
 
     public static function userBelongsToProjectSpace(
-        string $projectAlias,
+        string $boardAlias,
         string $aliasPrefix = 'sm_check',
         string $userParam = 'user',
     ): string {
@@ -38,7 +38,7 @@ final class SpaceMembershipDql
             SpaceMembership::class,
             $aliasPrefix,
             $aliasPrefix,
-            $projectAlias,
+            $boardAlias,
             $aliasPrefix,
             $userParam,
         );
@@ -51,7 +51,7 @@ final class SpaceMembershipDql
             $aliasPrefix,
             $aliasPrefix,
             $aliasPrefix,
-            $projectAlias,
+            $boardAlias,
             $aliasPrefix,
             $userParam,
         );

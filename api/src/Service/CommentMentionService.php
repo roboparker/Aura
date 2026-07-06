@@ -11,7 +11,7 @@ use App\Entity\User;
  * one `mention` Notification per resolved recipient. The recipient
  * set is derived from the comment's parent:
  *
- *  - task comments: task owner + project space members.
+ *  - task comments: task owner + board space members.
  *  - page comments: page's space members.
  *  - discussion comments: discussion's space members.
  *
@@ -114,7 +114,7 @@ final class CommentMentionService
     /**
      * Recipient set for the comment's parent.
      *
-     *  - Task: owner + project space members. Standalone (projectless)
+     *  - Task: owner + board space members. Standalone (boardless)
      *    tasks yield just the owner.
      *  - Page: page's space members (effective: direct + via group).
      *
@@ -130,9 +130,9 @@ final class CommentMentionService
             if (null !== $owner) {
                 $bag[$this->localPart($owner)] = $owner;
             }
-            $project = $task->getProject();
-            if (null !== $project) {
-                foreach ($project->getEffectiveMembers() as $member) {
+            $board = $task->getBoard();
+            if (null !== $board) {
+                foreach ($board->getEffectiveMembers() as $member) {
                     $bag[$this->localPart($member)] = $member;
                 }
             }

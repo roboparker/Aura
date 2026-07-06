@@ -6,14 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 /**
- * Inline list tabs for the space detail page: Projects / Discussions /
+ * Inline list tabs for the space detail page: Boards / Discussions /
  * Pages / Tasks. Each tab independently fetches its own list filtered
- * by `?space=<iri>` (or `?project.space=` for tasks, which doesn't
+ * by `?space=<iri>` (or `?board.space=` for tasks, which doesn't
  * carry its own space FK).
  *
  * Kept intentionally lean — title + a small meta row + a link out to
  * the resource's detail page. The top-level aggregators
- * (/projects, /discussions, /pages, /tasks) remain the place for
+ * (/boards, /discussions, /pages, /tasks) remain the place for
  * filter chips, search, and bulk actions.
  */
 
@@ -90,10 +90,10 @@ function useFetchList<T>({ spaceIri, url, enabled }: FetchListOpts) {
 /* eslint-enable react-hooks/exhaustive-deps */
 
 // ---------------------------------------------------------------------
-// Projects
+// Boards
 // ---------------------------------------------------------------------
 
-interface ProjectRow {
+interface BoardRow {
   "@id": string;
   id: string;
   title: string;
@@ -103,11 +103,11 @@ interface ProjectRow {
 }
 
 export const SpaceProjectsList = ({ spaceIri, enabled }: { spaceIri: string | null; enabled: boolean }) => {
-  const { items, isLoading, error } = useFetchList<ProjectRow>({
+  const { items, isLoading, error } = useFetchList<BoardRow>({
     spaceIri,
     enabled,
     url: (s) =>
-      `${ENTRYPOINT}/projects?space=${encodeURIComponent(s)}&itemsPerPage=100`,
+      `${ENTRYPOINT}/boards?space=${encodeURIComponent(s)}&itemsPerPage=100`,
   });
 
   if (error) {
@@ -123,20 +123,20 @@ export const SpaceProjectsList = ({ spaceIri, enabled }: { spaceIri: string | nu
       <Card>
         <CardContent className="pt-6">
           <p className="text-muted-foreground text-sm">
-            No projects in this space yet.
+            No boards in this space yet.
           </p>
         </CardContent>
       </Card>
     );
   }
   return (
-    <ul className="space-y-2" data-testid="space-projects-list">
+    <ul className="space-y-2" data-testid="space-boards-list">
       {items.map((p) => (
-        <li key={p["@id"]} data-testid="space-project-item">
+        <li key={p["@id"]} data-testid="space-board-item">
           <Card>
             <CardContent className="pt-4 pb-4">
               <Link
-                href={`/projects/${p.id}`}
+                href={`/boards/${p.id}`}
                 className="font-semibold text-foreground no-underline hover:underline"
               >
                 {p.title}
@@ -320,7 +320,7 @@ interface TaskRow {
   title: string;
   createdOn: string;
   completedOn: string | null;
-  project: { id: string; title: string } | null;
+  board: { id: string; title: string } | null;
 }
 
 export const SpaceTasksList = ({
@@ -330,15 +330,15 @@ export const SpaceTasksList = ({
   spaceIri: string | null;
   enabled: boolean;
 }) => {
-  // Task has no direct space FK; filter by `project.space` (added to
+  // Task has no direct space FK; filter by `board.space` (added to
   // the SearchFilter property list on Task). Excludes standalone
-  // personal tasks (no project) by design — those don't live in any
+  // personal tasks (no board) by design — those don't live in any
   // space.
   const { items, isLoading, error } = useFetchList<TaskRow>({
     spaceIri,
     enabled,
     url: (s) =>
-      `${ENTRYPOINT}/tasks?project.space=${encodeURIComponent(s)}&itemsPerPage=100`,
+      `${ENTRYPOINT}/tasks?board.space=${encodeURIComponent(s)}&itemsPerPage=100`,
   });
 
   if (error) {
@@ -375,12 +375,12 @@ export const SpaceTasksList = ({
                 >
                   {t.title}
                 </span>
-                {t.project && (
+                {t.board && (
                   <Link
-                    href={`/projects/${t.project.id}`}
+                    href={`/boards/${t.board.id}`}
                     className="text-xs text-muted-foreground hover:underline"
                   >
-                    in {t.project.title}
+                    in {t.board.title}
                   </Link>
                 )}
               </div>

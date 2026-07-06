@@ -13,7 +13,7 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Shared media container. Owned by the uploading user, referenced by
- * domain entities (User.avatar today; tasks/projects/comments later).
+ * domain entities (User.avatar today; tasks/boards/comments later).
  * `variants` stores a map of variant name to Flysystem path — images get
  * "thumb"/"profile" entries; plain attachments use "original".
  */
@@ -61,7 +61,7 @@ class MediaObject
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -69,7 +69,7 @@ class MediaObject
     private ?User $owner = null;
 
     #[ORM\Column(length: 32)]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private string $kind = self::KIND_ATTACHMENT;
 
     /** @var array<string, string> */
@@ -77,19 +77,19 @@ class MediaObject
     private array $variants = [];
 
     #[ORM\Column(length: 255)]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private string $originalName = '';
 
     #[ORM\Column(length: 100)]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private string $mimeType = '';
 
     #[ORM\Column(type: 'integer')]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private int $byteSize = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     private \DateTimeImmutable $createdOn;
 
     public function __construct()
@@ -185,7 +185,7 @@ class MediaObject
      *
      * @return array<string, string>
      */
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     public function getVariantUrls(): array
     {
         $urls = [];
@@ -202,7 +202,7 @@ class MediaObject
      * attachment kinds keeps the frontend selector trivial: prefer
      * `downloadUrl` when present, fall back to `variantUrls.original`.
      */
-    #[Groups(['media_object:read', 'task:read', 'space:read'])]
+    #[Groups(['media_object:read', 'task:read', 'space:read', 'engagement:read'])]
     public function getDownloadUrl(): ?string
     {
         if (self::KIND_ATTACHMENT !== $this->kind) {

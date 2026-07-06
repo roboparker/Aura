@@ -45,7 +45,7 @@ export interface CalendarEntry {
   completedOn: string | null;
   /** True for a live recurring series (drag prompts this/all). */
   recurring: boolean;
-  project: { "@id": string; id: string; title: string } | null;
+  board: { "@id": string; id: string; title: string } | null;
   assignees: (AvatarUser & { "@id": string })[];
   tags: { "@id": string; id: string; title: string; color: string }[];
 }
@@ -166,7 +166,7 @@ const DayCell = ({
         tall ? "min-h-40" : "min-h-24",
         !inMonth && "bg-muted/20 text-muted-foreground",
         isOver && "bg-foreground/5 ring-1 ring-inset ring-foreground/15",
-        // Today gets a green outline (matches the project calendar).
+        // Today gets a green outline (matches the board calendar).
         isToday && "ring-2 ring-inset ring-emerald-500",
       )}
       data-testid="calendar-day"

@@ -139,7 +139,6 @@ const PagesIndex = () => {
           <PageHeader
             title="Pages"
             icon={<PagesIcon className={cn("h-6 w-6 shrink-0", pagesMeta.iconClass)} />}
-            count={isLoading ? null : pages.length}
             subtitle={
               activeSpace
                 ? `Long-form documents in ${activeSpace.name}.`

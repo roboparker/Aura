@@ -131,9 +131,9 @@ export interface Task {
   position: number;
   tags: Tag[];
   assignees: AssigneeOption[];
-  // The API serializes Task.project as a bare IRI string under `task:read`.
+  // The API serializes Task.board as a bare IRI string under `task:read`.
   // null means "personal task" — only the owner is assignable.
-  project: string | null;
+  board: string | null;
 }
 
 export const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {

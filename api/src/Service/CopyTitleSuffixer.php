@@ -6,7 +6,7 @@ namespace App\Service;
 
 /**
  * Appends the idempotent " (copy)" suffix used when cloning a titled entity
- * (project / page / discussion), truncating to fit the entity's title column.
+ * (board / page / discussion), truncating to fit the entity's title column.
  * Idempotent so repeated copies don't pile up "(copy) (copy) (copy)". Pulled
  * out of the three copy controllers that each carried an identical copy.
  */

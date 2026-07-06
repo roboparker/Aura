@@ -41,7 +41,7 @@ const AllDiscussionsPage = () => {
               isSpaceAdmin={isActiveSpaceAdmin}
               canCreate={can("discussions", "create")}
               title="Discussions"
-              description="Space-level threads — announcements, ideas, Q&A, and anything that doesn’t belong inside a project."
+              description="Space-level threads — announcements, ideas, Q&A, and anything that doesn’t belong inside a board."
               icon={
                 <MessagesSquare className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />
               }

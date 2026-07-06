@@ -28,12 +28,14 @@ final class AccessPolicy
 
     public const CATEGORIES = [
         'tasks',
-        'projects',
+        'boards',
         'pages',
         'discussions',
         'comments',
         'notifications',
         'files',
+        'time_entries',
+        'invoices',
         // Account surfaces (token actors only — not impersonation, which uses
         // User::IMPERSONATION_CATEGORIES). 'profile' gates /api/me + /me/preferences;
         // 'security' gates /me/2fa, /me/sessions, account lifecycle, change-password.
@@ -41,11 +43,11 @@ final class AccessPolicy
         'security',
     ];
 
-    public const ITEM_TYPES = ['project', 'page', 'task', 'discussion'];
+    public const ITEM_TYPES = ['board', 'page', 'task', 'discussion'];
 
     /** @var array<string, string> item type → owning category */
     private const ITEM_TYPE_CATEGORY = [
-        'project' => 'projects',
+        'board' => 'boards',
         'page' => 'pages',
         'task' => 'tasks',
         'discussion' => 'discussions',

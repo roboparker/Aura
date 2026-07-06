@@ -17,7 +17,7 @@
 // natural home is the user's workspace (their Private space is made
 // active on a fresh sign-in by ActiveSpaceContext), not the settings
 // shell.
-const FALLBACK_PATH = "/projects";
+const FALLBACK_PATH = "/boards";
 
 // Arbitrary base used to round-trip user-supplied `next` through the
 // URL parser. The host/protocol are bogus so we can detect any value
@@ -44,7 +44,7 @@ export const isSafeNextPath = (candidate: unknown): candidate is string => {
   if (!candidate.startsWith("/")) return false;
   if (candidate.startsWith("//")) return false;
   if (candidate.startsWith("/\\")) return false;
-  // Reject unresolved Next.js dynamic-route patterns like "/projects/[id]" —
+  // Reject unresolved Next.js dynamic-route patterns like "/boards/[id]" —
   // handed to router.push they throw "missing query values (id)", which
   // aborts the navigation (so sign-in appears to do nothing). These leak in
   // when router.asPath is read before the router is ready.

@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
 use App\Entity\Notification;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\SpaceRole;
 use App\Entity\Task;
 use App\Entity\User;
@@ -31,7 +31,7 @@ class CommentTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -130,8 +130,8 @@ class CommentTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         $client = static::createClient();
         $client->loginUser($bob);
@@ -231,8 +231,8 @@ class CommentTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
         $bobsComment = $this->seedComment($bob, $task, 'Bob said');
 
         $client = static::createClient();
@@ -260,12 +260,12 @@ class CommentTest extends ApiTestCase
 
     public function testTaskOwnerCanDeleteAnyCommentOnTheirTask(): void
     {
-        // Project lead sweeps up after a teammate — owner of the task
+        // Board lead sweeps up after a teammate — owner of the task
         // should be allowed to remove a comment they didn't author.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
         $bobsComment = $this->seedComment($bob, $task, 'Off-topic');
 
         $client = static::createClient();
@@ -281,9 +281,9 @@ class CommentTest extends ApiTestCase
         // is via a role that lacks comments.delete.
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $this->restrictComments($project, $bob, ['comments' => ['read' => true]]);
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $this->restrictComments($board, $bob, ['comments' => ['read' => true]]);
+        $task = $this->createTaskInProject($alice, $board, 'Task');
         $aliceComment = $this->seedComment($alice, $task, 'Owner note');
 
         $client = static::createClient();
@@ -296,9 +296,9 @@ class CommentTest extends ApiTestCase
     /**
      * @param array<string, array<string, bool>> $permissions
      */
-    private function restrictComments(Project $project, User $user, array $permissions): void
+    private function restrictComments(Board $board, User $user, array $permissions): void
     {
-        $space = $project->getSpace();
+        $space = $board->getSpace();
         if (null === $space) {
             return;
         }
@@ -370,8 +370,8 @@ class CommentTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Plan launch');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Plan launch');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -397,10 +397,10 @@ class CommentTest extends ApiTestCase
     public function testMentionOfNonMemberIsIgnored(): void
     {
         $alice = $this->createUser('alice@example.com');
-        // Charlie exists but isn't a member of the task's project.
+        // Charlie exists but isn't a member of the task's board.
         $charlie = $this->createUser('charlie@example.com');
-        $project = $this->createSharedProject($alice, [$alice], 'Solo');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice], 'Solo');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -426,8 +426,8 @@ class CommentTest extends ApiTestCase
     public function testMentionDoesNotNotifyAuthor(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createSharedProject($alice, [$alice], 'Solo');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice], 'Solo');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -451,8 +451,8 @@ class CommentTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -489,8 +489,8 @@ class CommentTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
         $carol = $this->createUser('carol@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob, $carol], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -528,8 +528,8 @@ class CommentTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->createSharedProject($alice, [$alice, $bob], 'Team');
-        $task = $this->createTaskInProject($alice, $project, 'Task');
+        $board = $this->createSharedProject($alice, [$alice, $bob], 'Team');
+        $task = $this->createTaskInProject($alice, $board, 'Task');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -570,11 +570,11 @@ class CommentTest extends ApiTestCase
         return $task;
     }
 
-    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    private function createTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -584,17 +584,17 @@ class CommentTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function createSharedProject(User $owner, array $members, string $title): Project
+    private function createSharedProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     /**

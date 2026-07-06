@@ -11,7 +11,7 @@ use App\Entity\Space;
  * `reference.discussion` — references one or more discussions. Scope
  * is the field's space; a discussion is in-scope iff
  * `discussion.space === field.space`. The denormalised `space` column
- * is kept in sync with the parent project on persist + move, so this
+ * is kept in sync with the parent board on persist + move, so this
  * comparison is cheap and consistent.
  */
 final class DiscussionReferenceStrategy extends AbstractReferenceStrategy

@@ -29,6 +29,11 @@ services:
       # Calendar-sync webhooks (#582 Phase D): public HTTPS origin providers
       # POST change-notifications to. Blank = webhooks off (poll still syncs).
       CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
+      # Sentry monitoring — blank DSN = disabled (values live in the server .env).
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       # Hostname for the Umami dashboard site block in the Caddyfile.
       # Prod: analytics.<domain> (with a matching DNS A record).
@@ -110,6 +115,11 @@ services:
       # Calendar-sync webhooks (#582 Phase D): the worker creates/renews the
       # provider subscriptions on the pull cron, so it needs the base URL too.
       CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
+      # Sentry monitoring — the worker reports cron/messenger failures too.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}

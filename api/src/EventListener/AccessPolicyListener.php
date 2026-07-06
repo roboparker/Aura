@@ -20,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
  * Each request maps to an action by HTTP method (GET/HEAD = view, else =
  * edit) and to one of these shapes by path:
  *
- *  - Item route of an addressable type (`/projects/{id}` + sub-resources):
+ *  - Item route of an addressable type (`/boards/{id}` + sub-resources):
  *    governed by the EFFECTIVE item level (per-item override else category).
- *  - Collection of an addressable type (`/projects`, `/tasks`, …): reads are
+ *  - Collection of an addressable type (`/boards`, `/tasks`, …): reads are
  *    always allowed because AccessPolicyItemScope filters the rows to what's
  *    viewable; writes (create) require the category to be 'edit'.
  *  - Any other content category (`/comments`, `/notifications`, `/media-objects`):
@@ -56,13 +56,16 @@ final class AccessPolicyListener
     private const PREFIX_TO_CATEGORY = [
         'tasks' => 'tasks',
         'tags' => 'tasks',
-        'projects' => 'projects',
-        'custom_field_definitions' => 'projects',
+        'boards' => 'boards',
+        'custom_field_definitions' => 'boards',
         'pages' => 'pages',
         'discussions' => 'discussions',
         'comments' => 'comments',
         'notifications' => 'notifications',
         'media-objects' => 'files',
+        'time_entries' => 'time_entries',
+        'clients' => 'invoices',
+        'invoices' => 'invoices',
     ];
 
     /**
@@ -72,7 +75,7 @@ final class AccessPolicyListener
      * @var array<string, string>
      */
     private const PREFIX_TO_ITEM_TYPE = [
-        'projects' => 'project',
+        'boards' => 'board',
         'pages' => 'page',
         'tasks' => 'task',
         'discussions' => 'discussion',

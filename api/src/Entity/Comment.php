@@ -47,7 +47,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  * `@mention` tokens in `body` are scanned by
  * {@see App\Service\CommentMentionService} after persist and create
  * one `mention` Notification per resolved recipient. The recipient
- * set is derived from the parent (task: owner + project space; page /
+ * set is derived from the parent (task: owner + board space; page /
  * discussion: the parent's space).
  */
 #[ApiResource(

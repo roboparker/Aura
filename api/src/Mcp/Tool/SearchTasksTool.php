@@ -30,7 +30,7 @@ final class SearchTasksTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Full-text search over tasks the user can read, matching against title, description, and comment bodies. Returns up to "limit" results (default 20, max 50). Optionally narrow to one projectId.';
+        return 'Full-text search over tasks the user can read, matching against title, description, and comment bodies. Returns up to "limit" results (default 20, max 50). Optionally narrow to one boardId.';
     }
 
     public function getInputSchema(): array
@@ -39,7 +39,7 @@ final class SearchTasksTool implements McpToolInterface
             'type' => 'object',
             'properties' => [
                 'query' => ['type' => 'string', 'description' => 'Search string (case-insensitive substring).'],
-                'projectId' => ['type' => 'string', 'description' => 'Restrict to one project.'],
+                'boardId' => ['type' => 'string', 'description' => 'Restrict to one board.'],
                 'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_LIMIT, 'default' => 20],
             ],
             'required' => ['query'],
@@ -58,7 +58,7 @@ final class SearchTasksTool implements McpToolInterface
 
         $qb = $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->leftJoin(Comment::class, 'c', 'WITH', 'c.task = t')
             ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'search_tasks'))
             ->andWhere('LOWER(t.title) LIKE :q OR LOWER(t.description) LIKE :q OR LOWER(c.body) LIKE :q')
@@ -68,8 +68,8 @@ final class SearchTasksTool implements McpToolInterface
             ->orderBy('t.createdOn', 'DESC')
             ->setMaxResults($limit);
 
-        if (null !== $projectId = $this->input->optionalUuid('projectId', $arguments['projectId'] ?? null)) {
-            $qb->andWhere('t.project = :projectId')->setParameter('projectId', $projectId);
+        if (null !== $boardId = $this->input->optionalUuid('boardId', $arguments['boardId'] ?? null)) {
+            $qb->andWhere('t.board = :boardId')->setParameter('boardId', $boardId);
         }
 
         /** @var list<Task> $tasks */

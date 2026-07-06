@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Doctrine\SpaceMembershipDql;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\Subscription;
 use App\Entity\User;
@@ -11,6 +12,10 @@ use Doctrine\Persistence\ManagerRegistry;
 
 /**
  * @extends ServiceEntityRepository<Subscription>
+ *
+ * Resolution is **account-first** (#billing Phase 1b): a subscription belongs to
+ * an {@see Organization} or a {@see User} (personal). The legacy per-space rows
+ * are still honoured as a transitional fallback until they're dropped.
  */
 final class SubscriptionRepository extends ServiceEntityRepository
 {
@@ -19,18 +24,93 @@ final class SubscriptionRepository extends ServiceEntityRepository
         parent::__construct($registry, Subscription::class);
     }
 
+    /** The organization's current entitling subscription (newest), or null. */
+    public function findActiveForOrganization(Organization $organization): ?Subscription
+    {
+        return $this->newestEntitling('s.organization = :account', 'account', $organization);
+    }
+
+    /** The user's personal entitling subscription (newest), or null. */
+    public function findActiveForUser(User $user): ?Subscription
+    {
+        return $this->newestEntitling('s.ownerUser = :account', 'account', $user);
+    }
+
     /**
-     * The space's current entitling subscription, or null if it's on the
-     * free plan. Filters to {@see Subscription::ENTITLING_STATUSES} and takes
-     * the newest, since a space can carry historical (canceled) rows.
+     * The subscription that governs a space: its organization account, else a
+     * legacy space-owned row, else the creator's personal account.
      */
     public function findActiveForSpace(Space $space): ?Subscription
     {
+        $organization = $space->getOrganization();
+        if (null !== $organization) {
+            return $this->findActiveForOrganization($organization);
+        }
+        $legacy = $this->newestEntitling('s.space = :account', 'account', $space);
+        if (null !== $legacy) {
+            return $legacy;
+        }
+        $creator = $space->getCreatedBy();
+
+        return null === $creator ? null : $this->findActiveForUser($creator);
+    }
+
+    public function findByStripeSubscriptionId(string $stripeSubscriptionId): ?Subscription
+    {
+        return $this->findOneBy(['stripeSubscriptionId' => $stripeSubscriptionId]);
+    }
+
+    /**
+     * True if the user is entitled through any account they belong to.
+     */
+    public function userHasActiveEntitlement(User $user): bool
+    {
+        return [] !== $this->entitlingPlansForUser($user);
+    }
+
+    /**
+     * Distinct plans the user is entitled to, across every account they belong
+     * to: organizations they're a member of, their personal account, and any
+     * legacy space-owned subscriptions reachable through space membership.
+     *
+     * @return list<string>
+     */
+    public function entitlingPlansForUser(User $user): array
+    {
+        $em = $this->getEntityManager();
+
+        $orgPlans = $em->createQuery(sprintf(
+            'SELECT DISTINCT s.plan FROM %s s JOIN s.organization o JOIN o.memberships m'
+            . ' WHERE m.user = :user AND s.status IN (:statuses)',
+            Subscription::class,
+        ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
+            ->getSingleColumnResult();
+
+        $personalPlans = $em->createQuery(sprintf(
+            'SELECT DISTINCT s.plan FROM %s s WHERE s.ownerUser = :user AND s.status IN (:statuses)',
+            Subscription::class,
+        ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
+            ->getSingleColumnResult();
+
+        $legacyPlans = $em->createQuery(sprintf(
+            'SELECT DISTINCT s.plan FROM %s s WHERE s.space IS NOT NULL AND s.status IN (:statuses) AND %s',
+            Subscription::class,
+            SpaceMembershipDql::userBelongsToProjectSpace('s'),
+        ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
+            ->getSingleColumnResult();
+
+        $merged = array_merge($orgPlans, $personalPlans, $legacyPlans);
+
+        return array_values(array_unique(array_filter($merged, 'is_string')));
+    }
+
+    private function newestEntitling(string $predicate, string $param, mixed $value): ?Subscription
+    {
         /** @var Subscription|null $result */
         $result = $this->createQueryBuilder('s')
-            ->where('s.space = :space')
+            ->where($predicate)
             ->andWhere('s.status IN (:statuses)')
-            ->setParameter('space', $space)
+            ->setParameter($param, $value)
             ->setParameter('statuses', Subscription::ENTITLING_STATUSES)
             ->orderBy('s.createdAt', 'DESC')
             ->setMaxResults(1)
@@ -38,37 +118,5 @@ final class SubscriptionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
 
         return $result;
-    }
-
-    /**
-     * Look a subscription up by its Stripe id — the webhook handler's
-     * primary key into our mirror of Stripe state.
-     */
-    public function findByStripeSubscriptionId(string $stripeSubscriptionId): ?Subscription
-    {
-        return $this->findOneBy(['stripeSubscriptionId' => $stripeSubscriptionId]);
-    }
-
-    /**
-     * True if the user belongs (directly or via a group) to at least one
-     * space with an entitling subscription — i.e. they get unlimited
-     * automation throughput. Reuses the shared space-membership EXISTS
-     * fragment so the "(direct OR via group)" rule stays in one place.
-     */
-    public function userHasActiveEntitlement(User $user): bool
-    {
-        $dql = sprintf(
-            'SELECT COUNT(s.id) FROM %s s WHERE s.status IN (:statuses) AND %s',
-            Subscription::class,
-            SpaceMembershipDql::userBelongsToProjectSpace('s'),
-        );
-
-        $count = (int) $this->getEntityManager()
-            ->createQuery($dql)
-            ->setParameter('statuses', Subscription::ENTITLING_STATUSES)
-            ->setParameter('user', $user)
-            ->getSingleScalarResult();
-
-        return $count > 0;
     }
 }

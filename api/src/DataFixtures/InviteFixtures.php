@@ -35,7 +35,7 @@ class InviteFixtures extends Fixture implements DependentFixtureInterface
     {
         return [
             UserFixtures::class,
-            ProjectFixtures::class,
+            BoardFixtures::class,
         ];
     }
 
@@ -46,9 +46,9 @@ class InviteFixtures extends Fixture implements DependentFixtureInterface
         /** @var User $noah */
         $noah = $this->getReference(UserFixtures::TEAM_USER_REFERENCES[0], User::class);
         /** @var Space $launchSpace */
-        $launchSpace = $this->getReference(ProjectFixtures::LAUNCH_SPACE_REFERENCE, Space::class);
+        $launchSpace = $this->getReference(BoardFixtures::LAUNCH_SPACE_REFERENCE, Space::class);
         /** @var UserGroup $engineering */
-        $engineering = $this->getReference(ProjectFixtures::ENGINEERING_GROUP_REFERENCE, UserGroup::class);
+        $engineering = $this->getReference(BoardFixtures::ENGINEERING_GROUP_REFERENCE, UserGroup::class);
 
         $now = new \DateTimeImmutable();
 

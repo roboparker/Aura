@@ -26,7 +26,7 @@ const GuidesIndex = ({ sections }: Props) => (
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             User-facing how-tos and developer reference, rendered from the
-            project&apos;s markdown docs.
+            board&apos;s markdown docs.
           </p>
         </header>
 

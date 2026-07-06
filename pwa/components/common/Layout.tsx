@@ -57,7 +57,7 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex flex-1 min-w-0 flex-col">
-        {/* Above the page's sticky layers (project title/tabs bar = z-30,
+        {/* Above the page's sticky layers (board title/tabs bar = z-30,
             column header = z-20) so a short page scrolling up can't push them
             over the navbar. Stays below portalled popovers/menus (z-50). */}
         <div className="sticky top-0 z-40">

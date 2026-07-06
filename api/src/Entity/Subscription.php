@@ -27,6 +27,8 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Entity(repositoryClass: SubscriptionRepository::class)]
 #[ORM\Table(name: 'subscription')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_subscription_space')]
+#[ORM\Index(columns: ['organization_id'], name: 'idx_subscription_organization')]
+#[ORM\Index(columns: ['owner_user_id'], name: 'idx_subscription_owner_user')]
 #[ORM\Index(columns: ['created_by_id'], name: 'idx_subscription_created_by')]
 #[ORM\UniqueConstraint(name: 'uniq_subscription_stripe_id', columns: ['stripe_subscription_id'])]
 class Subscription
@@ -65,13 +67,28 @@ class Subscription
     private ?Uuid $id = null;
 
     /**
-     * The space this subscription pays for. Never a personal space.
-     * onDelete CASCADE: deleting the space removes its billing rows (the
-     * webhook handler / portal cancellation is responsible for stopping
-     * the Stripe-side subscription first).
+     * The **account** this subscription pays for (#billing Phase 1b): either an
+     * {@see Organization} (a team account) or a {@see User} (a personal
+     * account) — exactly one is set for new rows. Legacy rows also carry the
+     * originating {@see $space} (now nullable + transitional); resolution goes
+     * account-first, falling back to the space.
+     */
+    #[ORM\ManyToOne(targetEntity: Organization::class)]
+    #[ORM\JoinColumn(name: 'organization_id', nullable: true, onDelete: 'CASCADE')]
+    private ?Organization $organization = null;
+
+    /** The personal account (a User) this subscription pays for, when personal. */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(name: 'owner_user_id', nullable: true, onDelete: 'CASCADE')]
+    private ?User $ownerUser = null;
+
+    /**
+     * Legacy: the space this subscription originally paid for (transitional;
+     * superseded by {@see $organization}). Nullable now; a later cleanup drops
+     * it once nothing reads it.
      */
     #[ORM\ManyToOne(targetEntity: Space::class)]
-    #[ORM\JoinColumn(name: 'space_id', nullable: false, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(name: 'space_id', nullable: true, onDelete: 'CASCADE')]
     private ?Space $space = null;
 
     #[ORM\Column(length: 32, options: ['default' => self::PLAN_TEAM])]
@@ -130,6 +147,28 @@ class Subscription
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    public function getOrganization(): ?Organization
+    {
+        return $this->organization;
+    }
+
+    public function setOrganization(?Organization $organization): static
+    {
+        $this->organization = $organization;
+        return $this;
+    }
+
+    public function getOwnerUser(): ?User
+    {
+        return $this->ownerUser;
+    }
+
+    public function setOwnerUser(?User $ownerUser): static
+    {
+        $this->ownerUser = $ownerUser;
+        return $this;
     }
 
     public function getSpace(): ?Space

@@ -31,12 +31,12 @@ use Symfony\Component\Validator\Constraints as Assert;
  * {@see App\CustomField\Type\CustomFieldTypeInterface} strategy registry, so
  * validation, value editors, footers, and search behave identically — the
  * only difference is scope. A global field lives in its own table, belongs
- * to no space, and is available to every project in every space.
+ * to no space, and is available to every board in every space.
  *
  * Only platform admins (`ROLE_ADMIN`) create / edit / delete definitions;
- * any authenticated user may read them (so they render in the project field
- * picker) and toggle them on/off per project via
- * {@see Project::$globalCustomFieldDefinitions}. A project's effective field
+ * any authenticated user may read them (so they render in the board field
+ * picker) and toggle them on/off per board via
+ * {@see Board::$globalCustomFieldDefinitions}. A board's effective field
  * set is the union of its space fields + its opted-in global fields.
  *
  * The `reference` kind is disallowed for global fields in v1 — a reference
@@ -67,7 +67,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['global_custom_field_definition:write']],
     order: ['position' => 'ASC', 'createdAt' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['projects' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['boards' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: GlobalCustomFieldDefinitionRepository::class)]
 #[ORM\Table(name: 'global_custom_field_definition')]
@@ -156,8 +156,8 @@ class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
     /**
      * Default surface visibility — where the field shows: the task list
      * (`list`), the Kanban board (`board`), or both. Like the space-owned
-     * field, this is the per-project fallback: a {@see ProjectFieldVisibility}
-     * override row wins in a project context (#custom-fields-project). Unlike
+     * field, this is the per-board fallback: a {@see BoardFieldVisibility}
+     * override row wins in a board context (#custom-fields-board). Unlike
      * the space field, admins set this default directly (it is writable) since
      * there is no per-space manager to own it.
      */
@@ -174,29 +174,29 @@ class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
     private \DateTimeImmutable $createdAt;
 
     /**
-     * Projects that have opted this global field into their task view.
+     * Boards that have opted this global field into their task view.
      * Inverse side — the join table is owned by
-     * {@see Project::$globalCustomFieldDefinitions}. Backs the `?projects=`
-     * filter the PWA uses to fetch a project's effective global field set.
+     * {@see Board::$globalCustomFieldDefinitions}. Backs the `?boards=`
+     * filter the PWA uses to fetch a board's effective global field set.
      *
-     * @var Collection<int, Project>
+     * @var Collection<int, Board>
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToMany(targetEntity: Project::class, mappedBy: 'globalCustomFieldDefinitions')]
-    private Collection $projects;
+    #[ORM\ManyToMany(targetEntity: Board::class, mappedBy: 'globalCustomFieldDefinitions')]
+    private Collection $boards;
 
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
-        $this->projects = new ArrayCollection();
+        $this->boards = new ArrayCollection();
     }
 
     /**
-     * @return Collection<int, Project>
+     * @return Collection<int, Board>
      */
-    public function getProjects(): Collection
+    public function getBoards(): Collection
     {
-        return $this->projects;
+        return $this->boards;
     }
 
     public function getId(): ?Uuid

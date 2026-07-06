@@ -27,10 +27,10 @@ const NODES: PermissionNode[] = [
   {
     key: "content",
     label: "Content",
-    description: "tasks, projects, pages, discussions, comments",
+    description: "tasks, boards, pages, discussions, comments",
     children: [
       { key: "tasks", label: "Tasks" },
-      { key: "projects", label: "Projects" },
+      { key: "boards", label: "Boards" },
       { key: "pages", label: "Pages" },
       { key: "discussions", label: "Discussions" },
       { key: "comments", label: "Comments" },
@@ -42,7 +42,7 @@ const NODES: PermissionNode[] = [
 
 const DEFAULT_ACCESS: Record<ImpersonationCategory, ImpersonationLevel> = {
   tasks: "none",
-  projects: "none",
+  boards: "none",
   pages: "none",
   discussions: "none",
   comments: "none",

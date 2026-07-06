@@ -6,7 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\MediaObject;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -16,9 +16,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Branch coverage for the MCP server that the existing suites
  * ({@see McpTest}, {@see McpReadToolsTest}, {@see McpExtraToolsTest})
  * don't exercise:
- *  - {@see \App\Mcp\Tool\ListTasksTool} filter args (projectId, search,
- *    dueBefore, pagination) + an unreachable projectId.
- *  - {@see \App\Mcp\Tool\UpdateTaskTool} assigneeIds / projectId / tagIds
+ *  - {@see \App\Mcp\Tool\ListTasksTool} filter args (boardId, search,
+ *    dueBefore, pagination) + an unreachable boardId.
+ *  - {@see \App\Mcp\Tool\UpdateTaskTool} assigneeIds / boardId / tagIds
  *    branches and the entity-validation (422) path.
  *  - {@see \App\Mcp\Tool\DownloadFileTool} forbidden-file + malformed-id
  *    branches.
@@ -47,7 +47,7 @@ class McpToolBranchesTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\ApiToken')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -56,15 +56,15 @@ class McpToolBranchesTest extends ApiTestCase
     public function testListTasksFiltersByProjectId(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->makeProject($alice, [$alice], 'Scoped');
-        $this->makeTaskInProject($alice, $project, 'In project');
+        $board = $this->makeProject($alice, [$alice], 'Scoped');
+        $this->makeTaskInProject($alice, $board, 'In board');
         $this->makeTask($alice, 'Standalone');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'list_tasks',
-            'arguments' => ['projectId' => (string) $project->getId()],
+            'arguments' => ['boardId' => (string) $board->getId()],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
@@ -72,7 +72,7 @@ class McpToolBranchesTest extends ApiTestCase
         $items = $structured['items'] ?? null;
         $this->assertIsArray($items);
         $titles = array_column($items, 'title');
-        $this->assertContains('In project', $titles);
+        $this->assertContains('In board', $titles);
         $this->assertNotContains('Standalone', $titles);
     }
 
@@ -152,7 +152,7 @@ class McpToolBranchesTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        // A project alice can't see — filtering by it yields no rows (no error).
+        // A board alice can't see — filtering by it yields no rows (no error).
         $hidden = $this->makeProject($bob, [$bob], 'Hidden');
         $this->makeTask($alice, 'Visible to alice');
         $plain = $this->mintToken($alice, 'CLI');
@@ -160,7 +160,7 @@ class McpToolBranchesTest extends ApiTestCase
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'list_tasks',
-            'arguments' => ['projectId' => (string) $hidden->getId()],
+            'arguments' => ['boardId' => (string) $hidden->getId()],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
@@ -177,8 +177,8 @@ class McpToolBranchesTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $project = $this->makeProject($alice, [$alice, $bob], 'Team');
-        $task = $this->makeTaskInProject($alice, $project, 'Joint');
+        $board = $this->makeProject($alice, [$alice, $bob], 'Team');
+        $task = $this->makeTaskInProject($alice, $board, 'Joint');
         $plain = $this->mintToken($alice, 'CLI');
 
         $client = static::createClient();
@@ -201,7 +201,7 @@ class McpToolBranchesTest extends ApiTestCase
     public function testUpdateTaskMovesToProject(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->makeProject($alice, [$alice], 'Destination');
+        $board = $this->makeProject($alice, [$alice], 'Destination');
         $task = $this->makeTask($alice, 'Detached');
         $plain = $this->mintToken($alice, 'CLI');
 
@@ -210,15 +210,15 @@ class McpToolBranchesTest extends ApiTestCase
             'name' => 'update_task',
             'arguments' => [
                 'taskId' => (string) $task->getId(),
-                'projectId' => (string) $project->getId(),
+                'boardId' => (string) $board->getId(),
             ],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
         $this->assertIsArray($structured);
-        $project = $structured['project'] ?? null;
-        $this->assertIsArray($project);
-        $this->assertSame('Destination', $project['title']);
+        $board = $structured['board'] ?? null;
+        $this->assertIsArray($board);
+        $this->assertSame('Destination', $board['title']);
     }
 
     public function testUpdateTaskUnreachableProjectIsError(): void
@@ -234,7 +234,7 @@ class McpToolBranchesTest extends ApiTestCase
             'name' => 'update_task',
             'arguments' => [
                 'taskId' => (string) $task->getId(),
-                'projectId' => (string) $hidden->getId(),
+                'boardId' => (string) $hidden->getId(),
             ],
         ]);
         $this->assertTrue($body['result']['isError'] ?? null);
@@ -249,7 +249,7 @@ class McpToolBranchesTest extends ApiTestCase
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        // bob is neither the owner nor a member of any shared project, so
+        // bob is neither the owner nor a member of any shared board, so
         // ValidAssignees rejects him → entity validation (422) branch.
         $task = $this->makeTask($alice, 'Standalone');
         $plain = $this->mintToken($alice, 'CLI');
@@ -528,11 +528,11 @@ class McpToolBranchesTest extends ApiTestCase
         return $task;
     }
 
-    private function makeTaskInProject(User $owner, Project $project, string $title): Task
+    private function makeTaskInProject(User $owner, Board $board, string $title): Task
     {
         $task = new Task();
         $task->setOwner($owner);
-        $task->setProject($project);
+        $task->setBoard($board);
         $task->setTitle($title);
         $this->entityManager->persist($task);
         $this->entityManager->flush();
@@ -542,17 +542,17 @@ class McpToolBranchesTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function makeProject(User $owner, array $members, string $title): Project
+    private function makeProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function seedAttachment(User $owner, string $name): MediaObject

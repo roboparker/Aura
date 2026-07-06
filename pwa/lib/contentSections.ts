@@ -6,12 +6,12 @@ import {
 } from "lucide-react";
 
 /**
- * Shared identity for the three space-content surfaces (Projects /
+ * Shared identity for the three space-content surfaces (Boards /
  * Pages / Discussions): the lucide icon and its color. Single source of
  * truth so the aggregator page headers and the sidebar nav sections
  * always render the same icon + hue per resource.
  */
-export type ContentResource = "projects" | "pages" | "discussions";
+export type ContentResource = "boards" | "pages" | "discussions";
 
 export interface ContentSectionMeta {
   resource: ContentResource;
@@ -26,9 +26,9 @@ export interface ContentSectionMeta {
 
 export const CONTENT_SECTIONS: ContentSectionMeta[] = [
   {
-    resource: "projects",
-    label: "Projects",
-    singular: "project",
+    resource: "boards",
+    label: "Boards",
+    singular: "board",
     icon: FolderKanban,
     iconClass: "text-violet-600 dark:text-violet-400",
   },

@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -13,8 +13,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Coverage for the space-level activity feed (`/spaces/{id}/activity`),
- * which aggregates the audit history of a space's projects, pages, and
- * the tasks inside those projects. Drives entities through the real API
+ * which aggregates the audit history of a space's boards, pages, and
+ * the tasks inside those boards. Drives entities through the real API
  * so Gedmo's LoggableListener fires.
  */
 class SpaceActivityTest extends ApiTestCase
@@ -34,7 +34,7 @@ class SpaceActivityTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\ActivityLog')->execute();
     }
@@ -43,17 +43,17 @@ class SpaceActivityTest extends ApiTestCase
     {
         $owner = $this->createUser('owner@example.com');
         $member = $this->createUser('member@example.com');
-        $project = $this->seedProject($owner, [$owner, $member], 'Launch checklist');
-        $space = $project->getSpace();
+        $board = $this->seedProject($owner, [$owner, $member], 'Launch checklist');
+        $space = $board->getSpace();
         self::assertNotNull($space);
         $spaceId = (string) $space->getId();
 
         $client = static::createClient();
         $client->loginUser($owner);
 
-        // Task inside the project → Task CREATE log.
+        // Task inside the board → Task CREATE log.
         $client->request('POST', '/tasks', [
-            'json' => ['title' => 'Press & PR', 'project' => '/projects/' . $project->getId()],
+            'json' => ['title' => 'Press & PR', 'board' => '/boards/' . $board->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -65,8 +65,8 @@ class SpaceActivityTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        // Project edit → Project UPDATE log.
-        $client->request('PATCH', '/projects/' . $project->getId(), [
+        // Board edit → Board UPDATE log.
+        $client->request('PATCH', '/boards/' . $board->getId(), [
             'json' => ['description' => 'Updated description'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -87,8 +87,8 @@ class SpaceActivityTest extends ApiTestCase
         $items = $body['items'] ?? null;
         $this->assertIsArray($items);
         $classes = array_column($items, 'objectClass');
-        $this->assertContains('Project', $classes, 'Feed should include the project.');
-        $this->assertContains('Task', $classes, 'Feed should include the in-project task.');
+        $this->assertContains('Board', $classes, 'Feed should include the board.');
+        $this->assertContains('Task', $classes, 'Feed should include the in-board task.');
         $this->assertContains('Page', $classes, 'Feed should include the space page.');
 
         // Actor map is keyed by IRI so the PWA can render avatars.
@@ -100,14 +100,14 @@ class SpaceActivityTest extends ApiTestCase
     public function testCustomFieldActivityRollsUpToSpaceFeed(): void
     {
         $owner = $this->createUser('owner@example.com');
-        $project = $this->seedProject($owner, [$owner], 'Launch checklist');
-        $space = $project->getSpace();
+        $board = $this->seedProject($owner, [$owner], 'Launch checklist');
+        $space = $board->getSpace();
         self::assertNotNull($space);
 
-        // A custom-field definition lives under the project; its activity should
+        // A custom-field definition lives under the board; its activity should
         // roll up to the space feed the same way tasks do (the hierarchy).
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName('Priority')
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')
@@ -138,8 +138,8 @@ class SpaceActivityTest extends ApiTestCase
     {
         $owner = $this->createUser('owner@example.com');
         $stranger = $this->createUser('stranger@example.com');
-        $project = $this->seedProject($owner, [$owner], 'Private');
-        $space = $project->getSpace();
+        $board = $this->seedProject($owner, [$owner], 'Private');
+        $space = $board->getSpace();
         self::assertNotNull($space);
 
         $client = static::createClient();
@@ -162,17 +162,17 @@ class SpaceActivityTest extends ApiTestCase
     /**
      * @param User[] $members
      */
-    private function seedProject(User $owner, array $members, string $title): Project
+    private function seedProject(User $owner, array $members, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
         foreach ($members as $member) {
-            $this->addProjectMember($project, $member);
+            $this->addBoardMember($board, $member);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

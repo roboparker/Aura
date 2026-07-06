@@ -7,7 +7,7 @@ namespace App\Service;
 use App\Entity\Comment;
 use App\Entity\Discussion;
 use App\Entity\Page;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
@@ -40,7 +40,7 @@ final class UserDataExporter
             ],
             'preferences' => $user->getPreferences(),
             'tasks' => $this->tasks($user),
-            'projects' => $this->projects($user),
+            'boards' => $this->boards($user),
             'pages' => $this->pages($user),
             'discussions' => $this->discussions($user),
             'comments' => $this->comments($user),
@@ -64,10 +64,10 @@ final class UserDataExporter
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function projects(User $user): array
+    private function boards(User $user): array
     {
-        $rows = $this->em->getRepository(Project::class)->findBy(['owner' => $user]);
-        return array_map(static fn (Project $p): array => [
+        $rows = $this->em->getRepository(Board::class)->findBy(['owner' => $user]);
+        return array_map(static fn (Board $p): array => [
             'id' => (string) $p->getId(),
             'title' => $p->getTitle(),
             'description' => $p->getDescription(),

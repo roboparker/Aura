@@ -122,7 +122,7 @@ const ChangeVisibilityDialog = ({
             <p className="text-sm text-muted-foreground">
               Switching{" "}
               <span className="font-semibold text-foreground">{space.name}</span>{" "}
-              to private removes everyone but you. The content stays — projects,
+              to private removes everyone but you. The content stays — boards,
               pages, and tasks aren&apos;t deleted or reassigned — but only you
               will be able to see it.
             </p>

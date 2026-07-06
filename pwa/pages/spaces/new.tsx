@@ -187,7 +187,7 @@ const NewSpacePage = () => {
                   Create a space
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Spaces have their own members, projects, and pages.
+                  Spaces have their own members, boards, and pages.
                 </p>
               </div>
             </div>

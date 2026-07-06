@@ -5,7 +5,7 @@ namespace App\Tests\Api;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\CustomField\CustomFieldKind;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -14,8 +14,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Edge-branch coverage for App\Controller\CustomFieldDefinitionReorderController.
  * The base CustomFieldDefinitionReorderTest covers admin happy-path,
  * non-admin 404, incomplete + duplicate payloads. This adds: unknown /
- * malformed project id, missing `order` key, malformed IRI, and an IRI
- * that belongs to another project.
+ * malformed board id, missing `order` key, malformed IRI, and an IRI
+ * that belongs to another board.
  */
 class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
 {
@@ -31,7 +31,7 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -41,7 +41,7 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/00000000-0000-0000-0000-000000000000/custom_field_definitions/reorder', [
+        $client->request('POST', '/boards/00000000-0000-0000-0000-000000000000/custom_field_definitions/reorder', [
             'json' => ['order' => []],
         ]);
         $this->assertResponseStatusCodeSame(404);
@@ -53,7 +53,7 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/not-a-uuid/custom_field_definitions/reorder', [
+        $client->request('POST', '/boards/not-a-uuid/custom_field_definitions/reorder', [
             'json' => ['order' => []],
         ]);
         $this->assertResponseStatusCodeSame(404);
@@ -62,11 +62,11 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
     public function testMissingOrderKeyIs400(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
+        $board = $this->createProject($alice, 'Backend');
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/custom_field_definitions/reorder', [
+        $client->request('POST', '/boards/' . $board->getId() . '/custom_field_definitions/reorder', [
             'json' => ['nope' => []],
         ]);
         $this->assertResponseStatusCodeSame(400);
@@ -75,12 +75,12 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
     public function testMalformedIriIs400(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $project = $this->createProject($alice, 'Backend');
-        $this->seedField($project, 'Alpha', 0);
+        $board = $this->createProject($alice, 'Backend');
+        $this->seedField($board, 'Alpha', 0);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        $client->request('POST', '/projects/' . $project->getId() . '/custom_field_definitions/reorder', [
+        $client->request('POST', '/boards/' . $board->getId() . '/custom_field_definitions/reorder', [
             'json' => ['order' => ['/custom_field_definitions/not-a-uuid']],
         ]);
         $this->assertResponseStatusCodeSame(400);
@@ -89,31 +89,31 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
     public function testIriFromAnotherProjectIs400(): void
     {
         $alice = $this->createUser('alice@example.com');
-        $projectA = $this->createProject($alice, 'Alpha project');
-        $projectB = $this->createProject($alice, 'Beta project');
-        // One field on each project.
-        $this->seedField($projectA, 'Local', 0);
-        $foreign = $this->seedField($projectB, 'Foreign', 0);
+        $boardA = $this->createProject($alice, 'Alpha board');
+        $boardB = $this->createProject($alice, 'Beta board');
+        // One field on each board.
+        $this->seedField($boardA, 'Local', 0);
+        $foreign = $this->seedField($boardB, 'Foreign', 0);
 
         $client = static::createClient();
         $client->loginUser($alice);
-        // Reorder project A but list project B's field — rejected (not part
-        // of this project / contiguity guard).
-        $client->request('POST', '/projects/' . $projectA->getId() . '/custom_field_definitions/reorder', [
+        // Reorder board A but list board B's field — rejected (not part
+        // of this board / contiguity guard).
+        $client->request('POST', '/boards/' . $boardA->getId() . '/custom_field_definitions/reorder', [
             'json' => ['order' => ['/custom_field_definitions/' . $foreign->getId()]],
         ]);
         $this->assertResponseStatusCodeSame(400);
     }
 
-    private function createProject(User $owner, string $title): Project
+    private function createProject(User $owner, string $title): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle($title);
-        $this->addProjectMember($project, $owner);
-        $this->entityManager->persist($project);
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle($title);
+        $this->addBoardMember($board, $owner);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User
@@ -132,10 +132,10 @@ class CustomFieldDefinitionReorderEdgeTest extends ApiTestCase
         return $user;
     }
 
-    private function seedField(Project $project, string $name, int $position): CustomFieldDefinition
+    private function seedField(Board $board, string $name, int $position): CustomFieldDefinition
     {
         $field = new CustomFieldDefinition();
-        $field->setProject($project)
+        $field->setBoard($board)
             ->setName($name)
             ->setKind(CustomFieldKind::TEXT->value)
             ->setSubtype('text')

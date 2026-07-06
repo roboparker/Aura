@@ -52,7 +52,7 @@ class UserFixtures extends Fixture
         'canBeImpersonated' => true,
         'impersonationAccess' => [
             'tasks' => 'edit',
-            'projects' => 'edit',
+            'boards' => 'edit',
             'pages' => 'edit',
             'discussions' => 'edit',
             'comments' => 'edit',

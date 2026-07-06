@@ -20,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
  * recurring series (the "this occurrence only" branch of a calendar drag).
  *
  * Body: `{ "date": "Y-m-d", "dueDate": "Y-m-d" }` — `date` is the occurrence
- * being detached (added to the series' EXDATE set so it stops projecting), and
+ * being detached (added to the series' EXDATE set so it stops boarding), and
  * `dueDate` is where the detached copy lands. The copy is a standalone,
- * non-recurring task cloning title/description/project/tags/assignees/reminders
+ * non-recurring task cloning title/description/board/tags/assignees/reminders
  * from the series (mirroring the on-completion spawn), owned by the series
  * owner, inserted at the top of that owner's list.
  *
@@ -88,7 +88,7 @@ final class TaskDetachOccurrenceController extends AbstractController
 
         $detached = new Task();
         $detached->setOwner($task->getOwner());
-        $detached->setProject($task->getProject());
+        $detached->setBoard($task->getBoard());
         $detached->setTitle($task->getTitle());
         $detached->setDescription($task->getDescription());
         $detached->setDueDate($newDue);
@@ -105,7 +105,7 @@ final class TaskDetachOccurrenceController extends AbstractController
             $detached->setPosition(null === $min ? 0 : $min - 1);
         }
 
-        // Skip the original slot so the series stops projecting that day.
+        // Skip the original slot so the series stops boarding that day.
         $task->addRecurrenceException($occurrenceDay->format('Y-m-d'));
 
         $this->em->persist($detached);

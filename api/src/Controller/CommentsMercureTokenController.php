@@ -25,7 +25,7 @@ use Symfony\Component\Uid\Uuid;
  * only that topic.
  *
  * Auth mirrors the parent's GET security expression (admin / task
- * owner / task project member / page space member). 404 (not 403)
+ * owner / task board member / page space member). 404 (not 403)
  * is returned for unreachable IDs so the endpoint can't be used to
  * enumerate parent IDs.
  */

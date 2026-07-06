@@ -94,7 +94,7 @@ test.describe("Task comments", () => {
   });
 
   test("non-author cannot see edit affordance", async ({ browser }) => {
-    // Alice owns a project task; Bob is a member who comments. Alice opens
+    // Alice owns a board task; Bob is a member who comments. Alice opens
     // the panel and should see her own delete option (task owner) but no
     // edit pencil on Bob's comment.
     const aliceEmail = uniqueEmail();
@@ -103,22 +103,22 @@ test.describe("Task comments", () => {
     const aliceCtx = await browser.newContext({ ignoreHTTPSErrors: true });
     const alice = await aliceCtx.newPage();
     await registerAndSignIn(alice, aliceEmail);
-    // Alice creates a project + task via API to isolate from inline UI.
-    const projectRes = await alice.request.post(`${BASE_URL}/projects`, {
+    // Alice creates a board + task via API to isolate from inline UI.
+    const boardRes = await alice.request.post(`${BASE_URL}/boards`, {
       headers: { "Content-Type": "application/ld+json" },
       data: { title: `Shared ${Date.now()}` },
     });
-    expect(projectRes.ok()).toBeTruthy();
-    const project = await projectRes.json();
+    expect(boardRes.ok()).toBeTruthy();
+    const board = await boardRes.json();
 
     // Bob signs up — needs to exist in the DB before Alice can add him by email.
     const bobCtx = await browser.newContext({ ignoreHTTPSErrors: true });
     const bob = await bobCtx.newPage();
     await registerAndSignIn(bob, bobEmail);
 
-    // Alice adds Bob to the project (the endpoint takes email, not user id).
+    // Alice adds Bob to the board (the endpoint takes email, not user id).
     const addRes = await alice.request.post(
-      `${BASE_URL}${project["@id"]}/members`,
+      `${BASE_URL}${board["@id"]}/members`,
       {
         headers: { "Content-Type": "application/json" },
         data: { email: bobEmail },
@@ -126,10 +126,10 @@ test.describe("Task comments", () => {
     );
     expect(addRes.ok()).toBeTruthy();
 
-    // Alice creates a task on the project.
+    // Alice creates a task on the board.
     const taskRes = await alice.request.post(`${BASE_URL}/tasks`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { title: `Team task ${Date.now()}`, project: project["@id"] },
+      data: { title: `Team task ${Date.now()}`, board: board["@id"] },
     });
     expect(taskRes.ok()).toBeTruthy();
     const task = await taskRes.json();

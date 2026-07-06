@@ -7,7 +7,7 @@ namespace App\CustomField\Type\Text;
 /**
  * `text.rich_text` — markdown-formatted body. Stored as the raw
  * markdown string; rendering is the PWA's job (BlockNote editor +
- * react-markdown viewer, same toolchain as Task / Project descriptions
+ * react-markdown viewer, same toolchain as Task / Board descriptions
  * and Page bodies).
  *
  * Validation rules are identical to plain text — markdown is, after

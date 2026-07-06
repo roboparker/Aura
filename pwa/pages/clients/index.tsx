@@ -1,0 +1,269 @@
+import Head from "next/head";
+import { useRouter } from "next/router";
+import { FormEvent, useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { apiGetCollection, apiSend } from "@/lib/apiClient";
+import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { Client, formatMoney } from "@/lib/invoiceTypes";
+import { CURRENCIES } from "@/lib/currencies";
+import PageHeader from "@/components/common/PageHeader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
+
+const ClientsPage = () => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { activeSpace, can } = useActiveSpace();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  const [showComposer, setShowComposer] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [address, setAddress] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [defaultRate, setDefaultRate] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.replace(signinHrefForCurrent(router.asPath));
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  const spaceIri = activeSpace?.["@id"] ?? null;
+  const clientsQuery = useQuery({
+    queryKey: ["clients", spaceIri],
+    enabled: isAuthenticated,
+    queryFn: () =>
+      apiGetCollection<Client>(
+        spaceIri ? `/clients?space=${encodeURIComponent(spaceIri)}` : "/clients",
+        { errorMessage: "Failed to load clients." },
+      ),
+  });
+  const clients = clientsQuery.data ?? [];
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["clients"] });
+
+  const createMutation = useMutation({
+    mutationFn: () => {
+      const rateMinor = defaultRate.trim() ? Math.round(parseFloat(defaultRate) * 100) : null;
+      return apiSend<Client>("POST", "/clients", {
+        errorMessage: "Failed to create client.",
+        body: {
+          name: name.trim(),
+          email: email.trim() || null,
+          address: address.trim() || null,
+          currency,
+          ...(rateMinor !== null ? { defaultRateAmount: rateMinor } : {}),
+          ...(spaceIri ? { space: spaceIri } : {}),
+        },
+      });
+    },
+    onSuccess: () => {
+      setName("");
+      setEmail("");
+      setAddress("");
+      setDefaultRate("");
+      setShowComposer(false);
+      setActionError(null);
+      void refresh();
+    },
+    onError: (e) => setActionError(e instanceof Error ? e.message : "Failed to create client."),
+  });
+
+  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!name.trim()) return;
+    createMutation.mutate();
+  };
+
+  const canCreate = can("invoices", "create");
+  const error = actionError || (clientsQuery.isError ? "Failed to load clients." : null);
+
+  if (authLoading || !isAuthenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading…</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Head>
+        <title>Clients — Madori</title>
+      </Head>
+      <div className="min-h-screen bg-background px-4 py-12">
+        <div className="mx-auto max-w-4xl">
+          <PageHeader
+            title="Clients"
+            icon={<Users className="size-6 text-blue-600 dark:text-blue-400" />}
+          />
+
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {clientsQuery.isLoading ? (
+            <p className="text-muted-foreground">Loading…</p>
+          ) : (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-4 py-2 font-medium">Name</th>
+                      <th className="px-4 py-2 font-medium">Email</th>
+                      <th className="px-4 py-2 font-medium">Currency</th>
+                      <th className="px-4 py-2 text-right font-medium">Rate / hr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Inline "Add client" row, pinned to the top. */}
+                    {canCreate &&
+                      (showComposer ? (
+                        <tr className="border-b bg-muted/10">
+                          <td colSpan={4} className="px-4 py-4">
+                            <form onSubmit={handleCreate} className="space-y-4">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cl-name">Name</Label>
+                                <Input
+                                  id="cl-name"
+                                  value={name}
+                                  onChange={(e) => setName(e.target.value)}
+                                  required
+                                  maxLength={200}
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <Label htmlFor="cl-email">
+                                    Email{" "}
+                                    <span className="font-normal text-muted-foreground">(optional)</span>
+                                  </Label>
+                                  <Input
+                                    id="cl-email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="cl-currency">Currency</Label>
+                                    <select
+                                      id="cl-currency"
+                                      value={currency}
+                                      onChange={(e) => setCurrency(e.target.value)}
+                                      className={SELECT_CLASS}
+                                    >
+                                      {CURRENCIES.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                          {c.code}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="cl-rate">Rate / hr</Label>
+                                    <Input
+                                      id="cl-rate"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={defaultRate}
+                                      onChange={(e) => setDefaultRate(e.target.value)}
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cl-address">
+                                  Address{" "}
+                                  <span className="font-normal text-muted-foreground">(optional)</span>
+                                </Label>
+                                <Textarea
+                                  id="cl-address"
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+                                  rows={2}
+                                />
+                              </div>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowComposer(false)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  disabled={createMutation.isPending || !name.trim()}
+                                >
+                                  {createMutation.isPending ? "Saving…" : "Create client"}
+                                </Button>
+                              </div>
+                            </form>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr className="border-b">
+                          <td colSpan={4} className="px-4 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowComposer(true)}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                            >
+                              <Plus className="h-4 w-4" /> Add client
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+
+                    {clients.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          No clients yet. Use “Add client” to start invoicing.
+                        </td>
+                      </tr>
+                    ) : (
+                      clients.map((client) => (
+                        <tr key={client["@id"]} className="border-b align-middle last:border-0">
+                          <td className="px-4 py-3 font-medium">{client.name}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{client.email || "—"}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{client.currency ?? "—"}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                            {client.defaultRateAmount != null && client.currency
+                              ? formatMoney(client.defaultRateAmount, client.currency)
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default ClientsPage;

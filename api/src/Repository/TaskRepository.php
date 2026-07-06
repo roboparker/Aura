@@ -70,7 +70,7 @@ final class TaskRepository extends ServiceEntityRepository
 
     /**
      * Tasks the user is allowed to reorder: anything they own directly,
-     * plus tasks attached to a project whose space they belong to
+     * plus tasks attached to a board whose space they belong to
      * (#185). Mirrors the visibility rule in TaskOwnerExtension.
      *
      * @return Task[]
@@ -86,7 +86,7 @@ final class TaskRepository extends ServiceEntityRepository
             UserGroup::class,
         );
         return $this->createQueryBuilder('t')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->where(sprintf(
                 't.owner = :user OR EXISTS(%s) OR EXISTS(%s)',
                 $directSubquery,

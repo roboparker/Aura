@@ -16,7 +16,7 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Reads the audit history for a single task. Access mirrors the Task GET
- * security expression (admin / owner / project member); 404 (not 403)
+ * security expression (admin / owner / board member); 404 (not 403)
  * for unreachable IDs to match the rest of the API.
  *
  * Returns paginated `ActivityLog` rows newest-first plus a small actor

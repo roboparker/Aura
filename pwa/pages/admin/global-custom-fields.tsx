@@ -12,8 +12,8 @@ import PageHeader from "@/components/common/PageHeader";
  * Admin-only manager for instance-wide GLOBAL custom fields
  * (#global-custom-fields). Reuses the space {@link CustomFieldsManager} UX
  * (kind/subtype editors, create/edit/delete drawer) but points it at
- * `/global_custom_field_definitions` and drops the space/project context —
- * global fields belong to no space and any project can opt into them.
+ * `/global_custom_field_definitions` and drops the space/board context —
+ * global fields belong to no space and any board can opt into them.
  * ROLE_ADMIN gated (matching the segments / waitlist admin pages).
  */
 const AdminGlobalCustomFields: NextPage = () => {
@@ -69,15 +69,15 @@ const AdminGlobalCustomFields: NextPage = () => {
             icon={<Globe className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
             subtitle={
               <>
-                Reusable task fields available to every project in every space.
-                Admins define them here; project members can only toggle them
-                on or off per project.
+                Reusable task fields available to every board in every space.
+                Admins define them here; board members can only toggle them
+                on or off per board.
               </>
             }
           />
 
           <CustomFieldsManager
-            projectTitle="Global"
+            boardTitle="Global"
             collectionPath="/global_custom_field_definitions"
             isSpaceAdmin
           />

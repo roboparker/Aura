@@ -80,6 +80,47 @@ final class StripeGateway implements StripeGatewayInterface
         return $url;
     }
 
+    public function createPaymentCheckout(
+        int $amount,
+        string $currency,
+        string $description,
+        string $successUrl,
+        string $cancelUrl,
+        ?string $customerEmail,
+        array $metadata,
+    ): string {
+        $body = [
+            'mode' => 'payment',
+            'line_items' => [
+                [
+                    'price_data' => [
+                        'currency' => strtolower($currency),
+                        'product_data' => ['name' => $description],
+                        'unit_amount' => max(0, $amount),
+                    ],
+                    'quantity' => 1,
+                ],
+            ],
+            'success_url' => $successUrl,
+            'cancel_url' => $cancelUrl,
+            // Stamp our invoice id on both the session and the payment intent so
+            // the checkout.session.completed webhook resolves it without a retrieve.
+            'metadata' => $metadata,
+            'payment_intent_data' => ['metadata' => $metadata],
+        ];
+        if (null !== $customerEmail) {
+            $body['customer_email'] = $customerEmail;
+        }
+
+        $data = $this->request('POST', '/checkout/sessions', $body);
+        $url = $data['url'] ?? null;
+        if (!is_string($url) || '' === $url) {
+            throw new BillingException('Stripe did not return a Checkout URL.');
+        }
+
+        return $url;
+    }
+
     public function createBillingPortalSession(string $customerId, string $returnUrl): string
     {
         $data = $this->request('POST', '/billing_portal/sessions', [

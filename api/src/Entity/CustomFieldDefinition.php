@@ -27,7 +27,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * Per-project custom field definition. Widened in #227 from the flat
+ * Per-board custom field definition. Widened in #227 from the flat
  * 5-type enum to a (kind, subtype, config) triple backed by a strategy
  * registry — see {@see App\CustomField\Type\CustomFieldTypeInterface}.
  *
@@ -44,8 +44,8 @@ use Symfony\Component\Validator\Constraints as Assert;
  * {@see App\Validator\ValidCustomFieldValues}.
  *
  * Owned by a Space (#custom-fields-space): the field schema is defined
- * once per space and shared. Projects opt in to the fields they want via
- * a {@see Project::$customFieldDefinitions} many-to-many, so each project's
+ * once per space and shared. Boards opt in to the fields they want via
+ * a {@see Board::$customFieldDefinitions} many-to-many, so each board's
  * task list shows only its chosen subset. Read + write (create/edit/delete)
  * are open to any space member for now.
  */
@@ -75,7 +75,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     denormalizationContext: ['groups' => ['custom_field_definition:write']],
     order: ['position' => 'ASC', 'createdAt' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'projects' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'boards' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: CustomFieldDefinitionRepository::class)]
 #[ORM\Table(name: 'custom_field_definition')]
@@ -120,8 +120,8 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     ];
 
     /**
-     * The independent surfaces a field's value can show on. Per-project
-     * visibility (#custom-fields-project) is a comma-joined SET of these.
+     * The independent surfaces a field's value can show on. Per-board
+     * visibility (#custom-fields-board) is a comma-joined SET of these.
      *
      * @var list<string>
      */
@@ -172,13 +172,13 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     private ?Space $space = null;
 
     /**
-     * Projects that show this field on their tasks. Inverse side — the join
-     * table is owned by {@see Project::$customFieldDefinitions}.
+     * Boards that show this field on their tasks. Inverse side — the join
+     * table is owned by {@see Board::$customFieldDefinitions}.
      *
-     * @var Collection<int, Project>
+     * @var Collection<int, Board>
      */
-    #[ORM\ManyToMany(targetEntity: Project::class, mappedBy: 'customFieldDefinitions')]
-    private Collection $projects;
+    #[ORM\ManyToMany(targetEntity: Board::class, mappedBy: 'customFieldDefinitions')]
+    private Collection $boards;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'Field name is required.')]
@@ -254,14 +254,14 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     private int $position = 0;
 
     /**
-     * Default visibility — where the field is shown to readers: the project
+     * Default visibility — where the field is shown to readers: the board
      * task list (`list`), the Kanban board cards (`board`), or both. Visibility
-     * is a PER-PROJECT choice now (#custom-fields-project): a {@see
-     * ProjectFieldVisibility} row overrides this default for a given project,
+     * is a PER-PROJECT choice now (#custom-fields-board): a {@see
+     * BoardFieldVisibility} row overrides this default for a given board,
      * and {@see \App\State\CustomFieldVisibilityProvider} injects the effective
-     * value into the read when the field is fetched in a project context
-     * (`?projects={iri}`). This column is the fallback when no override exists.
-     * Read-only over the API — set per-project, not on the definition. The task
+     * value into the read when the field is fetched in a board context
+     * (`?boards={iri}`). This column is the fallback when no override exists.
+     * Read-only over the API — set per-board, not on the definition. The task
      * detail drawer always shows every field regardless.
      */
     #[ORM\Column(length: 16, options: ['default' => self::VISIBILITY_BOTH])]
@@ -291,7 +291,7 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
-        $this->projects = new ArrayCollection();
+        $this->boards = new ArrayCollection();
     }
 
     public function getId(): ?Uuid
@@ -311,52 +311,52 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     }
 
     /**
-     * @return Collection<int, Project>
+     * @return Collection<int, Board>
      */
-    public function getProjects(): Collection
+    public function getBoards(): Collection
     {
-        return $this->projects;
+        return $this->boards;
     }
 
-    public function addProject(Project $project): static
+    public function addBoard(Board $board): static
     {
-        if (!$this->projects->contains($project)) {
-            $this->projects->add($project);
-            $project->addCustomFieldDefinition($this);
+        if (!$this->boards->contains($board)) {
+            $this->boards->add($board);
+            $board->addCustomFieldDefinition($this);
         }
         return $this;
     }
 
-    public function removeProject(Project $project): static
+    public function removeBoard(Board $board): static
     {
-        if ($this->projects->removeElement($project)) {
-            $project->removeCustomFieldDefinition($this);
+        if ($this->boards->removeElement($board)) {
+            $board->removeCustomFieldDefinition($this);
         }
         return $this;
     }
 
     /**
-     * Back-compat: fields are space-owned + project-attached now. Attaches the
-     * project and, when the space isn't set yet, inherits it from the project —
+     * Back-compat: fields are space-owned + board-attached now. Attaches the
+     * board and, when the space isn't set yet, inherits it from the board —
      * so the many test seeders that still do `new CustomFieldDefinition()
-     * ->setProject($p)` keep producing valid (space + attachment) rows. Prefer
-     * {@see setSpace()} + {@see addProject()} in new code.
+     * ->setBoard($p)` keep producing valid (space + attachment) rows. Prefer
+     * {@see setSpace()} + {@see addBoard()} in new code.
      */
-    public function setProject(?Project $project): static
+    public function setBoard(?Board $board): static
     {
-        if (null !== $project) {
+        if (null !== $board) {
             if (null === $this->space) {
-                $this->space = $project->getSpace();
+                $this->space = $board->getSpace();
             }
-            $this->addProject($project);
+            $this->addBoard($board);
         }
         return $this;
     }
 
-    /** Back-compat: the first project this field is attached to, if any. */
-    public function getProject(): ?Project
+    /** Back-compat: the first board this field is attached to, if any. */
+    public function getBoard(): ?Board
     {
-        $first = $this->projects->first();
+        $first = $this->boards->first();
         return false === $first ? null : $first;
     }
 

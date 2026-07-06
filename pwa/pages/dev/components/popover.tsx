@@ -23,7 +23,7 @@ const PopoverPage = () => (
   </PopoverTrigger>
   <PopoverContent align="start">
     <PopoverHeader>
-      <PopoverTitle>Project moonshot</PopoverTitle>
+      <PopoverTitle>Board moonshot</PopoverTitle>
       <PopoverDescription>Owned by ada-lovelace.</PopoverDescription>
     </PopoverHeader>
   </PopoverContent>
@@ -35,7 +35,7 @@ const PopoverPage = () => (
             </PopoverTrigger>
             <PopoverContent align="start">
               <PopoverHeader>
-                <PopoverTitle>Project moonshot</PopoverTitle>
+                <PopoverTitle>Board moonshot</PopoverTitle>
                 <PopoverDescription>Owned by ada-lovelace.</PopoverDescription>
               </PopoverHeader>
             </PopoverContent>

@@ -13,7 +13,7 @@ export const PERMISSION_ACTIONS = [
 export type PermissionAction = (typeof PERMISSION_ACTIONS)[number];
 
 export const PERMISSION_CATEGORIES = [
-  "projects",
+  "boards",
   "tasks",
   "pages",
   "discussions",
@@ -23,11 +23,13 @@ export const PERMISSION_CATEGORIES = [
   "groups",
   "files",
   "api_keys",
+  "time_entries",
+  "invoices",
 ] as const;
 export type PermissionCategory = (typeof PERMISSION_CATEGORIES)[number];
 
 export const CATEGORY_LABELS: Record<PermissionCategory, string> = {
-  projects: "Projects",
+  boards: "Boards",
   tasks: "Tasks",
   pages: "Pages",
   discussions: "Discussions",
@@ -37,6 +39,8 @@ export const CATEGORY_LABELS: Record<PermissionCategory, string> = {
   groups: "Groups",
   files: "Files",
   api_keys: "API keys",
+  time_entries: "Time tracking",
+  invoices: "Invoicing",
 };
 
 export const ACTION_LABELS: Record<PermissionAction, string> = {

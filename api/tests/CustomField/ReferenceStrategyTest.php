@@ -3,7 +3,7 @@
 namespace App\Tests\CustomField;
 
 use App\CustomField\Footer\FooterKind;
-use App\CustomField\Type\Reference\ProjectReferenceStrategy;
+use App\CustomField\Type\Reference\BoardReferenceStrategy;
 use App\CustomField\Type\Reference\TaskReferenceStrategy;
 use App\CustomField\Type\Reference\UserReferenceStrategy;
 use App\Entity\CustomFieldDefinition;
@@ -32,13 +32,13 @@ final class ReferenceStrategyTest extends TestCase
     {
         $user = new UserReferenceStrategy($this->em());
         $task = new TaskReferenceStrategy($this->em());
-        $project = new ProjectReferenceStrategy($this->em());
+        $board = new BoardReferenceStrategy($this->em());
 
         $this->assertSame('reference.user', $user->key());
         $this->assertSame('reference.task', $task->key());
-        $this->assertSame('reference.project', $project->key());
+        $this->assertSame('reference.board', $board->key());
 
-        foreach ([$user, $task, $project] as $s) {
+        foreach ([$user, $task, $board] as $s) {
             $this->assertTrue($s->supportsMulti());
             // References don't aggregate beyond count.
             $this->assertSame([FooterKind::COUNT->value], $s->supportedAggregations());

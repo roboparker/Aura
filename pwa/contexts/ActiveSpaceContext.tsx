@@ -72,7 +72,7 @@ export interface Space {
   } | null;
   userMemberships: SpaceMembershipRow[];
   /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
-  projectsCount: number;
+  boardsCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */
   pagesCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getGroupsCount`). */

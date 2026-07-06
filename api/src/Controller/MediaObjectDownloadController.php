@@ -2,10 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Engagement;
 use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Security\Permission\SpacePermission;
+use App\Security\Permission\SpacePermissionResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use League\Flysystem\FilesystemException;
 use League\Flysystem\FilesystemOperator;
@@ -24,7 +27,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * The public `/media/...` files served by Caddy are unauthenticated — the
  * UUID-prefixed filename makes URL guessing impractical, but we don't want
- * task attachments (legal docs, financial PDFs, project files) to rely on
+ * task attachments (legal docs, financial PDFs, board files) to rely on
  * obscurity. This endpoint streams the bytes only after re-checking that the
  * caller is allowed to see at least one task that uses the MediaObject, or
  * that they uploaded it themselves.
@@ -41,6 +44,7 @@ class MediaObjectDownloadController extends AbstractController
         private EntityManagerInterface $em,
         #[Autowire(service: 'media.storage')]
         private FilesystemOperator $storage,
+        private SpacePermissionResolver $permissions,
     ) {
     }
 
@@ -108,8 +112,8 @@ class MediaObjectDownloadController extends AbstractController
 
     /**
      * The caller may download the MediaObject if they own it OR if at least
-     * one task or space they belong to attaches it. Mirrors the Task and
-     * Space GET security expressions.
+     * one task, space, or engagement they can read attaches it. Mirrors the
+     * Task / Space / Engagement GET security expressions.
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
@@ -118,10 +122,12 @@ class MediaObjectDownloadController extends AbstractController
         }
         if ($this->isGranted('ROLE_ADMIN')) {
             return $this->mediaIsAttachedToAnyTask($media)
-                || $this->mediaIsAttachedToAnySpace($media);
+                || $this->mediaIsAttachedToAnySpace($media)
+                || $this->mediaIsAttachedToAnyEngagement($media);
         }
         return $this->mediaIsAttachedToReadableTask($media, $user)
-            || $this->mediaIsAttachedToReadableSpace($media, $user);
+            || $this->mediaIsAttachedToReadableSpace($media, $user)
+            || $this->mediaIsAttachedToReadableEngagement($media, $user);
     }
 
     private function mediaIsAttachedToAnyTask(MediaObject $media): bool
@@ -140,7 +146,7 @@ class MediaObjectDownloadController extends AbstractController
     private function mediaIsAttachedToReadableTask(MediaObject $media, User $user): bool
     {
         // A task is readable to a non-admin user when they own it OR
-        // they're a member of its project's space (#185). EXISTS
+        // they're a member of its board's space (#185). EXISTS
         // subqueries cover both direct membership and group-inherited
         // membership; same shape as TaskOwnerExtension.
         $directSubquery = sprintf(
@@ -154,7 +160,7 @@ class MediaObjectDownloadController extends AbstractController
         $count = (int) $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->select('COUNT(t.id)')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->where(':media MEMBER OF t.attachments')
             ->andWhere(sprintf('(t.owner = :user OR EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
             ->setParameter('media', $media)
@@ -202,5 +208,49 @@ class MediaObjectDownloadController extends AbstractController
             ->getQuery()
             ->getSingleScalarResult();
         return $count > 0;
+    }
+
+    private function mediaIsAttachedToAnyEngagement(MediaObject $media): bool
+    {
+        $count = (int) $this->em->getRepository(Engagement::class)
+            ->createQueryBuilder('e')
+            ->select('COUNT(e.id)')
+            ->where(':media MEMBER OF e.attachments')
+            ->setParameter('media', $media)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getSingleScalarResult();
+        return $count > 0;
+    }
+
+    /**
+     * Engagement attachments are contract-sensitive: readable only by a space
+     * admin or a member holding an explicit `invoices.read` grant — the same
+     * bar as the Engagement GET security expression. A media is attached to at
+     * most a handful of engagements, so the per-row permission check is cheap.
+     */
+    private function mediaIsAttachedToReadableEngagement(MediaObject $media, User $user): bool
+    {
+        $engagements = $this->em->getRepository(Engagement::class)
+            ->createQueryBuilder('e')
+            ->where(':media MEMBER OF e.attachments')
+            ->setParameter('media', $media)
+            ->getQuery()
+            ->getResult();
+
+        foreach ($engagements as $engagement) {
+            $space = $engagement->getSpace();
+            if (null === $space) {
+                continue;
+            }
+            if (
+                $space->isAdmin($user)
+                || $this->permissions->canByExplicitGrant($user, $space, SpacePermission::INVOICES, SpacePermission::READ)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

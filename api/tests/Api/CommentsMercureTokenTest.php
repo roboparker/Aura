@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Project;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,7 +25,7 @@ class CommentsMercureTokenTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Comment')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
@@ -70,8 +70,8 @@ class CommentsMercureTokenTest extends ApiTestCase
     {
         $owner = $this->createUser('owner@example.com');
         $member = $this->createUser('member@example.com');
-        $project = $this->createSharedProject($owner, [$owner, $member]);
-        $task = $this->createTaskInProject($owner, $project, 'Project task');
+        $board = $this->createSharedProject($owner, [$owner, $member]);
+        $task = $this->createTaskInProject($owner, $board, 'Board task');
 
         $client = static::createClient();
         $client->loginUser($member);
@@ -114,38 +114,38 @@ class CommentsMercureTokenTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
     }
 
-    private function createTask(User $owner, string $title, ?Project $project = null): Task
+    private function createTask(User $owner, string $title, ?Board $board = null): Task
     {
         $task = new Task();
         $task->setOwner($owner);
         $task->setTitle($title);
-        if (null !== $project) {
-            $task->setProject($project);
+        if (null !== $board) {
+            $task->setBoard($board);
         }
         $this->entityManager->persist($task);
         $this->entityManager->flush();
         return $task;
     }
 
-    private function createTaskInProject(User $owner, Project $project, string $title): Task
+    private function createTaskInProject(User $owner, Board $board, string $title): Task
     {
-        return $this->createTask($owner, $title, $project);
+        return $this->createTask($owner, $title, $board);
     }
 
     /**
      * @param User[] $members
      */
-    private function createSharedProject(User $owner, array $members): Project
+    private function createSharedProject(User $owner, array $members): Board
     {
-        $project = new Project();
-        $project->setOwner($owner);
-        $project->setTitle('Shared');
+        $board = new Board();
+        $board->setOwner($owner);
+        $board->setTitle('Shared');
         foreach ($members as $m) {
-            $this->addProjectMember($project, $m);
+            $this->addBoardMember($board, $m);
         }
-        $this->entityManager->persist($project);
+        $this->entityManager->persist($board);
         $this->entityManager->flush();
-        return $project;
+        return $board;
     }
 
     private function createUser(string $email): User

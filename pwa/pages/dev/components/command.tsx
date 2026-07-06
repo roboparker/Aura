@@ -24,7 +24,7 @@ const CommandPage = () => (
     <CommandEmpty>No results.</CommandEmpty>
     <CommandGroup heading="Suggestions">
       <CommandItem>New task <CommandShortcut>⌘N</CommandShortcut></CommandItem>
-      <CommandItem>Search projects</CommandItem>
+      <CommandItem>Search boards</CommandItem>
     </CommandGroup>
     <CommandSeparator />
     <CommandGroup heading="Settings">
@@ -40,7 +40,7 @@ const CommandPage = () => (
               <CommandEmpty>No results.</CommandEmpty>
               <CommandGroup heading="Suggestions">
                 <CommandItem>New task <CommandShortcut>⌘N</CommandShortcut></CommandItem>
-                <CommandItem>Search projects</CommandItem>
+                <CommandItem>Search boards</CommandItem>
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup heading="Settings">

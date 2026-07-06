@@ -7,7 +7,7 @@
  * control sits flush in a table cell like plain text, revealing a border only
  * on hover (with a text/pointer cursor) and on focus while editing.
  *
- * Pass `elevation={0}` to the form components in the project list view; the
+ * Pass `elevation={0}` to the form components in the board list view; the
  * task drawer and standalone forms keep the default raised look (level 1).
  */
 export type Elevation = 0 | 1 | 2 | 3;

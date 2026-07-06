@@ -89,7 +89,7 @@ final class DateStrategyTest extends TestCase
 
         $this->assertNull($date->searchText(null, []));
         $this->assertSame('2026-06-15', $date->searchText('2026-06-15', []));
-        // Invalid string projects nothing.
+        // Invalid string boards nothing.
         $this->assertNull($date->searchText('garbage', []));
         // Multi: only the parseable elements survive.
         $this->assertSame(

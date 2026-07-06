@@ -53,11 +53,11 @@ describe("landingPathFor", () => {
       "/notifications",
     );
     expect(landingPathFor({ page: "spaces", spaceId: null })).toBe("/spaces");
-    expect(landingPathFor({ page: "space", spaceId: "x" })).toBe("/projects");
+    expect(landingPathFor({ page: "space", spaceId: "x" })).toBe("/boards");
   });
 
   it("falls back to the default route for an unrecognised page", () => {
     // @ts-expect-error — defends against a value outside the union.
-    expect(landingPathFor({ page: "bogus", spaceId: null })).toBe("/projects");
+    expect(landingPathFor({ page: "bogus", spaceId: null })).toBe("/boards");
   });
 });

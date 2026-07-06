@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Billing\PlanCatalog;
+use App\Billing\PlanGate;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
@@ -169,9 +171,14 @@ class UsageLimiterTest extends KernelTestCase
 
     private function limiter(int $mcpLimit, int $memberLimit, bool $enforcement = true): UsageLimiter
     {
+        // The catalog's Free-tier caps are the test's caps; a subscription
+        // (default legacy 'team' → Business) lifts both to unlimited.
+        $planGate = new PlanGate($this->subscriptions, new PlanCatalog($memberLimit, $mcpLimit));
+
         return new UsageLimiter(
             $this->connection,
             $this->subscriptions,
+            $planGate,
             freeMcpDailyLimit: $mcpLimit,
             freeSpaceMemberLimit: $memberLimit,
             enforcementEnabled: $enforcement,

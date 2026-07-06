@@ -25,9 +25,9 @@ use Symfony\Component\Validator\Constraints as Assert;
  * space — every space member can browse and post; edit is author-only;
  * delete + pin/lock are author OR space admin.
  *
- * Originally project-scoped (#91) and reparented to the space (#185)
+ * Originally board-scoped (#91) and reparented to the space (#185)
  * so the natural unit of conversation matches the access boundary:
- * spaces are what users join and switch between, not projects.
+ * spaces are what users join and switch between, not boards.
  */
 #[ApiResource(
     operations: [

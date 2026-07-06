@@ -34,7 +34,7 @@ class SpaceIriResolverTest extends TestCase
     {
         yield 'empty' => [''];
         yield 'not an iri' => ['hello'];
-        yield 'wrong prefix' => ['/projects/0190a0b1-c2d3-7e4f-8a9b-0c1d2e3f4a5b'];
+        yield 'wrong prefix' => ['/boards/0190a0b1-c2d3-7e4f-8a9b-0c1d2e3f4a5b'];
         yield 'iri with non-uuid id' => ['/spaces/not-a-uuid'];
     }
 

@@ -97,8 +97,10 @@ class BillingTest extends ApiTestCase
         $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
         $this->assertCount(1, $gateway->checkoutSessions);
         $session = $gateway->checkoutSessions[0];
-        $this->assertSame('price_test_yearly', $session['priceId']);
+        // No plan specified → defaults to Pro; yearly interval.
+        $this->assertSame('price_test_pro_yearly', $session['priceId']);
         $this->assertSame((string) $space->getId(), $session['metadata']['space_id']);
+        $this->assertSame('pro', $session['metadata']['plan']);
     }
 
     public function testCheckoutRejectsPersonalSpace(): void
@@ -295,7 +297,8 @@ class BillingTest extends ApiTestCase
         $client->loginUser($alice);
         $client->request('GET', '/spaces/' . $space->getId() . '/billing');
         $this->assertResponseStatusCodeSame(200);
-        $this->assertJsonContains(['plan' => 'team', 'active' => true, 'status' => 'active']);
+        // Legacy 'team' resolves to the Business tier in the entitlement catalog.
+        $this->assertJsonContains(['plan' => 'business', 'active' => true, 'status' => 'active']);
     }
 
     public function testWebhookRejectsBadSignature(): void
@@ -391,6 +394,68 @@ class BillingTest extends ApiTestCase
                 ],
             ],
         ], JSON_THROW_ON_ERROR);
+    }
+
+    public function testBillingStatusReturnsFreePlanEntitlements(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/billing')->toArray();
+
+        $this->assertSame('free', $body['plan']);
+        $features = $body['features'];
+        $this->assertIsArray($features);
+        $this->assertFalse($features['calendar_sync']);
+        $this->assertFalse($features['automations']);
+        $this->assertTrue($features['time_tracking']);
+        $limits = $body['limits'];
+        $this->assertIsArray($limits);
+        $this->assertSame(5, $limits['space_members']);
+    }
+
+    public function testBillingStatusReflectsProPlan(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        $subscription = $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_pro');
+        $subscription->setPlan('pro');
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/billing')->toArray();
+
+        $this->assertSame('pro', $body['plan']);
+        $features = $body['features'];
+        $this->assertIsArray($features);
+        $this->assertTrue($features['calendar_sync']);
+        $this->assertFalse($features['automations']);
+        $limits = $body['limits'];
+        $this->assertIsArray($limits);
+        $this->assertNull($limits['space_members'], 'Pro lifts the member cap');
+    }
+
+    public function testBillingStatusReflectsBusinessPlanAndLegacyTeamAlias(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+        // Default plan is the legacy 'team' → resolves to Business.
+        $this->seedSubscription($space, Subscription::STATUS_ACTIVE, 'cus_biz');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/billing')->toArray();
+
+        $this->assertSame('business', $body['plan']);
+        $features = $body['features'];
+        $this->assertIsArray($features);
+        $this->assertTrue($features['automations']);
+        $this->assertTrue($features['sso']);
+        $this->assertTrue($features['ai_assist']);
+        $this->assertFalse($features['scim'], 'SCIM is Enterprise-only');
     }
 
     private function seedSubscription(

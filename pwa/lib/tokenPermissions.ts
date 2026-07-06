@@ -18,10 +18,10 @@ export const TOKEN_PERMISSION_NODES: PermissionNode[] = [
   {
     key: "content",
     label: "Content",
-    description: "tasks, projects, pages, discussions, comments, files",
+    description: "tasks, boards, pages, discussions, comments, files",
     children: [
       { key: "tasks", label: "Tasks" },
-      { key: "projects", label: "Projects" },
+      { key: "boards", label: "Boards" },
       { key: "pages", label: "Pages" },
       { key: "discussions", label: "Discussions" },
       { key: "comments", label: "Comments" },
@@ -42,7 +42,7 @@ export const TOKEN_PERMISSION_NODES: PermissionNode[] = [
 
 export const TOKEN_CATEGORIES = [
   "tasks",
-  "projects",
+  "boards",
   "pages",
   "discussions",
   "comments",

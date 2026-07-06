@@ -29,7 +29,7 @@ final class ListTasksTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List tasks visible to the user with optional filters (project, assignee, status, due-before/after, tags, search). Paginated; returns the slice plus a total count so callers can iterate.';
+        return 'List tasks visible to the user with optional filters (board, assignee, status, due-before/after, tags, search). Paginated; returns the slice plus a total count so callers can iterate.';
     }
 
     public function getInputSchema(): array
@@ -37,7 +37,7 @@ final class ListTasksTool implements McpToolInterface
         return [
             'type' => 'object',
             'properties' => [
-                'projectId' => ['type' => 'string'],
+                'boardId' => ['type' => 'string'],
                 'assigneeId' => ['type' => 'string'],
                 'status' => ['type' => 'string', 'enum' => ['open', 'completed']],
                 'dueBefore' => ['type' => 'string', 'description' => 'ISO-8601 datetime — include only tasks due before this.'],
@@ -59,8 +59,8 @@ final class ListTasksTool implements McpToolInterface
 
         $qb = $this->buildBaseQuery($user);
 
-        if (null !== $projectId = $this->input->optionalUuid('projectId', $arguments['projectId'] ?? null)) {
-            $qb->andWhere('t.project = :projectId')->setParameter('projectId', $projectId);
+        if (null !== $boardId = $this->input->optionalUuid('boardId', $arguments['boardId'] ?? null)) {
+            $qb->andWhere('t.board = :boardId')->setParameter('boardId', $boardId);
         }
         if (null !== $assigneeId = $this->input->optionalUuid('assigneeId', $arguments['assigneeId'] ?? null)) {
             $qb->innerJoin('t.assignees', 'a_filter', 'WITH', 'a_filter.id = :assigneeId')
@@ -117,14 +117,14 @@ final class ListTasksTool implements McpToolInterface
 
     /**
      * Tasks visible to the user: owned directly OR attached to a
-     * project whose space the user belongs to (#185). Mirrors
+     * board whose space the user belongs to (#185). Mirrors
      * {@see TaskOwnerExtension}.
      */
     private function buildBaseQuery(User $user): QueryBuilder
     {
         return $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
-            ->leftJoin('t.project', 'p')
+            ->leftJoin('t.board', 'p')
             ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_tasks'))
             ->setParameter('user', $user);
     }

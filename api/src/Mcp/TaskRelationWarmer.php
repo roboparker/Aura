@@ -8,7 +8,7 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Batch-initializes the relations {@see McpEntitySerializer::task()} reads
  * so a page of tasks serializes without an N+1 storm. Each task's
- * `assignees`/`tags`/`attachments` collections and `owner`/`project`
+ * `assignees`/`tags`/`attachments` collections and `owner`/`board`
  * proxies would otherwise lazy-load one query at a time (~5 queries per
  * task); we warm them with a fixed five `WHERE id IN (...)` fetch-joins for
  * the whole page instead.
@@ -34,7 +34,7 @@ final class TaskRelationWarmer
 
         $ids = array_map(static fn (Task $task) => $task->getId(), $tasks);
 
-        foreach (['assignees', 'tags', 'attachments', 'owner', 'project'] as $relation) {
+        foreach (['assignees', 'tags', 'attachments', 'owner', 'board'] as $relation) {
             $this->em->createQueryBuilder()
                 ->select('t', 'r')
                 ->from(Task::class, 't')

@@ -84,7 +84,7 @@ class FeedbackFixtures extends Fixture implements DependentFixtureInterface
                 'status' => Feedback::STATUS_IN_PROGRESS,
                 'title' => 'Keyboard shortcuts for navigation',
                 'description' => "A ⌘K command palette exists for search, but moving between Tasks, "
-                    . "Projects, and Pages still needs the mouse. Vim-style `g t` / `g p` jumps would "
+                    . "Boards, and Pages still needs the mouse. Vim-style `g t` / `g p` jumps would "
                     . "be lovely.",
                 'votes' => ['uma' => 1, 'noah' => 1, 'ava' => 1],
                 'comments' => [],
@@ -95,7 +95,7 @@ class FeedbackFixtures extends Fixture implements DependentFixtureInterface
                 'status' => Feedback::STATUS_SHIPPED,
                 'title' => 'Export all space data as a single archive',
                 'description' => "For backups and GDPR requests it would help to download everything "
-                    . "in a space — projects, tasks, pages, discussions, attachments — as one zip.",
+                    . "in a space — boards, tasks, pages, discussions, attachments — as one zip.",
                 'votes' => ['uma' => 1, 'emma' => 1, 'ada' => 1, 'ava' => 1],
                 'comments' => [
                     ['ada', "Shipped! Space admins can now export from Space settings → Export."],

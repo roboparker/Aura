@@ -103,6 +103,8 @@ security:
         # PWA can route it to the /waitlist gate.
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
+        # Personal-account billing (#billing Phase 1b).
+        - { path: ^/me/billing, roles: ROLE_USER }
         - { path: ^/me/sessions, roles: ROLE_USER }
         # Self-service calendar-feed management (reveal/regenerate/revoke).
         # The feed itself (/calendar/feed/{token}.ics) is token-authenticated
@@ -127,6 +129,8 @@ security:
         - { path: ^/me/sso, roles: ROLE_USER }
         # OAuth account connections for API access (#581).
         - { path: ^/me/connections, roles: ROLE_USER }
+        # Organizations (#billing Phase 1) — the account layer above spaces.
+        - { path: ^/organizations, roles: ROLE_USER }
         # Admin-managed SSO provider configuration (#267).
         - { path: ^/admin/sso, roles: ROLE_ADMIN }
         # User segments (A/B tests, beta gating, rollouts) — platform admins
@@ -138,7 +142,7 @@ security:
         # global fields render in the per-project field picker and on task values.
         - { path: ^/global_custom_field_definitions, methods: [POST, PUT, PATCH, DELETE], roles: ROLE_ADMIN }
         - { path: ^/media-objects, methods: [POST], roles: ROLE_USER }
-        - { path: ^/projects/[^/]+/members$, methods: [POST], roles: ROLE_USER }
+        - { path: ^/boards/[^/]+/members$, methods: [POST], roles: ROLE_USER }
         - { path: ^/api-tokens, roles: ROLE_USER }
         - { path: ^/mcp, roles: ROLE_USER }
         # Stripe billing webhook: unauthenticated at the firewall (no Bearer,
