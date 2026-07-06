@@ -56,6 +56,13 @@ if [ -z "${IMAGES_TAG:-}" ]; then
 fi
 export IMAGES_TAG
 
+# Tag every Sentry event / log / trace with the release being deployed (the
+# image tag = commit SHA), so Sentry can group issues by release and flag
+# regressions. Releases are free on all Sentry plans. Exported so the
+# `${SENTRY_RELEASE:-}` refs in compose.yaml (php + worker) pick it up; a
+# SENTRY_RELEASE already set in the environment wins.
+export SENTRY_RELEASE="${SENTRY_RELEASE:-$IMAGES_TAG}"
+
 log() {
   printf '[deploy %s] %s\n' "$(date -Iseconds 2>/dev/null || date)" "$*"
 }

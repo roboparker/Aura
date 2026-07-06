@@ -60,3 +60,11 @@ when@prod:
                 channels: [deprecation]
                 path: php://stderr
                 formatter: monolog.formatter.json
+            # Fan app logs out to Sentry's Logs product alongside stderr. The
+            # handler bubbles (returns false), so every record still reaches the
+            # stream handlers above. Level (info+) lives on the service; noisy
+            # framework channels are excluded here. Inert without a SENTRY_DSN.
+            sentry_logs:
+                type: service
+                id: Sentry\SentryBundle\Monolog\LogsHandler
+                channels: ["!event", "!doctrine"]

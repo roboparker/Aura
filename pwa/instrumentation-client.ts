@@ -16,6 +16,12 @@ if (dsn) {
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     sendDefaultPii: false,
+    // Structured Logs: mirror browser console.* into Sentry Logs. Additive —
+    // messages still print to the console as usual.
+    enableLogs: true,
+    integrations: [
+      Sentry.consoleLoggingIntegration({ levels: ["log", "info", "warn", "error"] }),
+    ],
   });
 }
 

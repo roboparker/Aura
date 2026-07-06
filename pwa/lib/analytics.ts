@@ -6,6 +6,11 @@
 // the script, including SPA route changes; call trackEvent() for product
 // events. Everything no-ops when the tracker is absent — dev without
 // analytics, tests, ad-blocked clients — so call sites never need to guard.
+//
+// Each event is also mirrored into Sentry Metrics (a counter per event name)
+// so the same coarse catalog shows up in Sentry dashboards/alerts. Metrics are
+// free on all Sentry plans; the call no-ops without a Sentry DSN.
+import * as Sentry from "@sentry/nextjs";
 
 type UmamiEventData = Record<string, string | number | boolean>;
 
@@ -32,5 +37,11 @@ export function trackEvent(name: string, data?: UmamiEventData): void {
     window.umami?.track(name, data);
   } catch {
     // Analytics must never break the app.
+  }
+  try {
+    // One counter per event name; no-ops without a Sentry DSN.
+    Sentry.metrics.count(name, 1);
+  } catch {
+    // Metrics must never break the app.
   }
 }

@@ -91,6 +91,13 @@ jobs:
           context: pwa
           target: prod
           push: true
+          # Sentry: the DSN is public (it ships in the client bundle) but kept
+          # OUT of this public repo via a repo-level Actions secret; forks build
+          # with a blank DSN (Sentry off) since they can't read our secrets. The
+          # release is the commit SHA. Both are baked at build (NEXT_PUBLIC_*).
+          build-args: |
+            NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}
+            NEXT_PUBLIC_SENTRY_RELEASE=${{ github.sha }}
           tags: |
             ghcr.io/${{ github.repository_owner }}/app-pwa:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/app-pwa:latest
