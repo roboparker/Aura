@@ -45,6 +45,15 @@ RUN pnpm fetch --prod
 
 COPY --link . .
 
+# Sentry (PWA) is configured at build time via NEXT_PUBLIC_* baked into the
+# client bundle. The DSN is injected from a CI secret so it stays OUT of the
+# public repo; the release is the commit SHA. Both default empty, so forks and
+# local builds that don't pass them build with Sentry OFF.
+ARG NEXT_PUBLIC_SENTRY_DSN=""
+ARG NEXT_PUBLIC_SENTRY_RELEASE=""
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+ENV NEXT_PUBLIC_SENTRY_RELEASE=$NEXT_PUBLIC_SENTRY_RELEASE
+
 RUN	pnpm install --frozen-lockfile --offline --prod && \
 	pnpm run build
 
