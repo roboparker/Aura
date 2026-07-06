@@ -61,6 +61,29 @@ final class SubscriptionRepository extends ServiceEntityRepository
     }
 
     /**
+     * The user's own (personal-account) subscriptions that are still live at
+     * Stripe and so worth cancelling before the account is deleted — status is
+     * still entitling and a Stripe id is present. Org/space subscriptions are
+     * deliberately excluded: those belong to accounts that outlive the user.
+     *
+     * @return list<Subscription>
+     */
+    public function findCancelableForUser(User $user): array
+    {
+        /** @var list<Subscription> $result */
+        $result = $this->createQueryBuilder('s')
+            ->where('s.ownerUser = :user')
+            ->andWhere('s.status IN (:statuses)')
+            ->andWhere('s.stripeSubscriptionId IS NOT NULL')
+            ->setParameter('user', $user)
+            ->setParameter('statuses', Subscription::ENTITLING_STATUSES)
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
+    /**
      * True if the user is entitled through any account they belong to.
      */
     public function userHasActiveEntitlement(User $user): bool

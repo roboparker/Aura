@@ -1,0 +1,20 @@
+<p>Hi,</p>
+
+<p>
+    Thanks for your Madori subscription. This confirms we received your payment
+    of <strong>{{ (amount / 100)|number_format(2) }} {{ currency }}</strong>{% if invoiceNumber %}
+    for invoice <strong>{{ invoiceNumber }}</strong>{% endif %}.
+</p>
+
+{% if invoiceUrl %}
+<p>
+    <a href="{{ invoiceUrl }}">View or download your receipt</a>
+</p>
+{% endif %}
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You can review past invoices and manage your subscription anytime from
+    Billing in your Madori settings.
+</p>
+
+<p>— Madori</p>

@@ -9,6 +9,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Entity\UserGroup;
+use App\Service\AccountDeletionService;
 use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -456,6 +457,68 @@ class BillingTest extends ApiTestCase
         $this->assertTrue($features['sso']);
         $this->assertTrue($features['ai_assist']);
         $this->assertFalse($features['scim'], 'SCIM is Enterprise-only');
+    }
+
+    public function testInvoicePaymentSucceededEmailsReceipt(): void
+    {
+        static::createClient()->request('POST', '/billing/webhook', [
+            'headers' => ['Content-Type' => 'application/json', 'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE],
+            'body' => json_encode([
+                'type' => 'invoice.payment_succeeded',
+                'data' => ['object' => [
+                    'subscription' => 'sub_receipt',
+                    'amount_paid' => 1200,
+                    'currency' => 'usd',
+                    'number' => 'INV-0001',
+                    'customer_email' => 'payer@example.com',
+                    'hosted_invoice_url' => 'https://invoice.stripe.test/i/1',
+                ]],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertEmailCount(1);
+        $email = $this->getMailerMessage();
+        self::assertNotNull($email);
+        $this->assertEmailAddressContains($email, 'To', 'payer@example.com');
+        $this->assertEmailHeaderSame($email, 'Subject', 'Your Madori payment receipt');
+    }
+
+    public function testInvoicePaymentSucceededSkipsNonSubscriptionInvoice(): void
+    {
+        static::createClient()->request('POST', '/billing/webhook', [
+            'headers' => ['Content-Type' => 'application/json', 'Stripe-Signature' => InMemoryStripeGateway::VALID_SIGNATURE],
+            'body' => json_encode([
+                'type' => 'invoice.payment_succeeded',
+                'data' => ['object' => ['amount_paid' => 500, 'currency' => 'usd', 'customer_email' => 'x@example.com']],
+            ], JSON_THROW_ON_ERROR),
+        ]);
+
+        // No `subscription` on the invoice → a one-off payment, not our receipt.
+        $this->assertResponseIsSuccessful();
+        $this->assertEmailCount(0);
+    }
+
+    public function testAccountDeletionCancelsPersonalStripeSubscription(): void
+    {
+        $user = $this->createUser('leaver@example.com');
+        $subscription = (new Subscription())
+            ->setOwnerUser($user)
+            ->setStatus(Subscription::STATUS_ACTIVE)
+            ->setStripeCustomerId('cus_leaver')
+            ->setStripeSubscriptionId('sub_leaver');
+        $this->entityManager->persist($subscription);
+        $this->entityManager->flush();
+
+        // phpstan-symfony infers the concrete class from the class-string.
+        $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
+        $service = static::getContainer()->get(AccountDeletionService::class);
+        $service->deleteAccount($user);
+
+        $this->assertContains('sub_leaver', $gateway->immediatelyCanceledSubscriptions);
+
+        $this->entityManager->clear();
+        $this->assertNull($this->entityManager->getRepository(User::class)->findOneBy(['email' => 'leaver@example.com']));
     }
 
     private function seedSubscription(

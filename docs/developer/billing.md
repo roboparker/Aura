@@ -63,7 +63,7 @@ back to our Space.
 | `POST /spaces/{id}/billing/portal` | space admin | Create a Customer Portal session → `{url}` |
 | `POST /spaces/{id}/billing/cancel` | space admin | Schedule cancel-at-period-end + record the churn survey (body `{reason, comment?}`) → `{ok, cancelAtPeriodEnd, currentPeriodEnd}` |
 | `GET /spaces/{id}/billing` | space member | Plan/status/seats/period + free limits |
-| `POST /billing/webhook` | Stripe (signed) | Upsert the Subscription from `customer.subscription.*` |
+| `POST /billing/webhook` | Stripe (signed) | Upsert the Subscription from `customer.subscription.*`; email a receipt on `invoice.payment_succeeded` |
 
 The **cancel** route is owned in-app (rather than punting to the Stripe portal)
 so we control the moment the "why are you leaving?" survey is asked. It validates
@@ -72,6 +72,15 @@ the required `reason`, calls `cancelSubscriptionAtPeriodEnd()` on the gateway
 further charge), records the survey only after Stripe accepts, then optimistically
 flags the mirror row's `cancelAtPeriodEnd` (the webhook confirms it). See the
 **Cancellation feedback** section below.
+
+**Account deletion cancels the card immediately.** A personal `Subscription` is
+`onDelete: CASCADE` on `ownerUser`, so deleting the account would erase our
+mirror while leaving the Stripe subscription live and renewing. `AccountDeletionService`
+therefore calls `cancelSubscription()` (Stripe `DELETE /subscriptions/{id}` —
+immediate, not period-end) on every still-entitling personal subscription
+*before* the delete transaction. It's best-effort and outside the transaction:
+a Stripe outage logs a warning but never blocks a GDPR deletion. Org/space
+subscriptions are left alone — those accounts outlive the departing member.
 
 The webhook is unauthenticated at the firewall (no Bearer, no cookie) — its
 authenticity is the `Stripe-Signature` HMAC, verified in `StripeGateway`
@@ -110,7 +119,10 @@ STRIPE_PRICE_TEAM_YEARLY=   # price_... (Team product, yearly)
    optional yearly one). Copy the `price_...` ids.
 3. Add a **webhook endpoint** → `https://<host>/billing/webhook`, subscribed to
    `customer.subscription.created`, `customer.subscription.updated`,
-   `customer.subscription.deleted`. Copy the signing secret (`whsec_...`).
+   `customer.subscription.deleted`, and `invoice.payment_succeeded` (the last
+   drives the receipt email — `SubscriptionReceiptMailer`; without it billing
+   still works, users just don't get an emailed receipt). Copy the signing
+   secret (`whsec_...`).
 4. Set the four `STRIPE_*` env vars on the server (and the price ids).
 5. Flip `app.billing_enforcement_enabled` to `true` and deploy.
 6. Smoke-test with a Stripe test card, then switch the keys to live mode.

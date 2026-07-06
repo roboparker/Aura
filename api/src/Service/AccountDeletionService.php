@@ -12,9 +12,13 @@ use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
+use App\Billing\BillingException;
+use App\Billing\StripeGatewayInterface;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -36,6 +40,9 @@ final class AccountDeletionService
     public function __construct(
         private EntityManagerInterface $em,
         private UserPasswordHasherInterface $hasher,
+        private SubscriptionRepository $subscriptions,
+        private StripeGatewayInterface $stripe,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -44,6 +51,14 @@ final class AccountDeletionService
         if (self::SENTINEL_EMAIL === $user->getEmail()) {
             throw new \RuntimeException('The system sentinel account cannot be deleted.');
         }
+
+        // Stop billing the departing user's card BEFORE we delete the account.
+        // The personal Subscription rows are `onDelete: CASCADE` on ownerUser,
+        // so the transaction below would erase our mirror while leaving the
+        // Stripe subscription live and renewing. Cancel immediately at Stripe
+        // first; the resulting customer.subscription.deleted webhook is a
+        // harmless no-op once the row has cascaded away.
+        $this->cancelPersonalSubscriptions($user);
 
         $this->em->wrapInTransaction(function () use ($user): void {
             $userId = (string) $user->getId();
@@ -68,6 +83,34 @@ final class AccountDeletionService
                 $this->em->remove($managed);
             }
         });
+    }
+
+    /**
+     * Cancel every still-live personal subscription the user owns at Stripe.
+     * Best-effort and outside the delete transaction: a Stripe outage logs a
+     * warning but must never block a GDPR account deletion — worst case an
+     * operator cancels the stray subscription from the dashboard.
+     */
+    private function cancelPersonalSubscriptions(User $user): void
+    {
+        if (!$this->stripe->isConfigured()) {
+            return;
+        }
+
+        foreach ($this->subscriptions->findCancelableForUser($user) as $subscription) {
+            $stripeId = $subscription->getStripeSubscriptionId();
+            if (null === $stripeId || '' === $stripeId) {
+                continue;
+            }
+            try {
+                $this->stripe->cancelSubscription($stripeId);
+            } catch (BillingException $e) {
+                $this->logger->warning('Failed to cancel Stripe subscription {sub} on account deletion: {error}', [
+                    'sub' => $stripeId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     private function reassign(string $entityClass, string $field, User $from, User $to): void
