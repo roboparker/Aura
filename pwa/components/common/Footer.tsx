@@ -15,6 +15,16 @@ const Footer = () => (
               </Link>
             </li>
             <li>
+              <Link href="/pricing" className="text-foreground hover:underline">
+                Pricing
+              </Link>
+            </li>
+            <li>
+              <Link href="/faq" className="text-foreground hover:underline">
+                FAQ
+              </Link>
+            </li>
+            <li>
               <Link href="/blog" className="text-foreground hover:underline">
                 Blog
               </Link>
