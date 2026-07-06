@@ -142,12 +142,13 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat, $buildCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
 
-        // Two billable completed entries (distinct category rates) + one non-billable (excluded).
-        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
-        $this->trackTime($client, $spaceIri, $bpIri, $buildCat, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00', true);
-        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00', false);
+        // Two billable completed entries (distinct category rates) + one on the
+        // non-billable "Internal" category (excluded from the invoice).
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
+        $this->trackTime($client, $spaceIri, $bpIri, $buildCat, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00');
+        $this->trackTime($client, $spaceIri, $bpIri, $internalCat, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00');
 
         $response = $client->request('POST', '/invoices/from-time-entries', [
             'json' => ['engagement' => $bpIri],
@@ -181,7 +182,7 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
-        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
             'json' => ['engagement' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
@@ -227,7 +228,7 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
-        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00', true);
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
 
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
             'json' => ['engagement' => $bpIri],
@@ -500,8 +501,8 @@ class ClientInvoiceTest extends ApiTestCase
         string $categoryIri,
         string $startedAt,
         string $endedAt,
-        bool $billable,
     ): void {
+        // Billability is derived from the category, not sent per entry.
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
@@ -509,7 +510,6 @@ class ClientInvoiceTest extends ApiTestCase
                 'category' => $categoryIri,
                 'startedAt' => $startedAt,
                 'endedAt' => $endedAt,
-                'billable' => $billable,
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
@@ -517,11 +517,13 @@ class ClientInvoiceTest extends ApiTestCase
     }
 
     /**
-     * Admin creates a engagement (for $clientIri) with two categories —
-     * "Dev" @ 6000 and "Build" @ 8000 — so tracked-time tests can hit distinct
-     * rates. Returns [engagementIri, devCategoryIri, buildCategoryIri].
+     * Admin creates a engagement (for $clientIri) with three categories — two
+     * billable ("Dev" @ 6000, "Build" @ 8000) with distinct rates and one
+     * non-billable ("Internal" @ 0) — so tracked-time tests can hit distinct
+     * rates and the non-billable exclusion. Billability is a per-category flag.
+     * Returns [engagementIri, devCategoryIri, buildCategoryIri, internalCategoryIri].
      *
-     * @return array{0: string, 1: string, 2: string}
+     * @return array{0: string, 1: string, 2: string, 3: string}
      */
     private function createEngagement(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
@@ -537,6 +539,7 @@ class ClientInvoiceTest extends ApiTestCase
                 'categories' => [
                     ['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0],
                     ['name' => 'Build', 'rateAmount' => 8000, 'position' => 1],
+                    ['name' => 'Internal', 'rateAmount' => 0, 'position' => 2, 'billable' => false],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -557,8 +560,9 @@ class ClientInvoiceTest extends ApiTestCase
         }
         $this->assertArrayHasKey('Dev', $byName);
         $this->assertArrayHasKey('Build', $byName);
+        $this->assertArrayHasKey('Internal', $byName);
 
-        return [$bpIri, $byName['Dev'], $byName['Build']];
+        return [$bpIri, $byName['Dev'], $byName['Build'], $byName['Internal']];
     }
 
     /**

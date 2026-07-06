@@ -116,7 +116,6 @@ const OrganizationsIndex = () => {
           title="Organizations"
           icon={<Building2 className="h-6 w-6 text-cyan-600" />}
           subtitle="Team accounts that own shared spaces and a subscription. Members occupy seats; guests are free."
-          count={orgs.length}
           actions={
             <Button
               size="sm"

@@ -356,7 +356,6 @@ const DiscussionsPanel = ({
           title={title}
           icon={icon}
           subtitle={description}
-          count={discussions.length}
           actions={newButton}
         >
           {searchBox}

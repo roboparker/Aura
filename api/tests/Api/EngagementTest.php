@@ -6,10 +6,12 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Engagement;
 use App\Entity\Client;
 use App\Entity\Board;
+use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemOperator;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -19,17 +21,21 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 class EngagementTest extends ApiTestCase
 {
     private EntityManagerInterface $entityManager;
+    private FilesystemOperator $storage;
 
     protected function setUp(): void
     {
         self::bootKernel();
-        $em = static::getContainer()->get('doctrine')->getManager();
+        $container = static::getContainer();
+        $em = $container->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
+        $this->storage = $container->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
@@ -120,6 +126,107 @@ class EngagementTest extends ApiTestCase
         $reloaded = $this->entityManager->getRepository(Board::class)->find($taskProject->getId());
         $this->assertInstanceOf(Board::class, $reloaded);
         $this->assertSame((string) $engagement->getId(), (string) $reloaded->getEngagement()?->getId());
+    }
+
+    public function testDescriptionAndContractAttachmentRoundTrip(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+        $media = $this->createMediaObject($admin);
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $engagement = $client->request('POST', '/engagements', [
+            'json' => ['space' => $spaceIri, 'client' => $clientRow['@id'], 'name' => 'Retainer'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $engagementIri = $engagement['@id'] ?? null;
+        $this->assertIsString($engagementIri);
+
+        $client->request('PATCH', $engagementIri, [
+            'json' => [
+                'description' => "## Scope\n\n- Weekly retainer\n- Net-30 terms",
+                'attachments' => ['/media-objects/' . $media->getId()],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertJsonContains([
+            'description' => "## Scope\n\n- Weekly retainer\n- Net-30 terms",
+            'attachments' => [
+                [
+                    '@type' => 'MediaObject',
+                    'kind' => 'attachment',
+                    'downloadUrl' => '/media-objects/' . $media->getId() . '/download',
+                ],
+            ],
+        ]);
+    }
+
+    public function testContractDownloadGatedToInvoiceReaders(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $coAdmin = $this->createUser('coadmin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSharedSpace($admin, $member);
+        $this->addAdmin($space, $coAdmin);
+
+        // Contract file uploaded + attached by the first admin.
+        $media = $this->createMediaObject($admin);
+        $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
+        $this->entityManager->persist($client);
+        $engagement = (new Engagement())
+            ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($admin);
+        $engagement->addAttachment($media);
+        $this->entityManager->persist($engagement);
+        $this->entityManager->flush();
+
+        $downloadUrl = '/media-objects/' . $media->getId() . '/download';
+        $httpClient = static::createClient();
+
+        // A second space admin (not the uploader) can download it.
+        $httpClient->loginUser($coAdmin);
+        $httpClient->request('GET', $downloadUrl);
+        $this->assertResponseIsSuccessful();
+
+        // A plain member (no invoices grant) cannot — 404, not 403, to avoid leaking existence.
+        $httpClient->loginUser($member);
+        $httpClient->request('GET', $downloadUrl);
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    private function createMediaObject(User $owner, string $kind = MediaObject::KIND_ATTACHMENT): MediaObject
+    {
+        $bytes = 'CONTRACT-PDF';
+        $path = 'attachments/engagement-test-' . bin2hex(random_bytes(4)) . '-contract.pdf';
+        $this->storage->write($path, $bytes);
+
+        $media = (new MediaObject())
+            ->setOwner($owner)
+            ->setKind($kind)
+            ->setVariants(['original' => $path])
+            ->setOriginalName('contract.pdf')
+            ->setMimeType('application/pdf')
+            ->setByteSize(\strlen($bytes));
+        $this->entityManager->persist($media);
+        $this->entityManager->flush();
+
+        return $media;
+    }
+
+    private function addAdmin(Space $space, User $user): void
+    {
+        $membership = (new SpaceMembership())->setUser($user)->setRole(Space::ROLE_ADMIN);
+        $space->addUserMembership($membership);
+        $this->entityManager->persist($membership);
+        $this->entityManager->flush();
     }
 
     private function createSharedSpace(User $admin, ?User $member = null): Space

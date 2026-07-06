@@ -56,13 +56,12 @@ const PageHeaderPage = () => (
         ),
       },
       {
-        title: "Icon, count, action + search toolbar",
+        title: "Icon, action + search toolbar",
         description:
-          "Pass `icon` for a leading glyph, `count` for the badge next to the title, `actions` for the top-right button, and `children` for a full-width toolbar (search / filters) below the title row.",
+          "Pass `icon` for a leading glyph, `actions` for the top-right button, and `children` for a full-width toolbar (search / filters) below the title row.",
         code: `<PageHeader
   title="Tags"
   icon={<TagIcon className="h-6 w-6 text-cyan-600" />}
-  count={12}
   subtitle="Shared across everyone in the space."
   actions={<Button size="sm">Add tag</Button>}
 >
@@ -72,7 +71,6 @@ const PageHeaderPage = () => (
           <PageHeader
             title="Tags"
             icon={<TagIcon className="h-6 w-6 text-cyan-600" />}
-            count={12}
             subtitle="Shared across everyone in the space."
             actions={<Button size="sm">Add tag</Button>}
           >
