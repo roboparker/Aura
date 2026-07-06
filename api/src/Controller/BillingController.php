@@ -16,6 +16,7 @@ use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Service\CancellationFeedbackRecorder;
+use App\Service\SubscriptionReceiptMailer;
 use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -52,6 +53,7 @@ class BillingController extends AbstractController
         private UsageLimiter $usageLimiter,
         private CancellationFeedbackRecorder $feedback,
         private PlanGate $planGate,
+        private SubscriptionReceiptMailer $receiptMailer,
         private LoggerInterface $logger,
         #[Autowire('%env(string:default::STRIPE_PRICE_PRO_MONTHLY)%')]
         private string $proMonthly,
@@ -289,10 +291,65 @@ class BillingController extends AbstractController
             $this->syncSubscription($object, false);
         } elseif ('checkout.session.completed' === $type) {
             $this->markInvoicePaid($object);
+        } elseif ('invoice.payment_succeeded' === $type) {
+            $this->sendSubscriptionReceipt($object);
         }
         // Any other event type is acknowledged and ignored.
 
         return new Response('', Response::HTTP_OK);
+    }
+
+    /**
+     * Email a payment receipt off Stripe's `invoice.payment_succeeded` (fired
+     * for the first checkout charge and every renewal). Only subscription
+     * invoices — one-off client-invoice payments (#445) go through
+     * checkout.session.completed above. Best-effort: a mail failure is logged
+     * but still 200s so Stripe doesn't retry the whole event.
+     *
+     * @param array<mixed, mixed> $invoice
+     */
+    private function sendSubscriptionReceipt(array $invoice): void
+    {
+        $stripeSubId = $this->stringAt($invoice, ['subscription']);
+        if (null === $stripeSubId) {
+            return; // Not a subscription invoice.
+        }
+
+        $amountPaid = $this->dig($invoice, ['amount_paid']);
+        if (!is_int($amountPaid) || $amountPaid <= 0) {
+            return; // Nothing charged (100%-off coupon / trial) — no receipt.
+        }
+
+        $recipient = $this->stringAt($invoice, ['customer_email'])
+            ?? $this->receiptRecipientFor($stripeSubId);
+        if (null === $recipient) {
+            $this->logger->warning('Subscription receipt: no recipient email resolved.', ['subscription' => $stripeSubId]);
+            return;
+        }
+
+        try {
+            $this->receiptMailer->sendReceipt(
+                $recipient,
+                $amountPaid,
+                $this->stringAt($invoice, ['currency']) ?? 'usd',
+                $this->stringAt($invoice, ['number']),
+                $this->stringAt($invoice, ['hosted_invoice_url']),
+            );
+        } catch (\Throwable $e) {
+            $this->logger->warning('Failed to send subscription receipt: {error}', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Resolve the billing account's email for a subscription id when the Stripe
+     * invoice didn't carry `customer_email`. Personal accounts only — org/space
+     * invoices reliably include customer_email, so a null here just skips.
+     */
+    private function receiptRecipientFor(string $stripeSubId): ?string
+    {
+        $owner = $this->subscriptions->findByStripeSubscriptionId($stripeSubId)?->getOwnerUser();
+
+        return $owner instanceof User ? $owner->getEmail() : null;
     }
 
     /**

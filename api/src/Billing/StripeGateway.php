@@ -145,6 +145,13 @@ final class StripeGateway implements StripeGatewayInterface
         ]);
     }
 
+    public function cancelSubscription(string $subscriptionId): void
+    {
+        // Immediate cancel: DELETE ends the subscription now (vs the POST
+        // cancel_at_period_end above which lets it ride out the period).
+        $this->request('DELETE', '/subscriptions/' . rawurlencode($subscriptionId), []);
+    }
+
     public function parseWebhookEvent(string $payload, string $signatureHeader): ?array
     {
         if ('' === $this->webhookSecret) {
