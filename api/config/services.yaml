@@ -201,6 +201,18 @@ services:
             $localFactory: '@limiter.login_ip_email'
             $secret: '%kernel.secret%'
 
+    # Sentry Structured Logs bridge: a Monolog handler that forwards records to
+    # Sentry's Logs product (needs sentry.options.enable_logs). Registered as an
+    # *extra* Monolog handler in monolog.yaml (when@prod), so app logs keep going
+    # to stderr AND fan out to Sentry — Monolog already multiplexes to every
+    # handler, so this is the "composite" without a custom logger. info+ only, to
+    # respect the free-tier logs quota; records whose context carries an
+    # exception are skipped (they're reported as issues). Inert without a DSN.
+    Sentry\SentryBundle\Monolog\LogsHandler:
+        arguments:
+            $level: 'info'
+            $bubble: true
+
 when@dev:
     parameters:
         # Local dev: don't make the engineer think up a 12-char password

@@ -17,6 +17,17 @@ the environment (exactly like the VAPID keys and the calendar-webhook URL).
   request bodies.
 - **Session Replay is off** (both PWA sample rates `0`) to conserve quota and
   keep the client bundle lean.
+- **Structured Logs** — application logs are mirrored into Sentry's Logs product
+  *in addition to* their normal destination (so nothing changes about existing
+  logging). On the API/worker, `enable_logs: true` plus the Monolog
+  `Sentry\SentryBundle\Monolog\LogsHandler` (wired as an extra `sentry_logs`
+  handler in `monolog.yaml` `when@prod`, `info`+, noisy `event`/`doctrine`
+  channels excluded) forward records — Monolog already fans each record out to
+  every handler, so it keeps hitting stderr too. Records whose context carries an
+  exception are skipped (they surface as issues instead). On the PWA, each
+  `Sentry.init` sets `enableLogs: true` + `consoleLoggingIntegration` so
+  `console.*` (log/info/warn/error) is mirrored while still printing normally.
+  Logs count against a separate free-tier quota from errors/traces.
 
 ## API + worker (Symfony)
 

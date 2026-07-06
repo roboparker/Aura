@@ -13,5 +13,10 @@ if (dsn) {
     release: process.env.NEXT_PUBLIC_SENTRY_RELEASE || undefined,
     tracesSampleRate: Number(process.env.NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE ?? "0.1"),
     sendDefaultPii: false,
+    // Structured Logs: mirror server-side console.* into Sentry Logs. Additive.
+    enableLogs: true,
+    integrations: [
+      Sentry.consoleLoggingIntegration({ levels: ["log", "info", "warn", "error"] }),
+    ],
   });
 }
