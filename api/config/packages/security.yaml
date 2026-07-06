@@ -94,6 +94,8 @@ security:
         - { path: ^/auth/login$, roles: PUBLIC_ACCESS }
         - { path: ^/auth/forgot-password$, roles: PUBLIC_ACCESS }
         - { path: ^/auth/reset-password$, roles: PUBLIC_ACCESS }
+        # Email confirmation: the clicker holds only the token (no session).
+        - { path: ^/verify-email$, methods: [POST], roles: PUBLIC_ACCESS }
         # Allow the half-authenticated 2FA token through the check endpoint
         # (and only that endpoint) so users can submit their code.
         - { path: ^/auth/2fa-check$, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
@@ -102,6 +104,9 @@ security:
         # account, which has no ROLE_USER) must read its own profile so the
         # PWA can route it to the /waitlist gate.
         - { path: ^/api/me$, roles: IS_AUTHENTICATED_FULLY }
+        # Resend the verification link: reachable by an authenticated but
+        # unverified (ROLE_UNVERIFIED) session boxed into the verify gate.
+        - { path: ^/me/verification/resend$, methods: [POST], roles: IS_AUTHENTICATED_FULLY }
         - { path: ^/me/2fa, roles: ROLE_USER }
         # Personal-account billing (#billing Phase 1b).
         - { path: ^/me/billing, roles: ROLE_USER }
