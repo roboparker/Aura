@@ -63,6 +63,15 @@ class EngagementCategory
     #[Groups(['engagement:read', 'engagement:write'])]
     private int $position = 0;
 
+    /**
+     * Whether time tracked against this category is billable. Billability lives
+     * on the category (not the individual entry): a {@see TimeEntry} snapshots
+     * this onto itself on save, so invoices pull the right pool of time.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
+    private bool $billable = true;
+
     public function getId(): ?Uuid
     {
         return $this->id;
@@ -112,6 +121,18 @@ class EngagementCategory
     public function setPosition(int $position): self
     {
         $this->position = $position;
+
+        return $this;
+    }
+
+    public function isBillable(): bool
+    {
+        return $this->billable;
+    }
+
+    public function setBillable(bool $billable): self
+    {
+        $this->billable = $billable;
 
         return $this;
     }

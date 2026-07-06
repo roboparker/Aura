@@ -202,7 +202,6 @@ const Boards = () => {
             icon={
               <BoardsIcon className={cn("h-6 w-6 shrink-0", boardsMeta.iconClass)} />
             }
-            count={boardsQuery.isLoading ? null : boards.length}
             actions={
               can("boards", "create") ? (
                 <Button

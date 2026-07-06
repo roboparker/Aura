@@ -2,7 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Users } from "lucide-react";
+import { Plus, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
@@ -12,10 +12,12 @@ import { CURRENCIES } from "@/lib/currencies";
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+
+const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 
 const ClientsPage = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -104,91 +106,7 @@ const ClientsPage = () => {
           <PageHeader
             title="Clients"
             icon={<Users className="size-6 text-blue-600 dark:text-blue-400" />}
-            count={clientsQuery.isLoading ? undefined : clients.length}
-            actions={
-              canCreate ? (
-                <Button variant="outline" size="sm" onClick={() => setShowComposer((v) => !v)}>
-                  {showComposer ? "Cancel" : "New client"}
-                </Button>
-              ) : undefined
-            }
           />
-
-          {showComposer && (
-            <Card className="mb-6">
-              <CardContent className="py-6">
-                <form onSubmit={handleCreate} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cl-name">Name</Label>
-                    <Input
-                      id="cl-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                      maxLength={200}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="cl-email">
-                        Email <span className="font-normal text-muted-foreground">(optional)</span>
-                      </Label>
-                      <Input
-                        id="cl-email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cl-currency">Currency</Label>
-                        <select
-                          id="cl-currency"
-                          value={currency}
-                          onChange={(e) => setCurrency(e.target.value)}
-                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                          {CURRENCIES.map((c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cl-rate">Rate / hr</Label>
-                        <Input
-                          id="cl-rate"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={defaultRate}
-                          onChange={(e) => setDefaultRate(e.target.value)}
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="cl-address">
-                      Address <span className="font-normal text-muted-foreground">(optional)</span>
-                    </Label>
-                    <Textarea
-                      id="cl-address"
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-                  <Button type="submit" disabled={createMutation.isPending || !name.trim()}>
-                    {createMutation.isPending ? "Saving…" : "Create client"}
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          )}
 
           {error && (
             <Alert variant="destructive" className="mb-4">
@@ -198,31 +116,149 @@ const ClientsPage = () => {
 
           {clientsQuery.isLoading ? (
             <p className="text-muted-foreground">Loading…</p>
-          ) : clients.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-muted-foreground">
-                No clients yet. Add one to start invoicing.
-              </CardContent>
-            </Card>
           ) : (
-            <ul className="divide-y rounded-md border">
-              {clients.map((client) => (
-                <li key={client["@id"]} className="flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{client.name}</p>
-                    {client.email && (
-                      <p className="truncate text-xs text-muted-foreground">{client.email}</p>
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-4 py-2 font-medium">Name</th>
+                      <th className="px-4 py-2 font-medium">Email</th>
+                      <th className="px-4 py-2 font-medium">Currency</th>
+                      <th className="px-4 py-2 text-right font-medium">Rate / hr</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Inline "Add client" row, pinned to the top. */}
+                    {canCreate &&
+                      (showComposer ? (
+                        <tr className="border-b bg-muted/10">
+                          <td colSpan={4} className="px-4 py-4">
+                            <form onSubmit={handleCreate} className="space-y-4">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cl-name">Name</Label>
+                                <Input
+                                  id="cl-name"
+                                  value={name}
+                                  onChange={(e) => setName(e.target.value)}
+                                  required
+                                  maxLength={200}
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                  <Label htmlFor="cl-email">
+                                    Email{" "}
+                                    <span className="font-normal text-muted-foreground">(optional)</span>
+                                  </Label>
+                                  <Input
+                                    id="cl-email"
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="cl-currency">Currency</Label>
+                                    <select
+                                      id="cl-currency"
+                                      value={currency}
+                                      onChange={(e) => setCurrency(e.target.value)}
+                                      className={SELECT_CLASS}
+                                    >
+                                      {CURRENCIES.map((c) => (
+                                        <option key={c.code} value={c.code}>
+                                          {c.code}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <Label htmlFor="cl-rate">Rate / hr</Label>
+                                    <Input
+                                      id="cl-rate"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={defaultRate}
+                                      onChange={(e) => setDefaultRate(e.target.value)}
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cl-address">
+                                  Address{" "}
+                                  <span className="font-normal text-muted-foreground">(optional)</span>
+                                </Label>
+                                <Textarea
+                                  id="cl-address"
+                                  value={address}
+                                  onChange={(e) => setAddress(e.target.value)}
+                                  rows={2}
+                                />
+                              </div>
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setShowComposer(false)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="submit"
+                                  size="sm"
+                                  disabled={createMutation.isPending || !name.trim()}
+                                >
+                                  {createMutation.isPending ? "Saving…" : "Create client"}
+                                </Button>
+                              </div>
+                            </form>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr className="border-b">
+                          <td colSpan={4} className="px-4 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowComposer(true)}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                            >
+                              <Plus className="h-4 w-4" /> Add client
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+
+                    {clients.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          No clients yet. Use “Add client” to start invoicing.
+                        </td>
+                      </tr>
+                    ) : (
+                      clients.map((client) => (
+                        <tr key={client["@id"]} className="border-b align-middle last:border-0">
+                          <td className="px-4 py-3 font-medium">{client.name}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{client.email || "—"}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{client.currency ?? "—"}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
+                            {client.defaultRateAmount != null && client.currency
+                              ? formatMoney(client.defaultRateAmount, client.currency)
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))
                     )}
-                  </div>
-                  <div className="shrink-0 text-right text-sm text-muted-foreground">
-                    {client.currency ?? "—"}
-                    {client.defaultRateAmount != null && client.currency && (
-                      <span> · {formatMoney(client.defaultRateAmount, client.currency)}/hr</span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
         </div>
       </div>

@@ -15,6 +15,7 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\EngagementRepository;
 use App\State\EngagementCreatorProcessor;
+use App\Validator\ValidEngagementAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -69,6 +70,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Index(columns: ['client_id'], name: 'idx_engagement_client')]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback('validateConsistency')]
+#[ValidEngagementAttachments]
 class Engagement
 {
     public const MAX_NAME_LENGTH = 200;
@@ -105,6 +107,11 @@ class Engagement
     #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
     private ?string $currency = null;
 
+    /** Optional long-form notes (markdown) — scope, terms, key contacts. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['engagement:read', 'engagement:write'])]
+    private ?string $description = null;
+
     #[ORM\Column(type: 'boolean')]
     #[Groups(['engagement:read', 'engagement:write'])]
     private bool $archived = false;
@@ -131,6 +138,21 @@ class Engagement
     #[ORM\OneToMany(mappedBy: 'engagement', targetEntity: Board::class)]
     private Collection $assignedProjects;
 
+    /**
+     * Contract + supporting files attached to this engagement. Same upload
+     * flow as {@see Space::$attachments}: PATCH an `attachments` array of
+     * MediaObject IRIs after POST /media-objects (kind=attachment).
+     * {@see ValidEngagementAttachments} enforces uploader-is-member + kind.
+     *
+     * @var Collection<int, MediaObject>
+     */
+    #[ORM\ManyToMany(targetEntity: MediaObject::class)]
+    #[ORM\JoinTable(name: 'engagement_attachment')]
+    #[ORM\JoinColumn(name: 'engagement_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(name: 'media_object_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[Groups(['engagement:read', 'engagement:write'])]
+    private Collection $attachments;
+
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -149,6 +171,7 @@ class Engagement
     {
         $this->categories = new ArrayCollection();
         $this->assignedProjects = new ArrayCollection();
+        $this->attachments = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -233,6 +256,42 @@ class Engagement
     public function setCurrency(?string $currency): self
     {
         $this->currency = $currency;
+
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = $description;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, MediaObject>
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function addAttachment(MediaObject $media): self
+    {
+        if (!$this->attachments->contains($media)) {
+            $this->attachments->add($media);
+        }
+
+        return $this;
+    }
+
+    public function removeAttachment(MediaObject $media): self
+    {
+        $this->attachments->removeElement($media);
 
         return $this;
     }

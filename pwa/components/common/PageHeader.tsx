@@ -4,10 +4,9 @@ import { cn } from "@/lib/utils";
 /**
  * Shared page header for top-level routes. Standardises the visual
  * rhythm at the top of every page: an optional leading icon, the title,
- * an optional count badge, an optional subtitle, an optional right-side
- * action cluster (e.g. a "New X" button), an optional toolbar row
- * (search bar / filters) below, a divider, and a comfortable gap before
- * the page body.
+ * an optional subtitle, an optional right-side action cluster (e.g. a
+ * "New X" button), an optional toolbar row (search bar / filters) below,
+ * a divider, and a comfortable gap before the page body.
  *
  * Use it instead of hand-rolling `<h1 className="…">` blocks so the
  * spacing stays consistent — when we tweak the rhythm here, every
@@ -18,7 +17,6 @@ import { cn } from "@/lib/utils";
  *     title="Tags"
  *     subtitle="Shared across everyone in the space."
  *     icon={<TagIcon className="h-6 w-6 text-cyan-600" />}
- *     count={tags.length}
  *     actions={<Button>Add tag</Button>}
  *   >
  *     <SearchInput … />
@@ -30,8 +28,6 @@ interface Props {
   /** Icon rendered immediately left of the title. Size it yourself
    *  (e.g. `className="h-6 w-6"`). */
   icon?: ReactNode;
-  /** Count badge rendered right of the title (skipped when null/undefined). */
-  count?: number | null;
   /** Right-aligned action cluster. Buttons baseline-align with the
    *  bottom of the subtitle. */
   actions?: ReactNode;
@@ -47,7 +43,6 @@ const PageHeader = ({
   title,
   subtitle,
   icon,
-  count,
   actions,
   children,
   className,
@@ -59,14 +54,6 @@ const PageHeader = ({
           <div className="flex items-center gap-2">
             {icon}
             <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
-            {count !== null && count !== undefined && (
-              <span
-                className="rounded-full bg-muted-foreground/15 px-2 py-0.5 text-xs font-medium text-muted-foreground"
-                data-testid="page-header-count"
-              >
-                {count}
-              </span>
-            )}
           </div>
           {subtitle && (
             <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>

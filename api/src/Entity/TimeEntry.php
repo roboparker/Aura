@@ -148,8 +148,9 @@ class TimeEntry
     #[Groups(['time_entry:read'])]
     private ?int $durationSeconds = null;
 
+    /** Derived from the {@see $category}'s billability on save — not client-set. */
     #[ORM\Column(type: 'boolean')]
-    #[Groups(['time_entry:read', 'time_entry:write'])]
+    #[Groups(['time_entry:read'])]
     private bool $billable = true;
 
     /**
@@ -199,11 +200,12 @@ class TimeEntry
             $this->space = $this->engagement->getSpace();
         }
 
-        // Snapshot the rate from the category + board currency so a later rate
-        // change never rewrites already-logged (or billed) time.
+        // Snapshot the rate + billability from the category + board currency so a
+        // later category change never rewrites already-logged (or billed) time.
         if (null !== $this->category) {
             $this->rateAmount = $this->category->getRateAmount();
             $this->rateCurrency = $this->engagement?->getCurrency();
+            $this->billable = $this->category->isBillable();
         }
 
         $this->durationSeconds = null;

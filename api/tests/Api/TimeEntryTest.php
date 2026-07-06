@@ -59,7 +59,6 @@ class TimeEntryTest extends ApiTestCase
                 'description' => 'Wiring the timer',
                 'startedAt' => '2026-07-03T09:00:00+00:00',
                 'endedAt' => '2026-07-03T10:30:00+00:00',
-                'billable' => true,
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();

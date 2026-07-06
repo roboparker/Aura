@@ -13,6 +13,7 @@ use App\Entity\Engagement;
 use App\Entity\EngagementCategory;
 use App\Entity\Invoice;
 use App\Entity\InvoiceLineItem;
+use App\Entity\MediaObject;
 use App\Entity\Page;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
@@ -26,18 +27,20 @@ use App\Entity\UserGroup;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
+use League\Flysystem\FilesystemOperator;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Admin (Ada) demo data — two spaces so an admin sign-in is interesting:
  *
- *  - **Admin desk** — a fully-populated shared space with at least one of
+ *  - **everything** — a fully-populated shared space with at least one of
  *    every content type: a board (with task sections, tasks — one recurring
  *    with a reminder, a custom field & value, a task relationship, and task
  *    comments), a page with a sub-page and a page comment, a discussion +
  *    comment, tags, groups, and the full billing chain (client → engagement
  *    with a category/rate → a tracked time entry → a draft invoice). It also
  *    holds a second, deliberately **empty board** for the empty-state UI.
- *  - **Sandbox** — a deliberately empty shared space, so the empty-space UI
+ *  - **nothing** — a deliberately empty shared space, so the empty-space UI
  *    is reachable without deleting anything.
  *
  * Admin (Ada) is intentionally not a member of the user-side "Launch team"
@@ -46,6 +49,12 @@ use Doctrine\Persistence\ObjectManager;
 class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
 {
     public const ADMIN_DESK_SPACE_REFERENCE = 'space-admin-desk';
+
+    public function __construct(
+        #[Autowire(service: 'media.storage')]
+        private readonly FilesystemOperator $storage,
+    ) {
+    }
 
     public function getDependencies(): array
     {
@@ -63,12 +72,12 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         /** @var User $liam */
         $liam = $this->getReference('user-liam', User::class);
 
-        // --- Admin desk: a fully-populated shared space ---
+        // --- everything: a fully-populated shared space ---
         $desk = (new Space())
-            ->setName('Admin desk')
+            ->setName('everything')
             ->setDescription(
-                'Housekeeping, account chores, and one-off admin tasks — the '
-                . 'workspace that keeps the lights on.',
+                'Has at least one of every content type — the space to open when '
+                . 'you want to see a populated UI.',
             )
             ->setCreatedBy($ada);
         $manager->persist($desk);
@@ -215,19 +224,39 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         $devCategory = (new EngagementCategory())->setName('Development')->setRateAmount(12000)->setPosition(0);
         $engagement = (new Engagement())
             ->setSpace($desk)->setClient($client)->setCreatedBy($ada)
-            ->setName('Acme website')->setCurrency('USD');
+            ->setName('Acme website')->setCurrency('USD')
+            ->setDescription(
+                "## Scope\n\nBuild + launch the Acme marketing site.\n\n"
+                . "- Net-30 terms\n- Weekly status call\n- Contract on file in the Files tab",
+            );
         $engagement->addCategory($devCategory);
         $manager->persist($engagement);
         // Roll the admin board up to this engagement.
         $board->setEngagement($engagement);
+
+        // A fake signed contract file attached to the engagement (Files tab).
+        $contractBody = "ACME MASTER SERVICES AGREEMENT\n\n"
+            . "This sample agreement is seeded so the engagement's contract files "
+            . "have something to show.\n\n- Term: 12 months\n- Billing: Net-30\n"
+            . "- Signed: Ada Admin\n";
+        $contractPath = 'attachments/fixture-acme-contract.txt';
+        $this->storage->write($contractPath, $contractBody);
+        $contract = (new MediaObject())
+            ->setOwner($ada)
+            ->setKind(MediaObject::KIND_ATTACHMENT)
+            ->setVariants(['original' => $contractPath])
+            ->setOriginalName('acme-contract.txt')
+            ->setMimeType('text/plain')
+            ->setByteSize(\strlen($contractBody));
+        $manager->persist($contract);
+        $engagement->addAttachment($contract);
 
         $entry = (new TimeEntry())
             ->setSpace($desk)->setUser($ada)
             ->setEngagement($engagement)->setCategory($devCategory)
             ->setDescription('Set up the staging environment.')
             ->setStartedAt(new \DateTimeImmutable('-2 days 09:00'))
-            ->setEndedAt(new \DateTimeImmutable('-2 days 11:00'))
-            ->setBillable(true);
+            ->setEndedAt(new \DateTimeImmutable('-2 days 11:00'));
         $manager->persist($entry);
 
         // A draft invoice for the client (2h × $120 = $240).
@@ -249,9 +278,9 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
             ->setDescription('Nothing here yet — handy for testing the empty board state.');
         $manager->persist($emptyBoard);
 
-        // --- Sandbox: an intentionally empty shared space ---
+        // --- nothing: an intentionally empty shared space ---
         $sandbox = (new Space())
-            ->setName('Sandbox')
+            ->setName('nothing')
             ->setDescription('An empty space — nothing here yet. Handy for trying the empty states.')
             ->setCreatedBy($ada);
         $manager->persist($sandbox);

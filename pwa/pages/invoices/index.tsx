@@ -3,22 +3,16 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MoreHorizontal, Receipt } from "lucide-react";
+import { MoreHorizontal, Plus, Receipt } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
-import {
-  Client,
-  Invoice,
-  STATUS_META,
-  clientName,
-  formatMoney,
-} from "@/lib/invoiceTypes";
+import { Invoice, STATUS_META, clientName, formatMoney } from "@/lib/invoiceTypes";
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import {
@@ -31,13 +25,20 @@ import {
 
 type InvoiceAction = "issue" | "send" | "mark-paid" | "void";
 
+/** Minimal engagement shape for the "generate from time" picker. */
+interface EngagementLite {
+  "@id": string;
+  name: string;
+}
+
 const InvoicesPage = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [genClient, setGenClient] = useState("");
+  const [showComposer, setShowComposer] = useState(false);
+  const [genEngagement, setGenEngagement] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,17 +59,19 @@ const InvoicesPage = () => {
         { errorMessage: "Failed to load invoices." },
       ),
   });
-  const clientsQuery = useQuery({
-    queryKey: ["clients", spaceIri],
-    enabled: isAuthenticated,
+  // Invoices generate from an *engagement* (Harvest model): the engagement
+  // carries the client + currency and its unbilled time becomes line items.
+  const engagementsQuery = useQuery({
+    queryKey: ["engagements", spaceIri],
+    enabled: isAuthenticated && can("invoices", "create"),
     queryFn: () =>
-      apiGetCollection<Client>(
-        spaceIri ? `/clients?space=${encodeURIComponent(spaceIri)}` : "/clients",
-        { errorMessage: "Failed to load clients." },
+      apiGetCollection<EngagementLite>(
+        spaceIri ? `/engagements?space=${encodeURIComponent(spaceIri)}` : "/engagements",
+        { errorMessage: "Failed to load engagements." },
       ),
   });
   const invoices = invoicesQuery.data ?? [];
-  const clients = clientsQuery.data ?? [];
+  const engagements = engagementsQuery.data ?? [];
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
   const generate = useMutation({
@@ -76,12 +79,14 @@ const InvoicesPage = () => {
       apiSend<{ id: string; lineItemCount: number }>("POST", "/invoices/from-time-entries", {
         contentType: "application/json",
         errorMessage: "Failed to generate an invoice.",
-        body: { space: spaceIri, client: genClient },
+        body: { engagement: genEngagement },
       }),
     onSuccess: (res) => {
       setError(null);
-      setNotice(`Draft invoice created from ${res?.lineItemCount ?? 0} time entr${(res?.lineItemCount ?? 0) === 1 ? "y" : "ies"}.`);
-      setGenClient("");
+      const n = res?.lineItemCount ?? 0;
+      setNotice(`Draft invoice created from ${n} time entr${n === 1 ? "y" : "ies"}.`);
+      setGenEngagement("");
+      setShowComposer(false);
       void refresh();
     },
     onError: (e) => setError(e instanceof Error ? e.message : "Failed to generate an invoice."),
@@ -143,46 +148,7 @@ const InvoicesPage = () => {
           <PageHeader
             title="Invoices"
             icon={<Receipt className="size-6 text-blue-600 dark:text-blue-400" />}
-            count={invoicesQuery.isLoading ? undefined : invoices.length}
           />
-
-          {canManage && (
-            <Card className="mb-6">
-              <CardContent className="flex flex-wrap items-end gap-3 py-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="gen-client">Generate from tracked time</Label>
-                  <select
-                    id="gen-client"
-                    value={genClient}
-                    onChange={(e) => setGenClient(e.target.value)}
-                    className="h-9 w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">Select a client…</option>
-                    {clients.map((c) => (
-                      <option key={c["@id"]} value={c["@id"]}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <Button
-                  onClick={() => generate.mutate()}
-                  disabled={!genClient || generate.isPending}
-                >
-                  {generate.isPending ? "Generating…" : "Generate draft"}
-                </Button>
-                {clients.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    Add a{" "}
-                    <Link href="/clients" className="text-primary hover:underline">
-                      client
-                    </Link>{" "}
-                    first.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          )}
 
           {notice && (
             <Alert className="mb-4">
@@ -197,84 +163,170 @@ const InvoicesPage = () => {
 
           {invoicesQuery.isLoading ? (
             <p className="text-muted-foreground">Loading…</p>
-          ) : invoices.length === 0 ? (
-            <Card>
-              <CardContent className="py-10 text-center text-muted-foreground">
-                No invoices yet. Generate one from tracked time above.
-              </CardContent>
-            </Card>
           ) : (
-            <ul className="divide-y rounded-md border">
-              {invoices.map((invoice) => {
-                const meta = STATUS_META[invoice.status];
-                return (
-                  <li key={invoice["@id"]} className="flex items-center justify-between gap-4 px-4 py-3">
-                    <Link href={`/invoices/${invoice.id}`} className="min-w-0 flex-1 hover:opacity-80">
-                      <p className="flex items-center gap-2 font-medium">
-                        {invoice.number ?? "Draft"}
-                        <span className={cn("rounded px-1.5 py-0.5 text-xs font-medium", meta.badgeClass)}>
-                          {meta.label}
-                        </span>
-                      </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {clientName(invoice.client) || "—"}
-                      </p>
-                    </Link>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="font-medium tabular-nums">
-                        {formatMoney(invoice.total, invoice.currency)}
-                      </span>
-                      {canManage && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label="Invoice actions">
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => void openPdf(invoice)}>
-                              View PDF
-                            </DropdownMenuItem>
-                            {invoice.status === "draft" && (
-                              <DropdownMenuItem
-                                onClick={() => act.mutate({ invoice, action: "issue" })}
-                              >
-                                Issue
-                              </DropdownMenuItem>
-                            )}
-                            {invoice.status !== "void" && (
-                              <DropdownMenuItem
-                                onClick={() => act.mutate({ invoice, action: "send" })}
-                              >
-                                Send
-                              </DropdownMenuItem>
-                            )}
-                            {invoice.status !== "paid" && invoice.status !== "void" && (
-                              <DropdownMenuItem
-                                onClick={() => act.mutate({ invoice, action: "mark-paid" })}
-                              >
-                                Mark paid
-                              </DropdownMenuItem>
-                            )}
-                            {invoice.status !== "void" && (
-                              <>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => act.mutate({ invoice, action: "void" })}
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                      <th className="px-4 py-2 font-medium">Invoice</th>
+                      <th className="px-4 py-2 font-medium">Client</th>
+                      <th className="px-4 py-2 text-right font-medium">Total</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Inline "Generate invoice" row, pinned to the top. */}
+                    {canManage &&
+                      (showComposer ? (
+                        <tr className="border-b bg-muted/10">
+                          <td colSpan={4} className="px-4 py-4">
+                            <div className="flex flex-wrap items-end gap-3">
+                              <div className="space-y-1.5">
+                                <Label htmlFor="gen-engagement">Generate from tracked time</Label>
+                                <select
+                                  id="gen-engagement"
+                                  value={genEngagement}
+                                  onChange={(e) => setGenEngagement(e.target.value)}
+                                  className="h-9 w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                  Void
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                                  <option value="">Select an engagement…</option>
+                                  {engagements.map((eng) => (
+                                    <option key={eng["@id"]} value={eng["@id"]}>
+                                      {eng.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => generate.mutate()}
+                                disabled={!genEngagement || generate.isPending}
+                              >
+                                {generate.isPending ? "Generating…" : "Generate draft"}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowComposer(false)}
+                              >
+                                Cancel
+                              </Button>
+                              {engagements.length === 0 && (
+                                <p className="text-sm text-muted-foreground">
+                                  Add an{" "}
+                                  <Link href="/engagements" className="text-primary hover:underline">
+                                    engagement
+                                  </Link>{" "}
+                                  first.
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <tr className="border-b">
+                          <td colSpan={4} className="px-4 py-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowComposer(true)}
+                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                            >
+                              <Plus className="h-4 w-4" /> Generate invoice
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+
+                    {invoices.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                          No invoices yet. Use “Generate invoice” to bill tracked time.
+                        </td>
+                      </tr>
+                    ) : (
+                      invoices.map((invoice) => {
+                        const meta = STATUS_META[invoice.status];
+                        return (
+                          <tr key={invoice["@id"]} className="border-b align-middle last:border-0">
+                            <td className="px-4 py-3">
+                              <Link
+                                href={`/invoices/${invoice.id}`}
+                                className="flex items-center gap-2 font-medium hover:opacity-80"
+                              >
+                                {invoice.number ?? "Draft"}
+                                <span
+                                  className={cn(
+                                    "rounded px-1.5 py-0.5 text-xs font-medium",
+                                    meta.badgeClass,
+                                  )}
+                                >
+                                  {meta.label}
+                                </span>
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {clientName(invoice.client) || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium tabular-nums">
+                              {formatMoney(invoice.total, invoice.currency)}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {canManage && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" aria-label="Invoice actions">
+                                      <MoreHorizontal className="size-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => void openPdf(invoice)}>
+                                      View PDF
+                                    </DropdownMenuItem>
+                                    {invoice.status === "draft" && (
+                                      <DropdownMenuItem
+                                        onClick={() => act.mutate({ invoice, action: "issue" })}
+                                      >
+                                        Issue
+                                      </DropdownMenuItem>
+                                    )}
+                                    {invoice.status !== "void" && (
+                                      <DropdownMenuItem
+                                        onClick={() => act.mutate({ invoice, action: "send" })}
+                                      >
+                                        Send
+                                      </DropdownMenuItem>
+                                    )}
+                                    {invoice.status !== "paid" && invoice.status !== "void" && (
+                                      <DropdownMenuItem
+                                        onClick={() => act.mutate({ invoice, action: "mark-paid" })}
+                                      >
+                                        Mark paid
+                                      </DropdownMenuItem>
+                                    )}
+                                    {invoice.status !== "void" && (
+                                      <>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem
+                                          className="text-destructive"
+                                          onClick={() => act.mutate({ invoice, action: "void" })}
+                                        >
+                                          Void
+                                        </DropdownMenuItem>
+                                      </>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
         </div>
       </div>
