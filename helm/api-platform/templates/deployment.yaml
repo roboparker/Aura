@@ -90,6 +90,21 @@ spec:
                 configMapKeyRef:
                   name: {{ include "api-platform.fullname" . }}
                   key: messenger-transport-dsn
+            - name: MAILER_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: mailer-dsn
+            - name: MAILER_FROM
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: mailer-from
+            - name: APP_FRONTEND_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "api-platform.fullname" . }}
+                  key: app-frontend-url
             - name: CADDY_GLOBAL_OPTIONS
               valueFrom:
                 configMapKeyRef:
