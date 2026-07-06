@@ -13,6 +13,10 @@ sentry:
         traces_sample_rate: '%env(float:SENTRY_TRACES_SAMPLE_RATE)%'
         # Don't attach IPs / cookies / request bodies by default.
         send_default_pii: false
+        # Turn on Sentry's Structured Logs product. This only opens the pipe;
+        # records reach it via the Monolog LogsHandler wired in monolog.yaml
+        # (when@prod). Inert without a DSN, so dev/test/CI never send.
+        enable_logs: true
 
 when@test:
     sentry:
