@@ -77,14 +77,26 @@ are set at build time, so a normal build without them just skips the upload —
 no build-time Sentry account needed for the dark launch.
 
 The DSN is **public** (baked into the client bundle at build), so a single
-`NEXT_PUBLIC_SENTRY_DSN` serves client + server:
+`NEXT_PUBLIC_SENTRY_DSN` serves client + server. **It is NOT committed** — this
+is a public repo, and a committed DSN would be inherited by forks and invites
+quota abuse. Instead it's injected at CI build time from a **repo-level Actions
+secret** (`NEXT_PUBLIC_SENTRY_DSN`) via a Docker `build-arg` (see the
+`Build & push pwa image` step in `deploy.yml` + the `ARG`/`ENV` in `pwa/Dockerfile`).
+Forks and local builds get no secret → blank DSN → Sentry off.
 
 | Env var | Purpose |
 | --- | --- |
-| `NEXT_PUBLIC_SENTRY_DSN` | PWA project DSN. **Blank = disabled.** Committed in `pwa/.env.production` after first-run. |
-| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | e.g. `production`. |
+| `NEXT_PUBLIC_SENTRY_DSN` | PWA project DSN. **Blank = disabled.** Injected at build from the repo Actions secret (not committed). |
+| `NEXT_PUBLIC_SENTRY_ENVIRONMENT` | e.g. `production` (committed in `pwa/.env.production`). |
+| `NEXT_PUBLIC_SENTRY_RELEASE` | Commit SHA, passed as a build-arg from `${{ github.sha }}`. |
 | `NEXT_PUBLIC_SENTRY_TRACES_SAMPLE_RATE` | Trace sample rate (default `0.1`). |
 | `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` / `SENTRY_PROJECT` | Build-time source-map upload (optional). |
+
+> **Even so, the DSN is visible in the deployed browser bundle** (unavoidable for
+> a browser SDK). Keeping it out of the repo only stops fork-inheritance and
+> casual grep. The real abuse mitigation is Sentry-side: in the PWA project's
+> settings, restrict **Allowed Domains / Inbound Filters** to `madori.app` and set
+> a **per-key rate limit / spike protection**.
 
 ## Going live
 
@@ -94,9 +106,11 @@ The DSN is **public** (baked into the client bundle at build), so a single
    optionally `SENTRY_RELEASE=<sha>`) to the server's `/opt/aura/.env`. The
    `compose.yaml` refs are already in place; a deploy recreates the containers
    with the value.
-3. **PWA:** commit the public DSN as `NEXT_PUBLIC_SENTRY_DSN` in
-   `pwa/.env.production` (it ships in the page source anyway) — it's baked into
-   the image at CI build.
+3. **PWA:** add the Next.js project DSN as a **repo-level Actions secret** named
+   `NEXT_PUBLIC_SENTRY_DSN` (repo → Settings → Secrets and variables → Actions).
+   The deploy build bakes it into the image; nothing to commit. Then, in the PWA
+   Sentry project, restrict Allowed Domains to `madori.app` + set a key rate
+   limit (the DSN is visible in the shipped bundle).
 4. *(Optional)* For readable stack traces, add `SENTRY_AUTH_TOKEN` / `SENTRY_ORG`
    / `SENTRY_PROJECT` to the CI build env so `withSentryConfig` uploads source
    maps.
