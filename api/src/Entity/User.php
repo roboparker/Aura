@@ -104,6 +104,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     private bool $waitlisted = false;
 
     /**
+     * Whether the account has confirmed ownership of its email address.
+     *
+     * Mirrors {@see $waitlisted}'s inverse-gating idiom: the default is
+     * `true` (i.e. NOT gated) so every path that constructs a User directly
+     * — SSO provisioning, fixtures, the test suite, CLI seeders, and every
+     * pre-existing row (backfilled to true in the migration) — is verified
+     * without thinking about it. Only the public-signup processor sets it
+     * false, and only when email verification is required (prod default) and
+     * the account isn't already waitlisted. While false the account holds
+     * only ROLE_UNVERIFIED (see {@see getRoles()}), so every ROLE_USER-gated
+     * resource + access extension blocks it, boxing the user into
+     * sign-in + /api/me + the verify-email gate until they confirm. Set
+     * server-side only (never in a serialization group).
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $emailVerified = true;
+
+    /**
      * Linked social-login identities (#267) — one per connected provider
      * (Google / Microsoft / GitHub). Any of them signs the user in. Managed
      * server-side by {@see \App\Controller\SsoController}; see {@see SsoIdentity}.
@@ -427,6 +445,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
             return ['ROLE_WAITLISTED'];
         }
 
+        // Same fail-closed idiom as waitlisting: an unverified account is
+        // denied ROLE_USER so every resource blocks it, leaving it only
+        // sign-in + /api/me + the verify-email gate until it confirms.
+        if (!$this->emailVerified) {
+            return ['ROLE_UNVERIFIED'];
+        }
+
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
         return array_unique($roles);
@@ -447,6 +472,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function setWaitlisted(bool $waitlisted): static
     {
         $this->waitlisted = $waitlisted;
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerified;
+    }
+
+    public function setEmailVerified(bool $emailVerified): static
+    {
+        $this->emailVerified = $emailVerified;
         return $this;
     }
 

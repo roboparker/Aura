@@ -77,6 +77,14 @@ framework:
             policy: 'sliding_window'
             limit: '%env(int:RATE_LIMIT_FORGOT_PASSWORD_PER_EMAIL)%'
             interval: '1 hour'
+        # Resend of the email-verification link (authenticated, keyed per
+        # user in EmailVerificationController). Each accepted request queues
+        # an email, so it doubles as a mail-spam vector at the user's own
+        # inbox. Fixed limit (not env-driven) like two_factor_verify.
+        email_verification_resend:
+            policy: 'token_bucket'
+            limit: 5
+            rate: { interval: '10 minutes', amount: 5 }
 
     #esi: true
     #fragments: true

@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
 import WaitlistGate from "@/components/auth/WaitlistGate";
+import EmailVerificationGate from "@/components/auth/EmailVerificationGate";
 import Footer from "./Footer";
 import ImpersonationBanner from "./ImpersonationBanner";
 import Navbar from "./Navbar";
@@ -27,6 +28,7 @@ const CHROME_FREE_PATHS = new Set([
   "/forgot-password",
   "/reset-password",
   "/waitlist",
+  "/verify-email",
 ]);
 
 /**
@@ -38,7 +40,11 @@ const AppShell = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
   const router = useRouter();
 
-  if (user?.waitlisted || CHROME_FREE_PATHS.has(router.pathname)) {
+  if (
+    user?.waitlisted ||
+    user?.emailVerified === false ||
+    CHROME_FREE_PATHS.has(router.pathname)
+  ) {
     return <>{children}</>;
   }
 
@@ -97,6 +103,10 @@ const Layout = ({
                 wherever it tries to navigate. Renders nothing for normal
                 users. */}
             <WaitlistGate />
+            {/* Keeps an unverified account pinned to the /verify-email
+                gate until it confirms its email. Renders nothing for
+                verified users. */}
+            <EmailVerificationGate />
           </ActiveSpaceProvider>
         </AuthProvider>
       </HydrationBoundary>
