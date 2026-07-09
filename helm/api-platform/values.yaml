@@ -27,6 +27,21 @@ pwa:
     # Overrides the image tag whose default is the chart appVersion.
     tag: ""
 
+# Outbound email (Symfony Mailer). For production set a real transport —
+# Resend is the recommended provider: dsn: "resend+api://YOUR_API_KEY@default".
+# Leaving dsn empty falls back to null://null, which SILENTLY DISCARDS all mail
+# (password resets, invites, verification, notifications). `from` must be an
+# address on a domain you've verified with the provider.
+# See docs/developer/email-delivery.md.
+mailer:
+  dsn: ""
+  from: "no-reply@example.com"
+
+# Absolute base URL of the PWA, used to build links in outbound email
+# (verification, password reset, invites, digests).
+app:
+  frontendUrl: "https://chart-example.local"
+
 # Postgres-backed Symfony Messenger job queue. The Doctrine transport reuses
 # the app database; auto_setup is off because the messenger_messages table is
 # created by a migration.

@@ -8,6 +8,15 @@ parameters:
     # env var is unset — see app.calendar_webhook_base_url below (#582 Phase D).
     env(CALENDAR_WEBHOOK_BASE_URL): ''
 
+    # Whether a new open signup (waitlist off) must confirm its email before
+    # the account is usable. Env-driven (like the RATE_LIMIT_* knobs) so the
+    # test suite can toggle it per case: prod/staging ship it ON via .env,
+    # dev + test default it OFF (.env.dev / .env.test) so existing signups +
+    # the suite register immediately-usable accounts. Read by
+    # UserPasswordHasherProcessor; see App\Service\EmailVerificationService.
+    env(EMAIL_VERIFICATION_REQUIRED): '1'
+    app.email_verification_required: '%env(bool:EMAIL_VERIFICATION_REQUIRED)%'
+
     # Minimum `Symfony\Component\Validator\Constraints\PasswordStrength` score
     # required for signup, change-password, and reset-password. 0 =
     # VERY_WEAK, 2 = MEDIUM, 4 = VERY_STRONG. Staging + production stay at

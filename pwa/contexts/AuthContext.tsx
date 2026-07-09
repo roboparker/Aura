@@ -132,6 +132,14 @@ export interface User {
    * signups. Optional on the wire — treat missing as false.
    */
   waitlisted?: boolean;
+  /**
+   * False while this account hasn't confirmed its email. Like `waitlisted`
+   * it holds no ROLE_USER server-side, so it's blocked from everything but
+   * sign-in + /api/me + the verify-email gate (see EmailVerificationGate in
+   * Layout). Optional on the wire — treat missing as true (verified), since
+   * SSO/legacy accounts are verified by default.
+   */
+  emailVerified?: boolean;
   // Inlined on /api/me so the PWA has notification + timezone settings on
   // first paint. Always present — the API merges in defaults for older rows.
   preferences: UserPreferences;

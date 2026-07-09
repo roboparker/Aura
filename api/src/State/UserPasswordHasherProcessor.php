@@ -9,6 +9,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
+use App\Service\EmailVerificationService;
 use App\Service\PersonalSpaceProvisioner;
 use App\Service\WaitlistJoinedMailer;
 use App\Service\WaitlistSettings;
@@ -38,6 +39,12 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         private EntityManagerInterface $em,
         private WaitlistSettings $waitlistSettings,
         private WaitlistJoinedMailer $waitlistJoinedMailer,
+        private EmailVerificationService $emailVerificationService,
+        // Prod/staging require email confirmation before an account works;
+        // dev + test default it off (env, see .env.dev/.env.test) so the
+        // existing suite keeps registering immediately-usable accounts.
+        #[Autowire('%app.email_verification_required%')]
+        private bool $emailVerificationRequired,
         private LoggerInterface $logger,
         #[Autowire(service: 'limiter.signup_ip')]
         private RateLimiterFactoryInterface $signupLimiter,
@@ -87,6 +94,15 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
             $data->setWaitlisted(true);
         }
 
+        // Open signups (waitlist off) require email confirmation before the
+        // account is usable: hold ROLE_USER back until the link is clicked
+        // (User::getRoles → ROLE_UNVERIFIED). Waitlisted accounts are already
+        // gated by ROLE_WAITLISTED and vetted at promotion, so we don't stack
+        // a second gate on them — they stay verified (the default).
+        if ($operation instanceof Post && $this->emailVerificationRequired && !$data->isWaitlisted()) {
+            $data->setEmailVerified(false);
+        }
+
         /** @var User $user */
         $user = $this->persistProcessor->process($data, $operation, $uriVariables, $context);
 
@@ -109,6 +125,14 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         // server logs a warning but can't undo the signup that already landed.
         if ($operation instanceof Post && $user->isWaitlisted()) {
             $this->sendWaitlistJoined($user);
+        }
+
+        // Send the confirmation link for an open signup that landed
+        // unverified. The service swallows transport errors (a dead SMTP
+        // server logs a warning but can't undo the signup); the user can
+        // always hit "resend" from the gate.
+        if ($operation instanceof Post && !$user->isEmailVerified()) {
+            $this->emailVerificationService->send($user);
         }
 
         return $user;

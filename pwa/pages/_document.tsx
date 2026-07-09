@@ -37,6 +37,7 @@ const Document = () => (
     <Head>
       <link rel="icon" href="/favicon.ico" sizes="48x48" />
       <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
       <script dangerouslySetInnerHTML={{ __html: codeThemeBootstrap }} />
     </Head>
     <body>

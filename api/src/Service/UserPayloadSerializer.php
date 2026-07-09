@@ -60,6 +60,11 @@ final class UserPayloadSerializer
             // User::getRoles), so the server-side block is authoritative —
             // this flag just drives the client UX.
             'waitlisted' => $user->isWaitlisted(),
+            // Surfaced so the PWA can route an unverified account to the
+            // verify-email gate. Like `waitlisted`, the account holds no
+            // ROLE_USER while this is false (see User::getRoles), so the
+            // server block is authoritative — this flag just drives UX.
+            'emailVerified' => $user->isEmailVerified(),
             // Inlined so the PWA has notification + timezone settings on
             // initial render without an extra round-trip to /me/preferences.
             'preferences' => $user->getPreferences(),

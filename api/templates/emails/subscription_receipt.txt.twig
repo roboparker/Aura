@@ -1,0 +1,9 @@
+Hi,
+
+Thanks for your Madori subscription. This confirms we received your payment of {{ (amount / 100)|number_format(2) }} {{ currency }}{% if invoiceNumber %} for invoice {{ invoiceNumber }}{% endif %}.
+{% if invoiceUrl %}
+View or download your receipt: {{ invoiceUrl }}
+{% endif %}
+You can review past invoices and manage your subscription anytime from Billing in your Madori settings.
+
+— Madori

@@ -15,3 +15,5 @@ data:
   mercure-extra-directives: {{ .Values.mercure.extraDirectives | quote }}
   caddy-global-options: {{ .Values.php.caddyGlobalOptions | quote }}
   messenger-transport-dsn: {{ .Values.messenger.transportDsn | quote }}
+  mailer-from: {{ .Values.mailer.from | quote }}
+  app-frontend-url: {{ .Values.app.frontendUrl | quote }}

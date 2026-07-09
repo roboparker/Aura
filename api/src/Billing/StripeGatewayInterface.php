@@ -76,6 +76,17 @@ interface StripeGatewayInterface
     public function cancelSubscriptionAtPeriodEnd(string $subscriptionId): void;
 
     /**
+     * Cancel a subscription **immediately** (Stripe `DELETE /subscriptions/{id}`)
+     * — used when an account is deleted, so the customer's card can't keep
+     * being charged for an account that no longer exists. Unlike the
+     * at-period-end variant this ends billing now. The mirror row's terminal
+     * state still arrives via the `customer.subscription.deleted` webhook (a
+     * no-op if the row has already cascaded away with the account). Throws
+     * {@see BillingException} on a transport / API error.
+     */
+    public function cancelSubscription(string $subscriptionId): void;
+
+    /**
      * Verify the `Stripe-Signature` header against the raw request body and
      * return the decoded event, or null when the signature is missing /
      * invalid / outside the timestamp tolerance (caller answers 400).
