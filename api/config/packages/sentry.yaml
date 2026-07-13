@@ -1,0 +1,38 @@
+# Sentry error tracking + performance tracing (sentry/sentry-symfony).
+#
+# The SDK is a no-op while SENTRY_DSN is empty (the committed default in
+# api/.env), so local dev, the PHPUnit suite, and CI never phone home. Set a
+# real DSN via the server env / .env.local — the SAME DSN is shared by the
+# `php` API and the `worker` (they run the same image; transactions are
+# distinguished by server_name), so one Sentry PHP project covers both.
+#
+# What's captured out of the box:
+#   * unhandled exceptions + HTTP 5xx (the bundle's error listener)
+#   * failed Messenger jobs — async queue, reminders, digests, calendar sync,
+#     backups (the `messenger` integration below)
+#   * performance traces at SENTRY_TRACES_SAMPLE_RATE (default 0.1 = 10%)
+#
+# We deliberately do NOT register a Monolog handler that turns every
+# logger->error() into a separate Sentry issue: Symfony already logs uncaught
+# exceptions through Monolog, so a broad error-level handler double-reports
+# what the error listener captured. Add `Sentry\Monolog\Handler` scoped to the
+# app channels later if standalone log-as-issue capture is wanted.
+sentry:
+    dsn: '%env(default::SENTRY_DSN)%'
+    # Uncaught exceptions/errors are captured by the bundle's error listener.
+    register_error_listener: true
+    register_error_handler: true
+    options:
+        environment: '%kernel.environment%'
+        # Optional build/release marker (e.g. the deploy image tag). Empty is fine.
+        release: '%env(default::SENTRY_RELEASE)%'
+        # Fraction of requests/jobs sampled for performance tracing (0..1).
+        traces_sample_rate: '%env(float:SENTRY_TRACES_SAMPLE_RATE)%'
+        # Never attach usernames/emails/IP/request bodies. Privacy-first posture,
+        # matching the rest of the app (cookieless analytics, no PII in events).
+        send_default_pii: false
+    messenger:
+        enabled: true
+        # Also report messages that fail but are retried (soft fails), so a job
+        # that only succeeds on retry still surfaces the underlying error.
+        capture_soft_fails: true

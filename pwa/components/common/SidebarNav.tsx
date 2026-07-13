@@ -296,6 +296,11 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
       label: "Global custom fields",
       match: "/admin/global-custom-fields",
     },
+    {
+      href: "/admin/sentry-test",
+      label: "Sentry test",
+      match: "/admin/sentry-test",
+    },
     { href: "/feedback", label: "Feedback", match: "/feedback" },
     ...ADMIN_EXTERNAL_LINKS.map((l) => ({ ...l, match: l.href, external: true })),
   ];

@@ -255,6 +255,7 @@ Developer docs:
 - `docs/developer/task-organization.md` - Task sections, the Kanban board view, and task relationships (entities, endpoints, validation, UI)
 - `docs/developer/billing.md` - Billing & the freemium gate: the Team plan, hybrid seat/usage caps, Stripe Checkout/Portal + webhook, enforcement flag, going-live setup
 - `docs/developer/blog.md` - Public file-based blog: markdown posts + frontmatter, SSG rendering, SEO meta, generated sitemap, drafts
+- `docs/developer/sentry.md` - Sentry error tracking + performance tracing across the API, worker, and PWA; DSN/env wiring, disabled-by-default posture, going-live checklist
 
 User docs:
 - `docs/user/two-factor-auth.md` - End-user guide for enabling, using, and recovering 2FA

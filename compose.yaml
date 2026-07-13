@@ -30,6 +30,12 @@ services:
       # POST change-notifications to. Blank = webhooks off (poll still syncs).
       CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
+      # Sentry error tracking + tracing. Blank DSN (the default) disables the
+      # SDK; set SENTRY_DSN in the server .env for staging/prod. Shared with the
+      # worker below — one Sentry PHP project covers both.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       # Hostname for the Umami dashboard site block in the Caddyfile.
       # Prod: analytics.<domain> (with a matching DNS A record).
       UMAMI_SERVER_NAME: ${UMAMI_SERVER_NAME:-analytics.localhost}
@@ -111,6 +117,11 @@ services:
       # provider subscriptions on the pull cron, so it needs the base URL too.
       CALENDAR_WEBHOOK_BASE_URL: ${CALENDAR_WEBHOOK_BASE_URL:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
+      # Sentry — same PHP project/DSN as the php service; captures failures in
+      # async jobs, reminders, digests, calendar sync, and backups.
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
       MERCURE_JWT_SECRET: ${CADDY_MERCURE_JWT_SECRET:-!ChangeThisMercureHubJWTSecretKey!}

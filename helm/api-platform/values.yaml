@@ -33,6 +33,14 @@ pwa:
 messenger:
   transportDsn: "doctrine://default?auto_setup=false"
 
+# Sentry error tracking + performance tracing for the PHP API + worker (they
+# share one Sentry PHP project). Leave dsn empty to keep the SDK disabled;
+# set it to your project DSN to turn Sentry on. tracesSampleRate is 0..1.
+sentry:
+  dsn: ""
+  tracesSampleRate: "0.1"
+  release: ""
+
 # Long-running job runner (bin/console messenger:consume). Set enabled: false
 # to fall back to processing jobs inline / via cron only.
 worker:

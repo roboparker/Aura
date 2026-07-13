@@ -15,3 +15,5 @@ data:
   mercure-extra-directives: {{ .Values.mercure.extraDirectives | quote }}
   caddy-global-options: {{ .Values.php.caddyGlobalOptions | quote }}
   messenger-transport-dsn: {{ .Values.messenger.transportDsn | quote }}
+  sentry-traces-sample-rate: {{ .Values.sentry.tracesSampleRate | default "0.1" | quote }}
+  sentry-release: {{ .Values.sentry.release | default "" | quote }}
