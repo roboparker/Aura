@@ -8,11 +8,10 @@ import { cn } from "@/lib/utils";
 /**
  * Public pricing page.
  *
- * NOTE: the prices below are PLACEHOLDERS pending the final pricing decision —
- * see https://github.com/roboparker/Aura/issues/617. When they're locked, update
- * the amounts here and create the matching Stripe Prices
- * (STRIPE_PRICE_{PRO,BUSINESS}_{MONTHLY,YEARLY}). Free-tier limits mirror the
- * app.free_* backend defaults (member cap 5, 100 MCP calls/day).
+ * Prices: Pro $10/mo (flat), Business $15/mo per seat; annual = ×10 (2 months
+ * free). These must match the Stripe Prices
+ * (STRIPE_PRICE_{PRO,BUSINESS}_{MONTHLY,YEARLY}) — update both together. Free-tier
+ * limits mirror the app.free_* backend defaults (member cap 5, 100 MCP calls/day).
  */
 
 interface Tier {
@@ -43,7 +42,7 @@ const TIERS: Tier[] = [
   {
     name: "Pro",
     tagline: "For power users who want more room.",
-    monthly: 8,
+    monthly: 10,
     cta: { label: "Start Pro", href: "/signup" },
     features: [
       "Everything in Free",
@@ -55,7 +54,7 @@ const TIERS: Tier[] = [
   {
     name: "Business",
     tagline: "For teams that collaborate in shared spaces.",
-    monthly: 12,
+    monthly: 15,
     perSeat: true,
     highlighted: true,
     cta: { label: "Start Business", href: "/signup" },
