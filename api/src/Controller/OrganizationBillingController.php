@@ -38,9 +38,9 @@ class OrganizationBillingController extends AbstractController
         private PlanGate $planGate,
         private CancellationFeedbackRecorder $feedback,
         private LoggerInterface $logger,
-        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_MONTHLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_business_monthly:STRIPE_PRICE_BUSINESS_MONTHLY)%')]
         private string $businessMonthly,
-        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_YEARLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_business_yearly:STRIPE_PRICE_BUSINESS_YEARLY)%')]
         private string $businessYearly,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
