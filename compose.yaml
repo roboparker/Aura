@@ -34,6 +34,13 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      # Stripe billing — blank = billing disabled (endpoints 503; values in the server .env).
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO_MONTHLY: ${STRIPE_PRICE_PRO_MONTHLY:-}
+      STRIPE_PRICE_PRO_YEARLY: ${STRIPE_PRICE_PRO_YEARLY:-}
+      STRIPE_PRICE_BUSINESS_MONTHLY: ${STRIPE_PRICE_BUSINESS_MONTHLY:-}
+      STRIPE_PRICE_BUSINESS_YEARLY: ${STRIPE_PRICE_BUSINESS_YEARLY:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       # Hostname for the Umami dashboard site block in the Caddyfile.
       # Prod: analytics.<domain> (with a matching DNS A record).
@@ -120,6 +127,13 @@ services:
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-}
       SENTRY_RELEASE: ${SENTRY_RELEASE:-}
       SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.1}
+      # Stripe billing — the worker sends subscription receipt emails on webhook events.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_PRO_MONTHLY: ${STRIPE_PRICE_PRO_MONTHLY:-}
+      STRIPE_PRICE_PRO_YEARLY: ${STRIPE_PRICE_PRO_YEARLY:-}
+      STRIPE_PRICE_BUSINESS_MONTHLY: ${STRIPE_PRICE_BUSINESS_MONTHLY:-}
+      STRIPE_PRICE_BUSINESS_YEARLY: ${STRIPE_PRICE_BUSINESS_YEARLY:-}
       MESSENGER_TRANSPORT_DSN: ${MESSENGER_TRANSPORT_DSN:-doctrine://default?auto_setup=false}
       MERCURE_URL: ${CADDY_MERCURE_URL:-http://php/.well-known/mercure}
       MERCURE_PUBLIC_URL: ${CADDY_MERCURE_PUBLIC_URL:-https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}/.well-known/mercure}
