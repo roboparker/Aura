@@ -21,6 +21,7 @@ export type NotificationType =
   | "task_reminder"
   | "timesheet_submitted"
   | "timesheet_decided"
+  | "timesheet_nudge"
   | "budget_alert";
 
 export type NotificationActor = AvatarUser & {
@@ -135,6 +136,13 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
     icon_color: "text-teal-600 dark:text-teal-400",
     stripe: "bg-teal-500",
   },
+  timesheet_nudge: {
+    label: "TIMESHEET",
+    icon: ClipboardCheck,
+    badge: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+    icon_color: "text-teal-600 dark:text-teal-400",
+    stripe: "bg-teal-500",
+  },
   budget_alert: {
     label: "BUDGET",
     icon: Gauge,
@@ -168,6 +176,7 @@ export const NOTIFICATION_TABS: {
       "task_reminder",
       "timesheet_submitted",
       "timesheet_decided",
+      "timesheet_nudge",
       "budget_alert",
     ],
   },

@@ -12,6 +12,7 @@ use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
 use App\Message\RunBackup;
+use App\Message\SendTimesheetNudges;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -105,6 +106,10 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // Recurring invoices: clone due templates into fresh drafts,
                 // daily at 03:55 UTC (App\Service\RecurringInvoiceSpawner).
                 RecurringMessage::cron('55 3 * * *', new SpawnRecurringInvoices(), $utc),
+                // Timesheet nudges (#668): Monday 09:00 UTC — members who
+                // tracked time last week but haven't submitted it
+                // (App\Service\TimesheetNudgeDispatcher).
+                RecurringMessage::cron('0 9 * * 1', new SendTimesheetNudges(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)
