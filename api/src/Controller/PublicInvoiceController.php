@@ -48,6 +48,15 @@ class PublicInvoiceController extends AbstractController
             ];
         }
 
+        $payments = [];
+        foreach ($invoice->getPayments() as $payment) {
+            $payments[] = [
+                'amount' => $payment->getAmount(),
+                'paidOn' => $payment->getPaidOn()->format('Y-m-d'),
+                'method' => $payment->getMethod(),
+            ];
+        }
+
         return $this->json([
             'number' => $invoice->getNumber(),
             'status' => $invoice->getStatus(),
@@ -58,8 +67,12 @@ class PublicInvoiceController extends AbstractController
             'billTo' => $invoice->getClient()?->getName(),
             'lineItems' => $lines,
             'subtotal' => $invoice->getSubtotal(),
+            'discountAmount' => $invoice->getDiscountAmount(),
             'taxAmount' => $invoice->getTaxAmount(),
             'total' => $invoice->getTotal(),
+            'amountPaid' => $invoice->getAmountPaid(),
+            'balanceDue' => $invoice->getBalanceDue(),
+            'payments' => $payments,
             'pdfUrl' => '/public/invoices/' . $token . '/pdf',
         ]);
     }
@@ -88,7 +101,7 @@ class PublicInvoiceController extends AbstractController
         if (Invoice::STATUS_PAID === $invoice->getStatus()) {
             return $this->json(['error' => 'This invoice is already paid.'], 409);
         }
-        if ($invoice->getTotal() <= 0) {
+        if ($invoice->getBalanceDue() <= 0) {
             return $this->json(['error' => 'Nothing to pay on this invoice.'], 409);
         }
 

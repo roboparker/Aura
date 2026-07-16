@@ -25,8 +25,12 @@ interface PublicInvoice {
   billTo: string | null;
   lineItems: PublicLine[];
   subtotal: number;
+  discountAmount: number;
   taxAmount: number;
   total: number;
+  amountPaid: number;
+  balanceDue: number;
+  payments: { amount: number; paidOn: string; method: string | null }[];
 }
 
 const fmtDate = (iso: string | null): string =>
@@ -192,6 +196,14 @@ const PublicInvoicePage = () => {
             <span className="text-muted-foreground">Subtotal</span>
             <span className="tabular-nums">{formatMoney(invoice.subtotal, invoice.currency)}</span>
           </div>
+          {invoice.discountAmount > 0 && (
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Discount</span>
+              <span className="tabular-nums">
+                −{formatMoney(invoice.discountAmount, invoice.currency)}
+              </span>
+            </div>
+          )}
           {invoice.taxAmount > 0 && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Tax</span>
@@ -202,7 +214,38 @@ const PublicInvoicePage = () => {
             <span>Total</span>
             <span className="tabular-nums">{formatMoney(invoice.total, invoice.currency)}</span>
           </div>
+          {invoice.amountPaid > 0 && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount paid</span>
+                <span className="tabular-nums">
+                  −{formatMoney(invoice.amountPaid, invoice.currency)}
+                </span>
+              </div>
+              <div className="flex justify-between border-t pt-1 text-base font-semibold">
+                <span>Balance due</span>
+                <span className="tabular-nums">
+                  {formatMoney(invoice.balanceDue, invoice.currency)}
+                </span>
+              </div>
+            </>
+          )}
         </div>
+
+        {invoice.payments.length > 0 && (
+          <div className="text-sm">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Payments</p>
+            {invoice.payments.map((p, i) => (
+              <div key={i} className="flex justify-between border-b py-1 last:border-0">
+                <span className="text-muted-foreground">
+                  {fmtDate(p.paidOn)}
+                  {p.method ? ` · ${p.method}` : ""}
+                </span>
+                <span className="tabular-nums">{formatMoney(p.amount, invoice.currency)}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {error && <p className="text-center text-sm text-destructive">{error}</p>}
 
@@ -210,9 +253,13 @@ const PublicInvoicePage = () => {
           <Button variant="outline" onClick={() => void downloadPdf()} className="gap-1.5">
             <Download className="h-4 w-4" aria-hidden /> PDF
           </Button>
-          {invoice.status !== "paid" && invoice.status !== "void" && invoice.total > 0 && (
+          {invoice.status !== "paid" && invoice.status !== "void" && invoice.balanceDue > 0 && (
             <Button onClick={() => void payOnline()} disabled={paying}>
-              {paying ? "Starting…" : "Pay online"}
+              {paying
+                ? "Starting…"
+                : invoice.amountPaid > 0
+                  ? `Pay ${formatMoney(invoice.balanceDue, invoice.currency)}`
+                  : "Pay online"}
             </Button>
           )}
           {invoice.status === "paid" && (

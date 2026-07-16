@@ -87,6 +87,12 @@ class Invoice
         self::STATUS_VOID,
     ];
 
+    public const DISCOUNT_PERCENT = 'percent';
+    public const DISCOUNT_FIXED = 'fixed';
+
+    /** @var list<string> */
+    public const DISCOUNT_TYPES = [self::DISCOUNT_PERCENT, self::DISCOUNT_FIXED];
+
     public const FREQ_WEEKLY = 'weekly';
     public const FREQ_MONTHLY = 'monthly';
     public const FREQ_YEARLY = 'yearly';
@@ -149,6 +155,25 @@ class Invoice
     private ?string $notes = null;
 
     /**
+     * Discount applied between subtotal and tax (#648): percent-of-subtotal or
+     * a fixed amount. Null = no discount.
+     */
+    #[ORM\Column(length: 10, nullable: true)]
+    #[Assert\Choice(choices: self::DISCOUNT_TYPES, message: 'Invalid discount type.')]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?string $discountType = null;
+
+    /** Basis points for percent (1000 = 10%), minor units for fixed. */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $discountValue = null;
+
+    /** The discount actually subtracted, minor units. Derived. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[Groups(['invoice:read'])]
+    private int $discountAmount = 0;
+
+    /**
      * When set, this invoice is a recurring template: the sweep clones it into a
      * fresh draft each time {@see $nextIssueDate} arrives. One of weekly / monthly
      * / yearly, repeated every {@see $recurrenceInterval}.
@@ -175,6 +200,19 @@ class Invoice
     #[Assert\Valid]
     #[Groups(['invoice:read', 'invoice:write'])]
     private Collection $lineItems;
+
+    /**
+     * Payments recorded against this invoice (#648) — server-written only
+     * (payments endpoint, mark-paid, Stripe webhook), read-embedded so the
+     * client sees the ledger + balance without another fetch.
+     *
+     * @var Collection<int, InvoicePayment>
+     */
+    #[ApiProperty(readableLink: true, writableLink: false)]
+    #[ORM\OneToMany(mappedBy: 'invoice', targetEntity: InvoicePayment::class, cascade: ['persist'], orphanRemoval: true)]
+    #[ORM\OrderBy(['paidOn' => 'ASC', 'createdAt' => 'ASC'])]
+    #[Groups(['invoice:read'])]
+    private Collection $payments;
 
     /** Sum of line amounts, minor units. Derived. */
     #[ORM\Column(type: 'integer')]
@@ -240,6 +278,7 @@ class Invoice
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->lineItems = new ArrayCollection();
+        $this->payments = new ArrayCollection();
     }
 
     #[ORM\PreUpdate]
@@ -257,6 +296,27 @@ class Invoice
             $context->buildViolation('Client must belong to the same space.')
                 ->atPath('client')
                 ->addViolation();
+        }
+
+        if (null !== $this->discountType && null === $this->discountValue) {
+            $context->buildViolation('A discount needs a value.')
+                ->atPath('discountValue')
+                ->addViolation();
+        }
+        if (null !== $this->discountValue) {
+            if (null === $this->discountType) {
+                $context->buildViolation('A discount value needs a type (percent or fixed).')
+                    ->atPath('discountType')
+                    ->addViolation();
+            } elseif ($this->discountValue < 0) {
+                $context->buildViolation('A discount cannot be negative.')
+                    ->atPath('discountValue')
+                    ->addViolation();
+            } elseif (self::DISCOUNT_PERCENT === $this->discountType && $this->discountValue > 10000) {
+                $context->buildViolation('A percent discount cannot exceed 100%.')
+                    ->atPath('discountValue')
+                    ->addViolation();
+            }
         }
 
         if (null !== $this->recurrenceFrequency) {
@@ -468,6 +528,88 @@ class Invoice
         }
 
         return $this;
+    }
+
+    public function getDiscountType(): ?string
+    {
+        return $this->discountType;
+    }
+
+    public function setDiscountType(?string $discountType): self
+    {
+        $this->discountType = $discountType;
+
+        return $this;
+    }
+
+    public function getDiscountValue(): ?int
+    {
+        return $this->discountValue;
+    }
+
+    public function setDiscountValue(?int $discountValue): self
+    {
+        $this->discountValue = $discountValue;
+
+        return $this;
+    }
+
+    public function getDiscountAmount(): int
+    {
+        return $this->discountAmount;
+    }
+
+    public function setDiscountAmount(int $discountAmount): self
+    {
+        $this->discountAmount = $discountAmount;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, InvoicePayment>
+     */
+    public function getPayments(): Collection
+    {
+        return $this->payments;
+    }
+
+    public function addPayment(InvoicePayment $payment): self
+    {
+        if (!$this->payments->contains($payment)) {
+            $this->payments->add($payment);
+            $payment->setInvoice($this);
+        }
+
+        return $this;
+    }
+
+    public function removePayment(InvoicePayment $payment): self
+    {
+        if ($this->payments->removeElement($payment) && $payment->getInvoice() === $this) {
+            $payment->setInvoice(null);
+        }
+
+        return $this;
+    }
+
+    /** Σ recorded payments, minor units. */
+    #[Groups(['invoice:read'])]
+    public function getAmountPaid(): int
+    {
+        $sum = 0;
+        foreach ($this->payments as $payment) {
+            $sum += $payment->getAmount();
+        }
+
+        return $sum;
+    }
+
+    /** total − Σ payments, floored at zero. */
+    #[Groups(['invoice:read'])]
+    public function getBalanceDue(): int
+    {
+        return max(0, $this->total - $this->getAmountPaid());
     }
 
     public function getSubtotal(): int
