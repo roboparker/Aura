@@ -62,6 +62,9 @@ final class NotificationDispatcher
         Notification::TYPE_COMMENT => 'comments',
         Notification::TYPE_ASSIGNED => 'assigned',
         Notification::TYPE_STATUS => 'status',
+        Notification::TYPE_TIMESHEET_SUBMITTED => 'timesheets',
+        Notification::TYPE_TIMESHEET_DECIDED => 'timesheets',
+        Notification::TYPE_BUDGET_ALERT => 'budgets',
     ];
 
     /**
@@ -79,6 +82,7 @@ final class NotificationDispatcher
         ?Comment $comment = null,
         ?Discussion $discussion = null,
         ?Page $page = null,
+        ?string $targetPath = null,
     ): ?Notification {
         // No self-notifications — you don't get pinged for your own act.
         if (
@@ -106,6 +110,7 @@ final class NotificationDispatcher
         $notification->setComment($comment);
         $notification->setDiscussion($discussion);
         $notification->setPage($page);
+        $notification->setTargetPath($targetPath);
 
         $this->em->persist($notification);
         try {

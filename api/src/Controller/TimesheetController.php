@@ -2,12 +2,13 @@
 
 namespace App\Controller;
 
+use App\Entity\Notification;
 use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\TimesheetSubmission;
 use App\Entity\User;
 use App\Repository\TimesheetSubmissionRepository;
-use App\Service\TimesheetMailer;
+use App\Service\NotificationDispatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -32,7 +33,7 @@ class TimesheetController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private TimesheetSubmissionRepository $submissions,
-        private TimesheetMailer $mailer,
+        private NotificationDispatcher $notifier,
     ) {
     }
 
@@ -76,7 +77,7 @@ class TimesheetController extends AbstractController
         }
         $this->em->flush();
 
-        $this->mailer->sendSubmitted($submission);
+        $this->notifySubmitted($submission);
 
         return $this->json($this->row($submission), 201);
     }
@@ -155,9 +156,72 @@ class TimesheetController extends AbstractController
         );
         $this->em->flush();
 
-        $this->mailer->sendDecision($submission);
+        $this->notifyDecided($submission, $user);
 
         return $this->json($this->row($submission));
+    }
+
+    /**
+     * A submission notifies the space's admins (#667) — in-app bell + push +
+     * email all ride NotificationDispatcher's per-user preference gates. The
+     * dispatcher's no-self-notification rule covers an admin submitting
+     * their own week.
+     */
+    private function notifySubmitted(TimesheetSubmission $submission): void
+    {
+        $space = $submission->getSpace();
+        $member = $submission->getUser();
+        $weekStart = $submission->getWeekStart();
+        if (null === $space || null === $member || null === $weekStart) {
+            return;
+        }
+        $name = trim($member->getGivenName() . ' ' . $member->getFamilyName());
+        $title = sprintf(
+            '%s submitted their timesheet for the week of %s',
+            '' !== $name ? $name : $member->getEmail(),
+            $weekStart->format('M j'),
+        );
+
+        foreach ($space->getUserMemberships() as $membership) {
+            if (Space::ROLE_ADMIN !== $membership->getRole()) {
+                continue;
+            }
+            $admin = $membership->getUser();
+            if (null === $admin) {
+                continue;
+            }
+            $this->notifier->notify(
+                recipient: $admin,
+                type: Notification::TYPE_TIMESHEET_SUBMITTED,
+                actor: $member,
+                title: $title,
+                targetPath: '/approvals',
+            );
+        }
+    }
+
+    /** A decision notifies the member, with the reviewer note as the body (#667). */
+    private function notifyDecided(TimesheetSubmission $submission, User $decider): void
+    {
+        $member = $submission->getUser();
+        $weekStart = $submission->getWeekStart();
+        if (null === $member || null === $weekStart) {
+            return;
+        }
+        $approved = TimesheetSubmission::STATUS_APPROVED === $submission->getStatus();
+
+        $this->notifier->notify(
+            recipient: $member,
+            type: Notification::TYPE_TIMESHEET_DECIDED,
+            actor: $decider,
+            title: sprintf(
+                'Your timesheet for the week of %s was %s',
+                $weekStart->format('M j'),
+                $approved ? 'approved' : 'rejected',
+            ),
+            body: $submission->getNote(),
+            targetPath: '/time',
+        );
     }
 
     /**
