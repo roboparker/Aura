@@ -73,6 +73,14 @@ export interface Space {
     personalizedColor?: string;
   } | null;
   userMemberships: SpaceMembershipRow[];
+  /** Invoice branding (#669) — admin-editable on the space settings page. */
+  invoiceLogo?: {
+    "@id": string;
+    variantUrls?: { thumb?: string; profile?: string };
+  } | null;
+  invoiceTerms?: string | null;
+  invoiceNumberPrefix?: string | null;
+  invoiceNumberNext?: number | null;
   /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
   boardsCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */

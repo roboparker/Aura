@@ -17,6 +17,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import SpaceBillingCard from "@/components/spaces/SpaceBillingCard";
+import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 
@@ -367,6 +368,9 @@ const SpaceSettings = () => {
         {BILLING_ENABLED && !space.isPersonal && (
           <SpaceBillingCard spaceId={space.id} />
         )}
+
+        {/* Invoice branding (#669): logo, terms, numbering. */}
+        <InvoiceBrandingCard space={space} onSaved={load} />
 
         {/* Export space data */}
         <Card className="mb-6">

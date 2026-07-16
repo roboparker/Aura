@@ -28,6 +28,8 @@ interface PublicEstimate {
   taxAmount: number;
   total: number;
   decidedAt: string | null;
+  logoUrl: string | null;
+  terms: string | null;
 }
 
 /**
@@ -122,6 +124,14 @@ const PublicEstimatePage = () => {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
+            {estimate.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={estimate.logoUrl}
+                alt={estimate.from ?? "Logo"}
+                className="mb-3 h-12 w-auto max-w-48 object-contain"
+              />
+            )}
             <h1 className="text-2xl font-semibold">Estimate {estimate.number ?? ""}</h1>
             {estimate.from && (
               <p className="text-sm text-muted-foreground">From {estimate.from}</p>
@@ -213,6 +223,12 @@ const PublicEstimatePage = () => {
             <span className="text-sm font-medium text-muted-foreground">Declined</span>
           ) : null}
         </div>
+
+        {estimate.terms && (
+          <p className="whitespace-pre-wrap border-t pt-4 text-xs text-muted-foreground">
+            {estimate.terms}
+          </p>
+        )}
       </div>
     );
   }
