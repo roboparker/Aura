@@ -1,0 +1,12 @@
+{# @var submission \App\Entity\TimesheetSubmission #}
+Hi,
+
+Your timesheet for the week of {{ submission.weekStart|date('M j, Y') }} was {{ approved ? 'approved' : 'rejected' }}.
+{% if submission.note %}
+Note from the reviewer: {{ submission.note }}
+{% endif %}
+{% if not approved %}
+The week is unlocked — fix the entries and submit it again.
+{% endif %}
+
+Open your timesheet: {{ timeUrl }}

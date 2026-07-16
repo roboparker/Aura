@@ -6,6 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\TimeEntry;
 use App\Repository\TimeEntryRepository;
+use App\Repository\TimesheetSubmissionRepository;
 use App\Security\AuthenticatedUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -36,6 +37,7 @@ final class TimeEntryUserProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private AuthenticatedUserResolver $auth,
         private TimeEntryRepository $timeEntries,
+        private TimesheetSubmissionRepository $timesheets,
         private EntityManagerInterface $em,
     ) {
     }
@@ -69,6 +71,20 @@ final class TimeEntryUserProcessor implements ProcessorInterface
                     $this->em->flush();
                 }
             }
+        }
+
+        // Timesheet approvals (#654): a submitted (pending/approved) week is
+        // frozen for the entry's tracker — creates and edits both bounce.
+        $space = $data->getSpace() ?? $data->getEngagement()?->getSpace();
+        $tracker = $data->getUser();
+        $startedAt = $data->getStartedAt();
+        if (
+            null !== $space && null !== $tracker && null !== $startedAt
+            && $this->timesheets->weekIsLocked($space, $tracker, $startedAt)
+        ) {
+            throw new UnprocessableEntityHttpException(
+                'This week has been submitted for approval and is locked.',
+            );
         }
 
         return $this->persistProcessor->process($data, $operation, $uriVariables, $context);

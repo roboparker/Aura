@@ -580,6 +580,7 @@ const BillingSection = ({
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
     { href: "/estimates", label: "Estimates", match: "/estimates", show: canInvoices },
     { href: "/reports", label: "Reports", match: "/reports", show: canInvoices },
+    { href: "/approvals", label: "Approvals", match: "/approvals", show: canInvoices },
   ].filter((l) => l.show);
 
   if (links.length === 0) return null;
