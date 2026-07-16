@@ -59,5 +59,27 @@ final class ValidSpaceAttachmentsValidator extends ConstraintValidator
                 return;
             }
         }
+
+        // The invoice logo (#669) plays by the same rules, but must be an
+        // image (avatar-kind — publicly served, image-validated on upload)
+        // and uploaded by a member.
+        $logo = $value->getInvoiceLogo();
+        if (null !== $logo) {
+            $logoOwner = $logo->getOwner();
+            if (
+                null === $logoOwner || null === $logoOwner->getId()
+                || !isset($memberIds[(string) $logoOwner->getId()])
+            ) {
+                $this->context->buildViolation($constraint->messageNotMember)
+                    ->atPath('invoiceLogo')
+                    ->addViolation();
+                return;
+            }
+            if (MediaObject::KIND_AVATAR !== $logo->getKind()) {
+                $this->context->buildViolation('The invoice logo must be an uploaded image.')
+                    ->atPath('invoiceLogo')
+                    ->addViolation();
+            }
+        }
     }
 }

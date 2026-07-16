@@ -270,6 +270,41 @@ class Space
     private Collection $attachments;
 
     /**
+     * Invoice branding (#669): logo rendered on the invoice PDF + the public
+     * invoice/estimate pages. Uploaded as an avatar-kind MediaObject so the
+     * public pages can use the plain `/media/...` URL; the PDF embeds the
+     * bytes as a data URI (dompdf runs with remote fetches disabled).
+     */
+    #[ORM\ManyToOne(targetEntity: MediaObject::class)]
+    #[ORM\JoinColumn(name: 'invoice_logo_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['space:read', 'space:write'])]
+    private ?MediaObject $invoiceLogo = null;
+
+    /** Default terms/footer text printed on every invoice (#669). */
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Assert\Length(max: 2000)]
+    #[Groups(['space:read', 'space:write'])]
+    private ?string $invoiceTerms = null;
+
+    /** Invoice number prefix, e.g. "ACME-" (default "INV-") (#669). */
+    #[ORM\Column(length: 20, nullable: true)]
+    #[Assert\Length(max: 20)]
+    #[Assert\Regex(pattern: '/^[A-Za-z0-9._-]*$/', message: 'Use letters, digits, dots, dashes.')]
+    #[Groups(['space:read', 'space:write'])]
+    private ?string $invoiceNumberPrefix = null;
+
+    /**
+     * Next sequential invoice number to assign (#669). Null = derive from
+     * the count of already-numbered invoices (the pre-branding behaviour);
+     * once set (by an admin, or by the numberer after each assignment) it
+     * is authoritative and increments per issued invoice.
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['space:read', 'space:write'])]
+    private ?int $invoiceNumberNext = null;
+
+    /**
      * Transient list of email addresses to invite at creation time —
      * consumed by {@see SpaceCreateProcessor}, never persisted. Validated
      * inline so a single bad address fails the whole create with 422
@@ -357,6 +392,54 @@ class Space
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+        return $this;
+    }
+
+    public function getInvoiceLogo(): ?MediaObject
+    {
+        return $this->invoiceLogo;
+    }
+
+    public function setInvoiceLogo(?MediaObject $invoiceLogo): static
+    {
+        $this->invoiceLogo = $invoiceLogo;
+
+        return $this;
+    }
+
+    public function getInvoiceTerms(): ?string
+    {
+        return $this->invoiceTerms;
+    }
+
+    public function setInvoiceTerms(?string $invoiceTerms): static
+    {
+        $this->invoiceTerms = $invoiceTerms;
+
+        return $this;
+    }
+
+    public function getInvoiceNumberPrefix(): ?string
+    {
+        return $this->invoiceNumberPrefix;
+    }
+
+    public function setInvoiceNumberPrefix(?string $invoiceNumberPrefix): static
+    {
+        $this->invoiceNumberPrefix = $invoiceNumberPrefix;
+
+        return $this;
+    }
+
+    public function getInvoiceNumberNext(): ?int
+    {
+        return $this->invoiceNumberNext;
+    }
+
+    public function setInvoiceNumberNext(?int $invoiceNumberNext): static
+    {
+        $this->invoiceNumberNext = $invoiceNumberNext;
+
         return $this;
     }
 

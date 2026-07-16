@@ -719,6 +719,106 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertNotNull($refreshed['paidAt'] ?? null);
     }
 
+    public function testInvoiceBrandingNumbersLogoAndTerms(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceId = (string) $space->getId();
+        $spaceIri = '/spaces/' . $spaceId;
+
+        // Media rows created before the HTTP phase — the client kernel
+        // reboots detach this EM's entities.
+        $storage = static::getContainer()->get('media.storage');
+        $logoPath = 'avatars/branding-test-' . bin2hex(random_bytes(4)) . '.png';
+        $storage->write($logoPath, 'LOGO-PNG-BYTES');
+        $logo = (new \App\Entity\MediaObject())
+            ->setOwner($admin)
+            ->setKind(\App\Entity\MediaObject::KIND_AVATAR)
+            ->setVariants(['profile' => $logoPath])
+            ->setOriginalName('logo.png')
+            ->setMimeType('image/png')
+            ->setByteSize(14);
+        $this->entityManager->persist($logo);
+        $doc = (new \App\Entity\MediaObject())
+            ->setOwner($admin)
+            ->setKind(\App\Entity\MediaObject::KIND_ATTACHMENT)
+            ->setVariants(['original' => $logoPath])
+            ->setOriginalName('doc.pdf')
+            ->setMimeType('application/pdf')
+            ->setByteSize(1);
+        $this->entityManager->persist($doc);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+
+        // Admin configures branding on the space.
+        $client->request('PATCH', $spaceIri, [
+            'json' => [
+                'invoiceNumberPrefix' => 'ACME-',
+                'invoiceNumberNext' => 42,
+                'invoiceTerms' => 'Net 30. Thank you!',
+                'invoiceLogo' => '/media-objects/' . $logo->getId(),
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+
+        // An attachment-kind logo is rejected (must be an uploaded image).
+        $client->request('PATCH', $spaceIri, [
+            'json' => ['invoiceLogo' => '/media-objects/' . $doc->getId()],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $makeInvoice = function () use ($client, $spaceIri, $clientRow): array {
+            $row = $client->request('POST', '/invoices', [
+                'json' => [
+                    'space' => $spaceIri,
+                    'client' => $clientRow['@id'],
+                    'currency' => 'USD',
+                    'lineItems' => [['description' => 'Work', 'quantity' => 1, 'unitAmount' => 5000]],
+                ],
+                'headers' => ['Content-Type' => 'application/ld+json'],
+            ])->toArray();
+            $this->assertResponseStatusCodeSame(201);
+
+            return $row;
+        };
+
+        // Numbering honours the prefix + explicit counter, and advances.
+        $first = $makeInvoice();
+        $issued = $client->request('POST', $this->iri($first) . '/issue', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertSame('ACME-0042', $issued['number'] ?? null);
+
+        $second = $makeInvoice();
+        $sent = $client->request('POST', $this->iri($second) . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('ACME-0043', $sent['number'] ?? null);
+        $token = $sent['token'];
+        $this->assertIsString($token);
+
+        // The public page carries the logo URL + terms.
+        $publicView = $client->request('GET', '/public/invoices/' . $token)->toArray();
+        $this->assertSame('/media/' . $logoPath, $publicView['logoUrl'] ?? null);
+        $this->assertSame('Net 30. Thank you!', $publicView['terms'] ?? null);
+
+        // The PDF renders with the branding embedded.
+        $pdf = $client->request('GET', '/public/invoices/' . $token . '/pdf');
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+    }
+
     public function testDiscountAppliesBetweenSubtotalAndTax(): void
     {
         $admin = $this->createUser('admin@example.com');

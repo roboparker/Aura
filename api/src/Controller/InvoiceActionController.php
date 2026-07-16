@@ -37,6 +37,7 @@ class InvoiceActionController extends AbstractController
         private InvoiceRepository $invoices,
         private SpacePermissionResolver $permissions,
         private InvoiceMailer $mailer,
+        private \App\Service\InvoiceNumberer $numberer,
     ) {
     }
 
@@ -52,11 +53,7 @@ class InvoiceActionController extends AbstractController
             return $this->json(['error' => 'Only a draft invoice can be issued.'], 409);
         }
 
-        $space = $invoice->getSpace();
-        if (null !== $space && null === $invoice->getNumber()) {
-            $next = $this->invoices->countNumbered($space) + 1;
-            $invoice->setNumber('INV-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT));
-        }
+        $this->numberer->assign($invoice);
         if (null === $invoice->getIssueDate()) {
             $invoice->setIssueDate(new \DateTimeImmutable('today'));
         }
@@ -201,11 +198,7 @@ class InvoiceActionController extends AbstractController
         }
 
         // Assign a number on first send (like issue), so a sent invoice is final.
-        $space = $invoice->getSpace();
-        if (null !== $space && null === $invoice->getNumber()) {
-            $next = $this->invoices->countNumbered($space) + 1;
-            $invoice->setNumber('INV-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT));
-        }
+        $this->numberer->assign($invoice);
         if (null === $invoice->getIssueDate()) {
             $invoice->setIssueDate(new \DateTimeImmutable('today'));
         }

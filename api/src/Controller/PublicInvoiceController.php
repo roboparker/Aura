@@ -57,6 +57,8 @@ class PublicInvoiceController extends AbstractController
             ];
         }
 
+        $logoUrls = $invoice->getSpace()?->getInvoiceLogo()?->getVariantUrls() ?? [];
+
         return $this->json([
             'number' => $invoice->getNumber(),
             'status' => $invoice->getStatus(),
@@ -74,6 +76,10 @@ class PublicInvoiceController extends AbstractController
             'balanceDue' => $invoice->getBalanceDue(),
             'payments' => $payments,
             'pdfUrl' => '/public/invoices/' . $token . '/pdf',
+            // Branding (#669): the logo is avatar-kind media on the public
+            // /media/ route, so exposing the URL leaks nothing sensitive.
+            'logoUrl' => $logoUrls['profile'] ?? array_values($logoUrls)[0] ?? null,
+            'terms' => $invoice->getSpace()?->getInvoiceTerms(),
         ]);
     }
 
