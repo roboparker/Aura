@@ -1,0 +1,18 @@
+{# @var estimate \App\Entity\Estimate #}
+{# @var accepted bool #}
+<p>Hi,</p>
+
+<p>
+    {% if estimate.client %}{{ estimate.client.name }}{% else %}Your client{% endif %}
+    has <strong>{{ accepted ? 'accepted' : 'declined' }}</strong>
+    {% if estimate.number %}estimate <strong>{{ estimate.number }}</strong>{% else %}your estimate{% endif %}
+    for <strong>{{ (estimate.total / 100)|number_format(2) }} {{ estimate.currency }}</strong>.
+</p>
+
+{% if accepted %}
+<p>You can convert it into a draft invoice from the estimates page.</p>
+{% endif %}
+
+<p>
+    <a href="{{ estimatesUrl }}">Open estimates</a>
+</p>

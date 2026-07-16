@@ -1,0 +1,9 @@
+{# @var estimate \App\Entity\Estimate #}
+{# @var client \App\Entity\Client #}
+Hi {{ client.name }},
+
+{{ fromName }} has sent you {% if estimate.number %}estimate {{ estimate.number }}{% else %}an estimate{% endif %} for {{ (estimate.total / 100)|number_format(2) }} {{ estimate.currency }}.
+
+Review, accept, or decline the estimate: {{ viewUrl }}
+
+You can review the line items and respond directly from that page.
