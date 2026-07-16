@@ -64,6 +64,7 @@ final class NotificationDispatcher
         Notification::TYPE_STATUS => 'status',
         Notification::TYPE_TIMESHEET_SUBMITTED => 'timesheets',
         Notification::TYPE_TIMESHEET_DECIDED => 'timesheets',
+        Notification::TYPE_TIMESHEET_NUDGE => 'timesheets',
         Notification::TYPE_BUDGET_ALERT => 'budgets',
     ];
 

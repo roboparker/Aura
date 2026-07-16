@@ -91,6 +91,8 @@ class Notification
     public const TYPE_TIMESHEET_SUBMITTED = 'timesheet_submitted';
     /** Your timesheet was approved or rejected (#654/#667). */
     public const TYPE_TIMESHEET_DECIDED = 'timesheet_decided';
+    /** You tracked time last week but haven't submitted the week yet (#668). */
+    public const TYPE_TIMESHEET_NUDGE = 'timesheet_nudge';
     /** An engagement crossed a budget threshold (→ space admins) (#651/#667). */
     public const TYPE_BUDGET_ALERT = 'budget_alert';
 
