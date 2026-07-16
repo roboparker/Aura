@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { Fragment, FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
+import { CalendarRange, Clock, List, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
@@ -17,6 +17,7 @@ import {
   isRunning,
 } from "@/lib/timeEntryTypes";
 import PageHeader from "@/components/common/PageHeader";
+import WeekTimesheet from "@/components/time/WeekTimesheet";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,6 +61,7 @@ const TimePage = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
+  const [view, setView] = useState<"list" | "week">("list");
   const [showComposer, setShowComposer] = useState(false);
   const [description, setDescription] = useState("");
   const [workDate, setWorkDate] = useState(() => dateInput(new Date()));
@@ -346,7 +348,36 @@ const TimePage = () => {
             </Alert>
           )}
 
-          {entriesQuery.isLoading ? (
+          <div className="mb-3 inline-flex rounded-md border p-0.5" role="tablist">
+            <Button
+              variant={view === "list" ? "secondary" : "ghost"}
+              size="sm"
+              role="tab"
+              aria-selected={view === "list"}
+              onClick={() => setView("list")}
+            >
+              <List className="h-4 w-4" /> List
+            </Button>
+            <Button
+              variant={view === "week" ? "secondary" : "ghost"}
+              size="sm"
+              role="tab"
+              aria-selected={view === "week"}
+              onClick={() => setView("week")}
+            >
+              <CalendarRange className="h-4 w-4" /> Week
+            </Button>
+          </div>
+
+          {view === "week" ? (
+            <WeekTimesheet
+              spaceIri={spaceIri}
+              projects={projects}
+              canCreate={canCreate && !noProjects}
+              canModify={canModify}
+              onError={setActionError}
+            />
+          ) : entriesQuery.isLoading ? (
             <p className="text-muted-foreground">Loading…</p>
           ) : (
             <Card>
