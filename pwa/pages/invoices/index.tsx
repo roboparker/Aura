@@ -43,8 +43,19 @@ interface PreviewEntry {
   amount: number;
 }
 
+/** One candidate expense from the from-time preview endpoint (#650). */
+interface PreviewExpense {
+  "@id": string;
+  id: string;
+  description: string | null;
+  category: string | null;
+  spentOn: string | null;
+  amount: number;
+}
+
 interface GenPreview {
   entries: PreviewEntry[];
+  expenses: PreviewExpense[];
   count: number;
   subtotal: number;
   currency: string;
@@ -62,6 +73,7 @@ const InvoicesPage = () => {
   const [genTo, setGenTo] = useState("");
   const [preview, setPreview] = useState<GenPreview | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [checkedExpenses, setCheckedExpenses] = useState<Set<string>>(new Set());
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,6 +122,7 @@ const InvoicesPage = () => {
     setGenTo("");
     setPreview(null);
     setChecked(new Set());
+    setCheckedExpenses(new Set());
     setShowComposer(false);
   };
 
@@ -117,6 +130,7 @@ const InvoicesPage = () => {
   const clearPreview = () => {
     setPreview(null);
     setChecked(new Set());
+    setCheckedExpenses(new Set());
   };
 
   const loadPreview = useMutation({
@@ -131,6 +145,7 @@ const InvoicesPage = () => {
       setPreview(res);
       // Everything ticked by default — the list is for *un*ticking.
       setChecked(new Set((res?.entries ?? []).map((e) => e["@id"])));
+      setCheckedExpenses(new Set((res?.expenses ?? []).map((x) => x["@id"])));
     },
     onError: (e) => setError(e instanceof Error ? e.message : "Failed to load unbilled time."),
   });
@@ -140,7 +155,11 @@ const InvoicesPage = () => {
       apiSend<{ id: string; lineItemCount: number }>("POST", "/invoices/from-time-entries", {
         contentType: "application/json",
         errorMessage: "Failed to generate an invoice.",
-        body: { ...rangeBody(), entries: Array.from(checked) },
+        body: {
+          ...rangeBody(),
+          entries: Array.from(checked),
+          expenses: Array.from(checkedExpenses),
+        },
       }),
     onSuccess: (res) => {
       setError(null);
@@ -154,6 +173,18 @@ const InvoicesPage = () => {
 
   const toggleChecked = (iri: string) => {
     setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(iri)) {
+        next.delete(iri);
+      } else {
+        next.add(iri);
+      }
+      return next;
+    });
+  };
+
+  const toggleCheckedExpense = (iri: string) => {
+    setCheckedExpenses((prev) => {
       const next = new Set(prev);
       if (next.has(iri)) {
         next.delete(iri);
@@ -336,14 +367,17 @@ const InvoicesPage = () => {
                               )}
                             </div>
 
-                            {preview && preview.entries.length === 0 && (
+                            {preview &&
+                              preview.entries.length === 0 &&
+                              preview.expenses.length === 0 && (
                               <p className="mt-3 text-sm text-muted-foreground">
-                                No unbilled billable time
+                                No unbilled billable time or expenses
                                 {genFrom || genTo ? " in this range" : ""} for this engagement.
                               </p>
                             )}
 
-                            {preview && preview.entries.length > 0 && (
+                            {preview &&
+                              (preview.entries.length > 0 || preview.expenses.length > 0) && (
                               <div className="mt-3 space-y-2">
                                 <div className="max-h-64 overflow-y-auto rounded-md border">
                                   <table className="w-full text-sm">
@@ -394,24 +428,82 @@ const InvoicesPage = () => {
                                           </td>
                                         </tr>
                                       ))}
+                                      {/* Unbilled billable expenses ride along (#650). */}
+                                      {preview.expenses.length > 0 && (
+                                        <tr className="border-b bg-muted/40">
+                                          <td
+                                            colSpan={5}
+                                            className="px-3 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                                          >
+                                            Expenses
+                                          </td>
+                                        </tr>
+                                      )}
+                                      {preview.expenses.map((expense) => (
+                                        <tr
+                                          key={expense["@id"]}
+                                          className={cn(
+                                            "border-b last:border-b-0",
+                                            !checkedExpenses.has(expense["@id"]) && "opacity-50",
+                                          )}
+                                        >
+                                          <td className="px-3 py-1.5">
+                                            <input
+                                              type="checkbox"
+                                              checked={checkedExpenses.has(expense["@id"])}
+                                              onChange={() =>
+                                                toggleCheckedExpense(expense["@id"])
+                                              }
+                                              aria-label="Include this expense"
+                                            />
+                                          </td>
+                                          <td className="whitespace-nowrap px-3 py-1.5">
+                                            {expense.spentOn
+                                              ? new Date(expense.spentOn).toLocaleDateString()
+                                              : "—"}
+                                          </td>
+                                          <td className="px-3 py-1.5">
+                                            {expense.description || "Expense"}
+                                            {expense.category && (
+                                              <span className="ml-1.5 text-xs text-muted-foreground">
+                                                {expense.category}
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="px-3 py-1.5" />
+                                          <td className="px-3 py-1.5 text-right tabular-nums">
+                                            {formatMoney(expense.amount, preview.currency)}
+                                          </td>
+                                        </tr>
+                                      ))}
                                     </tbody>
                                   </table>
                                 </div>
                                 <div className="flex flex-wrap items-center justify-between gap-3">
                                   <p className="text-sm text-muted-foreground">
-                                    {checked.size} of {preview.entries.length} entr
-                                    {preview.entries.length === 1 ? "y" : "ies"} selected ·{" "}
+                                    {checked.size + checkedExpenses.size} of{" "}
+                                    {preview.entries.length + preview.expenses.length} item
+                                    {preview.entries.length + preview.expenses.length === 1
+                                      ? ""
+                                      : "s"}{" "}
+                                    selected ·{" "}
                                     {formatMoney(
                                       preview.entries
                                         .filter((e) => checked.has(e["@id"]))
-                                        .reduce((sum, e) => sum + e.amount, 0),
+                                        .reduce((sum, e) => sum + e.amount, 0) +
+                                        preview.expenses
+                                          .filter((x) => checkedExpenses.has(x["@id"]))
+                                          .reduce((sum, x) => sum + x.amount, 0),
                                       preview.currency,
                                     )}
                                   </p>
                                   <Button
                                     size="sm"
                                     onClick={() => generate.mutate()}
-                                    disabled={checked.size === 0 || generate.isPending}
+                                    disabled={
+                                      (checked.size === 0 && checkedExpenses.size === 0) ||
+                                      generate.isPending
+                                    }
                                   >
                                     {generate.isPending ? "Generating…" : "Generate draft"}
                                   </Button>

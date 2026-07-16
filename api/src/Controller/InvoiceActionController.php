@@ -240,9 +240,10 @@ class InvoiceActionController extends AbstractController
             return $invoice;
         }
 
-        // Release the billed time entries so the hours can be re-invoiced.
+        // Release the billed time entries + expenses so they can be re-invoiced.
         foreach ($invoice->getLineItems() as $line) {
             $line->getSourceTimeEntry()?->setBilledAt(null);
+            $line->getSourceExpense()?->setBilledAt(null);
         }
         $invoice->setStatus(Invoice::STATUS_VOID);
         $this->em->flush();

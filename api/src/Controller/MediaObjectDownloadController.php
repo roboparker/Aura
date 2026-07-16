@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Engagement;
+use App\Entity\Expense;
 use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\Task;
@@ -123,11 +124,13 @@ class MediaObjectDownloadController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return $this->mediaIsAttachedToAnyTask($media)
                 || $this->mediaIsAttachedToAnySpace($media)
-                || $this->mediaIsAttachedToAnyEngagement($media);
+                || $this->mediaIsAttachedToAnyEngagement($media)
+                || $this->mediaIsAReceiptOnAnyExpense($media);
         }
         return $this->mediaIsAttachedToReadableTask($media, $user)
             || $this->mediaIsAttachedToReadableSpace($media, $user)
-            || $this->mediaIsAttachedToReadableEngagement($media, $user);
+            || $this->mediaIsAttachedToReadableEngagement($media, $user)
+            || $this->mediaIsAReceiptOnReadableExpense($media, $user);
     }
 
     private function mediaIsAttachedToAnyTask(MediaObject $media): bool
@@ -221,6 +224,53 @@ class MediaObjectDownloadController extends AbstractController
             ->getQuery()
             ->getSingleScalarResult();
         return $count > 0;
+    }
+
+    private function mediaIsAReceiptOnAnyExpense(MediaObject $media): bool
+    {
+        $count = (int) $this->em->getRepository(Expense::class)
+            ->createQueryBuilder('x')
+            ->select('COUNT(x.id)')
+            ->where('x.receipt = :media')
+            ->setParameter('media', $media)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getSingleScalarResult();
+        return $count > 0;
+    }
+
+    /**
+     * Expense receipts (#650) are readable by the expense's own spender, a
+     * space admin, or a member holding an explicit `time_entries.read` grant
+     * — the same bar as the Expense GET security expression. A media backs at
+     * most a handful of expenses, so the per-row check is cheap.
+     */
+    private function mediaIsAReceiptOnReadableExpense(MediaObject $media, User $user): bool
+    {
+        $expenses = $this->em->getRepository(Expense::class)
+            ->createQueryBuilder('x')
+            ->where('x.receipt = :media')
+            ->setParameter('media', $media)
+            ->getQuery()
+            ->getResult();
+
+        foreach ($expenses as $expense) {
+            if (true === $expense->getUser()?->getId()?->equals($user->getId())) {
+                return true;
+            }
+            $space = $expense->getSpace();
+            if (null === $space || !$space->hasMember($user)) {
+                continue;
+            }
+            if (
+                $space->isAdmin($user)
+                || $this->permissions->can($user, $space, SpacePermission::TIME_ENTRIES, SpacePermission::READ)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
