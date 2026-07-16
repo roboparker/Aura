@@ -586,6 +586,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         $handler(new \App\Message\MarkOverdueInvoices());
         $this->assertEmailCount(2);
+        $em->refresh($aEntity);
         $this->assertCount(2, $aEntity->getRemindersSentAt());
     }
 
