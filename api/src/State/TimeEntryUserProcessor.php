@@ -9,6 +9,7 @@ use App\Repository\TimeEntryRepository;
 use App\Security\AuthenticatedUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Stamps the current user as the time entry's tracker on create, mirroring the
@@ -47,6 +48,16 @@ final class TimeEntryUserProcessor implements ProcessorInterface
         $user = $this->auth->requireUser('track time');
 
         $isCreate = null === $data->getUser();
+
+        // Billed entries are frozen: they back an invoice line, so editing them
+        // would desync the financial document from the time behind it. billedAt
+        // is never client-writable, so non-null here means "already invoiced".
+        if (!$isCreate && null !== $data->getBilledAt()) {
+            throw new UnprocessableEntityHttpException(
+                'This entry is on an invoice and can no longer be edited.',
+            );
+        }
+
         if ($isCreate) {
             $data->setUser($user);
 

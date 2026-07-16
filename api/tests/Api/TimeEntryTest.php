@@ -204,6 +204,76 @@ class TimeEntryTest extends ApiTestCase
         $this->assertSame(1, $running['totalItems'] ?? null);
     }
 
+    public function testBilledEntryCannotBeEditedOrDeleted(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $spaceIri = $this->spaceIri($board);
+        [$bpIri, $catIri] = $this->createBilling($board, 'Website', 'Development', 12000);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $entry = $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'category' => $catIri,
+                'description' => 'Soon to be billed',
+                'startedAt' => '2026-07-03T09:00:00+00:00',
+                'endedAt' => '2026-07-03T10:00:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $iri = $entry['@id'];
+        $this->assertIsString($iri);
+
+        // Simulate the invoice pull stamping billedAt (server-side only —
+        // billedAt is never client-writable).
+        $row = $this->entityManager->getRepository(TimeEntry::class)
+            ->findOneBy(['description' => 'Soon to be billed']);
+        $this->assertNotNull($row);
+        $row->setBilledAt(new \DateTimeImmutable());
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+
+        // A billed entry is frozen: no edits…
+        $client->request('PATCH', $iri, [
+            'json' => ['description' => 'rewritten history'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // …and no deletion.
+        $client->request('DELETE', $iri);
+        $this->assertResponseStatusCodeSame(422);
+
+        // Control: an unbilled entry still edits and deletes normally.
+        $other = $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'category' => $catIri,
+                'description' => 'Still editable',
+                'startedAt' => '2026-07-03T11:00:00+00:00',
+                'endedAt' => '2026-07-03T11:30:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $otherIri = $other['@id'];
+        $this->assertIsString($otherIri);
+
+        $client->request('PATCH', $otherIri, [
+            'json' => ['description' => 'Edited'],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+
+        $client->request('DELETE', $otherIri);
+        $this->assertResponseStatusCodeSame(204);
+    }
+
     public function testMemberCanListEngagementOptions(): void
     {
         $alice = $this->createUser('alice@example.com');
