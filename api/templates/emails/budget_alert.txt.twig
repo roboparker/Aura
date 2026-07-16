@@ -1,0 +1,8 @@
+{# @var engagement \App\Entity\Engagement #}
+Hi,
+
+{{ engagement.name }}{% if engagement.client %} ({{ engagement.client.name }}){% endif %} has used {{ percent }}% of its {% if engagement.budgetType == 'hours' %}{{ (budget / 60)|number_format(1) }}-hour budget ({{ (spent / 60)|number_format(1) }} hours tracked).{% else %}{{ (budget / 100)|number_format(2) }} {{ engagement.currency ?? '' }} fees budget ({{ (spent / 100)|number_format(2) }} {{ engagement.currency ?? '' }} billable so far).{% endif %}
+
+Review the engagement: {{ engagementsUrl }}
+
+You're receiving this because you're an admin of the engagement's space.{% if threshold >= 100 %} This engagement is now over budget.{% endif %}

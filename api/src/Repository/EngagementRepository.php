@@ -15,4 +15,20 @@ class EngagementRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Engagement::class);
     }
+
+    /**
+     * Budgeted, non-archived engagements — the nightly alert sweep's pool (#651).
+     *
+     * @return list<Engagement>
+     */
+    public function findBudgeted(): array
+    {
+        /** @var list<Engagement> */
+        return $this->createQueryBuilder('e')
+            ->andWhere('e.budgetType IS NOT NULL')
+            ->andWhere('e.budgetAmount IS NOT NULL')
+            ->andWhere('e.archived = false')
+            ->getQuery()
+            ->getResult();
+    }
 }
