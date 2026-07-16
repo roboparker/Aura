@@ -574,6 +574,7 @@ const BillingSection = ({
 
   const links = [
     { href: "/time", label: "Time", match: "/time", show: true },
+    { href: "/expenses", label: "Expenses", match: "/expenses", show: true },
     { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
     { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },

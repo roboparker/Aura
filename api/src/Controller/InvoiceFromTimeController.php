@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Engagement;
+use App\Entity\Expense;
 use App\Entity\Invoice;
 use App\Entity\InvoiceLineItem;
 use App\Entity\TimeEntry;
 use App\Entity\User;
+use App\Repository\ExpenseRepository;
 use App\Repository\TimeEntryRepository;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
@@ -44,6 +46,7 @@ class InvoiceFromTimeController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private TimeEntryRepository $timeEntries,
+        private ExpenseRepository $expenses,
         private SpacePermissionResolver $permissions,
     ) {
     }
@@ -115,12 +118,42 @@ class InvoiceFromTimeController extends AbstractController
 
         $currency = $engagement->getCurrency() ?? $client->getCurrency() ?? 'USD';
 
-        if (true === ($payload['preview'] ?? false)) {
-            return $this->preview($entries, $client->getDefaultRateAmount(), $currency);
+        // Unbilled billable expenses ride along (#650) unless opted out.
+        // Only same-currency expenses join — an invoice pins one currency.
+        $expenses = [];
+        if (false !== ($payload['includeExpenses'] ?? true)) {
+            $expenses = array_values(array_filter(
+                $this->expenses->findInvoiceableForEngagement($engagement, $from, $to?->modify('+1 day')),
+                static fn (Expense $x): bool => null === $x->getCurrency() || $x->getCurrency() === $currency,
+            ));
+        }
+        $expenseSelection = $payload['expenses'] ?? null;
+        if (is_array($expenseSelection)) {
+            $wantedExpenses = [];
+            foreach ($expenseSelection as $ref) {
+                $xid = $this->entryId($ref);
+                if (null === $xid) {
+                    return $this->json(['error' => 'Invalid expense reference in the selection.'], 422);
+                }
+                $wantedExpenses[$xid] = true;
+            }
+            $expenses = array_values(array_filter(
+                $expenses,
+                static fn (Expense $x): bool => isset($wantedExpenses[(string) $x->getId()]),
+            ));
+            if (count($expenses) !== count($wantedExpenses)) {
+                return $this->json([
+                    'error' => 'One or more selected expenses are not invoiceable for this engagement.',
+                ], 422);
+            }
         }
 
-        if (0 === count($entries)) {
-            return $this->json(['error' => 'No unbilled billable time to invoice.'], 422);
+        if (true === ($payload['preview'] ?? false)) {
+            return $this->preview($entries, $expenses, $client->getDefaultRateAmount(), $currency);
+        }
+
+        if (0 === count($entries) && 0 === count($expenses)) {
+            return $this->json(['error' => 'No unbilled billable time or expenses to invoice.'], 422);
         }
 
         $now = new \DateTimeImmutable();
@@ -150,6 +183,23 @@ class InvoiceFromTimeController extends AbstractController
             $entry->setBilledAt($now);
         }
 
+        // Expenses follow the time lines, grouped as their own section (#650).
+        foreach ($expenses as $expense) {
+            $amount = $expense->getAmount();
+            $subtotal += $amount;
+
+            $line = (new InvoiceLineItem())
+                ->setDescription($this->expenseLabel($expense))
+                ->setQuantity(1.0)
+                ->setUnitAmount($amount)
+                ->setAmount($amount)
+                ->setPosition($position++)
+                ->setSourceExpense($expense);
+            $invoice->addLineItem($line);
+
+            $expense->setBilledAt($now);
+        }
+
         $invoice->setSubtotal($subtotal);
         $invoice->setTaxAmount(0);
         $invoice->setTotal($subtotal);
@@ -164,7 +214,7 @@ class InvoiceFromTimeController extends AbstractController
             'currency' => $invoice->getCurrency(),
             'subtotal' => $invoice->getSubtotal(),
             'total' => $invoice->getTotal(),
-            'lineItemCount' => count($entries),
+            'lineItemCount' => count($entries) + count($expenses),
         ], 201);
     }
 
@@ -173,8 +223,9 @@ class InvoiceFromTimeController extends AbstractController
      * generation loop, but read-only: nothing is created, nothing is stamped.
      *
      * @param list<TimeEntry> $entries
+     * @param list<Expense>   $expenses
      */
-    private function preview(array $entries, ?int $clientDefaultRate, string $currency): JsonResponse
+    private function preview(array $entries, array $expenses, ?int $clientDefaultRate, string $currency): JsonResponse
     {
         $rows = [];
         $subtotal = 0;
@@ -197,12 +248,43 @@ class InvoiceFromTimeController extends AbstractController
             ];
         }
 
+        $expenseRows = [];
+        foreach ($expenses as $expense) {
+            $subtotal += $expense->getAmount();
+            $expenseRows[] = [
+                '@id' => '/expenses/' . $expense->getId(),
+                'id' => (string) $expense->getId(),
+                'description' => $expense->getDescription(),
+                'category' => $expense->getCategory(),
+                'spentOn' => $expense->getSpentOn()?->format('Y-m-d'),
+                'amount' => $expense->getAmount(),
+            ];
+        }
+
         return $this->json([
             'entries' => $rows,
-            'count' => count($rows),
+            'expenses' => $expenseRows,
+            'count' => count($rows) + count($expenseRows),
             'subtotal' => $subtotal,
             'currency' => $currency,
         ]);
+    }
+
+    /** "Expense — Category: description" (parts optional), capped to the column length. */
+    private function expenseLabel(Expense $expense): string
+    {
+        $parts = [];
+        $category = $expense->getCategory();
+        if (null !== $category && '' !== trim($category)) {
+            $parts[] = trim($category);
+        }
+        $description = $expense->getDescription();
+        if (null !== $description && '' !== trim($description)) {
+            $parts[] = trim($description);
+        }
+        $label = 'Expense — ' . ([] === $parts ? 'other' : implode(': ', $parts));
+
+        return mb_substr($label, 0, InvoiceLineItem::MAX_DESCRIPTION_LENGTH);
     }
 
     /** A `Y-m-d` payload date → midnight UTC; null when absent, false when malformed. */

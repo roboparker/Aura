@@ -67,6 +67,13 @@ class InvoiceLineItem
     #[Groups(['invoice:read', 'invoice:write'])]
     private ?TimeEntry $sourceTimeEntry = null;
 
+    /** Back-link for a line generated from an expense (#650) — lets void release it. */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: Expense::class)]
+    #[ORM\JoinColumn(name: 'source_expense_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['invoice:read'])]
+    private ?Expense $sourceExpense = null;
+
     public function getId(): ?Uuid
     {
         return $this->id;
@@ -152,6 +159,18 @@ class InvoiceLineItem
     public function setSourceTimeEntry(?TimeEntry $sourceTimeEntry): self
     {
         $this->sourceTimeEntry = $sourceTimeEntry;
+
+        return $this;
+    }
+
+    public function getSourceExpense(): ?Expense
+    {
+        return $this->sourceExpense;
+    }
+
+    public function setSourceExpense(?Expense $sourceExpense): self
+    {
+        $this->sourceExpense = $sourceExpense;
 
         return $this;
     }
