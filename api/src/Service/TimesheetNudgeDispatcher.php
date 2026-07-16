@@ -45,16 +45,20 @@ final class TimesheetNudgeDispatcher
 
         /** @var list<Space> $spaces */
         $spaces = $this->em->createQuery(
-            'SELECT DISTINCT s FROM ' . TimesheetSubmission::class . ' t JOIN t.space s',
+            'SELECT s FROM ' . Space::class . ' s
+             WHERE EXISTS (SELECT 1 FROM ' . TimesheetSubmission::class . ' t WHERE t.space = s)',
         )->getResult();
 
         $sent = 0;
         foreach ($spaces as $space) {
             /** @var list<User> $trackers */
             $trackers = $this->em->createQuery(
-                'SELECT DISTINCT u FROM ' . TimeEntry::class . ' e JOIN e.user u
-                 WHERE e.space = :space AND e.endedAt IS NOT NULL
-                   AND e.startedAt >= :from AND e.startedAt < :to',
+                'SELECT u FROM ' . User::class . ' u
+                 WHERE EXISTS (
+                     SELECT 1 FROM ' . TimeEntry::class . ' e
+                     WHERE e.user = u AND e.space = :space AND e.endedAt IS NOT NULL
+                       AND e.startedAt >= :from AND e.startedAt < :to
+                 )',
             )
                 ->setParameter('space', $space)
                 ->setParameter('from', $weekStart)
