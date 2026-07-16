@@ -593,6 +593,25 @@ class Space
     }
 
     /**
+     * The member's space-level internal cost rate (#653), or null when
+     * unset / not a direct member. UUID-based comparison like the other
+     * membership helpers.
+     */
+    public function getCostRateFor(?User $user): ?int
+    {
+        if (null === $user || null === $user->getId()) {
+            return null;
+        }
+        foreach ($this->userMemberships as $membership) {
+            if (true === $membership->getUser()?->getId()?->equals($user->getId())) {
+                return $membership->getCostRateAmount();
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Shared scan for direct user memberships, optionally filtered to
      * a specific role. Pulled out so {@see isAdmin()} and
      * {@see hasMember()} stay one-liners.

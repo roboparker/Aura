@@ -176,6 +176,16 @@ class SpaceMemberController extends AbstractController
             $membership->setRole($role);
         }
 
+        // Internal cost rate (#653): minor units per hour, null clears it.
+        // Admin-only by the shared guard above; feeds profitability reports.
+        if (array_key_exists('costRateAmount', $payload)) {
+            $costRate = $payload['costRateAmount'];
+            if (null !== $costRate && (!is_int($costRate) || $costRate < 0)) {
+                return $this->json(['error' => 'costRateAmount must be a non-negative integer or null.'], 422);
+            }
+            $membership->setCostRateAmount($costRate);
+        }
+
         if (array_key_exists('roles', $payload)) {
             $resolved = $this->resolveRoles($space, $payload['roles']);
             if ($resolved instanceof JsonResponse) {
