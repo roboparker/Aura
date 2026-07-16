@@ -169,6 +169,146 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testInvoicePreviewListsCandidatesWithoutBilling(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
+        $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-04T09:00:00+00:00', '2026-07-04T09:30:00+00:00');
+
+        $preview = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpIri, 'preview' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertSame(2, $preview['count'] ?? null);
+        // 1h × 6000 + 0.5h × 6000 = 9000.
+        $this->assertSame(9000, $preview['subtotal'] ?? null);
+
+        // Preview stamped nothing — a real generation afterwards still pulls both.
+        $result = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpIri],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(2, $result['lineItemCount'] ?? null);
+    }
+
+    public function testInvoiceGenerationHonoursRangeAndSelection(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+
+        // One hour on each of July 1, 2 and 3.
+        foreach (['01', '02', '03'] as $day) {
+            $this->trackTime(
+                $client,
+                $spaceIri,
+                $bpIri,
+                $devCat,
+                sprintf('2026-07-%sT09:00:00+00:00', $day),
+                sprintf('2026-07-%sT10:00:00+00:00', $day),
+            );
+        }
+
+        // A range preview scopes the pool (July 2 only) and yields the entry id.
+        $preview = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpIri, 'from' => '2026-07-02', 'to' => '2026-07-02', 'preview' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertSame(1, $preview['count'] ?? null);
+        $rows = $preview['entries'];
+        $this->assertIsArray($rows);
+        $first = $rows[0];
+        $this->assertIsArray($first);
+        $july2Iri = $first['@id'];
+        $this->assertIsString($july2Iri);
+
+        // Generate July 1–2 but explicitly select only the July 2 entry.
+        $result = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => [
+                'engagement' => $bpIri,
+                'from' => '2026-07-01',
+                'to' => '2026-07-02',
+                'entries' => [$july2Iri],
+            ],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(1, $result['lineItemCount'] ?? null);
+        $this->assertSame(6000, $result['subtotal'] ?? null);
+
+        // July 1 and July 3 stay invoiceable for a later invoice.
+        $rest = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpIri, 'preview' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertSame(2, $rest['count'] ?? null);
+    }
+
+    public function testInvoiceSelectionRejectsNonInvoiceableEntry(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $clientIri = $this->iri($clientRow);
+        [$bpA] = $this->createEngagement($client, $spaceIri, $clientIri);
+        [$bpB, $devB] = $this->createEngagement($client, $spaceIri, $clientIri);
+
+        $this->trackTime($client, $spaceIri, $bpB, $devB, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
+        $previewB = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpB, 'preview' => true],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $rowsB = $previewB['entries'];
+        $this->assertIsArray($rowsB);
+        $firstB = $rowsB[0];
+        $this->assertIsArray($firstB);
+        $entryBIri = $firstB['@id'];
+        $this->assertIsString($entryBIri);
+
+        // Selecting engagement B's entry while invoicing engagement A → 422.
+        $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpA, 'entries' => [$entryBIri]],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // Malformed dates are rejected too.
+        $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpB, 'from' => 'not-a-date'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testIssueAssignsNumberThenMarkPaid(): void
     {
         $admin = $this->createUser('admin@example.com');
