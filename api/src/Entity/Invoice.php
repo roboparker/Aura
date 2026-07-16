@@ -574,6 +574,13 @@ class Invoice
         return $this->payments;
     }
 
+    /**
+     * Mutates the ledger — marked impure so PHPStan forgets remembered
+     * getBalanceDue()/getStatus() values after a call (the fluent return
+     * otherwise makes it look side-effect-free).
+     *
+     * @phpstan-impure
+     */
     public function addPayment(InvoicePayment $payment): self
     {
         if (!$this->payments->contains($payment)) {
@@ -584,6 +591,7 @@ class Invoice
         return $this;
     }
 
+    /** @phpstan-impure */
     public function removePayment(InvoicePayment $payment): self
     {
         if ($this->payments->removeElement($payment) && $payment->getInvoice() === $this) {
