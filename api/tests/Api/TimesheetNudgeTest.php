@@ -116,8 +116,13 @@ class TimesheetNudgeTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
 
-        // No HTTP requests from here — the mailer counts below only see the
-        // in-process sweep sends.
+        // The submit itself emailed the admin (#667) into this container's
+        // mailer logger — make one email-free request so the logger resets and
+        // the counts below only see the in-process sweep sends. No HTTP
+        // requests after this point.
+        $client->request('GET', '/spaces/' . $space->getId() . '/timesheets');
+        $this->assertResponseStatusCodeSame(200);
+
         $dispatcher = static::getContainer()->get(TimesheetNudgeDispatcher::class);
 
         // Only the unsubmitted tracker is nudged; the pending submitter isn't.
