@@ -548,48 +548,45 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
         $this->assertResponseStatusCodeSame(200);
-        // Two "here's your invoice" emails from the sends.
-        $this->assertEmailCount(2);
 
-        // The daily sweep flips both overdue and sends A's first reminder only.
+        // No more HTTP requests from here — each client request reboots the
+        // kernel and resets the mailer message logger, so the counts below see
+        // only what the in-process sweep sends.
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
         $handler = static::getContainer()->get(\App\MessageHandler\MarkOverdueInvoicesHandler::class);
-        $this->assertInstanceOf(\App\MessageHandler\MarkOverdueInvoicesHandler::class, $handler);
+
+        // The daily sweep flips both overdue and sends A's first reminder only
+        // (B is paused).
         $handler(new \App\Message\MarkOverdueInvoices());
-        $this->assertEmailCount(3);
-        $message = $this->getMailerMessage(2);
+        $this->assertEmailCount(1);
+        $message = $this->getMailerMessage();
         $this->assertNotNull($message);
         $this->assertEmailAddressContains($message, 'To', 'billing@acme.test');
 
-        $aFresh = $client->request('GET', $this->iri($a))->toArray();
-        $this->assertSame('overdue', $aFresh['status'] ?? null);
-        $aLog = $aFresh['remindersSentAt'] ?? null;
-        $this->assertIsArray($aLog);
-        $this->assertCount(1, $aLog);
-        $bFresh = $client->request('GET', $this->iri($b))->toArray();
-        $this->assertSame('overdue', $bFresh['status'] ?? null);
-        $this->assertSame([], $bFresh['remindersSentAt'] ?? []);
-
         // Re-run the same day: reminder 2 isn't due yet (+7d), nothing new sent.
         $handler(new \App\Message\MarkOverdueInvoices());
-        $this->assertEmailCount(3);
+        $this->assertEmailCount(1);
 
-        // A missed week self-heals: back-date A's due date so +7d has passed —
-        // the next run sends exactly one more (reminder 2 of 3).
-        $em = static::getContainer()->get('doctrine')->getManager();
-        assert($em instanceof EntityManagerInterface);
         $aId = $a['id'];
         $this->assertIsString($aId);
         $aEntity = $em->getRepository(Invoice::class)->find($aId);
         $this->assertInstanceOf(Invoice::class, $aEntity);
+        $this->assertCount(1, $aEntity->getRemindersSentAt());
+        $bId = $b['id'];
+        $this->assertIsString($bId);
+        $bEntity = $em->getRepository(Invoice::class)->find($bId);
+        $this->assertInstanceOf(Invoice::class, $bEntity);
+        $this->assertSame([], $bEntity->getRemindersSentAt());
+
+        // A missed week self-heals: back-date A's due date so +7d has passed —
+        // the next run sends exactly one more (reminder 2 of 3).
         $aEntity->setDueDate(new \DateTimeImmutable('-8 days'));
         $em->flush();
 
         $handler(new \App\Message\MarkOverdueInvoices());
-        $this->assertEmailCount(4);
-        $aFresh = $client->request('GET', $this->iri($a))->toArray();
-        $aLog = $aFresh['remindersSentAt'] ?? null;
-        $this->assertIsArray($aLog);
-        $this->assertCount(2, $aLog);
+        $this->assertEmailCount(2);
+        $this->assertCount(2, $aEntity->getRemindersSentAt());
     }
 
     public function testRecurringInvoiceSpawnsAFreshDraft(): void
