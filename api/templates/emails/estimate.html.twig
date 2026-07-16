@@ -1,0 +1,17 @@
+{# @var estimate \App\Entity\Estimate #}
+{# @var client \App\Entity\Client #}
+<p>Hi {{ client.name }},</p>
+
+<p>
+    {{ fromName }} has sent you
+    {% if estimate.number %}estimate <strong>{{ estimate.number }}</strong>{% else %}an estimate{% endif %}
+    for <strong>{{ (estimate.total / 100)|number_format(2) }} {{ estimate.currency }}</strong>.
+</p>
+
+<p>
+    <a href="{{ viewUrl }}">Review, accept, or decline the estimate</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You can review the line items and respond directly from that page.
+</p>

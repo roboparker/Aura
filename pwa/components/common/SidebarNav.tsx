@@ -578,6 +578,7 @@ const BillingSection = ({
     { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
     { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
+    { href: "/estimates", label: "Estimates", match: "/estimates", show: canInvoices },
     { href: "/reports", label: "Reports", match: "/reports", show: canInvoices },
   ].filter((l) => l.show);
 
