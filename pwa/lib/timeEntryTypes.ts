@@ -71,6 +71,39 @@ export const formatDuration = (totalSeconds: number): string => {
   return `${seconds}s`;
 };
 
+/**
+ * Format a duration as a timesheet cell value — "1:30" (h:mm). Empty string
+ * for zero so an untouched grid cell stays blank.
+ */
+export const formatCellDuration = (totalSeconds: number): string => {
+  const s = Math.max(0, Math.round(totalSeconds));
+  if (s === 0) return "";
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.round((s % 3600) / 60);
+  return `${hours}:${minutes.toString().padStart(2, "0")}`;
+};
+
+/**
+ * Parse a timesheet cell input into seconds. Accepts "1:30" (h:mm), "1.5"
+ * (decimal hours), and "" / "0" (zero). Returns null for anything malformed
+ * or out of range (an entry can't span midnight, so < 24h).
+ */
+export const parseDurationInput = (raw: string): number | null => {
+  const value = raw.trim();
+  if (value === "" || value === "0") return 0;
+  let seconds: number;
+  const colon = /^(\d{1,2}):([0-5]?\d)$/.exec(value);
+  if (colon) {
+    seconds = parseInt(colon[1], 10) * 3600 + parseInt(colon[2], 10) * 60;
+  } else if (/^\d+([.,]\d+)?$/.test(value)) {
+    seconds = Math.round(parseFloat(value.replace(",", ".")) * 3600);
+  } else {
+    return null;
+  }
+  if (seconds <= 0 || seconds >= 24 * 3600) return null;
+  return seconds;
+};
+
 /** A stopwatch-style "1:30:05" clock for a live running timer. */
 export const formatClock = (totalSeconds: number): string => {
   const s = Math.max(0, Math.floor(totalSeconds));

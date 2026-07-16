@@ -44,6 +44,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            // The week timesheet grid fetches a whole week in one request —
+            // let clients raise the page size (capped globally at 100).
+            paginationClientItemsPerPage: true,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
