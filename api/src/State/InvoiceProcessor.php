@@ -57,9 +57,22 @@ final class InvoiceProcessor implements ProcessorInterface
             $subtotal += $amount;
         }
 
-        $taxAmount = (int) round($subtotal * $invoice->getTaxRate() / self::BASIS_POINTS);
+        // Discount (#648) applies between subtotal and tax: percent of the
+        // subtotal or a fixed amount, never more than the subtotal itself.
+        $discountValue = $invoice->getDiscountValue();
+        $discountAmount = 0;
+        if (null !== $invoice->getDiscountType() && null !== $discountValue) {
+            $discountAmount = Invoice::DISCOUNT_PERCENT === $invoice->getDiscountType()
+                ? (int) round($subtotal * $discountValue / self::BASIS_POINTS)
+                : $discountValue;
+            $discountAmount = max(0, min($discountAmount, $subtotal));
+        }
+
+        $taxable = $subtotal - $discountAmount;
+        $taxAmount = (int) round($taxable * $invoice->getTaxRate() / self::BASIS_POINTS);
         $invoice->setSubtotal($subtotal);
+        $invoice->setDiscountAmount($discountAmount);
         $invoice->setTaxAmount($taxAmount);
-        $invoice->setTotal($subtotal + $taxAmount);
+        $invoice->setTotal($taxable + $taxAmount);
     }
 }

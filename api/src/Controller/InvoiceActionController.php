@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Invoice;
+use App\Entity\InvoicePayment;
 use App\Entity\User;
 use App\Repository\InvoiceRepository;
 use App\Security\Permission\SpacePermission;
@@ -11,6 +12,7 @@ use App\Service\InvoiceMailer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
@@ -76,11 +78,115 @@ class InvoiceActionController extends AbstractController
             return $this->json(['error' => 'A void invoice cannot be marked paid.'], 409);
         }
 
+        // Record the remaining balance as a payment (#648) so the ledger and
+        // the status agree — a fully-paid-by-parts invoice records nothing new.
+        $balance = $invoice->getBalanceDue();
+        if ($balance > 0) {
+            $invoice->addPayment(
+                (new InvoicePayment())
+                    ->setAmount($balance)
+                    ->setMethod(InvoicePayment::METHOD_MANUAL)
+                    ->setCreatedBy($user instanceof User ? $user : null),
+            );
+        }
         $invoice->setStatus(Invoice::STATUS_PAID);
         $invoice->setPaidAt(new \DateTimeImmutable());
         $this->em->flush();
 
         return $this->summary($invoice);
+    }
+
+    /**
+     * Record a (possibly partial) payment (#648). Balance due = total − Σ
+     * payments; the status flips to paid only when the balance hits zero and
+     * stays sent/overdue while anything is outstanding.
+     */
+    #[Route('/invoices/{id}/payments', name: 'invoice_payment_add', methods: ['POST'])]
+    public function addPayment(string $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $invoice = $this->authorize($id, $user);
+        if ($invoice instanceof JsonResponse) {
+            return $invoice;
+        }
+        if (in_array($invoice->getStatus(), [Invoice::STATUS_DRAFT, Invoice::STATUS_VOID], true)) {
+            return $this->json(['error' => 'Payments can only be recorded on an issued invoice.'], 409);
+        }
+
+        $payload = $request->toArray();
+        $amount = $payload['amount'] ?? null;
+        if (!is_int($amount) || $amount <= 0) {
+            return $this->json(['error' => 'A positive amount (minor units) is required.'], 422);
+        }
+        if ($amount > $invoice->getBalanceDue()) {
+            return $this->json(['error' => 'The payment exceeds the balance due.'], 422);
+        }
+
+        $paidOn = new \DateTimeImmutable('today');
+        $paidOnRaw = $payload['paidOn'] ?? null;
+        if (is_string($paidOnRaw) && '' !== trim($paidOnRaw)) {
+            $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($paidOnRaw), new \DateTimeZone('UTC'));
+            if (false === $parsed) {
+                return $this->json(['error' => 'paidOn must be formatted YYYY-MM-DD.'], 422);
+            }
+            $paidOn = $parsed;
+        }
+
+        $method = $payload['method'] ?? null;
+        $note = $payload['note'] ?? null;
+        $payment = (new InvoicePayment())
+            ->setAmount($amount)
+            ->setPaidOn($paidOn)
+            ->setMethod(is_string($method) && '' !== trim($method) ? mb_substr(trim($method), 0, 40) : InvoicePayment::METHOD_MANUAL)
+            ->setNote(is_string($note) && '' !== trim($note) ? mb_substr(trim($note), 0, 255) : null)
+            ->setCreatedBy($user instanceof User ? $user : null);
+        $invoice->addPayment($payment);
+
+        if (0 === $invoice->getBalanceDue()) {
+            $invoice->setStatus(Invoice::STATUS_PAID);
+            $invoice->setPaidAt(new \DateTimeImmutable());
+        }
+        $this->em->flush();
+
+        return $this->paymentSummary($invoice);
+    }
+
+    /**
+     * Remove a recorded payment (a typo'd amount, a bounced check). If the
+     * invoice was paid and the balance reopens, the status reverts to
+     * sent/overdue (past-due picks overdue).
+     */
+    #[Route('/invoices/{id}/payments/{paymentId}', name: 'invoice_payment_remove', methods: ['DELETE'])]
+    public function removePayment(string $id, string $paymentId, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $invoice = $this->authorize($id, $user);
+        if ($invoice instanceof JsonResponse) {
+            return $invoice;
+        }
+
+        if (!Uuid::isValid($paymentId)) {
+            return $this->json(['error' => 'Payment not found.'], 404);
+        }
+        $payment = null;
+        foreach ($invoice->getPayments() as $candidate) {
+            if ($candidate->getId()?->toRfc4122() === strtolower($paymentId)) {
+                $payment = $candidate;
+                break;
+            }
+        }
+        if (null === $payment) {
+            return $this->json(['error' => 'Payment not found.'], 404);
+        }
+
+        $invoice->removePayment($payment);
+
+        if (Invoice::STATUS_PAID === $invoice->getStatus() && $invoice->getBalanceDue() > 0) {
+            $pastDue = null !== $invoice->getDueDate() && $invoice->getDueDate() < new \DateTimeImmutable('today');
+            $invoice->setStatus($pastDue ? Invoice::STATUS_OVERDUE : Invoice::STATUS_SENT);
+            $invoice->setPaidAt(null);
+        }
+        $this->em->flush();
+
+        return $this->paymentSummary($invoice);
     }
 
     #[Route('/invoices/{id}/send', name: 'invoice_send', methods: ['POST'])]
@@ -172,6 +278,31 @@ class InvoiceActionController extends AbstractController
         }
 
         return $invoice;
+    }
+
+    /** The payment ledger + balance the PWA re-renders after a payment write. */
+    private function paymentSummary(Invoice $invoice): JsonResponse
+    {
+        $payments = [];
+        foreach ($invoice->getPayments() as $payment) {
+            $payments[] = [
+                'id' => (string) $payment->getId(),
+                'amount' => $payment->getAmount(),
+                'paidOn' => $payment->getPaidOn()->format('Y-m-d'),
+                'method' => $payment->getMethod(),
+                'note' => $payment->getNote(),
+            ];
+        }
+
+        return $this->json([
+            '@id' => '/invoices/' . $invoice->getId(),
+            'id' => (string) $invoice->getId(),
+            'status' => $invoice->getStatus(),
+            'total' => $invoice->getTotal(),
+            'amountPaid' => $invoice->getAmountPaid(),
+            'balanceDue' => $invoice->getBalanceDue(),
+            'payments' => $payments,
+        ]);
     }
 
     private function summary(Invoice $invoice): JsonResponse

@@ -719,6 +719,152 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertNotNull($refreshed['paidAt'] ?? null);
     }
 
+    public function testDiscountAppliesBetweenSubtotalAndTax(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        // 25% off 20000 = 5000; tax 10% on the discounted 15000 = 1500.
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'taxRate' => 1000,
+                'discountType' => 'percent',
+                'discountValue' => 2500,
+                'lineItems' => [['description' => 'Work', 'quantity' => 4, 'unitAmount' => 5000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(20000, $invoice['subtotal'] ?? null);
+        $this->assertSame(5000, $invoice['discountAmount'] ?? null);
+        $this->assertSame(1500, $invoice['taxAmount'] ?? null);
+        $this->assertSame(16500, $invoice['total'] ?? null);
+
+        // Switch to a fixed 30.00 discount: tax 10% on 17000 = 1700.
+        $patched = $client->request('PATCH', $this->iri($invoice), [
+            'json' => ['discountType' => 'fixed', 'discountValue' => 3000],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertSame(3000, $patched['discountAmount'] ?? null);
+        $this->assertSame(1700, $patched['taxAmount'] ?? null);
+        $this->assertSame(18700, $patched['total'] ?? null);
+
+        // A percent discount over 100% is rejected.
+        $client->request('PATCH', $this->iri($invoice), [
+            'json' => ['discountType' => 'percent', 'discountValue' => 10001],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    public function testPartialPaymentsTrackBalanceAndFlipStatus(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->format('Y-m-d');
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'dueDate' => $yesterday,
+                'lineItems' => [['description' => 'Work', 'quantity' => 1, 'unitAmount' => 10000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoiceIri = $invoice['@id'];
+        $this->assertIsString($invoiceIri);
+
+        // Payments can't be recorded on a draft.
+        $client->request('POST', $invoiceIri . '/payments', [
+            'json' => ['amount' => 1000],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(409);
+
+        $client->request('POST', $invoiceIri . '/send', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        // Partial payment: status stays sent, balance shrinks.
+        $partial = $client->request('POST', $invoiceIri . '/payments', [
+            'json' => ['amount' => 4000, 'method' => 'bank transfer', 'note' => 'first half'],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertSame('sent', $partial['status'] ?? null);
+        $this->assertSame(4000, $partial['amountPaid'] ?? null);
+        $this->assertSame(6000, $partial['balanceDue'] ?? null);
+
+        // Overpaying is rejected.
+        $client->request('POST', $invoiceIri . '/payments', [
+            'json' => ['amount' => 7000],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // Paying the rest flips the invoice to paid.
+        $final = $client->request('POST', $invoiceIri . '/payments', [
+            'json' => ['amount' => 6000],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertSame('paid', $final['status'] ?? null);
+        $this->assertSame(0, $final['balanceDue'] ?? null);
+        $payments = $final['payments'] ?? null;
+        $this->assertIsArray($payments);
+        $this->assertCount(2, $payments);
+        // Same-day payments share a paidOn — pick the 6000 row by amount.
+        $lastId = null;
+        foreach ($payments as $row) {
+            $this->assertIsArray($row);
+            if (6000 === ($row['amount'] ?? null)) {
+                $lastId = $row['id'];
+            }
+        }
+        $this->assertIsString($lastId);
+
+        // Removing the final payment reopens the balance — past due, so overdue.
+        $reopened = $client->request('DELETE', $invoiceIri . '/payments/' . $lastId)->toArray();
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertSame('overdue', $reopened['status'] ?? null);
+        $this->assertSame(6000, $reopened['balanceDue'] ?? null);
+
+        // mark-paid records the remaining balance as a manual payment.
+        $client->request('POST', $invoiceIri . '/mark-paid', [
+            'json' => [],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+        $refreshed = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertSame('paid', $refreshed['status'] ?? null);
+        $this->assertSame(10000, $refreshed['amountPaid'] ?? null);
+        $paymentRows = $refreshed['payments'] ?? null;
+        $this->assertIsArray($paymentRows);
+        $this->assertCount(2, $paymentRows);
+    }
+
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,

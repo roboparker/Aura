@@ -37,8 +37,10 @@ final class StripePaymentGateway implements PaymentGatewayInterface
         $label = $invoice->getNumber();
         $description = 'Invoice ' . (null !== $label && '' !== $label ? $label : (string) $invoice->getId());
 
+        // Charge the balance due, not the full total — partial payments (#648)
+        // may already cover part of the invoice.
         return $this->stripe->createPaymentCheckout(
-            $invoice->getTotal(),
+            $invoice->getBalanceDue(),
             $invoice->getCurrency(),
             $description,
             $successUrl,

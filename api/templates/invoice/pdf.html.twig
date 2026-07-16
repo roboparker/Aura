@@ -90,6 +90,12 @@
         <td>Subtotal</td>
         <td class="num">{{ fmt.money(invoice.subtotal, c) }}</td>
     </tr>
+    {% if invoice.discountAmount > 0 %}
+    <tr>
+        <td>Discount{% if invoice.discountType == 'percent' and invoice.discountValue %} ({{ (invoice.discountValue / 100)|number_format(2) }}%){% endif %}</td>
+        <td class="num">−{{ fmt.money(invoice.discountAmount, c) }}</td>
+    </tr>
+    {% endif %}
     {% if invoice.taxAmount > 0 %}
     <tr>
         <td>Tax ({{ (invoice.taxRate / 100)|number_format(2) }}%)</td>
@@ -100,7 +106,38 @@
         <td>Total</td>
         <td class="num">{{ fmt.money(invoice.total, c) }}</td>
     </tr>
+    {% if invoice.amountPaid > 0 %}
+    <tr>
+        <td>Amount paid</td>
+        <td class="num">−{{ fmt.money(invoice.amountPaid, c) }}</td>
+    </tr>
+    <tr class="grand">
+        <td>Balance due</td>
+        <td class="num">{{ fmt.money(invoice.balanceDue, c) }}</td>
+    </tr>
+    {% endif %}
 </table>
+
+{% if invoice.payments|length > 0 %}
+<table class="lines" style="margin-top: 20px;">
+    <thead>
+        <tr>
+            <th>Payment</th>
+            <th class="num">Date</th>
+            <th class="num">Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for payment in invoice.payments %}
+        <tr>
+            <td>{{ payment.method ?? 'payment' }}</td>
+            <td class="num">{{ payment.paidOn|date('M j, Y') }}</td>
+            <td class="num">{{ fmt.money(payment.amount, c) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
 
 {% if invoice.notes %}
 <div class="notes">{{ invoice.notes }}</div>
