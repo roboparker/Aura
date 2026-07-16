@@ -70,17 +70,19 @@ class ReportTest extends ApiTestCase
             $this->assertIsString($label);
             $byLabel[$label] = $row;
         }
-        $this->assertSame(1.0, $byLabel['Dev']['hours'] ?? null);
+        // json_encode drops zero fractions (1.0 → 1), so numeric fields use
+        // assertEquals rather than assertSame.
+        $this->assertEquals(1.0, $byLabel['Dev']['hours'] ?? null);
         $this->assertSame(['USD' => 6000], $byLabel['Dev']['amounts'] ?? null);
-        $this->assertSame(0.5, $byLabel['Build']['billableHours'] ?? null);
+        $this->assertEquals(0.5, $byLabel['Build']['billableHours'] ?? null);
         $this->assertSame(['USD' => 4000], $byLabel['Build']['amounts'] ?? null);
-        $this->assertSame(2.0, $byLabel['Internal']['hours'] ?? null);
-        $this->assertSame(0.0, $byLabel['Internal']['billableHours'] ?? null);
+        $this->assertEquals(2.0, $byLabel['Internal']['hours'] ?? null);
+        $this->assertEquals(0.0, $byLabel['Internal']['billableHours'] ?? null);
         $this->assertSame([], $byLabel['Internal']['amounts'] ?? null);
         $totals = $report['totals'];
         $this->assertIsArray($totals);
-        $this->assertSame(3.5, $totals['hours'] ?? null);
-        $this->assertSame(1.5, $totals['billableHours'] ?? null);
+        $this->assertEquals(3.5, $totals['hours'] ?? null);
+        $this->assertEquals(1.5, $totals['billableHours'] ?? null);
         $this->assertSame(['USD' => 10000], $totals['amounts'] ?? null);
 
         // A range that misses everything comes back empty.
