@@ -275,6 +275,7 @@ class Space
      * public pages can use the plain `/media/...` URL; the PDF embeds the
      * bytes as a data URI (dompdf runs with remote fetches disabled).
      */
+    #[\ApiPlatform\Metadata\ApiProperty(readableLink: true)]
     #[ORM\ManyToOne(targetEntity: MediaObject::class)]
     #[ORM\JoinColumn(name: 'invoice_logo_id', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['space:read', 'space:write'])]

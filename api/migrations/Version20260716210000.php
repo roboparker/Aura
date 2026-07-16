@@ -24,13 +24,13 @@ final class Version20260716210000 extends AbstractMigration
         $this->addSql('ALTER TABLE space ADD invoice_terms TEXT DEFAULT NULL');
         $this->addSql('ALTER TABLE space ADD invoice_number_prefix VARCHAR(20) DEFAULT NULL');
         $this->addSql('ALTER TABLE space ADD invoice_number_next INT DEFAULT NULL');
-        $this->addSql('CREATE INDEX IDX_2972C13A0B562299 ON space (invoice_logo_id)');
-        $this->addSql('ALTER TABLE space ADD CONSTRAINT FK_2972C13A0B562299 FOREIGN KEY (invoice_logo_id) REFERENCES media_object (id) ON DELETE SET NULL NOT DEFERRABLE');
+        $this->addSql('CREATE INDEX IDX_2972C13AB562299 ON space (invoice_logo_id)');
+        $this->addSql('ALTER TABLE space ADD CONSTRAINT FK_2972C13AB562299 FOREIGN KEY (invoice_logo_id) REFERENCES media_object (id) ON DELETE SET NULL NOT DEFERRABLE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE space DROP CONSTRAINT FK_2972C13A0B562299');
+        $this->addSql('ALTER TABLE space DROP CONSTRAINT FK_2972C13AB562299');
         $this->addSql('ALTER TABLE space DROP invoice_logo_id');
         $this->addSql('ALTER TABLE space DROP invoice_terms');
         $this->addSql('ALTER TABLE space DROP invoice_number_prefix');
