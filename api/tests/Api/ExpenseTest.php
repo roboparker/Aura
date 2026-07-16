@@ -30,9 +30,7 @@ class ExpenseTest extends ApiTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
-        $storage = static::getContainer()->get('media.storage');
-        assert($storage instanceof FilesystemOperator);
-        $this->storage = $storage;
+        $this->storage = static::getContainer()->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
@@ -198,6 +196,10 @@ class ExpenseTest extends ApiTestCase
         $member = $this->createUser('member@example.com');
         $space = $this->createSharedSpace($admin, $member);
         $spaceIri = '/spaces/' . $space->getId();
+        // Created before any HTTP request — the client kernel reboots detach
+        // this EM's entities, and persisting a MediaObject with a detached
+        // owner would trip Doctrine's new-entity-through-relationship check.
+        $receipt = $this->createReceipt($member);
 
         $client = static::createClient();
         $client->loginUser($admin);
@@ -207,8 +209,7 @@ class ExpenseTest extends ApiTestCase
         ])->toArray();
         $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
 
-        // The member uploads a receipt and attaches it to their expense.
-        $receipt = $this->createReceipt($member);
+        // The member attaches their uploaded receipt to a new expense.
         $client->loginUser($member);
         $client->request('POST', '/expenses', [
             'json' => [
