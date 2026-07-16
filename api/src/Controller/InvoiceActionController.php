@@ -174,6 +174,19 @@ class InvoiceActionController extends AbstractController
             return $this->json(['error' => 'Payment not found.'], 404);
         }
 
+        // Removing a retainer payment refunds the draw (#673) — a reversing
+        // deposit keeps the ledger append-only and the balance whole.
+        if (\App\Entity\InvoicePayment::METHOD_RETAINER === $payment->getMethod() && null !== $invoice->getClient()) {
+            $refund = (new \App\Entity\RetainerTransaction())
+                ->setClient($invoice->getClient())
+                ->setType(\App\Entity\RetainerTransaction::TYPE_DEPOSIT)
+                ->setAmount($payment->getAmount())
+                ->setInvoice($invoice)
+                ->setNote('Reversal — retainer payment removed')
+                ->setCreatedBy($user instanceof User ? $user : null);
+            $this->em->persist($refund);
+        }
+
         $invoice->removePayment($payment);
 
         if (Invoice::STATUS_PAID === $invoice->getStatus() && $invoice->getBalanceDue() > 0) {
