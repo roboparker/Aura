@@ -16,6 +16,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TimeEntryRepository;
+use App\State\TimeEntryDeleteProcessor;
 use App\State\TimeEntryUserProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -58,6 +59,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getUser() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.time_entries.delete', object)))",
+            processor: TimeEntryDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['time_entry:read']],
