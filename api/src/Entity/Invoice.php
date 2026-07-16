@@ -644,6 +644,39 @@ class Invoice
         return $this;
     }
 
+    /**
+     * Tax grouped by effective rate (#670) — one row per distinct nonzero
+     * rate, mirroring InvoiceProcessor's per-line proportional math so the
+     * rows always sum to {@see $taxAmount}. Lets the PDF/public page print
+     * "Tax (10%)" and "Tax (21%)" separately on mixed-rate invoices.
+     *
+     * @return list<array{rate: int, amount: int}>
+     */
+    #[Groups(['invoice:read'])]
+    public function getTaxBreakdown(): array
+    {
+        $taxable = $this->subtotal - $this->discountAmount;
+        $ratio = $this->subtotal > 0 ? $taxable / $this->subtotal : 0.0;
+
+        $byRate = [];
+        foreach ($this->lineItems as $line) {
+            $rate = $line->getTaxRate() ?? $this->taxRate;
+            if ($rate <= 0) {
+                continue;
+            }
+            $byRate[$rate] = ($byRate[$rate] ?? 0)
+                + (int) round($line->getAmount() * $ratio * $rate / 10000);
+        }
+        ksort($byRate);
+
+        $rows = [];
+        foreach ($byRate as $rate => $amount) {
+            $rows[] = ['rate' => $rate, 'amount' => $amount];
+        }
+
+        return $rows;
+    }
+
     public function getTotal(): int
     {
         return $this->total;

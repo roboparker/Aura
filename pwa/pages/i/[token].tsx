@@ -27,6 +27,7 @@ interface PublicInvoice {
   subtotal: number;
   discountAmount: number;
   taxAmount: number;
+  taxBreakdown?: { rate: number; amount: number }[];
   total: number;
   amountPaid: number;
   balanceDue: number;
@@ -214,12 +215,12 @@ const PublicInvoicePage = () => {
               </span>
             </div>
           )}
-          {invoice.taxAmount > 0 && (
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Tax</span>
-              <span className="tabular-nums">{formatMoney(invoice.taxAmount, invoice.currency)}</span>
+          {(invoice.taxBreakdown ?? []).map((tax) => (
+            <div key={tax.rate} className="flex justify-between">
+              <span className="text-muted-foreground">Tax ({(tax.rate / 100).toFixed(2)}%)</span>
+              <span className="tabular-nums">{formatMoney(tax.amount, invoice.currency)}</span>
             </div>
-          )}
+          ))}
           <div className="flex justify-between border-t pt-1 text-base font-semibold">
             <span>Total</span>
             <span className="tabular-nums">{formatMoney(invoice.total, invoice.currency)}</span>

@@ -29,6 +29,8 @@ interface EditableLine {
   description: string;
   quantity: string;
   unit: string; // major units
+  /** Per-line tax % override (#670); "" = inherit the invoice rate. */
+  tax: string;
 }
 
 const InvoiceDetailPage = () => {
@@ -80,6 +82,7 @@ const InvoiceDetailPage = () => {
         description: l.description,
         quantity: String(l.quantity),
         unit: (l.unitAmount / 100).toFixed(2),
+        tax: l.taxRate === null || l.taxRate === undefined ? "" : String(l.taxRate / 100),
       })),
     );
     setDueDate(invoice.dueDate ?? "");
@@ -113,14 +116,23 @@ const InvoiceDetailPage = () => {
     }
     discount = Math.max(0, Math.min(discount, subtotal));
     const taxable = subtotal - discount;
-    const tax = Math.round((taxable * (parseFloat(taxPercent) || 0) * 100) / 10000);
+    // Per-line tax (#670), mirroring InvoiceProcessor's proportional math.
+    const ratio = subtotal > 0 ? taxable / subtotal : 0;
+    const tax = lines.reduce((sum, l) => {
+      const amount = Math.round(
+        (parseFloat(l.quantity) || 0) * Math.round((parseFloat(l.unit) || 0) * 100),
+      );
+      const ratePercent = l.tax.trim() === "" ? parseFloat(taxPercent) || 0 : parseFloat(l.tax) || 0;
+      if (ratePercent <= 0) return sum;
+      return sum + Math.round((amount * ratio * ratePercent * 100) / 10000);
+    }, 0);
     return { subtotal, discount, tax, total: taxable + tax };
   }, [lines, taxPercent, discType, discValue]);
 
   const addLine = () =>
     setLines((prev) => [
       ...prev,
-      { key: `new-${prev.length}-${Date.now()}`, description: "", quantity: "1", unit: "0.00" },
+      { key: `new-${prev.length}-${Date.now()}`, description: "", quantity: "1", unit: "0.00", tax: "" },
     ]);
   const removeLine = (key: string) => setLines((prev) => prev.filter((l) => l.key !== key));
   const updateLine = (key: string, patch: Partial<EditableLine>) =>
@@ -148,6 +160,7 @@ const InvoiceDetailPage = () => {
             description: l.description.trim() || "—",
             quantity: parseFloat(l.quantity) || 0,
             unitAmount: Math.round((parseFloat(l.unit) || 0) * 100),
+            taxRate: l.tax.trim() === "" ? null : Math.round((parseFloat(l.tax) || 0) * 100),
             position: i,
           })),
           recurrenceFrequency: recurring ? freq : null,
@@ -313,6 +326,7 @@ const InvoiceDetailPage = () => {
                         <th className="py-2">Description</th>
                         <th className="w-20 py-2 text-right">Qty</th>
                         <th className="w-28 py-2 text-right">Unit</th>
+                        <th className="w-20 py-2 text-right">Tax %</th>
                         <th className="w-28 py-2 text-right">Amount</th>
                         {editable && <th className="w-8" />}
                       </tr>
@@ -359,6 +373,23 @@ const InvoiceDetailPage = () => {
                                 />
                               ) : (
                                 formatMoney(Math.round((parseFloat(line.unit) || 0) * 100), currency)
+                              )}
+                            </td>
+                            <td className="py-1.5 text-right">
+                              {editable ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={line.tax}
+                                  placeholder={taxPercent}
+                                  onChange={(e) => updateLine(line.key, { tax: e.target.value })}
+                                  title="Per-line tax % (blank inherits the invoice rate)"
+                                  className="h-8 text-right"
+                                />
+                              ) : line.tax.trim() === "" ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                `${line.tax}%`
                               )}
                             </td>
                             <td className="py-1.5 text-right tabular-nums">{formatMoney(amount, currency)}</td>

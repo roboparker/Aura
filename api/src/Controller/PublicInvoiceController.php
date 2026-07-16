@@ -45,6 +45,7 @@ class PublicInvoiceController extends AbstractController
                 'quantity' => $line->getQuantity(),
                 'unitAmount' => $line->getUnitAmount(),
                 'amount' => $line->getAmount(),
+                'taxRate' => $line->getTaxRate(),
             ];
         }
 
@@ -71,6 +72,7 @@ class PublicInvoiceController extends AbstractController
             'subtotal' => $invoice->getSubtotal(),
             'discountAmount' => $invoice->getDiscountAmount(),
             'taxAmount' => $invoice->getTaxAmount(),
+            'taxBreakdown' => $invoice->getTaxBreakdown(),
             'total' => $invoice->getTotal(),
             'amountPaid' => $invoice->getAmountPaid(),
             'balanceDue' => $invoice->getBalanceDue(),
