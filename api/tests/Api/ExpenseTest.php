@@ -4,10 +4,12 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Expense;
+use App\Entity\MediaObject;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use League\Flysystem\FilesystemOperator;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -20,6 +22,7 @@ class ExpenseTest extends ApiTestCase
     use SpaceMembershipFixture;
 
     private EntityManagerInterface $entityManager;
+    private FilesystemOperator $storage;
 
     protected function setUp(): void
     {
@@ -27,6 +30,9 @@ class ExpenseTest extends ApiTestCase
         $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
+        $storage = static::getContainer()->get('media.storage');
+        assert($storage instanceof FilesystemOperator);
+        $this->storage = $storage;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
@@ -184,6 +190,75 @@ class ExpenseTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
         $released = $client->request('GET', $this->iri($billableExpense))->toArray();
         $this->assertNull($released['billedAt'] ?? null);
+    }
+
+    public function testReceiptDownloadGatedToSpenderAndTimeReaders(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSharedSpace($admin, $member);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+
+        // The member uploads a receipt and attaches it to their expense.
+        $receipt = $this->createReceipt($member);
+        $client->loginUser($member);
+        $client->request('POST', '/expenses', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'spentOn' => '2026-07-10',
+                'category' => 'Travel',
+                'amount' => 2500,
+                'receipt' => '/media-objects/' . $receipt->getId(),
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        $downloadUrl = '/media-objects/' . $receipt->getId() . '/download';
+
+        // Spender (owner) downloads their own receipt.
+        $client->request('GET', $downloadUrl);
+        $this->assertResponseIsSuccessful();
+
+        // A space admin (not the uploader) can download it too.
+        $client->loginUser($admin);
+        $client->request('GET', $downloadUrl);
+        $this->assertResponseIsSuccessful();
+
+        // An outsider gets 404 — not 403, to avoid leaking existence.
+        $outsider = $this->createUser('outsider@example.com');
+        $client->loginUser($outsider);
+        $client->request('GET', $downloadUrl);
+        $this->assertResponseStatusCodeSame(404);
+    }
+
+    /** A stored receipt file + MediaObject row owned by $owner. */
+    private function createReceipt(User $owner): MediaObject
+    {
+        $bytes = 'RECEIPT-IMAGE-BYTES';
+        $path = 'attachments/expense-test-' . bin2hex(random_bytes(4)) . '-receipt.png';
+        $this->storage->write($path, $bytes);
+
+        $media = (new MediaObject())
+            ->setOwner($owner)
+            ->setKind(MediaObject::KIND_ATTACHMENT)
+            ->setVariants(['original' => $path])
+            ->setOriginalName('receipt.png')
+            ->setMimeType('image/png')
+            ->setByteSize(\strlen($bytes));
+        $this->entityManager->persist($media);
+        $this->entityManager->flush();
+
+        return $media;
     }
 
     /**

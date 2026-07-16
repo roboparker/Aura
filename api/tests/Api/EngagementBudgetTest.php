@@ -28,6 +28,7 @@ class EngagementBudgetTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
@@ -144,6 +145,89 @@ class EngagementBudgetTest extends ApiTestCase
         $this->assertSame([], $entity->getBudgetAlertsSent());
         $this->assertSame(0, $alerter->dispatchDue());
         $this->assertEmailCount(2);
+    }
+
+    public function testFeesBudgetCountsBillableExpenses(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $clientIri = $clientRow['@id'];
+        $this->assertIsString($clientIri);
+
+        // A $100 fees budget (10000 minor units) with Dev @ $60/h.
+        $engagement = $client->request('POST', '/engagements', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientIri,
+                'name' => 'Fees budget',
+                'currency' => 'USD',
+                'budgetType' => 'fees',
+                'budgetAmount' => 10000,
+                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $engagementIri = $engagement['@id'];
+        $this->assertIsString($engagementIri);
+        $categories = $engagement['categories'] ?? null;
+        $this->assertIsArray($categories);
+        $first = $categories[0];
+        $this->assertIsArray($first);
+        $categoryIri = $first['@id'];
+        $this->assertIsString($categoryIri);
+
+        // 1h Dev = 6000 in fees.
+        $client->request('POST', '/time_entries', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $engagementIri,
+                'category' => $categoryIri,
+                'startedAt' => '2026-07-10T09:00:00+00:00',
+                'endedAt' => '2026-07-10T10:00:00+00:00',
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+
+        // A billable expense adds to the burn; a non-billable one doesn't (#666).
+        foreach ([[2500, true], [5000, false]] as [$amount, $billable]) {
+            $client->request('POST', '/expenses', [
+                'json' => [
+                    'space' => $spaceIri,
+                    'engagement' => $engagementIri,
+                    'spentOn' => '2026-07-10',
+                    'category' => 'Travel',
+                    'amount' => $amount,
+                    'billable' => $billable,
+                ],
+                'headers' => ['Content-Type' => 'application/ld+json'],
+            ]);
+            $this->assertResponseStatusCodeSame(201);
+        }
+
+        $list = $client->request('GET', '/engagements?space=' . $spaceIri)->toArray();
+        $members = $list['member'] ?? $list['hydra:member'] ?? null;
+        $this->assertIsArray($members);
+        $this->assertCount(1, $members);
+        $row = $members[0];
+        $this->assertIsArray($row);
+        // 6000 tracked + 2500 billable expense = 8500 (85%); the 5000
+        // non-billable expense never counts.
+        $this->assertSame(8500, $row['budgetSpent'] ?? null);
+
+        // 85% crosses the 80 threshold only — one alert.
+        $alerter = static::getContainer()->get(\App\Service\EngagementBudgetAlerter::class);
+        $this->assertSame(1, $alerter->dispatchDue());
+        $this->assertEmailCount(1);
     }
 
     private function createSharedSpace(User $admin, ?User $member = null): Space

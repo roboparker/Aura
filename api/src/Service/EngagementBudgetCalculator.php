@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Entity\Engagement;
+use App\Entity\Expense;
 use App\Entity\TimeEntry;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -13,8 +14,8 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * An `hours` budget counts every completed entry's duration (minutes); a
  * `fees` budget counts the billable amount (Σ seconds × snapshotted rate /
- * 3600, minor units) — a cheap SQL approximation of the invoice math, close
- * enough for progress + alerts.
+ * 3600, minor units) **plus billable expenses** (#666) — a cheap SQL
+ * approximation of the invoice math, close enough for progress + alerts.
  */
 final class EngagementBudgetCalculator
 {
@@ -55,6 +56,26 @@ final class EngagementBudgetCalculator
                 'seconds' => (int) $row['totalSec'],
                 'fees' => (int) round(((int) $row['feeSec']) / 3600),
             ];
+        }
+
+        // Billable expenses consume a fees budget too (#666) — an engagement
+        // that burns its budget on costs rather than hours still alerts.
+        /** @var list<array{eid: string|null, amount: string|int|null}> $expenseRows */
+        $expenseRows = $this->em->createQuery(
+            'SELECT IDENTITY(x.engagement) AS eid,
+                    COALESCE(SUM(x.amount), 0) AS amount
+             FROM ' . Expense::class . ' x
+             WHERE x.engagement IN (:engagements) AND x.billable = true
+             GROUP BY x.engagement',
+        )->setParameter('engagements', $engagements)->getResult();
+
+        foreach ($expenseRows as $row) {
+            if (null === $row['eid']) {
+                continue;
+            }
+            $entry = $map[$row['eid']] ?? ['seconds' => 0, 'fees' => 0];
+            $entry['fees'] += (int) $row['amount'];
+            $map[$row['eid']] = $entry;
         }
 
         return $map;

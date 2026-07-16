@@ -382,7 +382,7 @@ const ReportsPage = () => {
                               </td>
                               <td className="px-4 py-2.5 text-right">
                                 <Link
-                                  href="/invoices"
+                                  href={`/invoices?generate=${encodeURIComponent(row.engagementId)}`}
                                   className="text-sm text-primary hover:underline"
                                 >
                                   Create invoice

@@ -83,6 +83,20 @@ const InvoicesPage = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  // Deep link from the uninvoiced report (#666): /invoices?generate={engagementId}
+  // opens the composer with the engagement preselected and previews it.
+  const [autoPreview, setAutoPreview] = useState(false);
+  useEffect(() => {
+    if (!router.isReady) return;
+    const generateParam = router.query.generate;
+    if (typeof generateParam !== "string" || generateParam === "") return;
+    setShowComposer(true);
+    setGenEngagement(`/engagements/${generateParam}`);
+    setAutoPreview(true);
+    void router.replace("/invoices", undefined, { shallow: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.generate]);
+
   const spaceIri = activeSpace?.["@id"] ?? null;
 
   const invoicesQuery = useQuery({
@@ -149,6 +163,15 @@ const InvoicesPage = () => {
     },
     onError: (e) => setError(e instanceof Error ? e.message : "Failed to load unbilled time."),
   });
+
+  // Fire the deep-linked preview once the preselected engagement is in state.
+  useEffect(() => {
+    if (autoPreview && genEngagement !== "") {
+      setAutoPreview(false);
+      loadPreview.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPreview, genEngagement]);
 
   const generate = useMutation({
     mutationFn: () =>
