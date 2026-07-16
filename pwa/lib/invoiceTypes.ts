@@ -30,6 +30,8 @@ export interface InvoiceLineItem {
   quantity: number;
   unitAmount: number;
   amount?: number;
+  /** Per-line tax override in basis points (#670); null = invoice rate. */
+  taxRate?: number | null;
   position?: number;
 }
 

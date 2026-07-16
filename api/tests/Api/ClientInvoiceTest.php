@@ -819,6 +819,66 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertStringStartsWith('%PDF', $pdf->getContent());
     }
 
+    public function testPerLineTaxRatesOverrideAndBreakDown(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        // Invoice-level 10%; line B overrides to 20%, line C is tax-free.
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'taxRate' => 1000,
+                'lineItems' => [
+                    ['description' => 'A', 'quantity' => 1, 'unitAmount' => 10000, 'position' => 0],
+                    ['description' => 'B', 'quantity' => 1, 'unitAmount' => 20000, 'taxRate' => 2000, 'position' => 1],
+                    ['description' => 'C', 'quantity' => 1, 'unitAmount' => 5000, 'taxRate' => 0, 'position' => 2],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame(35000, $invoice['subtotal'] ?? null);
+        // 10% of 10000 + 20% of 20000 + 0 = 5000.
+        $this->assertSame(5000, $invoice['taxAmount'] ?? null);
+        $this->assertSame(40000, $invoice['total'] ?? null);
+        $this->assertSame(
+            [['rate' => 1000, 'amount' => 1000], ['rate' => 2000, 'amount' => 4000]],
+            $invoice['taxBreakdown'] ?? null,
+        );
+
+        // A 50% discount halves each line's taxable share proportionally.
+        $patched = $client->request('PATCH', $this->iri($invoice), [
+            'json' => ['discountType' => 'percent', 'discountValue' => 5000],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertSame(17500, $patched['discountAmount'] ?? null);
+        $this->assertSame(2500, $patched['taxAmount'] ?? null);
+        $this->assertSame(20000, $patched['total'] ?? null);
+
+        // A line rate outside 0–1000% is rejected.
+        $client->request('PATCH', $this->iri($invoice), [
+            'json' => [
+                'lineItems' => [
+                    ['description' => 'A', 'quantity' => 1, 'unitAmount' => 10000, 'taxRate' => 200000, 'position' => 0],
+                ],
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testDiscountAppliesBetweenSubtotalAndTax(): void
     {
         $admin = $this->createUser('admin@example.com');

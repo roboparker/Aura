@@ -100,12 +100,12 @@
         <td class="num">−{{ fmt.money(invoice.discountAmount, c) }}</td>
     </tr>
     {% endif %}
-    {% if invoice.taxAmount > 0 %}
+    {% for tax in invoice.taxBreakdown %}
     <tr>
-        <td>Tax ({{ (invoice.taxRate / 100)|number_format(2) }}%)</td>
-        <td class="num">{{ fmt.money(invoice.taxAmount, c) }}</td>
+        <td>Tax ({{ (tax.rate / 100)|number_format(2) }}%)</td>
+        <td class="num">{{ fmt.money(tax.amount, c) }}</td>
     </tr>
-    {% endif %}
+    {% endfor %}
     <tr class="grand">
         <td>Total</td>
         <td class="num">{{ fmt.money(invoice.total, c) }}</td>

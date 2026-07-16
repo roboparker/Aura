@@ -57,6 +57,15 @@ class InvoiceLineItem
     #[Groups(['invoice:read'])]
     private int $amount = 0;
 
+    /**
+     * Per-line tax rate override in basis points (#670). Null = the line
+     * taxes at the invoice-level rate; 0 = explicitly tax-free.
+     */
+    #[ORM\Column(name: 'tax_rate', type: 'integer', nullable: true)]
+    #[Assert\Range(min: 0, max: 100000)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $taxRate = null;
+
     #[ORM\Column(type: 'integer')]
     #[Groups(['invoice:read', 'invoice:write'])]
     private int $position = 0;
@@ -149,6 +158,24 @@ class InvoiceLineItem
         $this->position = $position;
 
         return $this;
+    }
+
+    public function getTaxRate(): ?int
+    {
+        return $this->taxRate;
+    }
+
+    public function setTaxRate(?int $taxRate): self
+    {
+        $this->taxRate = $taxRate;
+
+        return $this;
+    }
+
+    /** The rate this line actually taxes at: its override, else the invoice's. */
+    public function getEffectiveTaxRate(): int
+    {
+        return $this->taxRate ?? $this->invoice?->getTaxRate() ?? 0;
     }
 
     public function getSourceTimeEntry(): ?TimeEntry
