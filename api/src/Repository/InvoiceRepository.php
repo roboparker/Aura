@@ -57,6 +57,25 @@ class InvoiceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Overdue invoices that may still need a late-payment reminder (#649):
+     * reminders on, a due date to schedule from. The caller checks the
+     * per-invoice reminder ledger — this just narrows the pool.
+     *
+     * @return list<Invoice>
+     */
+    public function findOverdueForReminders(): array
+    {
+        /** @var list<Invoice> */
+        return $this->createQueryBuilder('i')
+            ->andWhere('i.status = :overdue')
+            ->andWhere('i.remindersEnabled = true')
+            ->andWhere('i.dueDate IS NOT NULL')
+            ->setParameter('overdue', Invoice::STATUS_OVERDUE)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Flip every sent invoice whose due date has passed to overdue, in one bulk
      * UPDATE. Returns how many were changed. Paid/void/draft are left alone.
      */

@@ -201,6 +201,25 @@ class Invoice
     #[ORM\Column(length: 64, nullable: true, unique: true)]
     private ?string $publicToken = null;
 
+    /**
+     * Per-invoice opt-out for the automatic late-payment reminder emails
+     * (#649) — on by default; a space admin can pause them per invoice.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private bool $remindersEnabled = true;
+
+    /**
+     * ISO-8601 timestamps of each late-payment reminder actually emailed —
+     * the idempotency log the daily sweep checks before sending the next one
+     * (max 3: on overdue, +7d, +14d).
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['invoice:read'])]
+    private ?array $remindersSentAt = null;
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['invoice:read'])]
     private ?\DateTimeImmutable $sentAt = null;
@@ -507,6 +526,33 @@ class Invoice
     public function setPublicToken(?string $publicToken): self
     {
         $this->publicToken = $publicToken;
+
+        return $this;
+    }
+
+    public function isRemindersEnabled(): bool
+    {
+        return $this->remindersEnabled;
+    }
+
+    public function setRemindersEnabled(bool $remindersEnabled): self
+    {
+        $this->remindersEnabled = $remindersEnabled;
+
+        return $this;
+    }
+
+    /** @return list<string> */
+    public function getRemindersSentAt(): array
+    {
+        return $this->remindersSentAt ?? [];
+    }
+
+    public function addReminderSentAt(\DateTimeImmutable $when): self
+    {
+        $log = $this->getRemindersSentAt();
+        $log[] = $when->format(\DateTimeInterface::ATOM);
+        $this->remindersSentAt = $log;
 
         return $this;
     }

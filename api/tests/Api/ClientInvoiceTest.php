@@ -505,6 +505,93 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame('overdue', $refreshed['status'] ?? null);
     }
 
+    public function testLatePaymentRemindersFollowScheduleAndOptOut(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'email' => 'billing@acme.test', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $yesterday = (new \DateTimeImmutable('today'))->modify('-1 day')->format('Y-m-d');
+        $makeInvoice = function (string $description) use ($client, $spaceIri, $clientRow, $yesterday): array {
+            $row = $client->request('POST', '/invoices', [
+                'json' => [
+                    'space' => $spaceIri,
+                    'client' => $clientRow['@id'],
+                    'currency' => 'USD',
+                    'dueDate' => $yesterday,
+                    'lineItems' => [['description' => $description, 'quantity' => 1, 'unitAmount' => 5000]],
+                ],
+                'headers' => ['Content-Type' => 'application/ld+json'],
+            ])->toArray();
+            $this->assertResponseStatusCodeSame(201);
+            $client->request('POST', $this->iri($row) . '/send', [
+                'json' => [],
+                'headers' => ['Content-Type' => 'application/json'],
+            ]);
+            $this->assertResponseStatusCodeSame(201);
+
+            return $row;
+        };
+
+        // A: reminders on (default). B: paused via the per-invoice opt-out.
+        $a = $makeInvoice('Work A');
+        $b = $makeInvoice('Work B');
+        $client->request('PATCH', $this->iri($b), [
+            'json' => ['remindersEnabled' => false],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+        // Two "here's your invoice" emails from the sends.
+        $this->assertEmailCount(2);
+
+        // The daily sweep flips both overdue and sends A's first reminder only.
+        $handler = static::getContainer()->get(\App\MessageHandler\MarkOverdueInvoicesHandler::class);
+        $this->assertInstanceOf(\App\MessageHandler\MarkOverdueInvoicesHandler::class, $handler);
+        $handler(new \App\Message\MarkOverdueInvoices());
+        $this->assertEmailCount(3);
+        $message = $this->getMailerMessage(2);
+        $this->assertNotNull($message);
+        $this->assertEmailAddressContains($message, 'To', 'billing@acme.test');
+
+        $aFresh = $client->request('GET', $this->iri($a))->toArray();
+        $this->assertSame('overdue', $aFresh['status'] ?? null);
+        $aLog = $aFresh['remindersSentAt'] ?? null;
+        $this->assertIsArray($aLog);
+        $this->assertCount(1, $aLog);
+        $bFresh = $client->request('GET', $this->iri($b))->toArray();
+        $this->assertSame('overdue', $bFresh['status'] ?? null);
+        $this->assertSame([], $bFresh['remindersSentAt'] ?? []);
+
+        // Re-run the same day: reminder 2 isn't due yet (+7d), nothing new sent.
+        $handler(new \App\Message\MarkOverdueInvoices());
+        $this->assertEmailCount(3);
+
+        // A missed week self-heals: back-date A's due date so +7d has passed —
+        // the next run sends exactly one more (reminder 2 of 3).
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $aId = $a['id'];
+        $this->assertIsString($aId);
+        $aEntity = $em->getRepository(Invoice::class)->find($aId);
+        $this->assertInstanceOf(Invoice::class, $aEntity);
+        $aEntity->setDueDate(new \DateTimeImmutable('-8 days'));
+        $em->flush();
+
+        $handler(new \App\Message\MarkOverdueInvoices());
+        $this->assertEmailCount(4);
+        $aFresh = $client->request('GET', $this->iri($a))->toArray();
+        $aLog = $aFresh['remindersSentAt'] ?? null;
+        $this->assertIsArray($aLog);
+        $this->assertCount(2, $aLog);
+    }
+
     public function testRecurringInvoiceSpawnsAFreshDraft(): void
     {
         $admin = $this->createUser('admin@example.com');

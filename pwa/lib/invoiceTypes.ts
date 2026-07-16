@@ -54,6 +54,8 @@ export interface Invoice {
   recurrenceFrequency: "weekly" | "monthly" | "yearly" | null;
   recurrenceInterval: number | null;
   nextIssueDate: string | null;
+  remindersEnabled: boolean;
+  remindersSentAt: string[] | null;
   sentAt: string | null;
   paidAt: string | null;
   createdAt: string;
