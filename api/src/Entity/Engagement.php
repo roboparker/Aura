@@ -178,6 +178,22 @@ class Engagement
     private Collection $categories;
 
     /**
+     * Per-person billable rate overrides (#653) — when a user has a row
+     * here, their tracked time snapshots this rate instead of the
+     * category's. Written as part of the engagement like categories.
+     *
+     * @var Collection<int, EngagementUserRate>
+     */
+    #[ORM\OneToMany(
+        mappedBy: 'engagement',
+        targetEntity: EngagementUserRate::class,
+        cascade: ['persist', 'remove'],
+        orphanRemoval: true,
+    )]
+    #[Groups(['engagement:read', 'engagement:write'])]
+    private Collection $userRates;
+
+    /**
      * Task-management boards assigned to this engagement (inverse of
      * {@see Board::$engagement}). Read-only summary for the detail page.
      *
@@ -218,9 +234,25 @@ class Engagement
     public function __construct()
     {
         $this->categories = new ArrayCollection();
+        $this->userRates = new ArrayCollection();
         $this->assignedProjects = new ArrayCollection();
         $this->attachments = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * The billable rate override for a user (#653), or null when they bill
+     * at the category rate. UUID-based comparison so it survives EM::clear().
+     */
+    public function getUserRateFor(User $user): ?int
+    {
+        foreach ($this->userRates as $rate) {
+            if (true === $rate->getUser()?->getId()?->equals($user->getId())) {
+                return $rate->getRateAmount();
+            }
+        }
+
+        return null;
     }
 
     #[ORM\PreUpdate]
@@ -448,6 +480,31 @@ class Engagement
     public function removeCategory(EngagementCategory $category): self
     {
         $this->categories->removeElement($category);
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, EngagementUserRate>
+     */
+    public function getUserRates(): Collection
+    {
+        return $this->userRates;
+    }
+
+    public function addUserRate(EngagementUserRate $userRate): self
+    {
+        if (!$this->userRates->contains($userRate)) {
+            $this->userRates->add($userRate);
+            $userRate->setEngagement($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUserRate(EngagementUserRate $userRate): self
+    {
+        $this->userRates->removeElement($userRate);
 
         return $this;
     }

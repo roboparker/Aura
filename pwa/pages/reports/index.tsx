@@ -31,6 +31,8 @@ interface SummaryRow {
   billableSeconds: number;
   billableHours: number;
   amounts: Record<string, number>;
+  costs: Record<string, number>;
+  profit: Record<string, number>;
 }
 
 interface SummaryReport {
@@ -44,6 +46,8 @@ interface SummaryReport {
     billableSeconds: number;
     billableHours: number;
     amounts: Record<string, number>;
+    costs: Record<string, number>;
+    profit: Record<string, number>;
   };
 }
 
@@ -265,18 +269,20 @@ const ReportsPage = () => {
                             <th className="px-4 py-2 text-right font-medium">Hours</th>
                             <th className="px-4 py-2 text-right font-medium">Billable hours</th>
                             <th className="px-4 py-2 text-right font-medium">Billable amount</th>
+                            <th className="px-4 py-2 text-right font-medium">Cost</th>
+                            <th className="px-4 py-2 text-right font-medium">Profit</th>
                           </tr>
                         </thead>
                         <tbody>
                           {summaryQuery.isLoading ? (
                             <tr>
-                              <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                                 Loading…
                               </td>
                             </tr>
                           ) : !summary || summary.rows.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="px-4 py-10 text-center text-muted-foreground">
+                              <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
                                 No tracked time in this period.
                               </td>
                             </tr>
@@ -292,6 +298,12 @@ const ReportsPage = () => {
                                 </td>
                                 <td className="px-4 py-2.5 text-right tabular-nums">
                                   {amountsLabel(row.amounts)}
+                                </td>
+                                <td className="px-4 py-2.5 text-right tabular-nums">
+                                  {amountsLabel(row.costs)}
+                                </td>
+                                <td className="px-4 py-2.5 text-right tabular-nums">
+                                  {amountsLabel(row.profit)}
                                 </td>
                               </tr>
                             ))
@@ -309,6 +321,12 @@ const ReportsPage = () => {
                               </td>
                               <td className="px-4 py-2 text-right tabular-nums">
                                 {amountsLabel(summary.totals.amounts)}
+                              </td>
+                              <td className="px-4 py-2 text-right tabular-nums">
+                                {amountsLabel(summary.totals.costs)}
+                              </td>
+                              <td className="px-4 py-2 text-right tabular-nums">
+                                {amountsLabel(summary.totals.profit)}
                               </td>
                             </tr>
                           </tfoot>

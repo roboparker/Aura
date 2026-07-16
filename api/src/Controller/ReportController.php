@@ -67,11 +67,11 @@ class ReportController extends AbstractController
 
         $entries = $this->timeEntries->findCompletedForSpace($space, $from, $to?->modify('+1 day'));
 
-        /** @var array<string, array{label: string, seconds: int, billableSeconds: int, amounts: array<string, int>}> $rows */
+        /** @var array<string, array{label: string, seconds: int, billableSeconds: int, amounts: array<string, int>, costs: array<string, int>}> $rows */
         $rows = [];
         foreach ($entries as $entry) {
             [$key, $label] = $this->groupKey($entry, $groupBy);
-            $row = $rows[$key] ?? ['label' => $label, 'seconds' => 0, 'billableSeconds' => 0, 'amounts' => []];
+            $row = $rows[$key] ?? ['label' => $label, 'seconds' => 0, 'billableSeconds' => 0, 'amounts' => [], 'costs' => []];
 
             $seconds = $entry->getDurationSeconds() ?? 0;
             $row['seconds'] += $seconds;
@@ -83,18 +83,31 @@ class ReportController extends AbstractController
                     $row['amounts'][$currency] = ($row['amounts'][$currency] ?? 0) + $amount;
                 }
             }
+            // Cost (#653) accrues on ALL tracked time — non-billable hours
+            // still cost the team — using the entry's snapshotted cost rate.
+            $costRate = $entry->getCostRateAmount();
+            if (null !== $costRate && $costRate > 0) {
+                $cost = (int) round(round($seconds / 3600, 2) * $costRate);
+                if ($cost > 0) {
+                    $currency = $this->entryCurrency($entry);
+                    $row['costs'][$currency] = ($row['costs'][$currency] ?? 0) + $cost;
+                }
+            }
             $rows[$key] = $row;
         }
 
         uasort($rows, static fn (array $a, array $b): int => strcasecmp($a['label'], $b['label']));
 
-        $totals = ['seconds' => 0, 'billableSeconds' => 0, 'amounts' => []];
+        $totals = ['seconds' => 0, 'billableSeconds' => 0, 'amounts' => [], 'costs' => []];
         $list = [];
         foreach ($rows as $key => $row) {
             $totals['seconds'] += $row['seconds'];
             $totals['billableSeconds'] += $row['billableSeconds'];
             foreach ($row['amounts'] as $currency => $amount) {
                 $totals['amounts'][$currency] = ($totals['amounts'][$currency] ?? 0) + $amount;
+            }
+            foreach ($row['costs'] as $currency => $cost) {
+                $totals['costs'][$currency] = ($totals['costs'][$currency] ?? 0) + $cost;
             }
             $list[] = [
                 'key' => $key,
@@ -104,6 +117,8 @@ class ReportController extends AbstractController
                 'billableSeconds' => $row['billableSeconds'],
                 'billableHours' => round($row['billableSeconds'] / 3600, 2),
                 'amounts' => $row['amounts'],
+                'costs' => $row['costs'],
+                'profit' => $this->profitOf($row['amounts'], $row['costs']),
             ];
         }
 
@@ -115,12 +130,14 @@ class ReportController extends AbstractController
                     number_format($row['hours'], 2, '.', ''),
                     number_format($row['billableHours'], 2, '.', ''),
                     $this->amountsLabel($row['amounts']),
+                    $this->amountsLabel($row['costs']),
+                    $this->amountsLabel($row['profit']),
                 ];
             }
 
             return $this->csv(
                 sprintf('time-summary-by-%s.csv', $groupBy),
-                [ucfirst($groupBy), 'Hours', 'Billable hours', 'Billable amount'],
+                [ucfirst($groupBy), 'Hours', 'Billable hours', 'Billable amount', 'Cost', 'Profit'],
                 $csvRows,
             );
         }
@@ -136,8 +153,29 @@ class ReportController extends AbstractController
                 'billableSeconds' => $totals['billableSeconds'],
                 'billableHours' => round($totals['billableSeconds'] / 3600, 2),
                 'amounts' => $totals['amounts'],
+                'costs' => $totals['costs'],
+                'profit' => $this->profitOf($totals['amounts'], $totals['costs']),
             ],
         ]);
+    }
+
+    /**
+     * Billable amount − cost, per currency (#653). Currencies that only
+     * appear on one side still surface (cost-only → negative profit).
+     *
+     * @param array<string, int> $amounts
+     * @param array<string, int> $costs
+     *
+     * @return array<string, int>
+     */
+    private function profitOf(array $amounts, array $costs): array
+    {
+        $profit = $amounts;
+        foreach ($costs as $currency => $cost) {
+            $profit[$currency] = ($profit[$currency] ?? 0) - $cost;
+        }
+
+        return $profit;
     }
 
     #[Route('/spaces/{id}/reports/uninvoiced', name: 'report_uninvoiced', methods: ['GET'])]

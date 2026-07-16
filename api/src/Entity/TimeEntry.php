@@ -174,6 +174,15 @@ class TimeEntry
     #[Groups(['time_entry:read'])]
     private ?string $rateCurrency = null;
 
+    /**
+     * Internal cost rate (#653), snapshotted from the member's space-level
+     * cost rate on save — profitability reports subtract it from billable
+     * amounts. Derived, read-only, never exposed to non-invoicing members
+     * (it's not in any read group; reports are the read surface).
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $costRateAmount = null;
+
     /** Set when the entry is pulled onto an invoice; locks it against re-billing. */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['time_entry:read'])]
@@ -209,8 +218,20 @@ class TimeEntry
         // later category change never rewrites already-logged (or billed) time.
         if (null !== $this->category) {
             $this->rateAmount = $this->category->getRateAmount();
+            // #653: a per-person engagement rate overrides the category rate.
+            if (null !== $this->engagement && null !== $this->user) {
+                $override = $this->engagement->getUserRateFor($this->user);
+                if (null !== $override) {
+                    $this->rateAmount = $override;
+                }
+            }
             $this->rateCurrency = $this->engagement?->getCurrency();
             $this->billable = $this->category->isBillable();
+        }
+
+        // #653: snapshot the member's space-level cost rate for profitability.
+        if (null !== $this->space && null !== $this->user) {
+            $this->costRateAmount = $this->space->getCostRateFor($this->user);
         }
 
         $this->durationSeconds = null;
@@ -404,6 +425,11 @@ class TimeEntry
         $this->billedAt = $billedAt;
 
         return $this;
+    }
+
+    public function getCostRateAmount(): ?int
+    {
+        return $this->costRateAmount;
     }
 
     public function getCreatedAt(): \DateTimeImmutable
