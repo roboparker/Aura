@@ -230,13 +230,16 @@ class TimeEntryTest extends ApiTestCase
         $this->assertIsString($iri);
 
         // Simulate the invoice pull stamping billedAt (server-side only —
-        // billedAt is never client-writable).
-        $row = $this->entityManager->getRepository(TimeEntry::class)
+        // billedAt is never client-writable). Use the CLIENT kernel's manager:
+        // requests share its identity map, so a write through the stale setUp
+        // manager would be invisible to the next request's item lookup.
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $row = $em->getRepository(TimeEntry::class)
             ->findOneBy(['description' => 'Soon to be billed']);
         $this->assertNotNull($row);
         $row->setBilledAt(new \DateTimeImmutable());
-        $this->entityManager->flush();
-        $this->entityManager->clear();
+        $em->flush();
 
         // A billed entry is frozen: no edits…
         $client->request('PATCH', $iri, [
