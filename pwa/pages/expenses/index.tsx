@@ -9,7 +9,7 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { uploadAttachmentFile } from "@/lib/attachments";
-import { Expense } from "@/lib/expenseTypes";
+import { Expense, ExpenseCategoryRow } from "@/lib/expenseTypes";
 import { EngagementOption } from "@/lib/timeEntryTypes";
 import { formatMoney } from "@/lib/invoiceTypes";
 import PageHeader from "@/components/common/PageHeader";
@@ -61,6 +61,8 @@ const ExpensesPage = () => {
   const [spentOn, setSpentOn] = useState(todayInput);
   const [engagementIri, setEngagementIri] = useState("");
   const [category, setCategory] = useState("");
+  const [expenseCategoryIri, setExpenseCategoryIri] = useState("");
+  const [units, setUnits] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [billable, setBillable] = useState(true);
@@ -100,6 +102,24 @@ const ExpensesPage = () => {
   });
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
   const noProjects = !projectsQuery.isLoading && projects.length === 0;
+
+  // Managed expense categories (#671): the curated picker; free text remains
+  // available when a space hasn't defined any (or via the "Other" choice).
+  const categoriesQuery = useQuery({
+    queryKey: ["expense_categories", spaceIri],
+    enabled: isAuthenticated && !!spaceIri,
+    queryFn: () =>
+      apiGetCollection<ExpenseCategoryRow>(
+        `/expense_categories?space=${encodeURIComponent(spaceIri ?? "")}&archived=false`,
+        { errorMessage: "Failed to load expense categories." },
+      ),
+  });
+  const managedCategories = useMemo(
+    () => categoriesQuery.data ?? [],
+    [categoriesQuery.data],
+  );
+  const selectedManaged =
+    managedCategories.find((c) => c["@id"] === expenseCategoryIri) ?? null;
   const projectName = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of projects) m.set(p["@id"], p.name);
@@ -113,6 +133,8 @@ const ExpensesPage = () => {
   const resetComposer = () => {
     setSpentOn(todayInput());
     setCategory("");
+    setExpenseCategoryIri("");
+    setUnits("");
     setDescription("");
     setAmount("");
     setBillable(true);
@@ -139,7 +161,9 @@ const ExpensesPage = () => {
         body: {
           engagement: engagementIri,
           spentOn,
-          category: category.trim() || null,
+          ...(expenseCategoryIri
+            ? { expenseCategory: expenseCategoryIri }
+            : { category: category.trim() || null }),
           description: description.trim() || null,
           amount: amountMinor,
           billable,
@@ -298,13 +322,63 @@ const ExpensesPage = () => {
                                       (optional)
                                     </span>
                                   </Label>
-                                  <Input
-                                    id="ex-category"
-                                    value={category}
-                                    onChange={(e) => setCategory(e.target.value)}
-                                    maxLength={80}
-                                    placeholder="Travel, software, materials…"
-                                  />
+                                  {managedCategories.length > 0 ? (
+                                    <>
+                                      <select
+                                        id="ex-category"
+                                        value={expenseCategoryIri}
+                                        onChange={(e) => {
+                                          setExpenseCategoryIri(e.target.value);
+                                          setUnits("");
+                                        }}
+                                        className={SELECT_CLASS}
+                                      >
+                                        <option value="">Other (free text)…</option>
+                                        {managedCategories.map((c) => (
+                                          <option key={c["@id"]} value={c["@id"]}>
+                                            {c.name}
+                                            {c.unitAmount != null
+                                              ? ` (${(c.unitAmount / 100).toFixed(2)}/unit)`
+                                              : ""}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      {expenseCategoryIri === "" && (
+                                        <Input
+                                          value={category}
+                                          onChange={(e) => setCategory(e.target.value)}
+                                          maxLength={80}
+                                          placeholder="Travel, software, materials…"
+                                          aria-label="Free-text category"
+                                        />
+                                      )}
+                                      {selectedManaged?.unitAmount != null && (
+                                        <Input
+                                          type="number"
+                                          step="0.1"
+                                          min="0"
+                                          value={units}
+                                          onChange={(e) => {
+                                            setUnits(e.target.value);
+                                            const u = parseFloat(e.target.value) || 0;
+                                            setAmount(
+                                              ((u * (selectedManaged.unitAmount ?? 0)) / 100).toFixed(2),
+                                            );
+                                          }}
+                                          placeholder="Units (auto-computes the amount)"
+                                          aria-label="Units"
+                                        />
+                                      )}
+                                    </>
+                                  ) : (
+                                    <Input
+                                      id="ex-category"
+                                      value={category}
+                                      onChange={(e) => setCategory(e.target.value)}
+                                      maxLength={80}
+                                      placeholder="Travel, software, materials…"
+                                    />
+                                  )}
                                 </div>
                                 <div className="space-y-1.5">
                                   <Label htmlFor="ex-desc">

@@ -34,6 +34,7 @@ class ExpenseTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\ExpenseCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
@@ -188,6 +189,69 @@ class ExpenseTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(200);
         $released = $client->request('GET', $this->iri($billableExpense))->toArray();
         $this->assertNull($released['billedAt'] ?? null);
+    }
+
+    public function testManagedCategoriesCurateThePickerAndLabelExpenses(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSharedSpace($admin, $member);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+
+        // Admin curates the list (one unit-priced, one plain).
+        $mileage = $client->request('POST', '/expense_categories', [
+            'json' => ['space' => $spaceIri, 'name' => 'Mileage', 'unitAmount' => 65],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $travel = $client->request('POST', '/expense_categories', [
+            'json' => ['space' => $spaceIri, 'name' => 'Travel'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+
+        // A plain member reads the picker but can't manage it.
+        $client->loginUser($member);
+        $list = $client->request('GET', '/expense_categories?space=' . $spaceIri)->toArray();
+        $this->assertSame(2, $list['totalItems'] ?? null);
+        $client->request('POST', '/expense_categories', [
+            'json' => ['space' => $spaceIri, 'name' => 'Sneaky'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(403);
+
+        // Logging with a managed category denormalises its name as the label.
+        $expense = $client->request('POST', '/expenses', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'spentOn' => '2026-07-10',
+                'expenseCategory' => $this->iri($travel),
+                'amount' => 2500,
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $this->assertSame('Travel', $expense['category'] ?? null);
+        $this->assertSame($this->iri($travel), $expense['expenseCategory'] ?? null);
+
+        // Archiving removes a category from the (archived=false) picker.
+        $client->loginUser($admin);
+        $client->request('PATCH', $this->iri($mileage), [
+            'json' => ['archived' => true],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(200);
+        $active = $client->request('GET', '/expense_categories?space=' . $spaceIri . '&archived=false')->toArray();
+        $this->assertSame(1, $active['totalItems'] ?? null);
     }
 
     public function testReceiptDownloadGatedToSpenderAndTimeReaders(): void
