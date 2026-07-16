@@ -33,6 +33,8 @@ export interface SpaceMembershipRow {
   role: "admin" | "member";
   /** Custom roles assigned to this member (#space-roles); empty = unrestricted. */
   roles?: { "@id": string; id: string; name: string; color: string | null }[];
+  /** Internal cost rate (#653), minor units per hour; null = not set. */
+  costRateAmount?: number | null;
 }
 
 export interface SpaceAttachment {

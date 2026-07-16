@@ -57,6 +57,59 @@ const toAvatarUser = (m: SpaceMember): AvatarUser => ({
   personalizedColor: m.personalizedColor ?? "#64748b",
 });
 
+/**
+ * Inline editor for a member's internal cost rate (#653/#666) — currency
+ * units in the box, minor units on the wire. Blank clears the rate. Commits
+ * on blur/Enter so tabbing down the roster is fast.
+ */
+const CostRateInput = ({
+  value,
+  onCommit,
+}: {
+  value: number | null;
+  onCommit: (minor: number | null) => void;
+}) => {
+  const [draft, setDraft] = useState(value === null ? "" : (value / 100).toFixed(2));
+  useEffect(() => {
+    setDraft(value === null ? "" : (value / 100).toFixed(2));
+  }, [value]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed === "") {
+      if (value !== null) onCommit(null);
+      return;
+    }
+    const parsed = parseFloat(trimmed);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDraft(value === null ? "" : (value / 100).toFixed(2));
+      return;
+    }
+    const minor = Math.round(parsed * 100);
+    if (minor !== value) onCommit(minor);
+  };
+
+  return (
+    <div
+      className="flex items-center gap-1"
+      title="Internal cost per hour — feeds the profitability report"
+    >
+      <Input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+        }}
+        inputMode="decimal"
+        placeholder="cost/h"
+        aria-label="Cost rate per hour"
+        className="h-8 w-20 text-right text-sm tabular-nums"
+      />
+    </div>
+  );
+};
+
 /** Compact role picker (Admin / Member) — used per member row and on invite. */
 const RoleSelect = ({
   value,
@@ -309,6 +362,29 @@ const SpaceUsers = () => {
     await refresh();
   };
 
+  const handleSetCostRate = async (
+    membership: { id: string },
+    costRateAmount: number | null,
+  ) => {
+    if (!space) return;
+    setError(null);
+    const res = await fetch(
+      `${ENTRYPOINT}/spaces/${encodeURIComponent(space.id)}/members/${encodeURIComponent(membership.id)}`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/merge-patch+json" },
+        body: JSON.stringify({ costRateAmount }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error || "Failed to update the cost rate.");
+      return;
+    }
+    await load();
+  };
+
   const handleRemoveMember = async (membership: { id: string }, label: string) => {
     if (!space) return;
     if (!window.confirm(`Remove ${label} from this space?`)) return;
@@ -508,6 +584,10 @@ const SpaceUsers = () => {
                             {m.user.email}
                           </p>
                         </div>
+                        <CostRateInput
+                          value={m.costRateAmount ?? null}
+                          onCommit={(minor) => void handleSetCostRate(m, minor)}
+                        />
                         <RoleSelect
                           value={m.role}
                           onChange={(role) => void handleChangeRole(m, role)}
