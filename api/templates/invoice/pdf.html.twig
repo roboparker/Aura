@@ -150,5 +150,17 @@
 {% if terms %}
 <div class="terms">{{ terms }}</div>
 {% endif %}
+
+{% if receipts|length > 0 %}
+<div style="page-break-before: always;">
+    <div class="label" style="margin-bottom: 10px;">Receipts</div>
+    {% for receipt in receipts %}
+    <div style="page-break-inside: avoid; margin-bottom: 18px;">
+        <div class="muted" style="font-size: 10px; margin-bottom: 4px;">{{ receipt.caption }}</div>
+        <img src="{{ receipt.dataUri }}" style="max-width: 100%; max-height: 640px;" alt="">
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 </body>
 </html>

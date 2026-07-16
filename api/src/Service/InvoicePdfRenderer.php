@@ -37,6 +37,7 @@ final class InvoicePdfRenderer
             'invoice' => $invoice,
             'logoDataUri' => $this->logoDataUri($invoice),
             'terms' => $invoice->getSpace()?->getInvoiceTerms(),
+            'receipts' => $this->receiptImages($invoice),
         ]);
 
         $options = new Options();
@@ -49,6 +50,43 @@ final class InvoicePdfRenderer
         $dompdf->render();
 
         return $dompdf->output();
+    }
+
+    /**
+     * Image receipts backing this invoice's expense lines (#672), embedded
+     * as data URIs (dompdf runs with remote fetches off). PDF-kind receipts
+     * are skipped — they can't be inlined into another PDF by dompdf — and
+     * unreadable bytes degrade to "no receipt" rather than failing the
+     * render.
+     *
+     * @return list<array{dataUri: string, caption: string}>
+     */
+    public function receiptImages(Invoice $invoice): array
+    {
+        $receipts = [];
+        foreach ($invoice->getLineItems() as $line) {
+            $media = $line->getSourceExpense()?->getReceipt();
+            if (null === $media || !str_starts_with($media->getMimeType(), 'image/')) {
+                continue;
+            }
+            $path = $media->getVariantPath('original')
+                ?? array_values($media->getVariants())[0]
+                ?? null;
+            if (null === $path) {
+                continue;
+            }
+            try {
+                $bytes = $this->storage->read($path);
+            } catch (FilesystemException) {
+                continue;
+            }
+            $receipts[] = [
+                'dataUri' => 'data:' . $media->getMimeType() . ';base64,' . base64_encode($bytes),
+                'caption' => $line->getDescription(),
+            ];
+        }
+
+        return $receipts;
     }
 
     /** A safe download filename for the invoice. */

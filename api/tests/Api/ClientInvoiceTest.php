@@ -879,6 +879,79 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testPdfEmbedsImageReceiptsFromExpenseLines(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        // A real (tiny) PNG receipt, created before the HTTP phase.
+        $image = imagecreatetruecolor(8, 8);
+        self::assertNotFalse($image);
+        ob_start();
+        imagepng($image);
+        $pngBytes = (string) ob_get_clean();
+        imagedestroy($image);
+        $storage = static::getContainer()->get('media.storage');
+        $receiptPath = 'attachments/pdf-receipt-' . bin2hex(random_bytes(4)) . '.png';
+        $storage->write($receiptPath, $pngBytes);
+        $receipt = (new \App\Entity\MediaObject())
+            ->setOwner($admin)
+            ->setKind(\App\Entity\MediaObject::KIND_ATTACHMENT)
+            ->setVariants(['original' => $receiptPath])
+            ->setOriginalName('receipt.png')
+            ->setMimeType('image/png')
+            ->setByteSize(\strlen($pngBytes));
+        $this->entityManager->persist($receipt);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        [$bpIri] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+
+        // A billable expense with the receipt, invoiced on its own.
+        $client->request('POST', '/expenses', [
+            'json' => [
+                'space' => $spaceIri,
+                'engagement' => $bpIri,
+                'spentOn' => '2026-07-10',
+                'category' => 'Travel',
+                'description' => 'Taxi to the site',
+                'amount' => 2500,
+                'receipt' => '/media-objects/' . $receipt->getId(),
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+        $invoice = $client->request('POST', '/invoices/from-time-entries', [
+            'json' => ['engagement' => $bpIri],
+            'headers' => ['Content-Type' => 'application/json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $invoiceId = $invoice['id'];
+        $this->assertIsString($invoiceId);
+
+        // The renderer collects the image receipt as an embeddable data URI…
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $entity = $em->getRepository(Invoice::class)->find($invoiceId);
+        $this->assertInstanceOf(Invoice::class, $entity);
+        $renderer = static::getContainer()->get(\App\Service\InvoicePdfRenderer::class);
+        $receipts = $renderer->receiptImages($entity);
+        $this->assertCount(1, $receipts);
+        $this->assertStringStartsWith('data:image/png;base64,', $receipts[0]['dataUri']);
+        $this->assertSame('Expense — Travel: Taxi to the site', $receipts[0]['caption']);
+
+        // …and the full PDF still renders.
+        $pdf = $client->request('GET', '/invoices/' . $invoiceId . '/pdf');
+        $this->assertResponseStatusCodeSame(200);
+        $this->assertStringStartsWith('%PDF', $pdf->getContent());
+    }
+
     public function testDiscountAppliesBetweenSubtotalAndTax(): void
     {
         $admin = $this->createUser('admin@example.com');
