@@ -40,12 +40,18 @@ class TimeEntryRepository extends ServiceEntityRepository
     /**
      * Completed, billable, not-yet-billed entries on a engagement — the pool
      * an invoice draws from. Ordered by category then start so line items group.
+     * An optional [$from, $toExclusive) window filters on the entry's startedAt
+     * (callers pass the day AFTER the last wanted date as $toExclusive, so a
+     * user-facing inclusive date range maps cleanly onto timestamps).
      *
      * @return list<TimeEntry>
      */
-    public function findInvoiceableForEngagement(Engagement $engagement): array
-    {
-        return $this->createQueryBuilder('t')
+    public function findInvoiceableForEngagement(
+        Engagement $engagement,
+        ?\DateTimeImmutable $from = null,
+        ?\DateTimeImmutable $toExclusive = null,
+    ): array {
+        $qb = $this->createQueryBuilder('t')
             ->andWhere('t.engagement = :bp')
             ->andWhere('t.billable = true')
             ->andWhere('t.endedAt IS NOT NULL')
@@ -53,8 +59,16 @@ class TimeEntryRepository extends ServiceEntityRepository
             ->setParameter('bp', $engagement)
             ->leftJoin('t.category', 'c')
             ->orderBy('c.position', 'ASC')
-            ->addOrderBy('t.startedAt', 'ASC')
-            ->getQuery()
-            ->getResult();
+            ->addOrderBy('t.startedAt', 'ASC');
+
+        if (null !== $from) {
+            $qb->andWhere('t.startedAt >= :from')->setParameter('from', $from);
+        }
+        if (null !== $toExclusive) {
+            $qb->andWhere('t.startedAt < :toExclusive')->setParameter('toExclusive', $toExclusive);
+        }
+
+        /** @var list<TimeEntry> */
+        return $qb->getQuery()->getResult();
     }
 }
