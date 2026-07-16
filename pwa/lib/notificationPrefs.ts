@@ -41,6 +41,17 @@ export const NOTIFICATION_ROWS: NotificationRow[] = [
     label: "Space invites",
     description: "When you're invited to a new space or your role changes.",
   },
+  {
+    key: "timesheets",
+    label: "Timesheet approvals",
+    description:
+      "Submitted timesheets waiting on your review, and decisions on your own weeks.",
+  },
+  {
+    key: "budgets",
+    label: "Budget alerts",
+    description: "An engagement you administer crosses 80% or 100% of its budget.",
+  },
 ];
 
 export const DEFAULT_NOTIFICATION_MATRIX: Record<string, NotificationChannel> = {
@@ -50,6 +61,8 @@ export const DEFAULT_NOTIFICATION_MATRIX: Record<string, NotificationChannel> = 
   replies: { inApp: true, email: true },
   status: { inApp: true, email: false },
   "space-invites": { inApp: true, email: true },
+  timesheets: { inApp: true, email: true },
+  budgets: { inApp: true, email: true },
 };
 
 /** Every row on, both channels. */

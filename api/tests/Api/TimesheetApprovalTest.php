@@ -197,6 +197,24 @@ class TimesheetApprovalTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(409);
+
+        // In-app rows landed alongside the emails (#667): the admin has the
+        // submission notifications (deep-linking the approvals queue), the
+        // member has the decisions (deep-linking their timesheet).
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $submittedRows = $em->getRepository(\App\Entity\Notification::class)->findBy([
+            'recipient' => $admin->getId(),
+            'type' => \App\Entity\Notification::TYPE_TIMESHEET_SUBMITTED,
+        ]);
+        $this->assertCount(2, $submittedRows); // initial submit + re-submit
+        $this->assertSame('/approvals', $submittedRows[0]->getTargetUrl());
+        $decidedRows = $em->getRepository(\App\Entity\Notification::class)->findBy([
+            'recipient' => $member->getId(),
+            'type' => \App\Entity\Notification::TYPE_TIMESHEET_DECIDED,
+        ]);
+        $this->assertCount(2, $decidedRows); // reject + approve
+        $this->assertSame('/time', $decidedRows[0]->getTargetUrl());
     }
 
     private function createSharedSpace(User $admin, ?User $member = null): Space

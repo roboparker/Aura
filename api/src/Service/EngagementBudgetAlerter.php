@@ -3,32 +3,34 @@
 namespace App\Service;
 
 use App\Entity\Engagement;
+use App\Entity\Notification;
 use App\Entity\Space;
 use App\Repository\EngagementRepository;
-use App\Service\Mail\MailDispatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Bridge\Twig\Mime\TemplatedEmail;
 
 /**
  * The nightly budget alert sweep (#651): for every budgeted, non-archived
- * engagement, computes consumption and emails the space's admins when a
+ * engagement, computes consumption and alerts the space's admins when a
  * threshold (80% / 100%) is crossed — once per threshold, stamped in the
  * engagement's budgetAlertsSent ledger so re-runs are idempotent. Editing the
  * budget clears the ledger, so a raised budget re-alerts when re-crossed.
+ *
+ * Alerts flow through NotificationDispatcher (#667): an in-app bell row plus
+ * push + email under each admin's own preference matrix / quiet hours.
  */
 final class EngagementBudgetAlerter
 {
     public function __construct(
         private readonly EngagementRepository $engagements,
         private readonly EngagementBudgetCalculator $calculator,
-        private readonly MailDispatcher $mail,
+        private readonly NotificationDispatcher $notifier,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
     }
 
-    /** Returns how many alert emails were sent (one per admin per threshold). */
+    /** Returns how many alerts were dispatched (one per admin per threshold). */
     public function dispatchDue(): int
     {
         $budgeted = $this->engagements->findBudgeted();
@@ -80,36 +82,43 @@ final class EngagementBudgetAlerter
             return 0;
         }
 
+        $body = Engagement::BUDGET_HOURS === $engagement->getBudgetType()
+            ? sprintf(
+                '%s of the %s-hour budget is used (%d%%, %d%% threshold).',
+                number_format($spent / 60, 1),
+                number_format($budget / 60, 1),
+                $percent,
+                $threshold,
+            )
+            : sprintf(
+                '%s of the %s budget is used (%d%%, %d%% threshold).',
+                number_format($spent / 100, 2),
+                number_format($budget / 100, 2),
+                $percent,
+                $threshold,
+            );
+
         $sent = 0;
         foreach ($space->getUserMemberships() as $membership) {
             if (Space::ROLE_ADMIN !== $membership->getRole()) {
                 continue;
             }
             $admin = $membership->getUser();
-            $to = $admin?->getEmail();
-            if (null === $to || '' === trim($to)) {
+            if (null === $admin) {
                 continue;
             }
 
-            $email = (new TemplatedEmail())
-                ->to($to)
-                ->subject(sprintf(
-                    '%s has used %d%% of its budget',
-                    $engagement->getName(),
-                    $percent,
-                ))
-                ->htmlTemplate('emails/budget_alert.html.twig')
-                ->textTemplate('emails/budget_alert.txt.twig')
-                ->context([
-                    'engagement' => $engagement,
-                    'threshold' => $threshold,
-                    'percent' => $percent,
-                    'spent' => $spent,
-                    'budget' => $budget,
-                    'engagementsUrl' => $this->mail->frontendLink('/engagements'),
-                ]);
-            $this->mail->send($email);
-            ++$sent;
+            $notification = $this->notifier->notify(
+                recipient: $admin,
+                type: Notification::TYPE_BUDGET_ALERT,
+                actor: null,
+                title: sprintf('%s has used %d%% of its budget', $engagement->getName(), $percent),
+                body: $body,
+                targetPath: '/engagements',
+            );
+            if (null !== $notification) {
+                ++$sent;
+            }
         }
 
         return $sent;

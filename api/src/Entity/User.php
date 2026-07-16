@@ -275,6 +275,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         'replies',
         'status',
         'space-invites',
+        'timesheets',
+        'budgets',
     ];
 
     /**
@@ -340,6 +342,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
             'replies' => ['inApp' => true, 'email' => true],
             'status' => ['inApp' => true, 'email' => false],
             'space-invites' => ['inApp' => true, 'email' => true],
+            'timesheets' => ['inApp' => true, 'email' => true],
+            'budgets' => ['inApp' => true, 'email' => true],
         ],
         // Email digest cadence (supersedes notificationFrequency).
         'emailDigest' => ['mode' => 'realtime', 'hour' => 8],
