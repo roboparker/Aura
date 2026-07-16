@@ -183,6 +183,22 @@ const InvoicesPage = () => {
     onError: (e) => setError(e instanceof Error ? e.message : "Action failed."),
   });
 
+  // Per-invoice opt-out for the automatic late-payment reminder emails (#649).
+  const toggleReminders = useMutation({
+    mutationFn: ({ invoice, enabled }: { invoice: Invoice; enabled: boolean }) =>
+      apiSend<Invoice>("PATCH", invoice["@id"], {
+        contentType: "application/merge-patch+json",
+        errorMessage: "Failed to update reminders.",
+        body: { remindersEnabled: enabled },
+      }),
+    onSuccess: (_res, { enabled }) => {
+      setError(null);
+      setNotice(enabled ? "Late-payment reminders resumed." : "Late-payment reminders paused.");
+      void refresh();
+    },
+    onError: (e) => setError(e instanceof Error ? e.message : "Failed to update reminders."),
+  });
+
   const openPdf = async (invoice: Invoice) => {
     try {
       const res = await fetch(`${invoice["@id"]}/pdf`, {
@@ -482,6 +498,21 @@ const InvoicesPage = () => {
                                         onClick={() => act.mutate({ invoice, action: "mark-paid" })}
                                       >
                                         Mark paid
+                                      </DropdownMenuItem>
+                                    )}
+                                    {(invoice.status === "sent" ||
+                                      invoice.status === "overdue") && (
+                                      <DropdownMenuItem
+                                        onClick={() =>
+                                          toggleReminders.mutate({
+                                            invoice,
+                                            enabled: !invoice.remindersEnabled,
+                                          })
+                                        }
+                                      >
+                                        {invoice.remindersEnabled
+                                          ? "Pause reminders"
+                                          : "Resume reminders"}
                                       </DropdownMenuItem>
                                     )}
                                     {invoice.status !== "void" && (

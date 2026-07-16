@@ -1,0 +1,27 @@
+{# @var invoice \App\Entity\Invoice #}
+{# @var client \App\Entity\Client #}
+{# @var sequence int 1 = just overdue, 2 = +7 days, 3 = final (+14 days) #}
+<p>Hi {{ client.name }},</p>
+
+<p>
+    {% if sequence == 1 %}
+        This is a friendly reminder that
+    {% elseif sequence == 2 %}
+        Just following up —
+    {% else %}
+        This is a final reminder —
+    {% endif %}
+    {% if invoice.number %}invoice <strong>{{ invoice.number }}</strong>{% else %}an invoice{% endif %}
+    from {{ fromName }}
+    for <strong>{{ (invoice.total / 100)|number_format(2) }} {{ invoice.currency }}</strong>
+    {% if invoice.dueDate %}was due {{ invoice.dueDate|date('F j, Y') }} and {% endif %}is still awaiting payment.
+</p>
+
+<p>
+    <a href="{{ viewUrl }}">View and pay your invoice</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You can review the line items, download a PDF, and pay online from that page.
+    If you've already paid, please disregard this message.
+</p>
