@@ -23,6 +23,9 @@
     .totals td { padding: 4px 8px; }
     .totals .grand td { border-top: 2px solid #111827; font-weight: bold; font-size: 14px; }
     .notes { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e5e7eb; white-space: pre-wrap; }
+    .logo { max-height: 56px; max-width: 200px; margin-bottom: 8px; }
+    .terms { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb;
+        white-space: pre-wrap; color: #6b7280; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -32,6 +35,7 @@
 
 <div class="header">
     <span class="status">{{ invoice.status }}</span>
+    {% if logoDataUri %}<img class="logo" src="{{ logoDataUri }}" alt="">{% endif %}
     <h1>INVOICE</h1>
     <div class="muted">{{ invoice.number ?? 'Draft' }}</div>
 </div>
@@ -141,6 +145,10 @@
 
 {% if invoice.notes %}
 <div class="notes">{{ invoice.notes }}</div>
+{% endif %}
+
+{% if terms %}
+<div class="terms">{{ terms }}</div>
 {% endif %}
 </body>
 </html>

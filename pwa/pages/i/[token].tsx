@@ -31,6 +31,8 @@ interface PublicInvoice {
   amountPaid: number;
   balanceDue: number;
   payments: { amount: number; paidOn: string; method: string | null }[];
+  logoUrl: string | null;
+  terms: string | null;
 }
 
 const fmtDate = (iso: string | null): string =>
@@ -143,6 +145,14 @@ const PublicInvoicePage = () => {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
+            {invoice.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={invoice.logoUrl}
+                alt={invoice.from ?? "Logo"}
+                className="mb-3 h-12 w-auto max-w-48 object-contain"
+              />
+            )}
             <h1 className="text-2xl font-semibold">Invoice {invoice.number ?? ""}</h1>
             {invoice.from && <p className="text-sm text-muted-foreground">From {invoice.from}</p>}
           </div>
@@ -268,6 +278,12 @@ const PublicInvoicePage = () => {
             </span>
           )}
         </div>
+
+        {invoice.terms && (
+          <p className="whitespace-pre-wrap border-t pt-4 text-xs text-muted-foreground">
+            {invoice.terms}
+          </p>
+        )}
       </div>
     );
   }

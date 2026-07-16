@@ -45,6 +45,8 @@ class PublicEstimateController extends AbstractController
             ];
         }
 
+        $logoUrls = $estimate->getSpace()?->getInvoiceLogo()?->getVariantUrls() ?? [];
+
         return $this->json([
             'number' => $estimate->getNumber(),
             'status' => $estimate->getStatus(),
@@ -57,6 +59,9 @@ class PublicEstimateController extends AbstractController
             'taxAmount' => $estimate->getTaxAmount(),
             'total' => $estimate->getTotal(),
             'decidedAt' => $estimate->getDecidedAt()?->format(\DateTimeInterface::ATOM),
+            // Branding (#669): shared with invoices — the space logo + terms.
+            'logoUrl' => $logoUrls['profile'] ?? array_values($logoUrls)[0] ?? null,
+            'terms' => $estimate->getSpace()?->getInvoiceTerms(),
         ]);
     }
 
