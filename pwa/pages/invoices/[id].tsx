@@ -229,6 +229,36 @@ const InvoiceDetailPage = () => {
     }
   };
 
+  // Client retainer (#673): available balance + one-click apply.
+  const clientId =
+    invoice && typeof invoice.client !== "string" ? invoice.client.id : null;
+  const retainerQuery = useQuery({
+    queryKey: ["retainer", clientId],
+    enabled: isAuthenticated && !!clientId,
+    queryFn: () =>
+      apiGet<{ balance: number; currency: string }>(`/clients/${clientId}/retainer`, {
+        errorMessage: "Failed to load the retainer balance.",
+      }),
+  });
+  const retainerBalance = retainerQuery.data?.balance ?? 0;
+
+  const applyRetainer = async () => {
+    if (!invoice) return;
+    setError(null);
+    try {
+      await apiSend("POST", `${invoice["@id"]}/apply-retainer`, {
+        contentType: "application/json",
+        errorMessage: "Failed to apply the retainer.",
+        body: {},
+      });
+      setNotice("Retainer applied.");
+      void invoiceQuery.refetch();
+      void retainerQuery.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to apply the retainer.");
+    }
+  };
+
   const deletePayment = async (paymentId: string) => {
     if (!invoice) return;
     if (!window.confirm("Remove this payment?")) return;
@@ -667,6 +697,21 @@ const InvoiceDetailPage = () => {
                         >
                           {payBusy ? "Recording…" : "Record payment"}
                         </Button>
+                        {retainerBalance > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void applyRetainer()}
+                            title="Pay from the client's retainer balance"
+                          >
+                            Apply retainer (
+                            {formatMoney(
+                              retainerBalance,
+                              retainerQuery.data?.currency ?? currency,
+                            )}
+                            )
+                          </Button>
+                        )}
                       </div>
                     )}
                   </CardContent>

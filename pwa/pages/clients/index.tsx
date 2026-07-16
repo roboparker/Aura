@@ -2,7 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, Plus, Users } from "lucide-react";
+import { Link2, PiggyBank, Plus, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
@@ -118,6 +118,38 @@ const ClientsPage = () => {
       !!client.email &&
       window.confirm(`Also email the new portal link to ${client.email}?`);
     portalMutation.mutate({ client, send });
+  };
+
+  // Retainer deposits (#673): record pre-paid money; invoices draw it down.
+  const depositMutation = useMutation({
+    mutationFn: ({ client, amount }: { client: Client; amount: number }) =>
+      apiSend<{ balance: number }>("POST", `/clients/${client.id}/retainer-deposits`, {
+        contentType: "application/json",
+        errorMessage: "Failed to record the deposit.",
+        body: { amount },
+      }),
+    onSuccess: (res, { client }) => {
+      setActionError(null);
+      setNotice(
+        `Deposit recorded. ${client.name}'s retainer balance: ${formatMoney(
+          res?.balance ?? 0,
+          client.currency ?? "USD",
+        )}.`,
+      );
+    },
+    onError: (e) =>
+      setActionError(e instanceof Error ? e.message : "Failed to record the deposit."),
+  });
+
+  const addDeposit = (client: Client) => {
+    const raw = window.prompt(`Retainer deposit for ${client.name} (amount)?`);
+    if (raw === null) return;
+    const amount = Math.round((parseFloat(raw) || 0) * 100);
+    if (amount <= 0) {
+      setActionError("Enter a positive amount.");
+      return;
+    }
+    depositMutation.mutate({ client, amount });
   };
 
   const canCreate = can("invoices", "create");
@@ -295,15 +327,26 @@ const ClientsPage = () => {
                           </td>
                           <td className="whitespace-nowrap px-2 py-3 text-right">
                             {canCreate && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => mintPortal(client)}
-                                disabled={portalMutation.isPending}
-                                title="Create (or rotate) this client's billing portal link"
-                              >
-                                <Link2 className="h-3.5 w-3.5" /> Portal
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => addDeposit(client)}
+                                  disabled={depositMutation.isPending}
+                                  title="Record a retainer deposit for this client"
+                                >
+                                  <PiggyBank className="h-3.5 w-3.5" /> Deposit
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => mintPortal(client)}
+                                  disabled={portalMutation.isPending}
+                                  title="Create (or rotate) this client's billing portal link"
+                                >
+                                  <Link2 className="h-3.5 w-3.5" /> Portal
+                                </Button>
+                              </>
                             )}
                           </td>
                         </tr>

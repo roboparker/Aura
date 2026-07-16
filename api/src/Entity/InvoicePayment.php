@@ -21,6 +21,8 @@ class InvoicePayment
 {
     public const METHOD_MANUAL = 'manual';
     public const METHOD_STRIPE = 'stripe';
+    /** Paid from the client's retainer balance (#673). */
+    public const METHOD_RETAINER = 'retainer';
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
