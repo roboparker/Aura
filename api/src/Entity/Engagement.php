@@ -14,6 +14,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\EngagementRepository;
+use App\State\EngagementBudgetProvider;
 use App\State\EngagementCreatorProcessor;
 use App\Validator\ValidEngagementAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -41,6 +42,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            provider: EngagementBudgetProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -49,6 +51,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.invoices.read', object)))",
+            provider: EngagementBudgetProvider::class,
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.invoices.update', object)))",
@@ -74,6 +77,15 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 class Engagement
 {
     public const MAX_NAME_LENGTH = 200;
+
+    public const BUDGET_HOURS = 'hours';
+    public const BUDGET_FEES = 'fees';
+
+    /** @var list<string> */
+    public const BUDGET_TYPES = [self::BUDGET_HOURS, self::BUDGET_FEES];
+
+    /** Percent thresholds the nightly sweep alerts on, in firing order. */
+    public const BUDGET_ALERT_THRESHOLDS = [80, 100];
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -115,6 +127,42 @@ class Engagement
     #[ORM\Column(type: 'boolean')]
     #[Groups(['engagement:read', 'engagement:write'])]
     private bool $archived = false;
+
+    /**
+     * Budget (#651): `hours` tracks total tracked time against
+     * {@see $budgetAmount} in minutes; `fees` tracks the billable amount
+     * against it in minor units of {@see $currency}. Null = no budget.
+     */
+    #[ORM\Column(length: 10, nullable: true)]
+    #[Assert\Choice(choices: self::BUDGET_TYPES, message: 'Invalid budget type.')]
+    #[Groups(['engagement:read', 'engagement:write'])]
+    private ?string $budgetType = null;
+
+    /** Minutes for an hours budget, minor units for a fees budget. */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Positive(message: 'The budget must be positive.')]
+    #[Groups(['engagement:read', 'engagement:write'])]
+    private ?int $budgetAmount = null;
+
+    /**
+     * Thresholds (percent) already alerted — the idempotency ledger the
+     * nightly sweep checks. Cleared whenever the budget itself changes so a
+     * raised budget re-alerts when re-crossed.
+     *
+     * @var list<int>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['engagement:read'])]
+    private ?array $budgetAlertsSent = null;
+
+    /**
+     * Transient (#651): consumption against the budget, set per-read by
+     * {@see EngagementBudgetProvider} — minutes for hours budgets, minor
+     * units for fees. Null when no budget is set.
+     */
+    #[ApiProperty(writable: false)]
+    #[Groups(['engagement:read'])]
+    private ?int $budgetSpent = null;
 
     /**
      * @var Collection<int, EngagementCategory>
@@ -205,6 +253,18 @@ class Engagement
             }
             $seen[$key] = true;
         }
+
+        // Budget type and amount come as a pair (#651).
+        if (null !== $this->budgetType && null === $this->budgetAmount) {
+            $context->buildViolation('A budget needs an amount.')
+                ->atPath('budgetAmount')
+                ->addViolation();
+        }
+        if (null !== $this->budgetAmount && null === $this->budgetType) {
+            $context->buildViolation('A budget amount needs a type (hours or fees).')
+                ->atPath('budgetType')
+                ->addViolation();
+        }
     }
 
     public function getId(): ?Uuid
@@ -292,6 +352,65 @@ class Engagement
     public function removeAttachment(MediaObject $media): self
     {
         $this->attachments->removeElement($media);
+
+        return $this;
+    }
+
+    public function getBudgetType(): ?string
+    {
+        return $this->budgetType;
+    }
+
+    public function setBudgetType(?string $budgetType): self
+    {
+        if ($budgetType !== $this->budgetType) {
+            $this->budgetAlertsSent = null;
+        }
+        $this->budgetType = $budgetType;
+
+        return $this;
+    }
+
+    public function getBudgetAmount(): ?int
+    {
+        return $this->budgetAmount;
+    }
+
+    public function setBudgetAmount(?int $budgetAmount): self
+    {
+        if ($budgetAmount !== $this->budgetAmount) {
+            $this->budgetAlertsSent = null;
+        }
+        $this->budgetAmount = $budgetAmount;
+
+        return $this;
+    }
+
+    /** @return list<int> */
+    public function getBudgetAlertsSent(): array
+    {
+        return $this->budgetAlertsSent ?? [];
+    }
+
+    public function addBudgetAlertSent(int $threshold): self
+    {
+        $log = $this->getBudgetAlertsSent();
+        if (!in_array($threshold, $log, true)) {
+            $log[] = $threshold;
+            $this->budgetAlertsSent = $log;
+        }
+
+        return $this;
+    }
+
+    public function getBudgetSpent(): ?int
+    {
+        return $this->budgetSpent;
+    }
+
+    public function setBudgetSpent(?int $budgetSpent): self
+    {
+        $this->budgetSpent = $budgetSpent;
 
         return $this;
     }
