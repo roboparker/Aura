@@ -18,6 +18,7 @@ import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import SpaceBillingCard from "@/components/spaces/SpaceBillingCard";
 import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
+import ExpenseCategoriesCard from "@/components/spaces/ExpenseCategoriesCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 
@@ -371,6 +372,9 @@ const SpaceSettings = () => {
 
         {/* Invoice branding (#669): logo, terms, numbering. */}
         <InvoiceBrandingCard space={space} onSaved={load} />
+
+        {/* Managed expense categories (#671). */}
+        <ExpenseCategoriesCard spaceIri={space["@id"]} />
 
         {/* Export space data */}
         <Card className="mb-6">

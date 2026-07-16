@@ -7,6 +7,8 @@ export interface Expense {
   user: string;
   spentOn: string;
   category: string | null;
+  /** Managed category IRI (#671); the `category` label mirrors its name. */
+  expenseCategory?: string | null;
   amount: number;
   currency: string | null;
   description: string | null;
@@ -15,4 +17,15 @@ export interface Expense {
   billedAt: string | null;
   createdAt: string;
   updatedAt: string | null;
+}
+
+/** Wire shape for `/expense_categories` (#671). */
+export interface ExpenseCategoryRow {
+  "@id": string;
+  id: string;
+  space: string;
+  name: string;
+  /** Minor units per unit for mileage-style categories; null = plain. */
+  unitAmount: number | null;
+  archived: boolean;
 }

@@ -111,11 +111,22 @@ class Expense
     #[Groups(['expense:read', 'expense:write'])]
     private ?\DateTimeImmutable $spentOn = null;
 
-    /** Free-text category ("Travel", "Software", …). */
+    /**
+     * Category label. Free text pre-#671; when {@see $expenseCategory} is
+     * set it's denormalised from the category's name on save, so invoice
+     * line labels and historical reads never need the join.
+     */
     #[ORM\Column(length: self::MAX_CATEGORY_LENGTH, nullable: true)]
     #[Assert\Length(max: self::MAX_CATEGORY_LENGTH)]
     #[Groups(['expense:read', 'expense:write'])]
     private ?string $category = null;
+
+    /** Managed category (#671) — optional; free-text stays supported. */
+    #[\ApiPlatform\Metadata\ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: ExpenseCategory::class)]
+    #[ORM\JoinColumn(name: 'expense_category_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['expense:read', 'expense:write'])]
+    private ?ExpenseCategory $expenseCategory = null;
 
     /** Cost in minor units of {@see $currency}. */
     #[ORM\Column(type: 'integer')]
@@ -178,6 +189,10 @@ class Expense
                 ?? $this->engagement?->getClient()?->getCurrency()
                 ?? 'USD';
         }
+        // A managed category owns the label (#671).
+        if (null !== $this->expenseCategory) {
+            $this->category = $this->expenseCategory->getName();
+        }
     }
 
     #[ORM\PreUpdate]
@@ -188,6 +203,15 @@ class Expense
 
     public function validateConsistency(ExecutionContextInterface $context): void
     {
+        if (
+            null !== $this->expenseCategory && null !== $this->space
+            && true !== $this->expenseCategory->getSpace()?->getId()?->equals($this->space->getId())
+        ) {
+            $context->buildViolation('Category must belong to the same space.')
+                ->atPath('expenseCategory')
+                ->addViolation();
+        }
+
         if (
             null !== $this->engagement && null !== $this->space
             && true !== $this->engagement->getSpace()?->getId()?->equals($this->space->getId())
@@ -247,6 +271,18 @@ class Expense
     public function setSpentOn(?\DateTimeImmutable $spentOn): self
     {
         $this->spentOn = $spentOn;
+
+        return $this;
+    }
+
+    public function getExpenseCategory(): ?ExpenseCategory
+    {
+        return $this->expenseCategory;
+    }
+
+    public function setExpenseCategory(?ExpenseCategory $expenseCategory): self
+    {
+        $this->expenseCategory = $expenseCategory;
 
         return $this;
     }
