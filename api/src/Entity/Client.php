@@ -106,6 +106,14 @@ class Client
     #[Groups(['client:read', 'client:write'])]
     private ?string $notes = null;
 
+    /**
+     * sha256 of the client-portal token (#674) — the plaintext only ever
+     * leaves in the link/email minted by POST /clients/{id}/portal-link.
+     * Rotating invalidates the previous link. Never serialized.
+     */
+    #[ORM\Column(length: 64, nullable: true, unique: true)]
+    private ?string $portalToken = null;
+
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -134,6 +142,18 @@ class Client
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    public function getPortalToken(): ?string
+    {
+        return $this->portalToken;
+    }
+
+    public function setPortalToken(?string $portalToken): self
+    {
+        $this->portalToken = $portalToken;
+
+        return $this;
     }
 
     public function getSpace(): ?Space
