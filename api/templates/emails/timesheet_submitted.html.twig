@@ -1,0 +1,15 @@
+{# @var submission \App\Entity\TimesheetSubmission #}
+<p>Hi,</p>
+
+<p>
+    <strong>{{ memberName }}</strong> submitted their timesheet for the week of
+    <strong>{{ submission.weekStart|date('M j, Y') }}</strong> for approval.
+</p>
+
+<p>
+    <a href="{{ approvalsUrl }}">Review it in the approvals queue</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    You're receiving this because you're an admin of the space.
+</p>

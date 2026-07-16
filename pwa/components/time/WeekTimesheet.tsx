@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, CopyPlus, Lock, Plus } from "lucide-react";
-import { apiGetCollection, apiSend } from "@/lib/apiClient";
+import { ChevronLeft, ChevronRight, CopyPlus, Lock, Plus, Send } from "lucide-react";
+import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import {
   EngagementOption,
   TimeEntry,
@@ -44,6 +44,20 @@ interface CellData {
   entries: TimeEntry[];
   total: number;
 }
+
+/** One row from GET /spaces/{id}/timesheets (#654). */
+interface TimesheetRow {
+  id: string;
+  weekStart: string | null;
+  status: "pending" | "approved" | "rejected";
+  note: string | null;
+}
+
+const SUBMISSION_BADGE: Record<TimesheetRow["status"], string> = {
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  rejected: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+};
 
 interface RowData {
   key: string;
@@ -110,6 +124,33 @@ const WeekTimesheet = ({
       }),
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["time_entries"] });
+
+  // Timesheet approvals (#654): the viewer's own submission for this week.
+  const spaceId = spaceIri ? spaceIri.slice(spaceIri.lastIndexOf("/") + 1) : null;
+  const submissionQuery = useQuery({
+    queryKey: ["timesheets", spaceId, weekKey],
+    enabled: !!spaceId,
+    queryFn: () =>
+      apiGet<{ rows: TimesheetRow[] }>(`/spaces/${spaceId}/timesheets`, {
+        errorMessage: "Failed to load the timesheet status.",
+      }).then((r) => (r.rows ?? []).find((row) => row.weekStart === weekKey) ?? null),
+  });
+  const submission = submissionQuery.data ?? null;
+  const weekLocked = !!submission && submission.status !== "rejected";
+
+  const submitWeek = useMutation({
+    mutationFn: () =>
+      apiSend("POST", `/spaces/${spaceId}/timesheets/submit`, {
+        contentType: "application/json",
+        errorMessage: "Failed to submit the week.",
+        body: { weekStart: weekKey },
+      }),
+    onSuccess: () => {
+      onError(null);
+      void queryClient.invalidateQueries({ queryKey: ["timesheets"] });
+    },
+    onError: (e) => onError(e instanceof Error ? e.message : "Failed to submit the week."),
+  });
 
   // Completed entries bucketed by (pair, local day) inside the shown week.
   const rows = useMemo((): RowData[] => {
@@ -317,17 +358,49 @@ const WeekTimesheet = ({
           </Button>
           <span className="ml-2 text-sm font-medium">{rangeLabel}</span>
         </div>
-        {canCreate && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => copyLastWeek.mutate()}
-            disabled={copyLastWeek.isPending}
-          >
-            <CopyPlus className="h-4 w-4" />
-            {copyLastWeek.isPending ? "Copying…" : "Copy last week"}
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {submission && (
+            <span
+              className={cn(
+                "rounded px-2 py-0.5 text-xs font-medium",
+                SUBMISSION_BADGE[submission.status],
+              )}
+              title={submission.note ?? undefined}
+            >
+              {submission.status === "pending"
+                ? "Submitted — pending approval"
+                : submission.status === "approved"
+                  ? "Approved"
+                  : `Rejected${submission.note ? ` — ${submission.note}` : ""}`}
+            </span>
+          )}
+          {canCreate && !weekLocked && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => copyLastWeek.mutate()}
+              disabled={copyLastWeek.isPending}
+            >
+              <CopyPlus className="h-4 w-4" />
+              {copyLastWeek.isPending ? "Copying…" : "Copy last week"}
+            </Button>
+          )}
+          {canCreate && !weekLocked && (
+            <Button
+              size="sm"
+              onClick={() => submitWeek.mutate()}
+              disabled={submitWeek.isPending}
+              title="Submit this week for approval — entries lock until it's reviewed"
+            >
+              <Send className="h-4 w-4" />
+              {submitWeek.isPending
+                ? "Submitting…"
+                : submission?.status === "rejected"
+                  ? "Re-submit week"
+                  : "Submit week"}
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card>
@@ -383,6 +456,7 @@ const WeekTimesheet = ({
                         const cellId = `${row.key}@${dayKey}`;
                         const editable =
                           canCreate &&
+                          !weekLocked &&
                           (!cell ||
                             (cell.entries.length === 1 && canModify(cell.entries[0])));
                         const display =
@@ -449,7 +523,7 @@ const WeekTimesheet = ({
               )}
 
               {/* Add-row control */}
-              {canCreate && (
+              {canCreate && !weekLocked && (
                 <tr className="border-b">
                   <td colSpan={9} className="px-4 py-2">
                     {addingRow ? (
