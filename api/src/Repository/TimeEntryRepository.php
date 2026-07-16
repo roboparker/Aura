@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Engagement;
+use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -35,6 +36,65 @@ class TimeEntryRepository extends ServiceEntityRepository
         assert(null === $result || $result instanceof TimeEntry);
 
         return $result;
+    }
+
+    /**
+     * Completed entries in a space for the reports (#647), relations
+     * fetch-joined so per-row label lookups don't N+1. Optional
+     * [$from, $toExclusive) window on startedAt.
+     *
+     * @return list<TimeEntry>
+     */
+    public function findCompletedForSpace(
+        Space $space,
+        ?\DateTimeImmutable $from = null,
+        ?\DateTimeImmutable $toExclusive = null,
+    ): array {
+        $qb = $this->createQueryBuilder('t')
+            ->addSelect('e', 'c', 'cl', 'u')
+            ->leftJoin('t.engagement', 'e')
+            ->leftJoin('t.category', 'c')
+            ->leftJoin('e.client', 'cl')
+            ->leftJoin('t.user', 'u')
+            ->andWhere('t.space = :space')
+            ->andWhere('t.endedAt IS NOT NULL')
+            ->setParameter('space', $space)
+            ->orderBy('t.startedAt', 'ASC');
+
+        if (null !== $from) {
+            $qb->andWhere('t.startedAt >= :from')->setParameter('from', $from);
+        }
+        if (null !== $toExclusive) {
+            $qb->andWhere('t.startedAt < :toExclusive')->setParameter('toExclusive', $toExclusive);
+        }
+
+        /** @var list<TimeEntry> */
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Unbilled billable completed entries across a whole space — the
+     * "what can I bill right now" pool the uninvoiced report (#647) groups
+     * per engagement. Entries without an engagement can't be invoiced, so
+     * they're excluded.
+     *
+     * @return list<TimeEntry>
+     */
+    public function findUninvoicedForSpace(Space $space): array
+    {
+        /** @var list<TimeEntry> */
+        return $this->createQueryBuilder('t')
+            ->addSelect('e', 'cl')
+            ->join('t.engagement', 'e')
+            ->leftJoin('e.client', 'cl')
+            ->andWhere('t.space = :space')
+            ->andWhere('t.billable = true')
+            ->andWhere('t.endedAt IS NOT NULL')
+            ->andWhere('t.billedAt IS NULL')
+            ->setParameter('space', $space)
+            ->orderBy('t.startedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
     /**
