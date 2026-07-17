@@ -194,7 +194,7 @@ const SearchBar = ({ className }: SearchBarProps = {}) => {
             }}
             onFocus={() => setOpen(true)}
             onKeyDown={onKeyDown}
-            placeholder="Search tasks…  ⌘K"
+            placeholder="Search tasks…"
             className="h-8 w-full pl-8"
             data-testid="navbar-search"
             aria-label="Search tasks"

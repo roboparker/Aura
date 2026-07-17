@@ -20,7 +20,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   applyMove,
@@ -31,6 +30,14 @@ import {
 } from "@/lib/pageTree";
 
 const INDENT = 14; // px per nesting level
+
+// Line page titles up with the other sidebar sections. The nav has no
+// horizontal padding, so every row is full-bleed and its 2px left accent border
+// sits at the sidebar's inner edge; a `size="sm"` ghost button's px-3 (12px)
+// plus the row span's pl-5 (20px) put their text at 34px. Page titles match:
+// 34 − 2 (border) = 32px, then one INDENT step per nesting level.
+const TITLE_BASE_INDENT = 32; // px
+const HANDLE_LEFT = 6; // px — grip inset from the row's (padding-box) left edge
 
 interface Props {
   spaceIri: string;
@@ -202,67 +209,72 @@ const PageRow = ({
   onToggle: () => void;
   wrap: (children: ReactNode) => ReactNode;
 }) => {
-  const { setNodeRef, attributes, listeners, transform, transition, isDragging } =
+  const { setNodeRef, listeners, transform, transition, isDragging } =
     useSortable({ id: item["@id"] });
   const href = `/pages/${item.id}`;
   const active = currentPath === href;
 
   return (
+    // The whole row is the drag source — grab the link anywhere to reorder or
+    // (drag sideways to) nest it, while a plain click still opens the page:
+    // dnd-kit's 4px activation distance tells a click from a drag. The row also
+    // carries the full-width hover + selection background, and the open/close
+    // disclosure is anchored on the right.
     <div
       ref={setNodeRef}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        paddingLeft: depth * INDENT,
       }}
       className={cn(
-        "group/pagerow relative flex items-center rounded-md",
-        active && "bg-accent text-accent-foreground",
-        isDragging && "opacity-60",
+        // Full-bleed row (the nav has no horizontal padding), square edges, and a
+        // 2px left accent border that turns the green theme color on hover /
+        // when active.
+        "group/pagerow relative flex h-8 cursor-grab select-none items-center gap-0.5 border-l-2 border-l-transparent pr-2 text-sm",
+        "hover:border-l-emerald-500 hover:bg-accent",
+        active && "border-l-emerald-500 bg-accent text-accent-foreground",
+        isDragging && "cursor-grabbing opacity-60",
       )}
       data-testid="pages-nav-row"
+      {...listeners}
     >
-      {item.childCount > 0 ? (
+      {/* Grip affordance, revealed on hover — a visual hint only; the whole row
+          is draggable. Pinned to the same fixed spot in the left gutter for
+          every page regardless of nesting depth. */}
+      <span
+        aria-hidden
+        style={{ left: HANDLE_LEFT }}
+        className="pointer-events-none absolute top-1/2 flex size-4 -translate-y-1/2 items-center justify-center text-muted-foreground/50 opacity-0 group-hover/pagerow:opacity-100"
+      >
+        <GripVertical className="size-3.5" />
+      </span>
+
+      {wrap(
+        <Link
+          href={href}
+          draggable={false}
+          style={{ paddingLeft: TITLE_BASE_INDENT + depth * INDENT }}
+          className="min-w-0 flex-1 truncate rounded-sm py-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          {item.title}
+        </Link>,
+      )}
+
+      {/* Disclosure toggle on the right. Stop the pointer from starting a row
+          drag so a click just toggles open/closed. */}
+      {item.childCount > 0 && (
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={onToggle}
           aria-label={collapsed ? "Expand" : "Collapse"}
-          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          aria-expanded={!collapsed}
+          className="relative z-10 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
         >
           <ChevronRight
             className={cn("size-3.5 transition-transform", !collapsed && "rotate-90")}
           />
         </button>
-      ) : (
-        <span className="w-[1.375rem] shrink-0" aria-hidden />
-      )}
-
-      {/* Drag handle overlays the right edge on hover so it doesn't indent the
-          row text (which should line up with the other nav sections). */}
-      <button
-        type="button"
-        aria-label={`Reorder ${item.title}`}
-        className="absolute right-1 top-1/2 z-10 -translate-y-1/2 cursor-grab rounded bg-accent p-0.5 text-muted-foreground/60 opacity-0 hover:text-foreground group-hover/pagerow:opacity-100"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical className="size-3.5" />
-      </button>
-
-      {wrap(
-        <Button
-          asChild
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-8 w-full min-w-0 justify-start font-normal",
-            active && "bg-transparent",
-          )}
-        >
-          <Link href={href}>
-            <span className="truncate">{item.title}</span>
-          </Link>
-        </Button>,
       )}
     </div>
   );

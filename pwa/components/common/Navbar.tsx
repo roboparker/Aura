@@ -78,6 +78,7 @@ const Navbar = () => {
                   </SheetHeader>
                   <SidebarNav
                     includeSpaceSwitcher
+                    scrollable
                     itemWrapper={(child) => (
                       <SheetClose asChild>{child}</SheetClose>
                     )}

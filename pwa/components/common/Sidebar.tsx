@@ -9,17 +9,18 @@ import SidebarNav from "./SidebarNav";
  * Renders nothing when the user isn't signed in — the public-facing
  * marketing/auth screens keep the original full-width chrome.
  *
- * Full viewport height, pinned to the left edge (`sticky top-0 h-screen`):
- * the header (banner + navbar) lives in the content column to its right, so
- * the space switcher at the top of the nav sits above everything. Its own
- * content scrolls internally (SidebarNav's `overflow-y-auto`).
+ * Sits in normal document flow and stretches to the row height (the parent
+ * layout row is `min-h-screen`), so the border + background always run the
+ * full page height. It grows with its own content rather than scrolling
+ * internally — a nav taller than the viewport makes the whole page grow and
+ * the document scroll as one (no separate sidebar scrollbar).
  */
 const Sidebar = () => {
   const { isAuthenticated } = useAuth();
   if (!isAuthenticated) return null;
   return (
     <aside
-      className="hidden md:flex w-60 shrink-0 border-r bg-background flex-col sticky top-0 h-screen"
+      className="hidden md:flex w-64 shrink-0 border-r bg-background flex-col"
       data-testid="app-sidebar"
     >
       <SidebarNav includeSpaceSwitcher />
