@@ -167,21 +167,56 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
                 ->setBody('Backups looked good last night — pruned to 5.'),
         );
 
-        // Page with a sub-page.
+        // Pages: a small nested tree (three levels, with siblings) so the
+        // sidebar Pages navigator has real depth to show off — expand/collapse,
+        // per-level indentation, and drag-to-nest.
         $runbook = (new Page())
             ->setSpace($desk)->setCreatedBy($ada)
             ->setTitle('Ops runbook')
             ->setBody("# Ops runbook\n\nHow to keep the lights on.\n\n## Backups\nNightly at 02:00 UTC.")
             ->setPosition(0);
         $manager->persist($runbook);
-        $manager->flush(); // need the parent id before linking the child
 
-        $child = (new Page())
+        $handbook = (new Page())
+            ->setSpace($desk)->setCreatedBy($ada)
+            ->setTitle('Engineering handbook')
+            ->setBody("# Engineering handbook\n\nHow we build and ship.")
+            ->setPosition(1);
+        $manager->persist($handbook);
+        $manager->flush(); // top-level pages need ids before their children link
+
+        $restoring = (new Page())
             ->setSpace($desk)->setCreatedBy($ada)->setParent($runbook)
             ->setTitle('Restoring from a backup')
             ->setBody('Steps to restore the latest pg_dump + media tarball.')
             ->setPosition(0);
-        $manager->persist($child);
+        $manager->persist($restoring);
+
+        $rotation = (new Page())
+            ->setSpace($desk)->setCreatedBy($ada)->setParent($runbook)
+            ->setTitle('Backup rotation policy')
+            ->setBody('Keep the newest five nightly archives; prune the rest.')
+            ->setPosition(1);
+        $manager->persist($rotation);
+
+        $manager->persist((new Page())
+            ->setSpace($desk)->setCreatedBy($ada)->setParent($handbook)
+            ->setTitle('Onboarding')
+            ->setBody('Day-one setup: accounts, repos, and the local stack.')
+            ->setPosition(0));
+        $manager->persist((new Page())
+            ->setSpace($desk)->setCreatedBy($ada)->setParent($handbook)
+            ->setTitle('Release process')
+            ->setBody('Cut a tag, let CI build, then promote main → production.')
+            ->setPosition(1));
+        $manager->flush(); // second level needs ids before the grandchild links
+
+        // A third level, so the tree shows more than one level of nesting.
+        $manager->persist((new Page())
+            ->setSpace($desk)->setCreatedBy($ada)->setParent($restoring)
+            ->setTitle('Verifying a restore')
+            ->setBody('Smoke-test checklist to run once a restore completes.')
+            ->setPosition(0));
 
         // Comment on a page.
         $manager->persist(
