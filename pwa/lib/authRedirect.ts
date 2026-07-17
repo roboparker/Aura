@@ -79,7 +79,15 @@ export const safeNextPath = (
   try {
     const parsed = new URL(candidate, SANITIZER_BASE);
     if (parsed.origin !== SANITIZER_BASE) return fallback;
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    // The *normalized* pathname can start with "//" even when the raw
+    // candidate didn't (e.g. "/..//evil.com" → pathname "//evil.com"),
+    // and a protocol-relative string handed to router.push navigates
+    // cross-origin. Re-check the output, not just the input.
+    if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) {
+      return fallback;
+    }
+    return path;
   } catch {
     return fallback;
   }
