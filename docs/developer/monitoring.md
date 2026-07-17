@@ -116,3 +116,24 @@ Forks and local builds get no secret → blank DSN → Sentry off.
    maps.
 
 Until those are set, everything stays inert.
+
+## Verifying the integration
+
+Once the DSNs are set, confirm each surface actually reports. Sign in as an admin
+and open **`/admin/sentry-test`** (sidebar → **Admin → Sentry test**). It has one
+button per surface:
+
+- **Throw a client error** — an uncaught browser error → the **Next.js** project.
+- **Trigger an API error** — calls an endpoint that raises an exception (HTTP 500)
+  → the **PHP** project.
+- **Trigger a worker error** — queues a job that fails on purpose → the **PHP**
+  project once the worker runs it.
+
+The triggers are non-destructive (they touch no data). The worker job throws an
+`UnrecoverableMessageHandlingException`, so it fails once (no retry storm) and
+dead-letters into the `failed` transport — inspect/clear it with
+`bin/console messenger:failed:show` / `:remove`.
+
+The backing endpoints — `GET /admin/sentry-test/error` and
+`POST /admin/sentry-test/worker` (`App\Controller\SentryTestController`, plus the
+`App\Message\SentryTestFailure` job) — are gated to `ROLE_ADMIN`.

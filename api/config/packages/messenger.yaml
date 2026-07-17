@@ -43,6 +43,9 @@ framework:
             # Phase D) — async so the provider callback returns immediately (the
             # scheduled sweep reaches the same handler via scheduler_default).
             App\Message\PullCalendarChanges: async
+            # Admin-only Sentry verification: a job that fails on purpose so the
+            # worker→Sentry pipeline can be confirmed (SentryTestController).
+            App\Message\SentryTestFailure: async
 
 when@test:
     framework:
