@@ -30,10 +30,23 @@ export interface InvoiceLineItem {
   quantity: number;
   unitAmount: number;
   amount?: number;
+  /** Per-line tax override in basis points (#670); null = invoice rate. */
+  taxRate?: number | null;
   position?: number;
 }
 
 export type InvoiceStatus = "draft" | "sent" | "paid" | "overdue" | "void";
+
+export type DiscountType = "percent" | "fixed";
+
+export interface InvoicePayment {
+  id: string;
+  amount: number;
+  paidOn: string;
+  method: string | null;
+  note: string | null;
+  createdAt: string;
+}
 
 export interface Invoice {
   "@id": string;
@@ -47,13 +60,21 @@ export interface Invoice {
   currency: string;
   taxRate: number;
   notes: string | null;
+  discountType: DiscountType | null;
+  discountValue: number | null;
+  discountAmount: number;
   lineItems: InvoiceLineItem[];
+  payments: InvoicePayment[];
+  amountPaid: number;
+  balanceDue: number;
   subtotal: number;
   taxAmount: number;
   total: number;
   recurrenceFrequency: "weekly" | "monthly" | "yearly" | null;
   recurrenceInterval: number | null;
   nextIssueDate: string | null;
+  remindersEnabled: boolean;
+  remindersSentAt: string[] | null;
   sentAt: string | null;
   paidAt: string | null;
   createdAt: string;

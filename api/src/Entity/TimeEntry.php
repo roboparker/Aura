@@ -16,6 +16,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TimeEntryRepository;
+use App\State\TimeEntryDeleteProcessor;
 use App\State\TimeEntryUserProcessor;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -43,6 +44,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
+            // The week timesheet grid fetches a whole week in one request —
+            // let clients raise the page size (capped globally at 100).
+            paginationClientItemsPerPage: true,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -58,6 +62,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getUser() == user or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.time_entries.delete', object)))",
+            processor: TimeEntryDeleteProcessor::class,
         ),
     ],
     normalizationContext: ['groups' => ['time_entry:read']],
@@ -169,6 +174,15 @@ class TimeEntry
     #[Groups(['time_entry:read'])]
     private ?string $rateCurrency = null;
 
+    /**
+     * Internal cost rate (#653), snapshotted from the member's space-level
+     * cost rate on save — profitability reports subtract it from billable
+     * amounts. Derived, read-only, never exposed to non-invoicing members
+     * (it's not in any read group; reports are the read surface).
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $costRateAmount = null;
+
     /** Set when the entry is pulled onto an invoice; locks it against re-billing. */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['time_entry:read'])]
@@ -204,8 +218,20 @@ class TimeEntry
         // later category change never rewrites already-logged (or billed) time.
         if (null !== $this->category) {
             $this->rateAmount = $this->category->getRateAmount();
+            // #653: a per-person engagement rate overrides the category rate.
+            if (null !== $this->engagement && null !== $this->user) {
+                $override = $this->engagement->getUserRateFor($this->user);
+                if (null !== $override) {
+                    $this->rateAmount = $override;
+                }
+            }
             $this->rateCurrency = $this->engagement?->getCurrency();
             $this->billable = $this->category->isBillable();
+        }
+
+        // #653: snapshot the member's space-level cost rate for profitability.
+        if (null !== $this->space && null !== $this->user) {
+            $this->costRateAmount = $this->space->getCostRateFor($this->user);
         }
 
         $this->durationSeconds = null;
@@ -399,6 +425,11 @@ class TimeEntry
         $this->billedAt = $billedAt;
 
         return $this;
+    }
+
+    public function getCostRateAmount(): ?int
+    {
+        return $this->costRateAmount;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

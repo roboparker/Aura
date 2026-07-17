@@ -58,6 +58,10 @@ interface Engagement {
   categories: CategoryRow[];
   attachments: Attachment[];
   assignedProjectList: { id: string; title: string }[];
+  budgetType: "hours" | "fees" | null;
+  budgetAmount: number | null;
+  budgetSpent: number | null;
+  userRates: { "@id"?: string; user: string; rateAmount: number }[];
 }
 
 /** A form category with the rate as a decimal string for editing. */
@@ -67,12 +71,61 @@ interface DraftCategory {
   billable: boolean;
 }
 
+/** A person-rate override row (#653) with the rate as a decimal string. */
+interface DraftUserRate {
+  user: string;
+  rate: string;
+}
+
+/** A space member as embedded in GET /spaces/{id} (space:read). */
+interface SpaceMemberRow {
+  user: {
+    "@id": string;
+    givenName?: string;
+    familyName?: string;
+    email?: string;
+  };
+}
+
+const memberLabel = (m: SpaceMemberRow): string => {
+  const name = `${m.user.givenName ?? ""} ${m.user.familyName ?? ""}`.trim();
+  return name !== "" ? name : m.user.email ?? m.user["@id"];
+};
+
 const toMinor = (rate: string): number => Math.round((parseFloat(rate) || 0) * 100);
 const toMajor = (minor: number): string => (minor / 100).toFixed(2);
 const money = (minor: number, currency: string | null): string =>
   new Intl.NumberFormat(undefined, { style: "currency", currency: currency || "USD" }).format(minor / 100);
 
 const NEW = "new";
+
+/** Budget progress copy: "1.0 / 2.0 h" or "$500.00 / $2,000.00" (#651). */
+const budgetLabel = (bp: Engagement): string => {
+  if (!bp.budgetType || !bp.budgetAmount) return "";
+  const spent = bp.budgetSpent ?? 0;
+  if (bp.budgetType === "hours") {
+    return `${(spent / 60).toFixed(1)} / ${(bp.budgetAmount / 60).toFixed(1)} h`;
+  }
+  return `${money(spent, bp.currency)} / ${money(bp.budgetAmount, bp.currency)}`;
+};
+
+/** Small budget progress bar — amber past 80%, red past 100%. */
+const BudgetBar = ({ bp }: { bp: Engagement }) => {
+  if (!bp.budgetType || !bp.budgetAmount) return null;
+  const pct = Math.round(((bp.budgetSpent ?? 0) / bp.budgetAmount) * 100);
+  const width = Math.min(100, pct);
+  const tone = pct >= 100 ? "bg-red-500" : pct >= 80 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="mt-1 w-44">
+      <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+        <div className={`h-full ${tone}`} style={{ width: `${width}%` }} />
+      </div>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        {budgetLabel(bp)} · {pct}%
+      </p>
+    </div>
+  );
+};
 
 const EngagementsPage = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -93,7 +146,11 @@ const EngagementsPage = () => {
   const [clientIri, setClientIri] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [description, setDescription] = useState("");
+  const [budgetType, setBudgetType] = useState("");
+  const [budgetValue, setBudgetValue] = useState("");
   const [cats, setCats] = useState<DraftCategory[]>([{ name: "", rate: "", billable: true }]);
+  const [userRates, setUserRates] = useState<DraftUserRate[]>([]);
+  const [members, setMembers] = useState<SpaceMemberRow[]>([]);
   const [assigned, setAssigned] = useState<string[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [saving, setSaving] = useState(false);
@@ -111,14 +168,16 @@ const EngagementsPage = () => {
     setLoadError(null);
     try {
       const q = `?space=${encodeURIComponent(spaceIri)}`;
-      const [bps, cls, prj] = await Promise.all([
+      const [bps, cls, prj, space] = await Promise.all([
         apiGetCollection<Engagement>(`/engagements${q}`),
         apiGetCollection<ClientRow>(`/clients${q}`),
         apiGetCollection<BoardRow>(`/boards${q}`),
+        apiGet<{ userMemberships?: SpaceMemberRow[] }>(spaceIri),
       ]);
       setProjects(bps);
       setClients(cls);
       setTaskBoards(prj);
+      setMembers(space.userMemberships ?? []);
     } catch (e) {
       setLoadError(
         e instanceof ApiError && e.status === 403
@@ -144,7 +203,10 @@ const EngagementsPage = () => {
     setClientIri(clients[0]?.["@id"] ?? "");
     setCurrency(clients[0]?.currency ?? "USD");
     setDescription("");
+    setBudgetType("");
+    setBudgetValue("");
     setCats([{ name: "", rate: "", billable: true }]);
+    setUserRates([]);
     setAssigned([]);
     setAttachments([]);
     setFormError(null);
@@ -156,10 +218,21 @@ const EngagementsPage = () => {
     setClientIri(bp.client);
     setCurrency(bp.currency ?? "USD");
     setDescription(bp.description ?? "");
+    setBudgetType(bp.budgetType ?? "");
+    setBudgetValue(
+      bp.budgetAmount === null
+        ? ""
+        : bp.budgetType === "hours"
+          ? String(bp.budgetAmount / 60)
+          : (bp.budgetAmount / 100).toFixed(2),
+    );
     setCats(
       bp.categories.length > 0
         ? bp.categories.map((c) => ({ name: c.name, rate: toMajor(c.rateAmount), billable: c.billable }))
         : [{ name: "", rate: "", billable: true }],
+    );
+    setUserRates(
+      (bp.userRates ?? []).map((r) => ({ user: r.user, rate: toMajor(r.rateAmount) })),
     );
     setAssigned(bp.assignedProjectList.map((p) => `/boards/${p.id}`));
     setAttachments(bp.attachments ?? []);
@@ -198,6 +271,18 @@ const EngagementsPage = () => {
         description: description.trim() || null,
         categories,
         attachments: attachmentIris,
+        // Budget (#651): hours stored as minutes, fees as minor units.
+        budgetType: budgetType || null,
+        budgetAmount:
+          budgetType === ""
+            ? null
+            : budgetType === "hours"
+              ? Math.round((parseFloat(budgetValue) || 0) * 60)
+              : Math.round((parseFloat(budgetValue) || 0) * 100),
+        // Person rates (#653): per-user billable overrides.
+        userRates: userRates
+          .filter((r) => r.user && r.rate.trim() !== "")
+          .map((r) => ({ user: r.user, rateAmount: toMinor(r.rate) })),
       };
       const saved = editingIri
         ? await apiSend<Engagement>("PATCH", editingIri, {
@@ -334,6 +419,7 @@ const EngagementsPage = () => {
                             <span className="font-medium">{bp.name}</span>
                             {bp.archived && <Badge variant="secondary">Archived</Badge>}
                           </div>
+                          <BudgetBar bp={bp} />
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">
                           {clientName.get(bp.client) ?? "Client"}
@@ -429,6 +515,37 @@ const EngagementsPage = () => {
               </div>
             </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="bp-budget-type">Budget</Label>
+                <select
+                  id="bp-budget-type"
+                  value={budgetType}
+                  onChange={(e) => setBudgetType(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">No budget</option>
+                  <option value="hours">Hours</option>
+                  <option value="fees">Fees</option>
+                </select>
+              </div>
+              {budgetType !== "" && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="bp-budget-value">
+                    {budgetType === "hours" ? "Budget hours" : `Budget amount (${currency})`}
+                  </Label>
+                  <Input
+                    id="bp-budget-value"
+                    type="number"
+                    step={budgetType === "hours" ? "0.5" : "0.01"}
+                    min="0"
+                    value={budgetValue}
+                    onChange={(e) => setBudgetValue(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1.5">
               <Label>
                 Description{" "}
@@ -494,6 +611,68 @@ const EngagementsPage = () => {
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add category
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Person rates</Label>
+              <p className="text-xs text-muted-foreground">
+                Optional per-person billable rate overrides — time this person tracks on
+                this engagement bills at their rate instead of the category&apos;s.
+              </p>
+              {userRates.map((r, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    value={r.user}
+                    onChange={(e) =>
+                      setUserRates((prev) =>
+                        prev.map((row, j) => (j === i ? { ...row, user: e.target.value } : row)),
+                      )
+                    }
+                    className={SELECT_CLASS}
+                    aria-label="Member"
+                  >
+                    <option value="">Member…</option>
+                    {members.map((m) => (
+                      <option key={m.user["@id"]} value={m.user["@id"]}>
+                        {memberLabel(m)}
+                      </option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={r.rate}
+                    onChange={(e) =>
+                      setUserRates((prev) =>
+                        prev.map((row, j) => (j === i ? { ...row, rate: e.target.value } : row)),
+                      )
+                    }
+                    placeholder="Rate / h"
+                    className="w-32"
+                    aria-label="Hourly rate"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setUserRates((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label="Remove person rate"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setUserRates((prev) => [...prev, { user: "", rate: "" }])}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add person rate
               </Button>
             </div>
 

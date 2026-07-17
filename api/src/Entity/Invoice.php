@@ -87,6 +87,12 @@ class Invoice
         self::STATUS_VOID,
     ];
 
+    public const DISCOUNT_PERCENT = 'percent';
+    public const DISCOUNT_FIXED = 'fixed';
+
+    /** @var list<string> */
+    public const DISCOUNT_TYPES = [self::DISCOUNT_PERCENT, self::DISCOUNT_FIXED];
+
     public const FREQ_WEEKLY = 'weekly';
     public const FREQ_MONTHLY = 'monthly';
     public const FREQ_YEARLY = 'yearly';
@@ -149,6 +155,25 @@ class Invoice
     private ?string $notes = null;
 
     /**
+     * Discount applied between subtotal and tax (#648): percent-of-subtotal or
+     * a fixed amount. Null = no discount.
+     */
+    #[ORM\Column(length: 10, nullable: true)]
+    #[Assert\Choice(choices: self::DISCOUNT_TYPES, message: 'Invalid discount type.')]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?string $discountType = null;
+
+    /** Basis points for percent (1000 = 10%), minor units for fixed. */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $discountValue = null;
+
+    /** The discount actually subtracted, minor units. Derived. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    #[Groups(['invoice:read'])]
+    private int $discountAmount = 0;
+
+    /**
      * When set, this invoice is a recurring template: the sweep clones it into a
      * fresh draft each time {@see $nextIssueDate} arrives. One of weekly / monthly
      * / yearly, repeated every {@see $recurrenceInterval}.
@@ -176,6 +201,19 @@ class Invoice
     #[Groups(['invoice:read', 'invoice:write'])]
     private Collection $lineItems;
 
+    /**
+     * Payments recorded against this invoice (#648) — server-written only
+     * (payments endpoint, mark-paid, Stripe webhook), read-embedded so the
+     * client sees the ledger + balance without another fetch.
+     *
+     * @var Collection<int, InvoicePayment>
+     */
+    #[ApiProperty(readableLink: true, writableLink: false)]
+    #[ORM\OneToMany(mappedBy: 'invoice', targetEntity: InvoicePayment::class, cascade: ['persist'], orphanRemoval: true)]
+    #[ORM\OrderBy(['paidOn' => 'ASC', 'createdAt' => 'ASC'])]
+    #[Groups(['invoice:read'])]
+    private Collection $payments;
+
     /** Sum of line amounts, minor units. Derived. */
     #[ORM\Column(type: 'integer')]
     #[Groups(['invoice:read'])]
@@ -201,6 +239,25 @@ class Invoice
     #[ORM\Column(length: 64, nullable: true, unique: true)]
     private ?string $publicToken = null;
 
+    /**
+     * Per-invoice opt-out for the automatic late-payment reminder emails
+     * (#649) — on by default; a space admin can pause them per invoice.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private bool $remindersEnabled = true;
+
+    /**
+     * ISO-8601 timestamps of each late-payment reminder actually emailed —
+     * the idempotency log the daily sweep checks before sending the next one
+     * (max 3: on overdue, +7d, +14d).
+     *
+     * @var list<string>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    #[Groups(['invoice:read'])]
+    private ?array $remindersSentAt = null;
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     #[Groups(['invoice:read'])]
     private ?\DateTimeImmutable $sentAt = null;
@@ -221,6 +278,7 @@ class Invoice
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->lineItems = new ArrayCollection();
+        $this->payments = new ArrayCollection();
     }
 
     #[ORM\PreUpdate]
@@ -238,6 +296,27 @@ class Invoice
             $context->buildViolation('Client must belong to the same space.')
                 ->atPath('client')
                 ->addViolation();
+        }
+
+        if (null !== $this->discountType && null === $this->discountValue) {
+            $context->buildViolation('A discount needs a value.')
+                ->atPath('discountValue')
+                ->addViolation();
+        }
+        if (null !== $this->discountValue) {
+            if (null === $this->discountType) {
+                $context->buildViolation('A discount value needs a type (percent or fixed).')
+                    ->atPath('discountType')
+                    ->addViolation();
+            } elseif ($this->discountValue < 0) {
+                $context->buildViolation('A discount cannot be negative.')
+                    ->atPath('discountValue')
+                    ->addViolation();
+            } elseif (self::DISCOUNT_PERCENT === $this->discountType && $this->discountValue > 10000) {
+                $context->buildViolation('A percent discount cannot exceed 100%.')
+                    ->atPath('discountValue')
+                    ->addViolation();
+            }
         }
 
         if (null !== $this->recurrenceFrequency) {
@@ -451,6 +530,96 @@ class Invoice
         return $this;
     }
 
+    public function getDiscountType(): ?string
+    {
+        return $this->discountType;
+    }
+
+    public function setDiscountType(?string $discountType): self
+    {
+        $this->discountType = $discountType;
+
+        return $this;
+    }
+
+    public function getDiscountValue(): ?int
+    {
+        return $this->discountValue;
+    }
+
+    public function setDiscountValue(?int $discountValue): self
+    {
+        $this->discountValue = $discountValue;
+
+        return $this;
+    }
+
+    public function getDiscountAmount(): int
+    {
+        return $this->discountAmount;
+    }
+
+    public function setDiscountAmount(int $discountAmount): self
+    {
+        $this->discountAmount = $discountAmount;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, InvoicePayment>
+     */
+    public function getPayments(): Collection
+    {
+        return $this->payments;
+    }
+
+    /**
+     * Mutates the ledger — marked impure so PHPStan forgets remembered
+     * getBalanceDue()/getStatus() values after a call (the fluent return
+     * otherwise makes it look side-effect-free).
+     *
+     * @phpstan-impure
+     */
+    public function addPayment(InvoicePayment $payment): self
+    {
+        if (!$this->payments->contains($payment)) {
+            $this->payments->add($payment);
+            $payment->setInvoice($this);
+        }
+
+        return $this;
+    }
+
+    /** @phpstan-impure */
+    public function removePayment(InvoicePayment $payment): self
+    {
+        if ($this->payments->removeElement($payment) && $payment->getInvoice() === $this) {
+            $payment->setInvoice(null);
+        }
+
+        return $this;
+    }
+
+    /** Σ recorded payments, minor units. */
+    #[Groups(['invoice:read'])]
+    public function getAmountPaid(): int
+    {
+        $sum = 0;
+        foreach ($this->payments as $payment) {
+            $sum += $payment->getAmount();
+        }
+
+        return $sum;
+    }
+
+    /** total − Σ payments, floored at zero. */
+    #[Groups(['invoice:read'])]
+    public function getBalanceDue(): int
+    {
+        return max(0, $this->total - $this->getAmountPaid());
+    }
+
     public function getSubtotal(): int
     {
         return $this->subtotal;
@@ -473,6 +642,39 @@ class Invoice
         $this->taxAmount = $taxAmount;
 
         return $this;
+    }
+
+    /**
+     * Tax grouped by effective rate (#670) — one row per distinct nonzero
+     * rate, mirroring InvoiceProcessor's per-line proportional math so the
+     * rows always sum to {@see $taxAmount}. Lets the PDF/public page print
+     * "Tax (10%)" and "Tax (21%)" separately on mixed-rate invoices.
+     *
+     * @return list<array{rate: int, amount: int}>
+     */
+    #[Groups(['invoice:read'])]
+    public function getTaxBreakdown(): array
+    {
+        $taxable = $this->subtotal - $this->discountAmount;
+        $ratio = $this->subtotal > 0 ? $taxable / $this->subtotal : 0.0;
+
+        $byRate = [];
+        foreach ($this->lineItems as $line) {
+            $rate = $line->getTaxRate() ?? $this->taxRate;
+            if ($rate <= 0) {
+                continue;
+            }
+            $byRate[$rate] = ($byRate[$rate] ?? 0)
+                + (int) round($line->getAmount() * $ratio * $rate / 10000);
+        }
+        ksort($byRate);
+
+        $rows = [];
+        foreach ($byRate as $rate => $amount) {
+            $rows[] = ['rate' => $rate, 'amount' => $amount];
+        }
+
+        return $rows;
     }
 
     public function getTotal(): int
@@ -507,6 +709,33 @@ class Invoice
     public function setPublicToken(?string $publicToken): self
     {
         $this->publicToken = $publicToken;
+
+        return $this;
+    }
+
+    public function isRemindersEnabled(): bool
+    {
+        return $this->remindersEnabled;
+    }
+
+    public function setRemindersEnabled(bool $remindersEnabled): self
+    {
+        $this->remindersEnabled = $remindersEnabled;
+
+        return $this;
+    }
+
+    /** @return list<string> */
+    public function getRemindersSentAt(): array
+    {
+        return $this->remindersSentAt ?? [];
+    }
+
+    public function addReminderSentAt(\DateTimeImmutable $when): self
+    {
+        $log = $this->getRemindersSentAt();
+        $log[] = $when->format(\DateTimeInterface::ATOM);
+        $this->remindersSentAt = $log;
 
         return $this;
     }

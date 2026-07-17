@@ -10,6 +10,9 @@ use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\Discussion;
+use App\Entity\Estimate;
+use App\Entity\Expense;
+use App\Entity\ExpenseCategory;
 use App\Entity\Invoice;
 use App\Entity\Page;
 use App\Entity\Board;
@@ -95,6 +98,9 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof Engagement => $subject->getSpace(),
             $subject instanceof EngagementCategory => $subject->getEngagement()?->getSpace(),
             $subject instanceof Invoice => $subject->getSpace(),
+            $subject instanceof Estimate => $subject->getSpace(),
+            $subject instanceof Expense => $subject->getSpace(),
+            $subject instanceof ExpenseCategory => $subject->getSpace(),
             $subject instanceof TaskRelationship => $subject->getSource()?->getBoard()?->getSpace(),
             $subject instanceof Comment => $this->commentSpace($subject),
             default => null,

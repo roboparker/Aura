@@ -53,6 +53,16 @@ class SpaceMembership
     private \DateTimeImmutable $joinedAt;
 
     /**
+     * Internal cost rate (#653): what an hour of this member costs the team,
+     * in minor units — the profitability reports subtract it from billable
+     * amounts. Admin-set via POST /spaces/{id}/members/{userId}/cost-rate;
+     * space-level so it follows the person across engagements.
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Groups(['space:read'])]
+    private ?int $costRateAmount = null;
+
+    /**
      * Custom roles assigned to this member (#space-roles). Effective
      * permissions are the union of these; an empty set = unrestricted
      * (back-compat). Admins are never restricted regardless.
@@ -111,6 +121,17 @@ class SpaceMembership
     public function getJoinedAt(): \DateTimeImmutable
     {
         return $this->joinedAt;
+    }
+
+    public function getCostRateAmount(): ?int
+    {
+        return $this->costRateAmount;
+    }
+
+    public function setCostRateAmount(?int $costRateAmount): static
+    {
+        $this->costRateAmount = $costRateAmount;
+        return $this;
     }
 
     /**

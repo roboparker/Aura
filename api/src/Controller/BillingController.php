@@ -12,6 +12,7 @@ use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\CancellationFeedback;
 use App\Entity\Invoice;
+use App\Entity\InvoicePayment;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -55,13 +56,13 @@ class BillingController extends AbstractController
         private PlanGate $planGate,
         private SubscriptionReceiptMailer $receiptMailer,
         private LoggerInterface $logger,
-        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_MONTHLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_pro_monthly:STRIPE_PRICE_PRO_MONTHLY)%')]
         private string $proMonthly,
-        #[Autowire('%env(string:default::STRIPE_PRICE_PRO_YEARLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_pro_yearly:STRIPE_PRICE_PRO_YEARLY)%')]
         private string $proYearly,
-        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_MONTHLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_business_monthly:STRIPE_PRICE_BUSINESS_MONTHLY)%')]
         private string $businessMonthly,
-        #[Autowire('%env(string:default::STRIPE_PRICE_BUSINESS_YEARLY)%')]
+        #[Autowire('%env(string:default:app.stripe_price_business_yearly:STRIPE_PRICE_BUSINESS_YEARLY)%')]
         private string $businessYearly,
         #[Autowire('%env(APP_FRONTEND_URL)%')]
         private string $frontendUrl,
@@ -377,8 +378,23 @@ class BillingController extends AbstractController
         if (Invoice::STATUS_PAID === $invoice->getStatus() || Invoice::STATUS_VOID === $invoice->getStatus()) {
             return;
         }
-        $invoice->setStatus(Invoice::STATUS_PAID);
-        $invoice->setPaidAt(new \DateTimeImmutable());
+
+        // Record the payment on the ledger (#648): the session charged the
+        // balance due at checkout time; fall back to the current balance if
+        // Stripe's amount_total is missing. Paid only when the balance clears.
+        $amountTotal = $this->dig($session, ['amount_total']);
+        $amount = is_int($amountTotal) && $amountTotal > 0 ? $amountTotal : $invoice->getBalanceDue();
+        if ($amount > 0) {
+            $invoice->addPayment(
+                (new InvoicePayment())
+                    ->setAmount(min($amount, $invoice->getBalanceDue()))
+                    ->setMethod(InvoicePayment::METHOD_STRIPE),
+            );
+        }
+        if (0 === $invoice->getBalanceDue()) {
+            $invoice->setStatus(Invoice::STATUS_PAID);
+            $invoice->setPaidAt(new \DateTimeImmutable());
+        }
         $this->em->flush();
     }
 

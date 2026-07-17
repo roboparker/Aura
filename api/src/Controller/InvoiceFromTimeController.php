@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Engagement;
+use App\Entity\Expense;
 use App\Entity\Invoice;
 use App\Entity\InvoiceLineItem;
 use App\Entity\TimeEntry;
 use App\Entity\User;
+use App\Repository\ExpenseRepository;
 use App\Repository\TimeEntryRepository;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
@@ -25,9 +27,17 @@ use Symfony\Component\Uid\Uuid;
  * snapshotted category rate), each back-linking its source entry, and every
  * pulled entry stamped `billedAt` so the same time can't be billed twice.
  *
- * Body: `{ engagement }` (IRI or UUID). Auth: creating invoices is
- * admin-reserved — the caller must be a space admin or hold an explicit
- * invoicing role.
+ * Body: `{ engagement }` (IRI or UUID), plus optional scoping (#644):
+ *  - `from` / `to` — inclusive `Y-m-d` dates on the entry's startedAt, so
+ *    "invoice just October" is possible;
+ *  - `entries` — an explicit list of entry IRIs/UUIDs to pull; every selected
+ *    entry must be in the invoiceable pool (unbilled, billable, completed, on
+ *    this engagement, inside the range) or the whole request 422s;
+ *  - `preview: true` — return the candidate rows + totals WITHOUT creating an
+ *    invoice or stamping billedAt, so the UI can offer per-entry unticks.
+ *
+ * Auth: creating invoices is admin-reserved — the caller must be a space admin
+ * or hold an explicit invoicing role.
  */
 class InvoiceFromTimeController extends AbstractController
 {
@@ -36,6 +46,7 @@ class InvoiceFromTimeController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private TimeEntryRepository $timeEntries,
+        private ExpenseRepository $expenses,
         private SpacePermissionResolver $permissions,
     ) {
     }
@@ -66,13 +77,86 @@ class InvoiceFromTimeController extends AbstractController
             return $this->json(['error' => 'This engagement has no client.'], 422);
         }
 
-        $entries = $this->timeEntries->findInvoiceableForEngagement($engagement);
-        if (0 === count($entries)) {
-            return $this->json(['error' => 'No unbilled billable time to invoice.'], 422);
+        $from = $this->parseDate($payload['from'] ?? null);
+        $to = $this->parseDate($payload['to'] ?? null);
+        if (false === $from || false === $to) {
+            return $this->json(['error' => 'Dates must be formatted YYYY-MM-DD.'], 422);
+        }
+        if (null !== $from && null !== $to && $to < $from) {
+            return $this->json(['error' => 'The end of the range is before its start.'], 422);
+        }
+
+        $entries = $this->timeEntries->findInvoiceableForEngagement(
+            $engagement,
+            $from,
+            $to?->modify('+1 day'),
+        );
+
+        // Optional explicit selection — must be a subset of the pool, so a
+        // stale/foreign/billed reference fails loudly instead of silently
+        // shrinking the invoice.
+        $selection = $payload['entries'] ?? null;
+        if (is_array($selection)) {
+            $wanted = [];
+            foreach ($selection as $ref) {
+                $id = $this->entryId($ref);
+                if (null === $id) {
+                    return $this->json(['error' => 'Invalid entry reference in the selection.'], 422);
+                }
+                $wanted[$id] = true;
+            }
+            $entries = array_values(array_filter(
+                $entries,
+                static fn (TimeEntry $t): bool => isset($wanted[(string) $t->getId()]),
+            ));
+            if (count($entries) !== count($wanted)) {
+                return $this->json([
+                    'error' => 'One or more selected entries are not invoiceable for this engagement.',
+                ], 422);
+            }
+        }
+
+        $currency = $engagement->getCurrency() ?? $client->getCurrency() ?? 'USD';
+
+        // Unbilled billable expenses ride along (#650) unless opted out.
+        // Only same-currency expenses join — an invoice pins one currency.
+        $expenses = [];
+        if (false !== ($payload['includeExpenses'] ?? true)) {
+            $expenses = array_values(array_filter(
+                $this->expenses->findInvoiceableForEngagement($engagement, $from, $to?->modify('+1 day')),
+                static fn (Expense $x): bool => null === $x->getCurrency() || $x->getCurrency() === $currency,
+            ));
+        }
+        $expenseSelection = $payload['expenses'] ?? null;
+        if (is_array($expenseSelection)) {
+            $wantedExpenses = [];
+            foreach ($expenseSelection as $ref) {
+                $xid = $this->entryId($ref);
+                if (null === $xid) {
+                    return $this->json(['error' => 'Invalid expense reference in the selection.'], 422);
+                }
+                $wantedExpenses[$xid] = true;
+            }
+            $expenses = array_values(array_filter(
+                $expenses,
+                static fn (Expense $x): bool => isset($wantedExpenses[(string) $x->getId()]),
+            ));
+            if (count($expenses) !== count($wantedExpenses)) {
+                return $this->json([
+                    'error' => 'One or more selected expenses are not invoiceable for this engagement.',
+                ], 422);
+            }
+        }
+
+        if (true === ($payload['preview'] ?? false)) {
+            return $this->preview($entries, $expenses, $client->getDefaultRateAmount(), $currency);
+        }
+
+        if (0 === count($entries) && 0 === count($expenses)) {
+            return $this->json(['error' => 'No unbilled billable time or expenses to invoice.'], 422);
         }
 
         $now = new \DateTimeImmutable();
-        $currency = $engagement->getCurrency() ?? $client->getCurrency() ?? 'USD';
         $invoice = (new Invoice())
             ->setSpace($space)
             ->setClient($client)
@@ -99,6 +183,23 @@ class InvoiceFromTimeController extends AbstractController
             $entry->setBilledAt($now);
         }
 
+        // Expenses follow the time lines, grouped as their own section (#650).
+        foreach ($expenses as $expense) {
+            $amount = $expense->getAmount();
+            $subtotal += $amount;
+
+            $line = (new InvoiceLineItem())
+                ->setDescription($this->expenseLabel($expense))
+                ->setQuantity(1.0)
+                ->setUnitAmount($amount)
+                ->setAmount($amount)
+                ->setPosition($position++)
+                ->setSourceExpense($expense);
+            $invoice->addLineItem($line);
+
+            $expense->setBilledAt($now);
+        }
+
         $invoice->setSubtotal($subtotal);
         $invoice->setTaxAmount(0);
         $invoice->setTotal($subtotal);
@@ -113,8 +214,102 @@ class InvoiceFromTimeController extends AbstractController
             'currency' => $invoice->getCurrency(),
             'subtotal' => $invoice->getSubtotal(),
             'total' => $invoice->getTotal(),
-            'lineItemCount' => count($entries),
+            'lineItemCount' => count($entries) + count($expenses),
         ], 201);
+    }
+
+    /**
+     * The candidate rows + totals for the UI's untick list — same math as the
+     * generation loop, but read-only: nothing is created, nothing is stamped.
+     *
+     * @param list<TimeEntry> $entries
+     * @param list<Expense>   $expenses
+     */
+    private function preview(array $entries, array $expenses, ?int $clientDefaultRate, string $currency): JsonResponse
+    {
+        $rows = [];
+        $subtotal = 0;
+        foreach ($entries as $entry) {
+            $hours = round(($entry->getDurationSeconds() ?? 0) / self::SECONDS_PER_HOUR, 2);
+            $unitAmount = $entry->getRateAmount() ?? $clientDefaultRate ?? 0;
+            $amount = (int) round($hours * $unitAmount);
+            $subtotal += $amount;
+
+            $rows[] = [
+                '@id' => '/time_entries/' . $entry->getId(),
+                'id' => (string) $entry->getId(),
+                'description' => $entry->getDescription(),
+                'categoryName' => $entry->getCategory()?->getName(),
+                'startedAt' => $entry->getStartedAt()?->format(\DateTimeInterface::ATOM),
+                'durationSeconds' => $entry->getDurationSeconds(),
+                'hours' => $hours,
+                'unitAmount' => $unitAmount,
+                'amount' => $amount,
+            ];
+        }
+
+        $expenseRows = [];
+        foreach ($expenses as $expense) {
+            $subtotal += $expense->getAmount();
+            $expenseRows[] = [
+                '@id' => '/expenses/' . $expense->getId(),
+                'id' => (string) $expense->getId(),
+                'description' => $expense->getDescription(),
+                'category' => $expense->getCategory(),
+                'spentOn' => $expense->getSpentOn()?->format('Y-m-d'),
+                'amount' => $expense->getAmount(),
+            ];
+        }
+
+        return $this->json([
+            'entries' => $rows,
+            'expenses' => $expenseRows,
+            'count' => count($rows) + count($expenseRows),
+            'subtotal' => $subtotal,
+            'currency' => $currency,
+        ]);
+    }
+
+    /** "Expense — Category: description" (parts optional), capped to the column length. */
+    private function expenseLabel(Expense $expense): string
+    {
+        $parts = [];
+        $category = $expense->getCategory();
+        if (null !== $category && '' !== trim($category)) {
+            $parts[] = trim($category);
+        }
+        $description = $expense->getDescription();
+        if (null !== $description && '' !== trim($description)) {
+            $parts[] = trim($description);
+        }
+        $label = 'Expense — ' . ([] === $parts ? 'other' : implode(': ', $parts));
+
+        return mb_substr($label, 0, InvoiceLineItem::MAX_DESCRIPTION_LENGTH);
+    }
+
+    /** A `Y-m-d` payload date → midnight UTC; null when absent, false when malformed. */
+    private function parseDate(mixed $value): \DateTimeImmutable|false|null
+    {
+        if (null === $value || '' === $value) {
+            return null;
+        }
+        if (!is_string($value)) {
+            return false;
+        }
+
+        return \DateTimeImmutable::createFromFormat('!Y-m-d', trim($value), new \DateTimeZone('UTC'));
+    }
+
+    /** Normalise an entry reference (IRI or bare UUID) to a UUID string, or null. */
+    private function entryId(mixed $ref): ?string
+    {
+        if (!is_string($ref) || '' === trim($ref)) {
+            return null;
+        }
+        $trimmed = trim($ref);
+        $id = Uuid::isValid($trimmed) ? $trimmed : substr($trimmed, (int) strrpos($trimmed, '/') + 1);
+
+        return Uuid::isValid($id) ? $id : null;
     }
 
     /** "Category — description" (either part optional), capped to the column length. */

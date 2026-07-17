@@ -1,0 +1,18 @@
+{# @var client \App\Entity\Client #}
+<p>Hi {{ client.name }},</p>
+
+<p>
+    {{ fromName }} set up a billing portal for you — one page listing every
+    invoice and estimate they've sent you, with online payment and PDF
+    downloads.
+</p>
+
+<p>
+    <a href="{{ portalUrl }}">Open your billing portal</a>
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    Keep this link private — anyone with it can see your invoices. If you
+    lose it, ask {{ fromName }} to send a fresh one (older links stop
+    working when a new one is issued).
+</p>

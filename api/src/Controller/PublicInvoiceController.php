@@ -45,8 +45,20 @@ class PublicInvoiceController extends AbstractController
                 'quantity' => $line->getQuantity(),
                 'unitAmount' => $line->getUnitAmount(),
                 'amount' => $line->getAmount(),
+                'taxRate' => $line->getTaxRate(),
             ];
         }
+
+        $payments = [];
+        foreach ($invoice->getPayments() as $payment) {
+            $payments[] = [
+                'amount' => $payment->getAmount(),
+                'paidOn' => $payment->getPaidOn()->format('Y-m-d'),
+                'method' => $payment->getMethod(),
+            ];
+        }
+
+        $logoUrls = $invoice->getSpace()?->getInvoiceLogo()?->getVariantUrls() ?? [];
 
         return $this->json([
             'number' => $invoice->getNumber(),
@@ -58,9 +70,18 @@ class PublicInvoiceController extends AbstractController
             'billTo' => $invoice->getClient()?->getName(),
             'lineItems' => $lines,
             'subtotal' => $invoice->getSubtotal(),
+            'discountAmount' => $invoice->getDiscountAmount(),
             'taxAmount' => $invoice->getTaxAmount(),
+            'taxBreakdown' => $invoice->getTaxBreakdown(),
             'total' => $invoice->getTotal(),
+            'amountPaid' => $invoice->getAmountPaid(),
+            'balanceDue' => $invoice->getBalanceDue(),
+            'payments' => $payments,
             'pdfUrl' => '/public/invoices/' . $token . '/pdf',
+            // Branding (#669): the logo is avatar-kind media on the public
+            // /media/ route, so exposing the URL leaks nothing sensitive.
+            'logoUrl' => $logoUrls['profile'] ?? array_values($logoUrls)[0] ?? null,
+            'terms' => $invoice->getSpace()?->getInvoiceTerms(),
         ]);
     }
 
@@ -88,7 +109,7 @@ class PublicInvoiceController extends AbstractController
         if (Invoice::STATUS_PAID === $invoice->getStatus()) {
             return $this->json(['error' => 'This invoice is already paid.'], 409);
         }
-        if ($invoice->getTotal() <= 0) {
+        if ($invoice->getBalanceDue() <= 0) {
             return $this->json(['error' => 'Nothing to pay on this invoice.'], 409);
         }
 

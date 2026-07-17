@@ -3,6 +3,8 @@ import {
   AtSign,
   Bell,
   CheckCircle2,
+  ClipboardCheck,
+  Gauge,
   MessageSquare,
   Reply,
   UserPlus,
@@ -16,7 +18,11 @@ export type NotificationType =
   | "comment"
   | "assigned"
   | "status"
-  | "task_reminder";
+  | "task_reminder"
+  | "timesheet_submitted"
+  | "timesheet_decided"
+  | "timesheet_nudge"
+  | "budget_alert";
 
 export type NotificationActor = AvatarUser & {
   "@id"?: string;
@@ -116,6 +122,34 @@ export const NOTIFICATION_META: Record<NotificationType, NotificationMeta> = {
     icon_color: "text-orange-600 dark:text-orange-400",
     stripe: "bg-orange-500",
   },
+  timesheet_submitted: {
+    label: "TIMESHEET",
+    icon: ClipboardCheck,
+    badge: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+    icon_color: "text-teal-600 dark:text-teal-400",
+    stripe: "bg-teal-500",
+  },
+  timesheet_decided: {
+    label: "TIMESHEET",
+    icon: ClipboardCheck,
+    badge: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+    icon_color: "text-teal-600 dark:text-teal-400",
+    stripe: "bg-teal-500",
+  },
+  timesheet_nudge: {
+    label: "TIMESHEET",
+    icon: ClipboardCheck,
+    badge: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+    icon_color: "text-teal-600 dark:text-teal-400",
+    stripe: "bg-teal-500",
+  },
+  budget_alert: {
+    label: "BUDGET",
+    icon: Gauge,
+    badge: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+    icon_color: "text-rose-600 dark:text-rose-400",
+    stripe: "bg-rose-500",
+  },
 };
 
 export const metaFor = (type: string): NotificationMeta =>
@@ -134,5 +168,16 @@ export const NOTIFICATION_TABS: {
   { key: "mentions", label: "Mentions", types: ["mention"] },
   { key: "assignments", label: "Assignments", types: ["assigned"] },
   { key: "replies", label: "Replies", types: ["reply", "comment"] },
-  { key: "updates", label: "Updates", types: ["status", "task_reminder"] },
+  {
+    key: "updates",
+    label: "Updates",
+    types: [
+      "status",
+      "task_reminder",
+      "timesheet_submitted",
+      "timesheet_decided",
+      "timesheet_nudge",
+      "budget_alert",
+    ],
+  },
 ];

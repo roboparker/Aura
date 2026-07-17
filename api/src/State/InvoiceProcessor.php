@@ -57,9 +57,37 @@ final class InvoiceProcessor implements ProcessorInterface
             $subtotal += $amount;
         }
 
-        $taxAmount = (int) round($subtotal * $invoice->getTaxRate() / self::BASIS_POINTS);
+        // Discount (#648) applies between subtotal and tax: percent of the
+        // subtotal or a fixed amount, never more than the subtotal itself.
+        $discountValue = $invoice->getDiscountValue();
+        $discountAmount = 0;
+        if (null !== $invoice->getDiscountType() && null !== $discountValue) {
+            $discountAmount = Invoice::DISCOUNT_PERCENT === $invoice->getDiscountType()
+                ? (int) round($subtotal * $discountValue / self::BASIS_POINTS)
+                : $discountValue;
+            $discountAmount = max(0, min($discountAmount, $subtotal));
+        }
+
+        $taxable = $subtotal - $discountAmount;
+
+        // Per-line tax (#670): each line taxes at its own rate (falling back
+        // to the invoice-level rate) on its discount-adjusted share, so a
+        // mixed-rate invoice (or a tax-free line) totals correctly. With no
+        // overrides this reduces to the old subtotal × rate math (modulo
+        // per-line rounding).
+        $ratio = $subtotal > 0 ? $taxable / $subtotal : 0.0;
+        $taxAmount = 0;
+        foreach ($invoice->getLineItems() as $line) {
+            $rate = $line->getTaxRate() ?? $invoice->getTaxRate();
+            if ($rate <= 0) {
+                continue;
+            }
+            $taxAmount += (int) round($line->getAmount() * $ratio * $rate / self::BASIS_POINTS);
+        }
+
         $invoice->setSubtotal($subtotal);
+        $invoice->setDiscountAmount($discountAmount);
         $invoice->setTaxAmount($taxAmount);
-        $invoice->setTotal($subtotal + $taxAmount);
+        $invoice->setTotal($taxable + $taxAmount);
     }
 }

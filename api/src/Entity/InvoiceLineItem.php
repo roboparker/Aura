@@ -57,6 +57,15 @@ class InvoiceLineItem
     #[Groups(['invoice:read'])]
     private int $amount = 0;
 
+    /**
+     * Per-line tax rate override in basis points (#670). Null = the line
+     * taxes at the invoice-level rate; 0 = explicitly tax-free.
+     */
+    #[ORM\Column(name: 'tax_rate', type: 'integer', nullable: true)]
+    #[Assert\Range(min: 0, max: 100000)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $taxRate = null;
+
     #[ORM\Column(type: 'integer')]
     #[Groups(['invoice:read', 'invoice:write'])]
     private int $position = 0;
@@ -66,6 +75,13 @@ class InvoiceLineItem
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     #[Groups(['invoice:read', 'invoice:write'])]
     private ?TimeEntry $sourceTimeEntry = null;
+
+    /** Back-link for a line generated from an expense (#650) — lets void release it. */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: Expense::class)]
+    #[ORM\JoinColumn(name: 'source_expense_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['invoice:read'])]
+    private ?Expense $sourceExpense = null;
 
     public function getId(): ?Uuid
     {
@@ -144,6 +160,24 @@ class InvoiceLineItem
         return $this;
     }
 
+    public function getTaxRate(): ?int
+    {
+        return $this->taxRate;
+    }
+
+    public function setTaxRate(?int $taxRate): self
+    {
+        $this->taxRate = $taxRate;
+
+        return $this;
+    }
+
+    /** The rate this line actually taxes at: its override, else the invoice's. */
+    public function getEffectiveTaxRate(): int
+    {
+        return $this->taxRate ?? $this->invoice?->getTaxRate() ?? 0;
+    }
+
     public function getSourceTimeEntry(): ?TimeEntry
     {
         return $this->sourceTimeEntry;
@@ -152,6 +186,18 @@ class InvoiceLineItem
     public function setSourceTimeEntry(?TimeEntry $sourceTimeEntry): self
     {
         $this->sourceTimeEntry = $sourceTimeEntry;
+
+        return $this;
+    }
+
+    public function getSourceExpense(): ?Expense
+    {
+        return $this->sourceExpense;
+    }
+
+    public function setSourceExpense(?Expense $sourceExpense): self
+    {
+        $this->sourceExpense = $sourceExpense;
 
         return $this;
     }

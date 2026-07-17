@@ -29,6 +29,8 @@ interface EditableLine {
   description: string;
   quantity: string;
   unit: string; // major units
+  /** Per-line tax % override (#670); "" = inherit the invoice rate. */
+  tax: string;
 }
 
 const InvoiceDetailPage = () => {
@@ -41,6 +43,13 @@ const InvoiceDetailPage = () => {
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [taxPercent, setTaxPercent] = useState("0");
+  const [discType, setDiscType] = useState("");
+  const [discValue, setDiscValue] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState("");
+  const [payMethod, setPayMethod] = useState("");
+  const [payNote, setPayNote] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
   const [freq, setFreq] = useState("");
   const [interval, setInterval] = useState("1");
   const [nextIssue, setNextIssue] = useState("");
@@ -73,11 +82,20 @@ const InvoiceDetailPage = () => {
         description: l.description,
         quantity: String(l.quantity),
         unit: (l.unitAmount / 100).toFixed(2),
+        tax: l.taxRate === null || l.taxRate === undefined ? "" : String(l.taxRate / 100),
       })),
     );
     setDueDate(invoice.dueDate ?? "");
     setNotes(invoice.notes ?? "");
     setTaxPercent(String(invoice.taxRate / 100));
+    setDiscType(invoice.discountType ?? "");
+    setDiscValue(
+      invoice.discountValue === null
+        ? ""
+        : invoice.discountType === "percent"
+          ? String(invoice.discountValue / 100)
+          : (invoice.discountValue / 100).toFixed(2),
+    );
     setFreq(invoice.recurrenceFrequency ?? "");
     setInterval(String(invoice.recurrenceInterval ?? 1));
     setNextIssue(invoice.nextIssueDate ?? "");
@@ -89,14 +107,32 @@ const InvoiceDetailPage = () => {
       const unitMinor = Math.round((parseFloat(l.unit) || 0) * 100);
       return sum + Math.round(qty * unitMinor);
     }, 0);
-    const tax = Math.round((subtotal * (parseFloat(taxPercent) || 0) * 100) / 10000);
-    return { subtotal, tax, total: subtotal + tax };
-  }, [lines, taxPercent]);
+    // Discount between subtotal and tax, mirroring InvoiceProcessor.
+    let discount = 0;
+    if (discType === "percent") {
+      discount = Math.round((subtotal * (parseFloat(discValue) || 0) * 100) / 10000);
+    } else if (discType === "fixed") {
+      discount = Math.round((parseFloat(discValue) || 0) * 100);
+    }
+    discount = Math.max(0, Math.min(discount, subtotal));
+    const taxable = subtotal - discount;
+    // Per-line tax (#670), mirroring InvoiceProcessor's proportional math.
+    const ratio = subtotal > 0 ? taxable / subtotal : 0;
+    const tax = lines.reduce((sum, l) => {
+      const amount = Math.round(
+        (parseFloat(l.quantity) || 0) * Math.round((parseFloat(l.unit) || 0) * 100),
+      );
+      const ratePercent = l.tax.trim() === "" ? parseFloat(taxPercent) || 0 : parseFloat(l.tax) || 0;
+      if (ratePercent <= 0) return sum;
+      return sum + Math.round((amount * ratio * ratePercent * 100) / 10000);
+    }, 0);
+    return { subtotal, discount, tax, total: taxable + tax };
+  }, [lines, taxPercent, discType, discValue]);
 
   const addLine = () =>
     setLines((prev) => [
       ...prev,
-      { key: `new-${prev.length}-${Date.now()}`, description: "", quantity: "1", unit: "0.00" },
+      { key: `new-${prev.length}-${Date.now()}`, description: "", quantity: "1", unit: "0.00", tax: "" },
     ]);
   const removeLine = (key: string) => setLines((prev) => prev.filter((l) => l.key !== key));
   const updateLine = (key: string, patch: Partial<EditableLine>) =>
@@ -115,10 +151,16 @@ const InvoiceDetailPage = () => {
           dueDate: dueDate || null,
           notes: notes.trim() || null,
           taxRate: Math.round((parseFloat(taxPercent) || 0) * 100),
+          discountType: discType || null,
+          discountValue:
+            discType === ""
+              ? null
+              : Math.round((parseFloat(discValue) || 0) * 100),
           lineItems: lines.map((l, i) => ({
             description: l.description.trim() || "—",
             quantity: parseFloat(l.quantity) || 0,
             unitAmount: Math.round((parseFloat(l.unit) || 0) * 100),
+            taxRate: l.tax.trim() === "" ? null : Math.round((parseFloat(l.tax) || 0) * 100),
             position: i,
           })),
           recurrenceFrequency: recurring ? freq : null,
@@ -150,6 +192,84 @@ const InvoiceDetailPage = () => {
       void invoiceQuery.refetch();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action failed.");
+    }
+  };
+
+  // Partial payments (#648): record against / remove from the ledger.
+  const recordPayment = async () => {
+    if (!invoice) return;
+    const amountMinor = Math.round((parseFloat(payAmount) || 0) * 100);
+    if (amountMinor <= 0) {
+      setError("Enter a payment amount.");
+      return;
+    }
+    setPayBusy(true);
+    setError(null);
+    try {
+      await apiSend("POST", `${invoice["@id"]}/payments`, {
+        contentType: "application/json",
+        errorMessage: "Failed to record the payment.",
+        body: {
+          amount: amountMinor,
+          ...(payDate ? { paidOn: payDate } : {}),
+          ...(payMethod.trim() ? { method: payMethod.trim() } : {}),
+          ...(payNote.trim() ? { note: payNote.trim() } : {}),
+        },
+      });
+      setPayAmount("");
+      setPayDate("");
+      setPayMethod("");
+      setPayNote("");
+      setNotice("Payment recorded.");
+      void invoiceQuery.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to record the payment.");
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  // Client retainer (#673): available balance + one-click apply.
+  const clientId =
+    invoice && typeof invoice.client !== "string" ? invoice.client.id : null;
+  const retainerQuery = useQuery({
+    queryKey: ["retainer", clientId],
+    enabled: isAuthenticated && !!clientId,
+    queryFn: () =>
+      apiGet<{ balance: number; currency: string }>(`/clients/${clientId}/retainer`, {
+        errorMessage: "Failed to load the retainer balance.",
+      }),
+  });
+  const retainerBalance = retainerQuery.data?.balance ?? 0;
+
+  const applyRetainer = async () => {
+    if (!invoice) return;
+    setError(null);
+    try {
+      await apiSend("POST", `${invoice["@id"]}/apply-retainer`, {
+        contentType: "application/json",
+        errorMessage: "Failed to apply the retainer.",
+        body: {},
+      });
+      setNotice("Retainer applied.");
+      void invoiceQuery.refetch();
+      void retainerQuery.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to apply the retainer.");
+    }
+  };
+
+  const deletePayment = async (paymentId: string) => {
+    if (!invoice) return;
+    if (!window.confirm("Remove this payment?")) return;
+    setError(null);
+    try {
+      await apiSend("DELETE", `${invoice["@id"]}/payments/${paymentId}`, {
+        errorMessage: "Failed to remove the payment.",
+      });
+      void invoiceQuery.refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to remove the payment.");
     }
   };
 
@@ -236,6 +356,7 @@ const InvoiceDetailPage = () => {
                         <th className="py-2">Description</th>
                         <th className="w-20 py-2 text-right">Qty</th>
                         <th className="w-28 py-2 text-right">Unit</th>
+                        <th className="w-20 py-2 text-right">Tax %</th>
                         <th className="w-28 py-2 text-right">Amount</th>
                         {editable && <th className="w-8" />}
                       </tr>
@@ -284,6 +405,23 @@ const InvoiceDetailPage = () => {
                                 formatMoney(Math.round((parseFloat(line.unit) || 0) * 100), currency)
                               )}
                             </td>
+                            <td className="py-1.5 text-right">
+                              {editable ? (
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={line.tax}
+                                  placeholder={taxPercent}
+                                  onChange={(e) => updateLine(line.key, { tax: e.target.value })}
+                                  title="Per-line tax % (blank inherits the invoice rate)"
+                                  className="h-8 text-right"
+                                />
+                              ) : line.tax.trim() === "" ? (
+                                <span className="text-muted-foreground">—</span>
+                              ) : (
+                                `${line.tax}%`
+                              )}
+                            </td>
                             <td className="py-1.5 text-right tabular-nums">{formatMoney(amount, currency)}</td>
                             {editable && (
                               <td className="py-1.5 text-right">
@@ -314,6 +452,14 @@ const InvoiceDetailPage = () => {
                       <span className="text-muted-foreground">Subtotal</span>
                       <span className="tabular-nums">{formatMoney(preview.subtotal, currency)}</span>
                     </div>
+                    {preview.discount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Discount</span>
+                        <span className="tabular-nums">
+                          −{formatMoney(preview.discount, currency)}
+                        </span>
+                      </div>
+                    )}
                     {preview.tax > 0 && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Tax</span>
@@ -324,6 +470,22 @@ const InvoiceDetailPage = () => {
                       <span>Total</span>
                       <span className="tabular-nums">{formatMoney(preview.total, currency)}</span>
                     </div>
+                    {invoice.amountPaid > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Paid</span>
+                          <span className="tabular-nums">
+                            −{formatMoney(invoice.amountPaid, currency)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between border-t pt-1 font-semibold">
+                          <span>Balance due</span>
+                          <span className="tabular-nums">
+                            {formatMoney(invoice.balanceDue, currency)}
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -352,6 +514,36 @@ const InvoiceDetailPage = () => {
                           onChange={(e) => setTaxPercent(e.target.value)}
                         />
                       </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="inv-disc-type">Discount</Label>
+                        <select
+                          id="inv-disc-type"
+                          value={discType}
+                          onChange={(e) => setDiscType(e.target.value)}
+                          className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">None</option>
+                          <option value="percent">Percent</option>
+                          <option value="fixed">Fixed amount</option>
+                        </select>
+                      </div>
+                      {discType !== "" && (
+                        <div className="space-y-1.5">
+                          <Label htmlFor="inv-disc-value">
+                            {discType === "percent" ? "Discount %" : "Discount amount"}
+                          </Label>
+                          <Input
+                            id="inv-disc-value"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={discValue}
+                            onChange={(e) => setDiscValue(e.target.value)}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="inv-notes">Notes</Label>
@@ -404,6 +596,124 @@ const InvoiceDetailPage = () => {
                     <Button onClick={() => void save()} disabled={saving}>
                       {saving ? "Saving…" : "Save"}
                     </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {(status === "sent" || status === "overdue" || status === "paid") && (
+                <Card className="mb-6">
+                  <CardContent className="space-y-4 py-6">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Payments
+                      </h2>
+                      <span className="text-sm text-muted-foreground">
+                        Balance due:{" "}
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {formatMoney(invoice.balanceDue, currency)}
+                        </span>
+                      </span>
+                    </div>
+
+                    {invoice.payments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+                    ) : (
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {invoice.payments.map((p) => (
+                            <tr key={p.id} className="border-b last:border-0">
+                              <td className="py-1.5 text-muted-foreground">
+                                {new Date(p.paidOn).toLocaleDateString(undefined, {
+                                  dateStyle: "medium",
+                                })}
+                              </td>
+                              <td className="py-1.5">{p.method ?? "payment"}</td>
+                              <td className="py-1.5 text-muted-foreground">{p.note}</td>
+                              <td className="py-1.5 text-right tabular-nums">
+                                {formatMoney(p.amount, currency)}
+                              </td>
+                              <td className="w-8 py-1.5 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => void deletePayment(p.id)}
+                                  aria-label="Remove payment"
+                                >
+                                  <Trash2 className="size-4 text-muted-foreground" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+
+                    {invoice.balanceDue > 0 && (
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="pay-amount">Amount</Label>
+                          <Input
+                            id="pay-amount"
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                            className="w-32"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="pay-date">Date</Label>
+                          <Input
+                            id="pay-date"
+                            type="date"
+                            value={payDate}
+                            onChange={(e) => setPayDate(e.target.value)}
+                            className="w-40"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="pay-method">Method</Label>
+                          <Input
+                            id="pay-method"
+                            placeholder="bank transfer"
+                            value={payMethod}
+                            onChange={(e) => setPayMethod(e.target.value)}
+                            className="w-40"
+                          />
+                        </div>
+                        <div className="min-w-40 flex-1 space-y-1.5">
+                          <Label htmlFor="pay-note">Note</Label>
+                          <Input
+                            id="pay-note"
+                            value={payNote}
+                            onChange={(e) => setPayNote(e.target.value)}
+                          />
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => void recordPayment()}
+                          disabled={payBusy}
+                        >
+                          {payBusy ? "Recording…" : "Record payment"}
+                        </Button>
+                        {retainerBalance > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void applyRetainer()}
+                            title="Pay from the client's retainer balance"
+                          >
+                            Apply retainer (
+                            {formatMoney(
+                              retainerBalance,
+                              retainerQuery.data?.currency ?? currency,
+                            )}
+                            )
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

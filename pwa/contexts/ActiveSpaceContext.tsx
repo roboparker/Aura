@@ -33,6 +33,8 @@ export interface SpaceMembershipRow {
   role: "admin" | "member";
   /** Custom roles assigned to this member (#space-roles); empty = unrestricted. */
   roles?: { "@id": string; id: string; name: string; color: string | null }[];
+  /** Internal cost rate (#653), minor units per hour; null = not set. */
+  costRateAmount?: number | null;
 }
 
 export interface SpaceAttachment {
@@ -71,6 +73,14 @@ export interface Space {
     personalizedColor?: string;
   } | null;
   userMemberships: SpaceMembershipRow[];
+  /** Invoice branding (#669) — admin-editable on the space settings page. */
+  invoiceLogo?: {
+    "@id": string;
+    variantUrls?: { thumb?: string; profile?: string };
+  } | null;
+  invoiceTerms?: string | null;
+  invoiceNumberPrefix?: string | null;
+  invoiceNumberNext?: number | null;
   /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
   boardsCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */

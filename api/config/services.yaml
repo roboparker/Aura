@@ -8,6 +8,17 @@ parameters:
     # env var is unset — see app.calendar_webhook_base_url below (#582 Phase D).
     env(CALENDAR_WEBHOOK_BASE_URL): ''
 
+    # Stripe self-serve price-id fallbacks. The billing controllers resolve each
+    # price from its STRIPE_PRICE_* env var, defaulting to these params when the
+    # env is empty/unset. Blank here → prod correctly reports "plan not
+    # configured" until the real ids are set. Pinned in when@test below so the
+    # billing suite is deterministic regardless of env-resolution order (see
+    # RateLimitTest, which mutates $_ENV and reboots kernels).
+    app.stripe_price_pro_monthly: ''
+    app.stripe_price_pro_yearly: ''
+    app.stripe_price_business_monthly: ''
+    app.stripe_price_business_yearly: ''
+
     # Whether a new open signup (waitlist off) must confirm its email before
     # the account is usable. Env-driven (like the RATE_LIMIT_* knobs) so the
     # test suite can toggle it per case: prod/staging ship it ON via .env,
@@ -243,6 +254,15 @@ when@test:
         # registering plain users; WaitlistTest flips the toggle on
         # explicitly to exercise the gated path.
         app.waitlist_enabled_default: false
+        # Pin the Stripe price ids so the billing suite always sees the plans as
+        # configured — the STRIPE_PRICE_* env in .env.test can resolve empty in
+        # an unlucky test order (RateLimitTest mutates $_ENV + reboots kernels),
+        # which intermittently 503'd checkout with "plan not configured". These
+        # match the .env.test values so assertions on the price id still hold.
+        app.stripe_price_pro_monthly: 'price_test_pro_monthly'
+        app.stripe_price_pro_yearly: 'price_test_pro_yearly'
+        app.stripe_price_business_monthly: 'price_test_biz_monthly'
+        app.stripe_price_business_yearly: 'price_test_biz_yearly'
     services:
         App\Tests\Push\InMemoryPushSender:
             public: true

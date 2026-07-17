@@ -297,6 +297,11 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
       label: "Global custom fields",
       match: "/admin/global-custom-fields",
     },
+    {
+      href: "/admin/sentry-test",
+      label: "Sentry test",
+      match: "/admin/sentry-test",
+    },
     { href: "/feedback", label: "Feedback", match: "/feedback" },
     ...ADMIN_EXTERNAL_LINKS.map((l) => ({ ...l, match: l.href, external: true })),
   ];
@@ -574,9 +579,13 @@ const BillingSection = ({
 
   const links = [
     { href: "/time", label: "Time", match: "/time", show: true },
+    { href: "/expenses", label: "Expenses", match: "/expenses", show: true },
     { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
     { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
+    { href: "/estimates", label: "Estimates", match: "/estimates", show: canInvoices },
+    { href: "/reports", label: "Reports", match: "/reports", show: canInvoices },
+    { href: "/approvals", label: "Approvals", match: "/approvals", show: canInvoices },
   ].filter((l) => l.show);
 
   if (links.length === 0) return null;

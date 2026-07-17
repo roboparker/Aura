@@ -87,6 +87,14 @@ class Notification
     public const TYPE_ASSIGNED = 'assigned';
     /** A task you own or are assigned to changed status (e.g. completed). */
     public const TYPE_STATUS = 'status';
+    /** A member submitted their weekly timesheet (→ space admins) (#654/#667). */
+    public const TYPE_TIMESHEET_SUBMITTED = 'timesheet_submitted';
+    /** Your timesheet was approved or rejected (#654/#667). */
+    public const TYPE_TIMESHEET_DECIDED = 'timesheet_decided';
+    /** You tracked time last week but haven't submitted the week yet (#668). */
+    public const TYPE_TIMESHEET_NUDGE = 'timesheet_nudge';
+    /** An engagement crossed a budget threshold (→ space admins) (#651/#667). */
+    public const TYPE_BUDGET_ALERT = 'budget_alert';
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -172,6 +180,15 @@ class Notification
     #[ORM\ManyToOne(targetEntity: Page::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     private ?Page $page = null;
+
+    /**
+     * Static in-app deep-link for notifications that don't point at an
+     * entity (#667) — e.g. "/approvals" for a timesheet submission or
+     * "/engagements" for a budget alert. Surfaced through the computed
+     * `targetUrl` getter like the entity-derived links.
+     */
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $targetPath = null;
 
     /**
      * Set by NotificationUpdateProcessor when the user marks the row read.
@@ -424,7 +441,19 @@ class Notification
             return $this->pageTarget($this->page);
         }
 
-        return ['url' => null, 'label' => null, 'context' => null];
+        return ['url' => $this->targetPath, 'label' => null, 'context' => null];
+    }
+
+    public function getTargetPath(): ?string
+    {
+        return $this->targetPath;
+    }
+
+    public function setTargetPath(?string $targetPath): self
+    {
+        $this->targetPath = $targetPath;
+
+        return $this;
     }
 
     /**

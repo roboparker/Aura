@@ -23,6 +23,9 @@
     .totals td { padding: 4px 8px; }
     .totals .grand td { border-top: 2px solid #111827; font-weight: bold; font-size: 14px; }
     .notes { margin-top: 28px; padding-top: 12px; border-top: 1px solid #e5e7eb; white-space: pre-wrap; }
+    .logo { max-height: 56px; max-width: 200px; margin-bottom: 8px; }
+    .terms { margin-top: 20px; padding-top: 10px; border-top: 1px solid #e5e7eb;
+        white-space: pre-wrap; color: #6b7280; font-size: 10px; }
 </style>
 </head>
 <body>
@@ -32,6 +35,7 @@
 
 <div class="header">
     <span class="status">{{ invoice.status }}</span>
+    {% if logoDataUri %}<img class="logo" src="{{ logoDataUri }}" alt="">{% endif %}
     <h1>INVOICE</h1>
     <div class="muted">{{ invoice.number ?? 'Draft' }}</div>
 </div>
@@ -90,20 +94,73 @@
         <td>Subtotal</td>
         <td class="num">{{ fmt.money(invoice.subtotal, c) }}</td>
     </tr>
-    {% if invoice.taxAmount > 0 %}
+    {% if invoice.discountAmount > 0 %}
     <tr>
-        <td>Tax ({{ (invoice.taxRate / 100)|number_format(2) }}%)</td>
-        <td class="num">{{ fmt.money(invoice.taxAmount, c) }}</td>
+        <td>Discount{% if invoice.discountType == 'percent' and invoice.discountValue %} ({{ (invoice.discountValue / 100)|number_format(2) }}%){% endif %}</td>
+        <td class="num">−{{ fmt.money(invoice.discountAmount, c) }}</td>
     </tr>
     {% endif %}
+    {% for tax in invoice.taxBreakdown %}
+    <tr>
+        <td>Tax ({{ (tax.rate / 100)|number_format(2) }}%)</td>
+        <td class="num">{{ fmt.money(tax.amount, c) }}</td>
+    </tr>
+    {% endfor %}
     <tr class="grand">
         <td>Total</td>
         <td class="num">{{ fmt.money(invoice.total, c) }}</td>
     </tr>
+    {% if invoice.amountPaid > 0 %}
+    <tr>
+        <td>Amount paid</td>
+        <td class="num">−{{ fmt.money(invoice.amountPaid, c) }}</td>
+    </tr>
+    <tr class="grand">
+        <td>Balance due</td>
+        <td class="num">{{ fmt.money(invoice.balanceDue, c) }}</td>
+    </tr>
+    {% endif %}
 </table>
+
+{% if invoice.payments|length > 0 %}
+<table class="lines" style="margin-top: 20px;">
+    <thead>
+        <tr>
+            <th>Payment</th>
+            <th class="num">Date</th>
+            <th class="num">Amount</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for payment in invoice.payments %}
+        <tr>
+            <td>{{ payment.method ?? 'payment' }}</td>
+            <td class="num">{{ payment.paidOn|date('M j, Y') }}</td>
+            <td class="num">{{ fmt.money(payment.amount, c) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
 
 {% if invoice.notes %}
 <div class="notes">{{ invoice.notes }}</div>
+{% endif %}
+
+{% if terms %}
+<div class="terms">{{ terms }}</div>
+{% endif %}
+
+{% if receipts|length > 0 %}
+<div style="page-break-before: always;">
+    <div class="label" style="margin-bottom: 10px;">Receipts</div>
+    {% for receipt in receipts %}
+    <div style="page-break-inside: avoid; margin-bottom: 18px;">
+        <div class="muted" style="font-size: 10px; margin-bottom: 4px;">{{ receipt.caption }}</div>
+        <img src="{{ receipt.dataUri }}" style="max-width: 100%; max-height: 640px;" alt="">
+    </div>
+    {% endfor %}
+</div>
 {% endif %}
 </body>
 </html>
