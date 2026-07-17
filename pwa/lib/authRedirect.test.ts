@@ -54,6 +54,18 @@ describe("safeNextPath", () => {
     expect(safeNextPath(undefined, "/settings/profile")).toBe("/settings/profile");
     expect(safeNextPath("//evil.com", "/home")).toBe("/home");
   });
+
+  it("rejects candidates that normalise to a protocol-relative path", () => {
+    // Each raw string starts with a single "/" (so isSafeNextPath passes),
+    // but URL dot-segment normalisation collapses the leading "/.." to leave
+    // a "//host" pathname — a protocol-relative string that router.push would
+    // navigate cross-origin. The output re-check must reject it.
+    for (const hostile of ["/..//evil.com", "/..//evil.com/x", "/a/../..//evil.com"]) {
+      const out = safeNextPath(hostile);
+      expect(out).toBe("/boards");
+      expect(out.startsWith("//")).toBe(false);
+    }
+  });
 });
 
 describe("signinHrefForCurrent", () => {

@@ -36,8 +36,21 @@ function sameOriginTarget(input: RequestInfo | URL): RequestInfo | URL {
   if (resolved.origin !== window.location.origin) {
     throw new Error("Refusing to fetch a cross-origin URL.");
   }
-  // Host is the constant, trusted origin; only path/query/hash are caller-derived.
-  return new URL(resolved.pathname + resolved.search + resolved.hash, window.location.origin).href;
+  // Rebuild via component *assignment*, never re-parsing. Re-parsing the
+  // path (`new URL(path + …, origin)`) was exploitable: a same-origin URL
+  // like `https://app//evil.com/x` has pathname `//evil.com/x`, which a
+  // re-parse treats as protocol-relative — flipping the host to evil.com.
+  // Property setters are component-scoped: assigning `pathname` can never
+  // introduce an authority, so the trusted origin survives by construction.
+  const rebuilt = new URL(window.location.origin);
+  rebuilt.pathname = resolved.pathname;
+  rebuilt.search = resolved.search;
+  rebuilt.hash = resolved.hash;
+  // Belt and braces: the exact value handed to fetch() is same-origin.
+  if (rebuilt.origin !== window.location.origin) {
+    throw new Error("Refusing to fetch a cross-origin URL.");
+  }
+  return rebuilt.href;
 }
 
 /**
