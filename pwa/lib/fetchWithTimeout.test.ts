@@ -14,15 +14,21 @@ describe("fetchWithTimeout same-origin guard", () => {
   });
 
   const stubFetch = () => {
-    const spy = vi.fn(async () => new Response("ok"));
+    const spy = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) => new Response("ok"),
+    );
     vi.stubGlobal("fetch", spy);
     return spy;
   };
 
+  /** The URL string actually handed to the stubbed fetch on its first call. */
+  const firstTarget = (spy: ReturnType<typeof stubFetch>): string =>
+    String(spy.mock.calls[0]?.[0]);
+
   it("passes a plain same-origin path through to fetch", async () => {
     const spy = stubFetch();
     await fetchWithTimeout("/api/me");
-    const target = spy.mock.calls[0][0] as string;
+    const target = firstTarget(spy);
     expect(new URL(target).origin).toBe(window.location.origin);
     expect(new URL(target).pathname).toBe("/api/me");
   });
@@ -50,7 +56,7 @@ describe("fetchWithTimeout same-origin guard", () => {
     // would treat it as protocol-relative and flip the host. The
     // component-assignment rebuild must keep the trusted origin.
     await fetchWithTimeout(`${window.location.origin}//evil.example/x`);
-    const target = spy.mock.calls[0][0] as string;
+    const target = firstTarget(spy);
     expect(new URL(target).origin).toBe(window.location.origin);
     expect(new URL(target).host).not.toBe("evil.example");
   });
