@@ -76,7 +76,7 @@ Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user 
 
 Create tools that target a space (`create_board`, `create_page`, `create_discussion`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
 
-> **Custom field values** — `get_custom_fields` returns a project's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
+> **Custom field values** — `get_custom_fields` returns a board's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
 
 ## Errors
 
