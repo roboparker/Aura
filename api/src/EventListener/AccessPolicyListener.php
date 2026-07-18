@@ -59,7 +59,6 @@ final class AccessPolicyListener
         'boards' => 'boards',
         'custom_field_definitions' => 'boards',
         'pages' => 'pages',
-        'discussions' => 'discussions',
         'comments' => 'comments',
         'notifications' => 'notifications',
         'media-objects' => 'files',
@@ -78,7 +77,6 @@ final class AccessPolicyListener
         'boards' => 'board',
         'pages' => 'page',
         'tasks' => 'task',
-        'discussions' => 'discussion',
     ];
 
     public function __construct(private ActorPolicyResolver $resolver)

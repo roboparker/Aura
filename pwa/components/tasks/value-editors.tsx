@@ -72,7 +72,7 @@ export interface ValueEditorProps {
   disabled?: boolean;
   /** Board the task belongs to (reference task scope). */
   boardIri?: string | null;
-  /** Space the board lives in (reference board/page/discussion scope). */
+  /** Space the board lives in (reference board/page scope). */
   spaceIri?: string | null;
   /** Space members for reference.user (avoids a fetch). */
   users?: AvatarUser[];
@@ -707,7 +707,7 @@ interface CollectionItem {
 /**
  * Load the option set for a reference subtype, scoped to match the
  * server-side validation: users from the space members (passed in), tasks
- * from the current board, boards/pages/discussions from the space.
+ * from the current board, boards/pages from the space.
  */
 const useReferenceOptions = (
   subtype: string,
@@ -778,8 +778,6 @@ const referenceEndpoint = (
       return `/boards${space}`;
     case "page":
       return `/pages${space}`;
-    case "discussion":
-      return `/discussions${space}`;
     default:
       return null;
   }

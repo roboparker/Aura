@@ -29,7 +29,7 @@ export const NOTIFICATION_ROWS: NotificationRow[] = [
   {
     key: "replies",
     label: "Replies in threads I follow",
-    description: "Replies inside discussion threads you're subscribed to.",
+    description: "Replies inside comment threads you're subscribed to.",
   },
   {
     key: "status",

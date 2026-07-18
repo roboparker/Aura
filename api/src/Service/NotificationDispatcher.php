@@ -3,7 +3,6 @@
 namespace App\Service;
 
 use App\Entity\Comment;
-use App\Entity\Discussion;
 use App\Entity\Notification;
 use App\Entity\Page;
 use App\Entity\Task;
@@ -81,7 +80,6 @@ final class NotificationDispatcher
         ?string $body = null,
         ?Task $task = null,
         ?Comment $comment = null,
-        ?Discussion $discussion = null,
         ?Page $page = null,
         ?string $targetPath = null,
     ): ?Notification {
@@ -109,7 +107,6 @@ final class NotificationDispatcher
         $notification->setBody($body);
         $notification->setTask($task);
         $notification->setComment($comment);
-        $notification->setDiscussion($discussion);
         $notification->setPage($page);
         $notification->setTargetPath($targetPath);
 

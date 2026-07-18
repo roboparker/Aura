@@ -86,7 +86,7 @@ class Board
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['board:read', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'task:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -123,7 +123,7 @@ class Board
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
-    #[Groups(['board:read', 'board:write', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'board:write', 'task:read'])]
     #[Gedmo\Versioned]
     private string $title = '';
 

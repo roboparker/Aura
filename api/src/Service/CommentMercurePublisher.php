@@ -13,9 +13,8 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
  * Publishes comment lifecycle events on the parent's Mercure topic so
  * collaborators see each other's posts without reloading. The topic
  * is the parent's path with `/comments` appended (e.g.
- * `/tasks/abc-123/comments`, `/pages/abc-123/comments`, or
- * `/discussions/abc-123/comments`), which matches what the
- * subscribe-token endpoint authorizes.
+ * `/tasks/abc-123/comments` or `/pages/abc-123/comments`), which
+ * matches what the subscribe-token endpoint authorizes.
  *
  * Updates are published with `private=true` — only subscribers whose
  * JWT lists the topic in its `subscribe` claim will receive them. The
@@ -92,10 +91,6 @@ final class CommentMercurePublisher
         $page = $comment->getPage();
         if (null !== $page && null !== $page->getId()) {
             return '/pages/' . $page->getId();
-        }
-        $discussion = $comment->getDiscussion();
-        if (null !== $discussion && null !== $discussion->getId()) {
-            return '/discussions/' . $discussion->getId();
         }
         $feedback = $comment->getFeedback();
         if (null !== $feedback && null !== $feedback->getId()) {

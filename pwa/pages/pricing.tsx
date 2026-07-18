@@ -36,7 +36,7 @@ const TIERS: Tier[] = [
       "Unlimited personal tasks, boards & pages",
       "Up to 5 members per shared space",
       "100 MCP (programmatic API) calls per day",
-      "Calendar, discussions & file attachments",
+      "Calendar & file attachments",
     ],
   },
   {

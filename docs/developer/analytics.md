@@ -109,7 +109,6 @@ emails**.
 | `task-create` | `pages/tasks.tsx` | — |
 | `board-create` | `pages/boards/index.tsx` | — |
 | `page-create` | `pages/pages/index.tsx` | — |
-| `discussion-create` | `DiscussionsPanel` | `category` |
 | `comment-create` | `CommentsPanel` (all surfaces) | — |
 | `space-create` | `pages/spaces/new.tsx` | `visibility` |
 | `group-create` | `pages/groups/new.tsx` | — |

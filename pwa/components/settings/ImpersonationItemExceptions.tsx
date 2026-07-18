@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Per-item impersonation overrides. For each addressable type (boards,
- * pages, tasks, discussions) the user can pin specific items to none/view/edit,
+ * pages, tasks) the user can pin specific items to none/view/edit,
  * overriding the category default from the PermissionTree above. Stored under
  * the `impersonationItemAccess` preference; enforced server-side by
  * ImpersonationAccessListener (item routes) + ImpersonationItemScope (lists).
@@ -24,21 +24,19 @@ const LEVELS: { value: ImpersonationLevel; label: string }[] = [
 ];
 
 const TYPES: {
-  type: "board" | "page" | "task" | "discussion";
+  type: "board" | "page" | "task";
   label: string;
   endpoint: string;
 }[] = [
   { type: "board", label: "Boards", endpoint: "/boards" },
   { type: "page", label: "Pages", endpoint: "/pages" },
   { type: "task", label: "Tasks", endpoint: "/tasks" },
-  { type: "discussion", label: "Discussions", endpoint: "/discussions" },
 ];
 
 const EMPTY: Record<string, Record<string, ImpersonationLevel>> = {
   board: {},
   page: {},
   task: {},
-  discussion: {},
 };
 
 interface Item {

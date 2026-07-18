@@ -12,7 +12,6 @@ const categories = [
   "Editor",
   "User",
   "Layout",
-  "Discussions",
   "Custom fields",
   "Groups",
   "Notifications",

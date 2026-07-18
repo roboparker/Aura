@@ -5,7 +5,6 @@ namespace App\Mcp;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Discussion;
 use App\Entity\MediaObject;
 use App\Entity\Page;
 use App\Entity\Board;
@@ -146,25 +145,6 @@ final class McpEntitySerializer
     /**
      * @return array<string, mixed>
      */
-    public function discussion(Discussion $discussion): array
-    {
-        return [
-            'id' => (string) $discussion->getId(),
-            'title' => $discussion->getTitle(),
-            'body' => $discussion->getBody(),
-            'category' => $discussion->getCategory(),
-            'isPinned' => $discussion->getIsPinned(),
-            'isLocked' => $discussion->getIsLocked(),
-            'spaceId' => null === $discussion->getSpace() ? null : (string) $discussion->getSpace()->getId(),
-            'author' => $this->userSummary($discussion->getAuthor()),
-            'createdOn' => $discussion->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updatedOn' => $discussion->getUpdatedAt()?->format(\DateTimeInterface::ATOM),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     public function comment(Comment $comment): array
     {
         return [
@@ -172,7 +152,6 @@ final class McpEntitySerializer
             'commentableType' => $comment->getCommentableType(),
             'taskId' => null === $comment->getTask() ? null : (string) $comment->getTask()->getId(),
             'pageId' => null === $comment->getPage() ? null : (string) $comment->getPage()->getId(),
-            'discussionId' => null === $comment->getDiscussion() ? null : (string) $comment->getDiscussion()->getId(),
             'feedbackId' => null === $comment->getFeedback() ? null : (string) $comment->getFeedback()->getId(),
             'body' => $comment->getBody(),
             'author' => $this->userSummary($comment->getAuthor()),

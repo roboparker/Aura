@@ -74,9 +74,9 @@ const CommentsPanelPage = () => (
       {
         title: "Locked thread (no composer)",
         description:
-          "Discussions pass `canCompose={false}` on a locked thread; existing comments stay readable and `composerNotice` replaces the composer.",
+          "Pass `canCompose={false}` on a closed thread; existing comments stay readable and `composerNotice` replaces the composer.",
         code: `<CommentsPanel
-  parentLabel="discussion"
+  parentLabel="thread"
   comments={comments}
   isLoading={false}
   currentUserIri="/users/2"
@@ -85,7 +85,7 @@ const CommentsPanelPage = () => (
   composerNotice={
     <Alert>
       <AlertDescription>
-        This discussion is locked — new replies are turned away.
+        This thread is locked — new replies are turned away.
       </AlertDescription>
     </Alert>
   }
@@ -95,7 +95,7 @@ const CommentsPanelPage = () => (
 />`,
         preview: (
           <CommentsPanel
-            parentLabel="discussion"
+            parentLabel="thread"
             comments={sampleComments}
             isLoading={false}
             currentUserIri="/users/2"
@@ -103,7 +103,7 @@ const CommentsPanelPage = () => (
             canCompose={false}
             composerNotice={
               <p className="text-sm text-muted-foreground">
-                This discussion is locked — new replies are turned away.
+                This thread is locked — new replies are turned away.
               </p>
             }
             onCreate={noop}

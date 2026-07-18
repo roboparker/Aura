@@ -1,17 +1,16 @@
 import {
   FileText,
   FolderKanban,
-  MessagesSquare,
   type LucideIcon,
 } from "lucide-react";
 
 /**
- * Shared identity for the three space-content surfaces (Boards /
- * Pages / Discussions): the lucide icon and its color. Single source of
- * truth so the aggregator page headers and the sidebar nav sections
- * always render the same icon + hue per resource.
+ * Shared identity for the space-content surfaces (Boards / Pages): the
+ * lucide icon and its color. Single source of truth so the aggregator
+ * page headers and the sidebar nav sections always render the same icon
+ * + hue per resource.
  */
-export type ContentResource = "boards" | "pages" | "discussions";
+export type ContentResource = "boards" | "pages";
 
 export interface ContentSectionMeta {
   resource: ContentResource;
@@ -38,13 +37,6 @@ export const CONTENT_SECTIONS: ContentSectionMeta[] = [
     singular: "page",
     icon: FileText,
     iconClass: "text-emerald-600 dark:text-emerald-400",
-  },
-  {
-    resource: "discussions",
-    label: "Discussions",
-    singular: "discussion",
-    icon: MessagesSquare,
-    iconClass: "text-cyan-600 dark:text-cyan-400",
   },
 ];
 

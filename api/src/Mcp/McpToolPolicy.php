@@ -29,13 +29,11 @@ final class McpToolPolicy
         'delete_task' => ['category' => 'tasks', 'write' => true],
         'assign_task' => ['category' => 'tasks', 'write' => true],
         'unassign_task' => ['category' => 'tasks', 'write' => true],
-        // comments (task / page / discussion comments share one category)
+        // comments (task / page comments share one category)
         'list_task_comments' => ['category' => 'comments', 'write' => false],
         'add_task_comment' => ['category' => 'comments', 'write' => true],
         'list_page_comments' => ['category' => 'comments', 'write' => false],
         'add_page_comment' => ['category' => 'comments', 'write' => true],
-        'list_discussion_comments' => ['category' => 'comments', 'write' => false],
-        'add_discussion_comment' => ['category' => 'comments', 'write' => true],
         // files (attachments)
         'list_files' => ['category' => 'files', 'write' => false],
         'download_file' => ['category' => 'files', 'write' => false],
@@ -57,10 +55,6 @@ final class McpToolPolicy
         'create_page' => ['category' => 'pages', 'write' => true],
         'update_page' => ['category' => 'pages', 'write' => true],
         'delete_page' => ['category' => 'pages', 'write' => true],
-        // discussions
-        'list_discussions' => ['category' => 'discussions', 'write' => false],
-        'get_discussion' => ['category' => 'discussions', 'write' => false],
-        'create_discussion' => ['category' => 'discussions', 'write' => true],
         // tags — no dedicated category; tags are a task-tagging concern,
         // so they ride the tasks scope.
         'list_tags' => ['category' => 'tasks', 'write' => false],

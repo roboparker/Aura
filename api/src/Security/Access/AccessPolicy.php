@@ -30,7 +30,6 @@ final class AccessPolicy
         'tasks',
         'boards',
         'pages',
-        'discussions',
         'comments',
         'notifications',
         'files',
@@ -43,14 +42,13 @@ final class AccessPolicy
         'security',
     ];
 
-    public const ITEM_TYPES = ['board', 'page', 'task', 'discussion'];
+    public const ITEM_TYPES = ['board', 'page', 'task'];
 
     /** @var array<string, string> item type → owning category */
     private const ITEM_TYPE_CATEGORY = [
         'board' => 'boards',
         'page' => 'pages',
         'task' => 'tasks',
-        'discussion' => 'discussions',
     ];
 
     /**

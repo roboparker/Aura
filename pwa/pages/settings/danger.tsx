@@ -26,7 +26,7 @@ import {
 
 const DELETE_CONSEQUENCES = [
   "Spaces you solely admin are transferred to another member, or archived if empty.",
-  "Pages, discussions and comments you authored stay published, reattributed to “Former member”.",
+  "Pages and comments you authored stay published, reattributed to “Former member”.",
   "Tasks & boards you own are kept under “Former member”; you're unassigned everywhere.",
   "API tokens and sessions are revoked immediately.",
   "You're signed out of all devices. This cannot be undone.",

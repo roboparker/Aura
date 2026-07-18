@@ -21,18 +21,17 @@ const LEVELS: PermissionLevel[] = [
   { value: "edit", label: "Edit" },
 ];
 
-// The five content categories roll up under one "Content" group; the more
+// The content categories roll up under one "Content" group; the more
 // sensitive notifications + files stand on their own as top-level leaves.
 const NODES: PermissionNode[] = [
   {
     key: "content",
     label: "Content",
-    description: "tasks, boards, pages, discussions, comments",
+    description: "tasks, boards, pages, comments",
     children: [
       { key: "tasks", label: "Tasks" },
       { key: "boards", label: "Boards" },
       { key: "pages", label: "Pages" },
-      { key: "discussions", label: "Discussions" },
       { key: "comments", label: "Comments" },
     ],
   },
@@ -44,7 +43,6 @@ const DEFAULT_ACCESS: Record<ImpersonationCategory, ImpersonationLevel> = {
   tasks: "none",
   boards: "none",
   pages: "none",
-  discussions: "none",
   comments: "none",
   notifications: "none",
   files: "none",

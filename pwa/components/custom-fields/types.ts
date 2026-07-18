@@ -34,8 +34,7 @@ export type CustomFieldSubtype =
   | "user"
   | "task"
   | "board"
-  | "page"
-  | "discussion";
+  | "page";
 
 export type FooterKind = "sum" | "avg" | "min" | "max" | "count" | "breakdown";
 

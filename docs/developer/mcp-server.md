@@ -49,7 +49,7 @@ A token acts **as its owner**. By default (`accessPolicy: null`) it can do exact
 }
 ```
 
-`categories` keys are `tasks` / `boards` / `pages` / `discussions` / `comments` / `notifications` / `files`; `items` keys are `board` / `page` / `task` / `discussion` mapping a UUID to a level (an item override wins over its category). Omitted categories default to `none`. The **same policy governs both the REST API and MCP**: REST requests are gated by `App\EventListener\AccessPolicyListener` (path→category, method→view/edit) + per-item collection filtering; MCP tool calls are gated by `App\Mcp\McpToolPolicy` (each tool → category + read/write). MCP enforcement is category-level (tool ids aren't parsed for per-item overrides).
+`categories` keys are `tasks` / `boards` / `pages` / `comments` / `notifications` / `files`; `items` keys are `board` / `page` / `task` mapping a UUID to a level (an item override wins over its category). Omitted categories default to `none`. The **same policy governs both the REST API and MCP**: REST requests are gated by `App\EventListener\AccessPolicyListener` (path→category, method→view/edit) + per-item collection filtering; MCP tool calls are gated by `App\Mcp\McpToolPolicy` (each tool → category + read/write). MCP enforcement is category-level (tool ids aren't parsed for per-item overrides).
 
 Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and the main REST firewall (the authenticator only engages when the Bearer header is present and keeps the request stateless). `POST /api-tokens` and `GET /api-tokens` themselves use the cookie-based PWA session.
 
@@ -65,16 +65,15 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Board       | `create_board`, `get_board`, `update_board`, `delete_board`, `list_boards` |
 | Space       | `list_spaces`                                                                   |
 | Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
-| Discussion  | `create_discussion`, `get_discussion`, `list_discussions`                      |
 | Assignment  | `assign_task`, `unassign_task`, `get_my_tasks`                                 |
-| Comment     | `add_task_comment`, `list_task_comments`, `add_page_comment`, `list_page_comments`, `add_discussion_comment`, `list_discussion_comments` |
+| Comment     | `add_task_comment`, `list_task_comments`, `add_page_comment`, `list_page_comments` |
 | Tag         | `list_tags`, `create_tag`                                                       |
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
 
-Create tools that target a space (`create_board`, `create_page`, `create_discussion`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
+Create tools that target a space (`create_board`, `create_page`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
 
 > **Custom field values** — `get_custom_fields` returns a board's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
 

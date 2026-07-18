@@ -10,8 +10,8 @@ use App\Mcp\McpEntitySerializer;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Lists the spaces the caller belongs to — the containers that boards,
- * pages, and discussions live in. Most other create tools accept a
+ * Lists the spaces the caller belongs to — the containers that boards
+ * and pages live in. Most other create tools accept a
  * `spaceId`, so this is the discovery step that lets the model target a
  * shared space instead of always defaulting to the personal one.
  */
@@ -30,7 +30,7 @@ final class ListSpacesTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List the spaces the user belongs to (personal first, then shared), with the user\'s role in each. Spaces are the top-level containers for boards, pages, and discussions; pass a returned space id as spaceId to other create tools to place content in a shared space.';
+        return 'List the spaces the user belongs to (personal first, then shared), with the user\'s role in each. Spaces are the top-level containers for boards and pages; pass a returned space id as spaceId to other create tools to place content in a shared space.';
     }
 
     public function getInputSchema(): array

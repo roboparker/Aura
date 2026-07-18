@@ -44,7 +44,7 @@ const Privacy = () => (
               </li>
               <li>
                 <strong className="text-foreground">Content you create.</strong>{" "}
-                Tasks, boards, pages, discussions, comments, attachments,
+                Tasks, boards, pages, comments, attachments,
                 tags, and other content you submit to the Service.
               </li>
               <li>
@@ -102,7 +102,7 @@ const Privacy = () => (
               notifications — within a reasonable period, except where
               retention is required for legal, security, or fraud-prevention
               purposes. Content you contributed to shared spaces (such as
-              tasks, pages, discussions, comments, and attachments) may remain
+              tasks, pages, comments, and attachments) may remain
               available to the other members of those spaces, disassociated
               from your identity.
             </p>
