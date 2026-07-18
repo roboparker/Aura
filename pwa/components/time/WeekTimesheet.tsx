@@ -77,13 +77,13 @@ interface RowData {
  */
 const WeekTimesheet = ({
   spaceIri,
-  projects,
+  engagements,
   canCreate,
   canModify,
   onError,
 }: {
   spaceIri: string | null;
-  projects: EngagementOption[];
+  engagements: EngagementOption[];
   canCreate: boolean;
   canModify: (entry: TimeEntry) => boolean;
   onError: (message: string | null) => void;
@@ -184,12 +184,12 @@ const WeekTimesheet = ({
     }
 
     const nameOf = (row: RowData): string => {
-      const p = projects.find((x) => x["@id"] === row.engagement);
+      const p = engagements.find((x) => x["@id"] === row.engagement);
       const c = p?.categories.find((x) => x["@id"] === row.category);
       return `${p?.name ?? "zzz"} ${c?.name ?? ""}`;
     };
     return Array.from(byKey.values()).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-  }, [entriesQuery.data, weekStart, extraRows, projects]);
+  }, [entriesQuery.data, weekStart, extraRows, engagements]);
 
   const dayTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -203,7 +203,7 @@ const WeekTimesheet = ({
   const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
 
   const labelFor = (row: RowData): { engagement: string; category: string } => {
-    const p = projects.find((x) => x["@id"] === row.engagement);
+    const p = engagements.find((x) => x["@id"] === row.engagement);
     const c = p?.categories.find((x) => x["@id"] === row.category);
     return {
       engagement: p?.name ?? "Unknown engagement",
@@ -323,7 +323,7 @@ const WeekTimesheet = ({
     setDraft(null);
   };
 
-  const addCats = projects.find((p) => p["@id"] === addEngagement)?.categories ?? [];
+  const addCats = engagements.find((p) => p["@id"] === addEngagement)?.categories ?? [];
   const rangeLabel = `${weekStart.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -533,7 +533,7 @@ const WeekTimesheet = ({
                           onChange={(e) => {
                             setAddEngagement(e.target.value);
                             const cats =
-                              projects.find((p) => p["@id"] === e.target.value)
+                              engagements.find((p) => p["@id"] === e.target.value)
                                 ?.categories ?? [];
                             setAddCategory(cats[0]?.["@id"] ?? "");
                           }}
@@ -541,7 +541,7 @@ const WeekTimesheet = ({
                           aria-label="Engagement"
                         >
                           <option value="">Engagement…</option>
-                          {projects.map((p) => (
+                          {engagements.map((p) => (
                             <option key={p["@id"]} value={p["@id"]}>
                               {p.name}
                             </option>

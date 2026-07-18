@@ -67,7 +67,7 @@ const TimePage = () => {
   const [workDate, setWorkDate] = useState(() => dateInput(new Date()));
   const [startTime, setStartTime] = useState(() => timeInput(new Date()));
   const [endTime, setEndTime] = useState(() => timeInput(new Date()));
-  const [projectIri, setProjectIri] = useState("");
+  const [engagementIri, setEngagementIri] = useState("");
   const [categoryIri, setCategoryIri] = useState("");
   const [editingIri, setEditingIri] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -96,34 +96,34 @@ const TimePage = () => {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["time_entries"] });
 
   // Engagements + categories the member may pick from.
-  const projectsQuery = useQuery({
-    queryKey: ["billing_project_options", spaceId],
+  const engagementsQuery = useQuery({
+    queryKey: ["billing_engagement_options", spaceId],
     enabled: isAuthenticated && !!spaceId,
     queryFn: () =>
       apiGet<{ options: EngagementOption[] }>(`/spaces/${spaceId}/engagement-options`, {
         errorMessage: "Failed to load engagements.",
       }).then((r) => r.options ?? []),
   });
-  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
-  const noProjects = !projectsQuery.isLoading && projects.length === 0;
+  const engagements = useMemo(() => engagementsQuery.data ?? [], [engagementsQuery.data]);
+  const noEngagements = !engagementsQuery.isLoading && engagements.length === 0;
 
-  const selectedProject = projects.find((p) => p["@id"] === projectIri) ?? null;
-  const categories = useMemo(() => selectedProject?.categories ?? [], [selectedProject]);
-  const projectName = useMemo(() => {
+  const selectedEngagement = engagements.find((p) => p["@id"] === engagementIri) ?? null;
+  const categories = useMemo(() => selectedEngagement?.categories ?? [], [selectedEngagement]);
+  const engagementName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of projects) m.set(p["@id"], p.name);
+    for (const p of engagements) m.set(p["@id"], p.name);
     return m;
-  }, [projects]);
+  }, [engagements]);
   const categoryName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of projects) for (const c of p.categories) m.set(c["@id"], c.name);
+    for (const p of engagements) for (const c of p.categories) m.set(c["@id"], c.name);
     return m;
-  }, [projects]);
+  }, [engagements]);
 
-  // Default the pickers once loaded / when the project changes.
+  // Default the pickers once loaded / when the engagement changes.
   useEffect(() => {
-    if (!projectIri && projects.length > 0) setProjectIri(projects[0]["@id"]);
-  }, [projects, projectIri]);
+    if (!engagementIri && engagements.length > 0) setEngagementIri(engagements[0]["@id"]);
+  }, [engagements, engagementIri]);
   useEffect(() => {
     if (categories.length > 0 && !categories.some((c) => c["@id"] === categoryIri)) {
       setCategoryIri(categories[0]["@id"]);
@@ -139,8 +139,8 @@ const TimePage = () => {
     return () => clearInterval(t);
   }, [runningIri]);
 
-  const projectCategoryBody = () => ({
-    engagement: projectIri,
+  const engagementCategoryBody = () => ({
+    engagement: engagementIri,
     category: categoryIri,
     ...(spaceIri ? { space: spaceIri } : {}),
   });
@@ -153,7 +153,7 @@ const TimePage = () => {
           description: description.trim() || null,
           startedAt: composeIso(workDate, startTime),
           endedAt: endTime ? composeIso(workDate, endTime) : null,
-          ...projectCategoryBody(),
+          ...engagementCategoryBody(),
         },
       }),
     onSuccess: () => {
@@ -172,7 +172,7 @@ const TimePage = () => {
     mutationFn: () =>
       apiSend<TimeEntry>("POST", "/time_entries", {
         errorMessage: "Failed to start the timer.",
-        body: { startedAt: new Date().toISOString(), ...projectCategoryBody() },
+        body: { startedAt: new Date().toISOString(), ...engagementCategoryBody() },
       }),
     onSuccess: () => {
       setActionError(null);
@@ -258,7 +258,7 @@ const TimePage = () => {
   const hasCompleted = grouped.length > 0;
 
   const canCreate = can("time_entries", "create");
-  const canTrack = !!projectIri && !!categoryIri;
+  const canTrack = !!engagementIri && !!categoryIri;
   const isOwn = (entry: TimeEntry) =>
     !!currentUserIri && entry.user === currentUserIri;
   const canModify = (entry: TimeEntry) =>
@@ -273,21 +273,21 @@ const TimePage = () => {
     );
   }
 
-  const projectCategoryPickers = (
+  const engagementCategoryPickers = (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label htmlFor="te-project">Engagement</Label>
+        <Label htmlFor="te-engagement">Engagement</Label>
         <select
-          id="te-project"
-          value={projectIri}
-          onChange={(e) => setProjectIri(e.target.value)}
-          disabled={noProjects}
+          id="te-engagement"
+          value={engagementIri}
+          onChange={(e) => setEngagementIri(e.target.value)}
+          disabled={noEngagements}
           className={SELECT_CLASS}
         >
-          {noProjects ? (
+          {noEngagements ? (
             <option value="">No engagements</option>
           ) : (
-            projects.map((p) => (
+            engagements.map((p) => (
               <option key={p["@id"]} value={p["@id"]}>
                 {p.name}
               </option>
@@ -330,7 +330,7 @@ const TimePage = () => {
             icon={<Clock className="size-6 text-orange-600 dark:text-orange-400" />}
           />
 
-          {canCreate && noProjects && (
+          {canCreate && noEngagements && (
             <Alert className="mb-4">
               <AlertDescription>
                 You need a engagement to track time.{" "}
@@ -372,8 +372,8 @@ const TimePage = () => {
           {view === "week" ? (
             <WeekTimesheet
               spaceIri={spaceIri}
-              projects={projects}
-              canCreate={canCreate && !noProjects}
+              engagements={engagements}
+              canCreate={canCreate && !noEngagements}
               canModify={canModify}
               onError={setActionError}
             />
@@ -396,12 +396,12 @@ const TimePage = () => {
                   </thead>
                   <tbody>
                     {/* Inline "Add time" row, pinned to the top of the table. */}
-                    {canCreate && !noProjects &&
+                    {canCreate && !noEngagements &&
                       (showComposer ? (
                         <tr className="border-b bg-muted/10">
                           <td colSpan={7} className="px-4 py-4">
                             <form onSubmit={handleLog} className="space-y-4">
-                              {projectCategoryPickers}
+                              {engagementCategoryPickers}
                               <div className="space-y-1.5">
                                 <Label htmlFor="te-desc">
                                   Description{" "}
@@ -495,7 +495,7 @@ const TimePage = () => {
                                   disabled={!canTrack || startTimer.isPending}
                                   title={
                                     canTrack
-                                      ? `Start a timer on ${projectName.get(projectIri) ?? "…"} · ${categoryName.get(categoryIri) ?? "…"} (change via Add time)`
+                                      ? `Start a timer on ${engagementName.get(engagementIri) ?? "…"} · ${categoryName.get(categoryIri) ?? "…"} (change via Add time)`
                                       : "Pick an engagement first"
                                   }
                                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
@@ -524,7 +524,7 @@ const TimePage = () => {
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
                           {running.engagement
-                            ? projectName.get(running.engagement) ?? "—"
+                            ? engagementName.get(running.engagement) ?? "—"
                             : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
@@ -575,7 +575,7 @@ const TimePage = () => {
                               <EditEntryRow
                                 key={entry["@id"]}
                                 entry={entry}
-                                projects={projects}
+                                engagements={engagements}
                                 pending={updateEntry.isPending}
                                 onCancel={() => setEditingIri(null)}
                                 onSave={(body) =>
@@ -594,7 +594,7 @@ const TimePage = () => {
                                 </td>
                                 <td className="px-4 py-2.5 text-muted-foreground">
                                   {entry.engagement
-                                    ? projectName.get(entry.engagement) ?? "—"
+                                    ? engagementName.get(entry.engagement) ?? "—"
                                     : "—"}
                                 </td>
                                 <td className="px-4 py-2.5 text-muted-foreground">
@@ -665,13 +665,13 @@ const TimePage = () => {
  */
 const EditEntryRow = ({
   entry,
-  projects,
+  engagements,
   pending,
   onSave,
   onCancel,
 }: {
   entry: TimeEntry;
-  projects: EngagementOption[];
+  engagements: EngagementOption[];
   pending: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -682,10 +682,10 @@ const EditEntryRow = ({
   const [eEnd, setEEnd] = useState(() =>
     entry.endedAt ? timeInput(new Date(entry.endedAt)) : "",
   );
-  const [eProject, setEProject] = useState(entry.engagement ?? "");
+  const [eEngagement, setEEngagement] = useState(entry.engagement ?? "");
   const [eCategory, setECategory] = useState(entry.category ?? "");
 
-  const cats = projects.find((p) => p["@id"] === eProject)?.categories ?? [];
+  const cats = engagements.find((p) => p["@id"] === eEngagement)?.categories ?? [];
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -693,7 +693,7 @@ const EditEntryRow = ({
       description: eDescription.trim() || null,
       startedAt: composeIso(eDate, eStart),
       endedAt: eEnd ? composeIso(eDate, eEnd) : null,
-      engagement: eProject,
+      engagement: eEngagement,
       category: eCategory,
     });
   };
@@ -704,20 +704,20 @@ const EditEntryRow = ({
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="tee-project">Engagement</Label>
+              <Label htmlFor="tee-engagement">Engagement</Label>
               <select
-                id="tee-project"
-                value={eProject}
+                id="tee-engagement"
+                value={eEngagement}
                 onChange={(e) => {
                   const next = e.target.value;
-                  setEProject(next);
+                  setEEngagement(next);
                   const nextCats =
-                    projects.find((p) => p["@id"] === next)?.categories ?? [];
+                    engagements.find((p) => p["@id"] === next)?.categories ?? [];
                   setECategory(nextCats[0]?.["@id"] ?? "");
                 }}
                 className={SELECT_CLASS}
               >
-                {projects.map((p) => (
+                {engagements.map((p) => (
                   <option key={p["@id"]} value={p["@id"]}>
                     {p.name}
                   </option>
@@ -787,7 +787,7 @@ const EditEntryRow = ({
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={pending || !eProject || !eCategory}>
+            <Button type="submit" size="sm" disabled={pending || !eEngagement || !eCategory}>
               {pending ? "Saving…" : "Save changes"}
             </Button>
           </div>

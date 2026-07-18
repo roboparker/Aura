@@ -92,16 +92,16 @@ const ExpensesPage = () => {
   const expenses = useMemo(() => expensesQuery.data ?? [], [expensesQuery.data]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["expenses"] });
 
-  const projectsQuery = useQuery({
-    queryKey: ["billing_project_options", spaceId],
+  const engagementsQuery = useQuery({
+    queryKey: ["billing_engagement_options", spaceId],
     enabled: isAuthenticated && !!spaceId,
     queryFn: () =>
       apiGet<{ options: EngagementOption[] }>(`/spaces/${spaceId}/engagement-options`, {
         errorMessage: "Failed to load engagements.",
       }).then((r) => r.options ?? []),
   });
-  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
-  const noProjects = !projectsQuery.isLoading && projects.length === 0;
+  const engagements = useMemo(() => engagementsQuery.data ?? [], [engagementsQuery.data]);
+  const noEngagements = !engagementsQuery.isLoading && engagements.length === 0;
 
   // Managed expense categories (#671): the curated picker; free text remains
   // available when a space hasn't defined any (or via the "Other" choice).
@@ -120,15 +120,15 @@ const ExpensesPage = () => {
   );
   const selectedManaged =
     managedCategories.find((c) => c["@id"] === expenseCategoryIri) ?? null;
-  const projectName = useMemo(() => {
+  const engagementName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of projects) m.set(p["@id"], p.name);
+    for (const p of engagements) m.set(p["@id"], p.name);
     return m;
-  }, [projects]);
+  }, [engagements]);
 
   useEffect(() => {
-    if (!engagementIri && projects.length > 0) setEngagementIri(projects[0]["@id"]);
-  }, [projects, engagementIri]);
+    if (!engagementIri && engagements.length > 0) setEngagementIri(engagements[0]["@id"]);
+  }, [engagements, engagementIri]);
 
   const resetComposer = () => {
     setSpentOn(todayInput());
@@ -234,7 +234,7 @@ const ExpensesPage = () => {
             icon={<ReceiptText className="size-6 text-amber-600 dark:text-amber-400" />}
           />
 
-          {canCreate && noProjects && (
+          {canCreate && noEngagements && (
             <Alert className="mb-4">
               <AlertDescription>
                 You need an engagement to log expenses.{" "}
@@ -270,7 +270,7 @@ const ExpensesPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {canCreate && !noProjects &&
+                    {canCreate && !noEngagements &&
                       (showComposer ? (
                         <tr className="border-b bg-muted/10">
                           <td colSpan={7} className="px-4 py-4">
@@ -287,14 +287,14 @@ const ExpensesPage = () => {
                                   />
                                 </div>
                                 <div className="space-y-1.5">
-                                  <Label htmlFor="ex-project">Engagement</Label>
+                                  <Label htmlFor="ex-engagement">Engagement</Label>
                                   <select
-                                    id="ex-project"
+                                    id="ex-engagement"
                                     value={engagementIri}
                                     onChange={(e) => setEngagementIri(e.target.value)}
                                     className={SELECT_CLASS}
                                   >
-                                    {projects.map((p) => (
+                                    {engagements.map((p) => (
                                       <option key={p["@id"]} value={p["@id"]}>
                                         {p.name}
                                       </option>
@@ -461,7 +461,7 @@ const ExpensesPage = () => {
                           <EditExpenseRow
                             key={expense["@id"]}
                             expense={expense}
-                            projects={projects}
+                            engagements={engagements}
                             pending={updateExpense.isPending}
                             onCancel={() => setEditingIri(null)}
                             onSave={(body) => updateExpense.mutate({ iri: expense["@id"], body })}
@@ -478,7 +478,7 @@ const ExpensesPage = () => {
                             </td>
                             <td className="px-4 py-2.5 text-muted-foreground">
                               {expense.engagement
-                                ? projectName.get(expense.engagement) ?? "—"
+                                ? engagementName.get(expense.engagement) ?? "—"
                                 : "—"}
                             </td>
                             <td className="px-4 py-2.5">{expense.category ?? "—"}</td>
@@ -557,13 +557,13 @@ const ExpensesPage = () => {
 /** Inline editor for one expense — local state keyed per row. */
 const EditExpenseRow = ({
   expense,
-  projects,
+  engagements,
   pending,
   onSave,
   onCancel,
 }: {
   expense: Expense;
-  projects: EngagementOption[];
+  engagements: EngagementOption[];
   pending: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -603,14 +603,14 @@ const EditExpenseRow = ({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="exe-project">Engagement</Label>
+              <Label htmlFor="exe-engagement">Engagement</Label>
               <select
-                id="exe-project"
+                id="exe-engagement"
                 value={eEngagement}
                 onChange={(e) => setEEngagement(e.target.value)}
                 className={SELECT_CLASS}
               >
-                {projects.map((p) => (
+                {engagements.map((p) => (
                   <option key={p["@id"]} value={p["@id"]}>
                     {p.name}
                   </option>
