@@ -3,7 +3,7 @@ export interface Expense {
   "@id": string;
   id: string;
   space: string;
-  engagement: string | null;
+  project: string | null;
   user: string;
   spentOn: string;
   category: string | null;

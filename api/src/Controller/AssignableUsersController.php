@@ -47,7 +47,7 @@ class AssignableUsersController extends AbstractController
         /** @var list<Board> $boards */
         $boards = $this->em->getRepository(Board::class)
             ->createQueryBuilder('board')
-            ->where(SpaceMembershipDql::userBelongsToProjectSpace('board'))
+            ->where(SpaceMembershipDql::userBelongsToBoardSpace('board'))
             ->setParameter('user', $user)
             ->getQuery()
             ->getResult();

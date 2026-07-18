@@ -102,7 +102,7 @@ interface BoardRow {
   owner: { id: string; email: string };
 }
 
-export const SpaceProjectsList = ({ spaceIri, enabled }: { spaceIri: string | null; enabled: boolean }) => {
+export const SpaceBoardsList = ({ spaceIri, enabled }: { spaceIri: string | null; enabled: boolean }) => {
   const { items, isLoading, error } = useFetchList<BoardRow>({
     spaceIri,
     enabled,

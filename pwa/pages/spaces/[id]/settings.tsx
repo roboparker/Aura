@@ -482,7 +482,7 @@ const SpaceSettings = () => {
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Permanently removes {space.name} and all{" "}
-                      {space.boardsCount} project
+                      {space.boardsCount} board
                       {space.boardsCount === 1 ? "" : "s"} and{" "}
                       {space.pagesCount} page
                       {space.pagesCount === 1 ? "" : "s"}. This can&apos;t be

@@ -55,7 +55,7 @@ final class ListPagesTool implements McpToolInterface
 
         $qb = $this->em->getRepository(Page::class)
             ->createQueryBuilder('p')
-            ->where(SpaceMembershipDql::userBelongsToProjectSpace('p', 'page_list'))
+            ->where(SpaceMembershipDql::userBelongsToBoardSpace('p', 'page_list'))
             ->setParameter('user', $user)
             ->orderBy('p.createdAt', 'DESC')
             ->setFirstResult(($page - 1) * $limit)

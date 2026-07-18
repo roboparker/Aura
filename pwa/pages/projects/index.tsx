@@ -43,11 +43,11 @@ interface BoardRow {
 interface CategoryRow {
   "@id"?: string;
   name: string;
-  rateAmount: number;
+  billingRate: number;
   position: number;
   billable: boolean;
 }
-interface Engagement {
+interface Project {
   "@id": string;
   id: string;
   name: string;
@@ -57,7 +57,7 @@ interface Engagement {
   client: string;
   categories: CategoryRow[];
   attachments: Attachment[];
-  assignedProjectList: { id: string; title: string }[];
+  assignedBoardList: { id: string; title: string }[];
   budgetType: "hours" | "fees" | null;
   budgetAmount: number | null;
   budgetSpent: number | null;
@@ -100,7 +100,7 @@ const money = (minor: number, currency: string | null): string =>
 const NEW = "new";
 
 /** Budget progress copy: "1.0 / 2.0 h" or "$500.00 / $2,000.00" (#651). */
-const budgetLabel = (bp: Engagement): string => {
+const budgetLabel = (bp: Project): string => {
   if (!bp.budgetType || !bp.budgetAmount) return "";
   const spent = bp.budgetSpent ?? 0;
   if (bp.budgetType === "hours") {
@@ -110,7 +110,7 @@ const budgetLabel = (bp: Engagement): string => {
 };
 
 /** Small budget progress bar — amber past 80%, red past 100%. */
-const BudgetBar = ({ bp }: { bp: Engagement }) => {
+const BudgetBar = ({ bp }: { bp: Project }) => {
   if (!bp.budgetType || !bp.budgetAmount) return null;
   const pct = Math.round(((bp.budgetSpent ?? 0) / bp.budgetAmount) * 100);
   const width = Math.min(100, pct);
@@ -127,20 +127,20 @@ const BudgetBar = ({ bp }: { bp: Engagement }) => {
   );
 };
 
-const EngagementsPage = () => {
+const ProjectsPage = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { activeSpace } = useActiveSpace();
   const router = useRouter();
 
   const spaceIri = activeSpace?.["@id"] ?? null;
-  const [projects, setProjects] = useState<Engagement[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [taskBoards, setTaskBoards] = useState<BoardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Which engagement the side panel is showing: null (closed) | NEW (create) |
-  // an engagement IRI (view/edit that one).
+  // Which project the side panel is showing: null (closed) | NEW (create) |
+  // an project IRI (view/edit that one).
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [clientIri, setClientIri] = useState("");
@@ -169,7 +169,7 @@ const EngagementsPage = () => {
     try {
       const q = `?space=${encodeURIComponent(spaceIri)}`;
       const [bps, cls, prj, space] = await Promise.all([
-        apiGetCollection<Engagement>(`/engagements${q}`),
+        apiGetCollection<Project>(`/projects${q}`),
         apiGetCollection<ClientRow>(`/clients${q}`),
         apiGetCollection<BoardRow>(`/boards${q}`),
         apiGet<{ userMemberships?: SpaceMemberRow[] }>(spaceIri),
@@ -181,8 +181,8 @@ const EngagementsPage = () => {
     } catch (e) {
       setLoadError(
         e instanceof ApiError && e.status === 403
-          ? "Engagements are managed by space admins."
-          : "Failed to load engagements.",
+          ? "Projects are managed by space admins."
+          : "Failed to load projects.",
       );
     } finally {
       setLoading(false);
@@ -213,7 +213,7 @@ const EngagementsPage = () => {
     setSheetFor(NEW);
   };
 
-  const openEdit = (bp: Engagement) => {
+  const openEdit = (bp: Project) => {
     setName(bp.name);
     setClientIri(bp.client);
     setCurrency(bp.currency ?? "USD");
@@ -228,13 +228,13 @@ const EngagementsPage = () => {
     );
     setCats(
       bp.categories.length > 0
-        ? bp.categories.map((c) => ({ name: c.name, rate: toMajor(c.rateAmount), billable: c.billable }))
+        ? bp.categories.map((c) => ({ name: c.name, rate: toMajor(c.billingRate), billable: c.billable }))
         : [{ name: "", rate: "", billable: true }],
     );
     setUserRates(
       (bp.userRates ?? []).map((r) => ({ user: r.user, rate: toMajor(r.rateAmount) })),
     );
-    setAssigned(bp.assignedProjectList.map((p) => `/boards/${p.id}`));
+    setAssigned(bp.assignedBoardList.map((p) => `/boards/${p.id}`));
     setAttachments(bp.attachments ?? []);
     setFormError(null);
     setSheetFor(bp["@id"]);
@@ -257,7 +257,7 @@ const EngagementsPage = () => {
       .filter((c) => c.name.trim())
       .map((c, i) => ({
         name: c.name.trim(),
-        rateAmount: toMinor(c.rate),
+        billingRate: toMinor(c.rate),
         position: i,
         billable: c.billable,
       }));
@@ -285,11 +285,11 @@ const EngagementsPage = () => {
           .map((r) => ({ user: r.user, rateAmount: toMinor(r.rate) })),
       };
       const saved = editingIri
-        ? await apiSend<Engagement>("PATCH", editingIri, {
+        ? await apiSend<Project>("PATCH", editingIri, {
             body: shared,
             contentType: "application/merge-patch+json",
           })
-        : await apiSend<Engagement>("POST", "/engagements", { body: { space: spaceIri, ...shared } });
+        : await apiSend<Project>("POST", "/projects", { body: { space: spaceIri, ...shared } });
       const bpIri = saved?.["@id"] ?? editingIri;
       if (bpIri) {
         await apiSend("PUT", `${bpIri}/boards`, { body: { boards: assigned } });
@@ -303,7 +303,7 @@ const EngagementsPage = () => {
     }
   };
 
-  const toggleArchive = async (bp: Engagement) => {
+  const toggleArchive = async (bp: Project) => {
     try {
       await apiSend("PATCH", bp["@id"], {
         body: { archived: !bp.archived },
@@ -315,7 +315,7 @@ const EngagementsPage = () => {
     }
   };
 
-  const remove = async (bp: Engagement) => {
+  const remove = async (bp: Project) => {
     try {
       await apiSend("DELETE", bp["@id"]);
       closeSheet();
@@ -352,13 +352,13 @@ const EngagementsPage = () => {
   return (
     <>
       <Head>
-        <title>Engagements — Madori</title>
+        <title>Projects — Madori</title>
       </Head>
       <main className="mx-auto max-w-4xl px-6 py-8">
         <PageHeader
-          title="Engagements"
+          title="Projects"
           icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
-          subtitle="A engagement has a client and a set of categories, each with an hourly rate. Time is tracked against an engagement + category."
+          subtitle="A project has a client and a set of categories, each with an hourly rate. Time is tracked against an project + category."
         />
 
         {loadError && (
@@ -368,7 +368,7 @@ const EngagementsPage = () => {
         )}
         {!loadError && clients.length === 0 && !loading && (
           <Alert className="mb-4">
-            <AlertDescription>Add a client first — engagements bill to a client.</AlertDescription>
+            <AlertDescription>Add a client first — projects bill to a client.</AlertDescription>
           </Alert>
         )}
 
@@ -387,7 +387,7 @@ const EngagementsPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Inline "Add engagement" row, pinned to the top. */}
+                  {/* Inline "Add project" row, pinned to the top. */}
                   <tr className="border-b">
                     <td colSpan={COL_COUNT} className="px-4 py-2">
                       <button
@@ -396,7 +396,7 @@ const EngagementsPage = () => {
                         disabled={clients.length === 0}
                         className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
                       >
-                        <Plus className="h-4 w-4" /> Add engagement
+                        <Plus className="h-4 w-4" /> Add project
                       </button>
                     </td>
                   </tr>
@@ -404,7 +404,7 @@ const EngagementsPage = () => {
                   {projects.length === 0 ? (
                     <tr>
                       <td colSpan={COL_COUNT} className="px-4 py-10 text-center text-muted-foreground">
-                        No engagements yet. Use “Add engagement” to create one.
+                        No projects yet. Use “Add project” to create one.
                       </td>
                     </tr>
                   ) : (
@@ -431,7 +431,7 @@ const EngagementsPage = () => {
                             <div className="flex flex-wrap gap-1.5">
                               {bp.categories.map((c) => (
                                 <Badge key={c.name} variant="outline" className="font-normal">
-                                  {c.name} · {money(c.rateAmount, bp.currency)}
+                                  {c.name} · {money(c.billingRate, bp.currency)}
                                   {!c.billable && " · non-billable"}
                                 </Badge>
                               ))}
@@ -475,7 +475,7 @@ const EngagementsPage = () => {
         >
           <SheetHeader className="border-b px-5 py-4">
             <SheetTitle className="pr-9">
-              {sheetFor === NEW ? "New engagement" : name || "Engagement"}
+              {sheetFor === NEW ? "New project" : name || "Project"}
             </SheetTitle>
           </SheetHeader>
 
@@ -551,7 +551,7 @@ const EngagementsPage = () => {
                 Description{" "}
                 <span className="font-normal text-muted-foreground">(optional, markdown)</span>
               </Label>
-              <MarkdownEditor value={description} onChange={setDescription} ariaLabel="Engagement description" />
+              <MarkdownEditor value={description} onChange={setDescription} ariaLabel="Project description" />
             </div>
 
             <div className="space-y-2">
@@ -618,7 +618,7 @@ const EngagementsPage = () => {
               <Label>Person rates</Label>
               <p className="text-xs text-muted-foreground">
                 Optional per-person billable rate overrides — time this person tracks on
-                this engagement bills at their rate instead of the category&apos;s.
+                this project bills at their rate instead of the category&apos;s.
               </p>
               {userRates.map((r, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -679,7 +679,7 @@ const EngagementsPage = () => {
             <div className="space-y-2">
               <Label>Contract files</Label>
               <AttachmentsPanel
-                taskTitle={name || "this engagement"}
+                taskTitle={name || "this project"}
                 attachments={attachments}
                 canDeleteAll
                 onAttach={onAttach}
@@ -727,7 +727,7 @@ const EngagementsPage = () => {
                     size="sm"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => void remove(editing)}
-                    aria-label="Delete engagement"
+                    aria-label="Delete project"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -749,4 +749,4 @@ const EngagementsPage = () => {
   );
 };
 
-export default EngagementsPage;
+export default ProjectsPage;

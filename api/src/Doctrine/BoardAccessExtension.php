@@ -29,6 +29,6 @@ final class BoardAccessExtension extends AbstractSpaceAccessExtension
 
     protected function getPermissionCategory(): string
     {
-        return SpacePermission::PROJECTS;
+        return SpacePermission::BOARDS;
     }
 }

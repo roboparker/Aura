@@ -89,7 +89,7 @@ final class DownloadFileTool implements McpToolInterface
             ->select('COUNT(t.id)')
             ->leftJoin('t.board', 'p')
             ->where(':media MEMBER OF t.attachments')
-            ->andWhere('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'mcp_dl_task'))
+            ->andWhere('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToBoardSpace('p', 'mcp_dl_task'))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)

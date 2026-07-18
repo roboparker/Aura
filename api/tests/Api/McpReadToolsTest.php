@@ -15,7 +15,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 /**
  * Additional coverage for the under-tested read-oriented MCP tools
  * (list_tasks, get_my_tasks, search_tasks, list_task_comments,
- * get_project, get_custom_fields) plus extra update_task branches.
+ * get_board, get_custom_fields) plus extra update_task branches.
  * Drives each via the JSON-RPC `tools/call` endpoint and asserts the
  * structured response shape.
  *
@@ -155,7 +155,7 @@ class McpReadToolsTest extends ApiTestCase
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'get_project',
+            'name' => 'get_board',
             'arguments' => ['boardId' => (string) $board->getId()],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);

@@ -36,14 +36,14 @@ const NAV_HEADING_CLASS = "border-l-2 border-l-transparent";
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
 // see UserMenu / Navbar. The sidebar carries the space switcher, the
-// active space's content sections (projects / pages / discussions),
+// active space's content sections (boards / pages / discussions),
 // and the admin section.
 
 // The shared section is now a list of accessible spaces (rendered
 // from ActiveSpaceContext at render time, since it's per-user state).
 // "All Spaces" is the only static entry — it's the management
 // surface; each space below is a link to its tabbed detail page
-// (#nav-refresh) which is itself the hub for projects, discussions,
+// (#nav-refresh) which is itself the hub for boards, discussions,
 // pages, and tasks inside that space.
 
 // Backend tooling surfaced inside the PWA chrome. The Mercure debugger
@@ -60,7 +60,7 @@ const ADMIN_EXTERNAL_LINKS =
     ? []
     : [{ href: "/.well-known/mercure/ui/", label: "Mercure" }];
 
-// The active space's content surfaces (Projects / Pages / Discussions)
+// The active space's content surfaces (Boards / Pages / Discussions)
 // are rendered as their own sidebar sections from the shared
 // CONTENT_SECTIONS map (icon + color shared with the aggregator page
 // headers). Each heading links to its top-level aggregator (scoped to
@@ -81,7 +81,7 @@ interface ResourceRow {
 }
 
 /**
- * Fetch the active space's rows for one resource (`projects` / `pages`
+ * Fetch the active space's rows for one resource (`boards` / `pages`
  * / `discussions`), scoped by `?space=<iri>` — the same filter the
  * aggregators and SpaceContentTabs use.
  *
@@ -594,7 +594,7 @@ const BillingSection = ({
   const links = [
     { href: "/time", label: "Time", match: "/time", show: true },
     { href: "/expenses", label: "Expenses", match: "/expenses", show: true },
-    { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
+    { href: "/projects", label: "Projects", match: "/projects", show: canInvoices },
     { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
     { href: "/estimates", label: "Estimates", match: "/estimates", show: canInvoices },

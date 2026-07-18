@@ -3,30 +3,30 @@
 namespace App\Repository;
 
 use App\Entity\Space;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * @extends ServiceEntityRepository<TimesheetSubmission>
+ * @extends ServiceEntityRepository<TimesheetApproval>
  */
-class TimesheetSubmissionRepository extends ServiceEntityRepository
+class TimesheetApprovalRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
-        parent::__construct($registry, TimesheetSubmission::class);
+        parent::__construct($registry, TimesheetApproval::class);
     }
 
-    /** The (unique) submission covering one member's week, if any. */
-    public function findForWeek(Space $space, User $user, \DateTimeImmutable $weekStart): ?TimesheetSubmission
+    /** The (unique) approval covering one member's week, if any. */
+    public function findForWeek(Space $space, User $user, \DateTimeImmutable $weekStart): ?TimesheetApproval
     {
         return $this->findOneBy(['space' => $space, 'user' => $user, 'weekStart' => $weekStart]);
     }
 
     /**
      * The Monday (UTC date) of the week containing a timestamp — the shared
-     * bucketing rule for submissions and the entry lock.
+     * bucketing rule for approvals and the entry lock.
      */
     public static function weekStartOf(\DateTimeImmutable $moment): \DateTimeImmutable
     {
@@ -42,20 +42,20 @@ class TimesheetSubmissionRepository extends ServiceEntityRepository
     }
 
     /**
-     * True when the entry's week is frozen by a pending/approved submission
+     * True when the entry's week is frozen by a pending/approved approval
      * for its tracker — the guard TimeEntry create/edit/delete run through.
      */
     public function weekIsLocked(Space $space, User $user, \DateTimeImmutable $startedAt): bool
     {
-        $submission = $this->findForWeek($space, $user, self::weekStartOf($startedAt));
+        $approval = $this->findForWeek($space, $user, self::weekStartOf($startedAt));
 
-        return null !== $submission && $submission->locksWeek();
+        return null !== $approval && $approval->locksWeek();
     }
 
     /**
-     * A space's submissions, optionally filtered by status, newest week first.
+     * A space's approvals, optionally filtered by status, newest week first.
      *
-     * @return list<TimesheetSubmission>
+     * @return list<TimesheetApproval>
      */
     public function findForSpace(Space $space, ?string $status = null): array
     {
@@ -68,7 +68,7 @@ class TimesheetSubmissionRepository extends ServiceEntityRepository
             $qb->andWhere('t.status = :status')->setParameter('status', $status);
         }
 
-        /** @var list<TimesheetSubmission> */
+        /** @var list<TimesheetApproval> */
         return $qb->getQuery()->getResult();
     }
 }

@@ -47,7 +47,7 @@ existing `UsageRecorder`/`UserUsageCounter` (off the request latency path);
 | Stripe API (Checkout, Portal, webhook verify) | `App\Billing\StripeGatewayInterface` + `StripeGateway` (HttpClient, no SDK) |
 | HTTP surface | `App\Controller\BillingController` |
 | MCP cap enforcement | `App\Controller\McpController` (`isMcpCallAllowed` before dispatch) |
-| Member cap enforcement | `SpaceMemberController`, `ProjectMemberController` (402 at the cap) |
+| Member cap enforcement | `SpaceMemberController`, `BoardMemberController` (402 at the cap) |
 
 The **Subscription row is written only by the webhook**, off Stripe's
 authoritative `customer.subscription.*` events — Checkout never persists one, so

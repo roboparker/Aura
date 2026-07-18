@@ -2,25 +2,25 @@
 
 namespace App\Doctrine;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Security\Permission\SpacePermission;
 
 /**
- * Scopes Engagement queries to the spaces the current user belongs to, via
- * the `engagement.space` FK, and read-gates on the admin-reserved
+ * Scopes Project queries to the spaces the current user belongs to, via
+ * the `project.space` FK, and read-gates on the admin-reserved
  * `invoices` permission category. Members reach boards for time tracking
  * through the minimal picker instead. See {@see AbstractSpaceAccessExtension}.
  */
-final class EngagementAccessExtension extends AbstractSpaceAccessExtension
+final class ProjectAccessExtension extends AbstractSpaceAccessExtension
 {
     protected function getResourceClass(): string
     {
-        return Engagement::class;
+        return Project::class;
     }
 
     protected function getAliasPrefix(): string
     {
-        return 'engagement_access';
+        return 'project_access';
     }
 
     protected function getImpersonationItemType(): ?string

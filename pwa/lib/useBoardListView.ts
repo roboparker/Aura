@@ -20,7 +20,7 @@ export interface BoardListView {
   sectionOrder: string[];
 }
 
-interface UseProjectListView extends BoardListView {
+interface UseBoardListView extends BoardListView {
   /** Set the active sort, or null to clear it. */
   setSort: (sort: SortState | null) => void;
   setFilter: (key: string, value: FilterValue | null) => void;
@@ -57,7 +57,7 @@ function load(boardId: string): BoardListView {
   }
 }
 
-export function useBoardListView(boardId: string | null): UseProjectListView {
+export function useBoardListView(boardId: string | null): UseBoardListView {
   const [view, setView] = useState<BoardListView>(empty);
 
   // Hydrate after mount so SSR and the first paint agree, then load the

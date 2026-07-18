@@ -33,7 +33,7 @@ const TIERS: Tier[] = [
     monthly: 0,
     cta: { label: "Get started", href: "/signup" },
     features: [
-      "Unlimited personal tasks, projects & pages",
+      "Unlimited personal tasks, boards & pages",
       "Up to 5 members per shared space",
       "100 MCP (programmatic API) calls per day",
       "Calendar, discussions & file attachments",
@@ -112,7 +112,7 @@ const Pricing = () => {
             </h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Start free and upgrade when your team grows. Every plan includes
-              the full Madori workspace — tasks, projects, pages, calendar, and
+              the full Madori workspace — tasks, boards, pages, calendar, and
               programmatic API access.
             </p>
           </header>

@@ -118,7 +118,7 @@ final class SubscriptionRepository extends ServiceEntityRepository
         $legacyPlans = $em->createQuery(sprintf(
             'SELECT DISTINCT s.plan FROM %s s WHERE s.space IS NOT NULL AND s.status IN (:statuses) AND %s',
             Subscription::class,
-            SpaceMembershipDql::userBelongsToProjectSpace('s'),
+            SpaceMembershipDql::userBelongsToBoardSpace('s'),
         ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
             ->getSingleColumnResult();
 

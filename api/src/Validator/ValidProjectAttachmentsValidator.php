@@ -2,7 +2,7 @@
 
 namespace App\Validator;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\MediaObject;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -11,7 +11,7 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
-final class ValidEngagementAttachmentsValidator extends ConstraintValidator
+final class ValidProjectAttachmentsValidator extends ConstraintValidator
 {
     public function __construct(private Security $security)
     {
@@ -19,16 +19,16 @@ final class ValidEngagementAttachmentsValidator extends ConstraintValidator
 
     public function validate(mixed $value, Constraint $constraint): void
     {
-        if (!$constraint instanceof ValidEngagementAttachments) {
-            throw new UnexpectedTypeException($constraint, ValidEngagementAttachments::class);
+        if (!$constraint instanceof ValidProjectAttachments) {
+            throw new UnexpectedTypeException($constraint, ValidProjectAttachments::class);
         }
 
         if (null === $value) {
             return;
         }
 
-        if (!$value instanceof Engagement) {
-            throw new UnexpectedValueException($value, Engagement::class);
+        if (!$value instanceof Project) {
+            throw new UnexpectedValueException($value, Project::class);
         }
 
         $space = $value->getSpace();

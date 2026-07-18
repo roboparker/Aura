@@ -5,31 +5,31 @@ namespace App\State;
 use ApiPlatform\Metadata\CollectionOperationInterface;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProviderInterface;
-use App\Entity\Engagement;
-use App\Service\EngagementBudgetCalculator;
+use App\Entity\Project;
+use App\Service\ProjectBudgetCalculator;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Enriches engagement reads with budget consumption (#651) — the transient
+ * Enriches project reads with budget consumption (#651) — the transient
  * `budgetSpent` field the PWA's progress bars render — in one grouped query
  * per page, mirroring {@see DiscussionAggregateProvider}. Delegates to the
  * stock Doctrine providers so access scoping / pagination / 404s behave
  * exactly as before.
  *
- * @implements ProviderInterface<Engagement>
+ * @implements ProviderInterface<Project>
  */
-final class EngagementBudgetProvider implements ProviderInterface
+final class ProjectBudgetProvider implements ProviderInterface
 {
     /**
-     * @param ProviderInterface<Engagement> $collectionProvider
-     * @param ProviderInterface<Engagement> $itemProvider
+     * @param ProviderInterface<Project> $collectionProvider
+     * @param ProviderInterface<Project> $itemProvider
      */
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.collection_provider')]
         private ProviderInterface $collectionProvider,
         #[Autowire(service: 'api_platform.doctrine.orm.state.item_provider')]
         private ProviderInterface $itemProvider,
-        private EngagementBudgetCalculator $calculator,
+        private ProjectBudgetCalculator $calculator,
     ) {
     }
 
@@ -38,18 +38,18 @@ final class EngagementBudgetProvider implements ProviderInterface
         if ($operation instanceof CollectionOperationInterface) {
             $data = $this->collectionProvider->provide($operation, $uriVariables, $context);
             if (is_iterable($data)) {
-                $engagements = [];
-                foreach ($data as $engagement) {
-                    $engagements[] = $engagement;
+                $projects = [];
+                foreach ($data as $project) {
+                    $projects[] = $project;
                 }
-                $this->enrich($engagements);
+                $this->enrich($projects);
             }
 
             return $data;
         }
 
         $item = $this->itemProvider->provide($operation, $uriVariables, $context);
-        if ($item instanceof Engagement) {
+        if ($item instanceof Project) {
             $this->enrich([$item]);
         }
 
@@ -57,23 +57,23 @@ final class EngagementBudgetProvider implements ProviderInterface
     }
 
     /**
-     * @param list<Engagement> $engagements
+     * @param list<Project> $projects
      */
-    private function enrich(array $engagements): void
+    private function enrich(array $projects): void
     {
         $budgeted = array_values(array_filter(
-            $engagements,
-            static fn (Engagement $e): bool => null !== $e->getBudgetType(),
+            $projects,
+            static fn (Project $e): bool => null !== $e->getBudgetType(),
         ));
         if ([] === $budgeted) {
             return;
         }
 
-        $spent = $this->calculator->spentByEngagement($budgeted);
-        foreach ($budgeted as $engagement) {
-            $row = $spent[(string) $engagement->getId()] ?? ['seconds' => 0, 'fees' => 0];
-            $engagement->setBudgetSpent(
-                Engagement::BUDGET_HOURS === $engagement->getBudgetType()
+        $spent = $this->calculator->spentByProject($budgeted);
+        foreach ($budgeted as $project) {
+            $row = $spent[(string) $project->getId()] ?? ['seconds' => 0, 'fees' => 0];
+            $project->setBudgetSpent(
+                Project::BUDGET_HOURS === $project->getBudgetType()
                     ? intdiv($row['seconds'], 60)
                     : $row['fees'],
             );

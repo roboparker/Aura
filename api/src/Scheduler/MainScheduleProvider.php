@@ -3,7 +3,7 @@
 namespace App\Scheduler;
 
 use App\Message\CaptureUsageSnapshot;
-use App\Message\CheckEngagementBudgets;
+use App\Message\CheckProjectBudgets;
 use App\Message\DispatchNotificationDigest;
 use App\Message\DispatchTaskReminders;
 use App\Message\MarkOverdueInvoices;
@@ -99,9 +99,9 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 RecurringMessage::cron('*/15 * * * *', new PullCalendarChanges(), $utc),
                 // Overdue invoices: flip sent invoices past their due date to
                 // overdue, daily at 03:50 UTC (InvoiceRepository::markOverdue).
-                // Engagement budget alerts (#651) — daily at 03:40 UTC
-                // (App\Service\EngagementBudgetAlerter).
-                RecurringMessage::cron('40 3 * * *', new CheckEngagementBudgets(), $utc),
+                // Project budget alerts (#651) — daily at 03:40 UTC
+                // (App\Service\ProjectBudgetAlerter).
+                RecurringMessage::cron('40 3 * * *', new CheckProjectBudgets(), $utc),
                 RecurringMessage::cron('50 3 * * *', new MarkOverdueInvoices(), $utc),
                 // Recurring invoices: clone due templates into fresh drafts,
                 // daily at 03:55 UTC (App\Service\RecurringInvoiceSpawner).

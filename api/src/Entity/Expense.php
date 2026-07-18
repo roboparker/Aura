@@ -24,7 +24,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
- * A billable (or internal) expense tracked against an {@see Engagement}
+ * A billable (or internal) expense tracked against an {@see Project}
  * (#650) — the sibling of {@see TimeEntry} on the cost side: members log
  * their own, invoice generation pulls the unbilled billable ones onto the
  * invoice as line items and stamps {@see $billedAt} so an expense can't be
@@ -62,14 +62,14 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['expense:write']],
     order: ['spentOn' => 'DESC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'engagement' => 'exact', 'user' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'project' => 'exact', 'user' => 'exact'])]
 #[ApiFilter(BooleanFilter::class, properties: ['billable'])]
 #[ApiFilter(DateFilter::class, properties: ['spentOn'])]
 #[ApiFilter(OrderFilter::class, properties: ['spentOn', 'createdAt'])]
 #[ORM\Entity(repositoryClass: ExpenseRepository::class)]
 #[ORM\Table(name: 'expense')]
 #[ORM\Index(columns: ['space_id', 'spent_on'], name: 'idx_expense_space_spent')]
-#[ORM\Index(columns: ['engagement_id'], name: 'idx_expense_engagement')]
+#[ORM\Index(columns: ['project_id'], name: 'idx_expense_project')]
 #[ORM\Index(columns: ['user_id'], name: 'idx_expense_user')]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback('validateConsistency')]
@@ -91,13 +91,13 @@ class Expense
     #[Groups(['expense:read', 'expense:write'])]
     private ?Space $space = null;
 
-    /** The engagement this expense bills against. Required. */
+    /** The project this expense bills against. Required. */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Engagement::class)]
-    #[ORM\JoinColumn(name: 'engagement_id', nullable: true, onDelete: 'SET NULL')]
-    #[Assert\NotNull(message: 'A engagement is required.')]
+    #[ORM\ManyToOne(targetEntity: Project::class)]
+    #[ORM\JoinColumn(name: 'project_id', nullable: true, onDelete: 'SET NULL')]
+    #[Assert\NotNull(message: 'A project is required.')]
     #[Groups(['expense:read', 'expense:write'])]
-    private ?Engagement $engagement = null;
+    private ?Project $project = null;
 
     /** Who spent it. Stamped server-side, never from the payload. */
     #[ApiProperty(readableLink: false)]
@@ -134,7 +134,7 @@ class Expense
     #[Groups(['expense:read', 'expense:write'])]
     private int $amount = 0;
 
-    /** Defaults to the engagement's (then client's) currency on save. */
+    /** Defaults to the project's (then client's) currency on save. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
     #[Groups(['expense:read', 'expense:write'])]
@@ -174,19 +174,19 @@ class Expense
     }
 
     /**
-     * Denormalise the space + currency from the engagement so the access
+     * Denormalise the space + currency from the project so the access
      * extension can scope by `space` alone and amounts always carry a currency.
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
     public function syncDerived(): void
     {
-        if (null === $this->space && null !== $this->engagement) {
-            $this->space = $this->engagement->getSpace();
+        if (null === $this->space && null !== $this->project) {
+            $this->space = $this->project->getSpace();
         }
         if (null === $this->currency) {
-            $this->currency = $this->engagement?->getCurrency()
-                ?? $this->engagement?->getClient()?->getCurrency()
+            $this->currency = $this->project?->getCurrency()
+                ?? $this->project?->getClient()?->getCurrency()
                 ?? 'USD';
         }
         // A managed category owns the label (#671).
@@ -213,11 +213,11 @@ class Expense
         }
 
         if (
-            null !== $this->engagement && null !== $this->space
-            && true !== $this->engagement->getSpace()?->getId()?->equals($this->space->getId())
+            null !== $this->project && null !== $this->space
+            && true !== $this->project->getSpace()?->getId()?->equals($this->space->getId())
         ) {
-            $context->buildViolation('Engagement must belong to the same space.')
-                ->atPath('engagement')
+            $context->buildViolation('Project must belong to the same space.')
+                ->atPath('project')
                 ->addViolation();
         }
     }
@@ -239,14 +239,14 @@ class Expense
         return $this;
     }
 
-    public function getEngagement(): ?Engagement
+    public function getProject(): ?Project
     {
-        return $this->engagement;
+        return $this->project;
     }
 
-    public function setEngagement(?Engagement $engagement): self
+    public function setProject(?Project $project): self
     {
-        $this->engagement = $engagement;
+        $this->project = $project;
 
         return $this;
     }

@@ -6,9 +6,9 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Notification;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use App\Service\TimesheetNudgeDispatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -32,10 +32,10 @@ class TimesheetNudgeTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetSubmission')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetApproval')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -45,7 +45,7 @@ class TimesheetNudgeTest extends ApiTestCase
     public function testNudgesUnsubmittedTrackersOnceAndSkipsSubmitted(): void
     {
         $now = new \DateTimeImmutable();
-        $lastWeekStart = TimesheetSubmissionRepository::weekStartOf($now)->modify('-7 days');
+        $lastWeekStart = TimesheetApprovalRepository::weekStartOf($now)->modify('-7 days');
 
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
@@ -58,11 +58,11 @@ class TimesheetNudgeTest extends ApiTestCase
         $this->entityManager->persist($extraMembership);
 
         // Approvals are "in use" here: an older decided submission exists.
-        $history = (new TimesheetSubmission())
+        $history = (new TimesheetApproval())
             ->setSpace($space)
             ->setUser($admin)
             ->setWeekStart($lastWeekStart->modify('-14 days'))
-            ->setStatus(TimesheetSubmission::STATUS_APPROVED);
+            ->setStatus(TimesheetApproval::STATUS_APPROVED);
         $this->entityManager->persist($history);
         $this->entityManager->flush();
 
@@ -72,19 +72,19 @@ class TimesheetNudgeTest extends ApiTestCase
             'json' => ['space' => '/spaces/' . $space->getId(), 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -97,7 +97,7 @@ class TimesheetNudgeTest extends ApiTestCase
             $client->request('POST', '/time_entries', [
                 'json' => [
                     'space' => '/spaces/' . $space->getId(),
-                    'engagement' => $engagementIri,
+                    'project' => $projectIri,
                     'category' => $categoryIri,
                     'startedAt' => $lastWeekStart->modify('+2 days')->setTime(9, 0)->format(\DateTimeInterface::ATOM),
                     'endedAt' => $lastWeekStart->modify('+2 days')->setTime(10, 0)->format(\DateTimeInterface::ATOM),
@@ -150,7 +150,7 @@ class TimesheetNudgeTest extends ApiTestCase
     public function testSpacesWithoutApprovalHistoryAreLeftAlone(): void
     {
         $now = new \DateTimeImmutable();
-        $lastWeekStart = TimesheetSubmissionRepository::weekStartOf($now)->modify('-7 days');
+        $lastWeekStart = TimesheetApprovalRepository::weekStartOf($now)->modify('-7 days');
 
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
@@ -161,19 +161,19 @@ class TimesheetNudgeTest extends ApiTestCase
             'json' => ['space' => '/spaces/' . $space->getId(), 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -183,7 +183,7 @@ class TimesheetNudgeTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => $lastWeekStart->modify('+2 days')->setTime(9, 0)->format(\DateTimeInterface::ATOM),
                 'endedAt' => $lastWeekStart->modify('+2 days')->setTime(10, 0)->format(\DateTimeInterface::ATOM),

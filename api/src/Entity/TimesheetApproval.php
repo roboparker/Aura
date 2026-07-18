@@ -2,12 +2,12 @@
 
 namespace App\Entity;
 
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * A member's weekly timesheet submission (#654): one row per
+ * A member's weekly timesheet approval (#654): one row per
  * (space, user, weekStart). While `pending` or `approved`, every time entry
  * the user started in that week is frozen (create/edit/delete 422) — the
  * same lock model as billed entries. A rejection unlocks the week (with a
@@ -16,12 +16,12 @@ use Symfony\Component\Uid\Uuid;
  * Server-written only (submit / approve / reject endpoints in
  * {@see \App\Controller\TimesheetController}); not an API resource.
  */
-#[ORM\Entity(repositoryClass: TimesheetSubmissionRepository::class)]
-#[ORM\Table(name: 'timesheet_submission')]
-#[ORM\UniqueConstraint(name: 'uniq_timesheet_submission_week', columns: ['space_id', 'user_id', 'week_start'])]
-#[ORM\Index(columns: ['space_id', 'status'], name: 'idx_timesheet_submission_space_status')]
-#[ORM\Index(columns: ['user_id'], name: 'idx_timesheet_submission_user')]
-class TimesheetSubmission
+#[ORM\Entity(repositoryClass: TimesheetApprovalRepository::class)]
+#[ORM\Table(name: 'timesheet_approval')]
+#[ORM\UniqueConstraint(name: 'uniq_timesheet_approval_week', columns: ['space_id', 'user_id', 'week_start'])]
+#[ORM\Index(columns: ['space_id', 'status'], name: 'idx_timesheet_approval_space_status')]
+#[ORM\Index(columns: ['user_id'], name: 'idx_timesheet_approval_user')]
+class TimesheetApproval
 {
     public const STATUS_PENDING = 'pending';
     public const STATUS_APPROVED = 'approved';

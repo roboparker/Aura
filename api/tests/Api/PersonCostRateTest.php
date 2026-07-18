@@ -11,7 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Per-person + cost rates (#653): engagement person-rate overrides win over
+ * Per-person + cost rates (#653): project person-rate overrides win over
  * the category rate, space-level cost rates snapshot onto entries, and the
  * time-summary report surfaces cost + profit.
  */
@@ -29,9 +29,9 @@ class PersonCostRateTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementUserRate')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\ProjectUserRate')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -55,24 +55,24 @@ class PersonCostRateTest extends ApiTestCase
         ])->toArray();
 
         // Dev bills at 6000/h; Bob has a 9000/h person-rate override.
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
                 'userRates' => [['user' => $memberIri, 'rateAmount' => 9000]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $rates = $engagement['userRates'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $rates = $project['userRates'] ?? null;
         $this->assertIsArray($rates);
         $this->assertCount(1, $rates);
-        $categories = $engagement['categories'] ?? null;
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -94,7 +94,7 @@ class PersonCostRateTest extends ApiTestCase
         $bobEntry = $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-10T09:00:00+00:00',
                 'endedAt' => '2026-07-10T10:00:00+00:00',
@@ -118,7 +118,7 @@ class PersonCostRateTest extends ApiTestCase
         $aliceEntry = $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-10T11:00:00+00:00',
                 'endedAt' => '2026-07-10T11:30:00+00:00',

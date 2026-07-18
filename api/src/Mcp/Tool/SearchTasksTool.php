@@ -60,7 +60,7 @@ final class SearchTasksTool implements McpToolInterface
             ->createQueryBuilder('t')
             ->leftJoin('t.board', 'p')
             ->leftJoin(Comment::class, 'c', 'WITH', 'c.task = t')
-            ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'search_tasks'))
+            ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToBoardSpace('p', 'search_tasks'))
             ->andWhere('LOWER(t.title) LIKE :q OR LOWER(t.description) LIKE :q OR LOWER(c.body) LIKE :q')
             ->setParameter('user', $user)
             ->setParameter('q', '%' . strtolower($query) . '%')

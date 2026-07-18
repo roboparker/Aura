@@ -93,7 +93,7 @@ class Notification
     public const TYPE_TIMESHEET_DECIDED = 'timesheet_decided';
     /** You tracked time last week but haven't submitted the week yet (#668). */
     public const TYPE_TIMESHEET_NUDGE = 'timesheet_nudge';
-    /** An engagement crossed a budget threshold (→ space admins) (#651/#667). */
+    /** An project crossed a budget threshold (→ space admins) (#651/#667). */
     public const TYPE_BUDGET_ALERT = 'budget_alert';
 
     #[ORM\Id]
@@ -184,7 +184,7 @@ class Notification
     /**
      * Static in-app deep-link for notifications that don't point at an
      * entity (#667) — e.g. "/approvals" for a timesheet submission or
-     * "/engagements" for a budget alert. Surfaced through the computed
+     * "/projects" for a budget alert. Surfaced through the computed
      * `targetUrl` getter like the entity-derived links.
      */
     #[ORM\Column(length: 120, nullable: true)]

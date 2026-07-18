@@ -28,7 +28,7 @@ final class SpaceMembershipDql
     {
     }
 
-    public static function userBelongsToProjectSpace(
+    public static function userBelongsToBoardSpace(
         string $boardAlias,
         string $aliasPrefix = 'sm_check',
         string $userParam = 'user',

@@ -2,7 +2,7 @@
 
 namespace App\Repository;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\TimeEntry;
 use App\Entity\User;
@@ -52,7 +52,7 @@ class TimeEntryRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->createQueryBuilder('t')
             ->addSelect('e', 'c', 'cl', 'u')
-            ->leftJoin('t.engagement', 'e')
+            ->leftJoin('t.project', 'e')
             ->leftJoin('t.category', 'c')
             ->leftJoin('e.client', 'cl')
             ->leftJoin('t.user', 'u')
@@ -75,7 +75,7 @@ class TimeEntryRepository extends ServiceEntityRepository
     /**
      * Unbilled billable completed entries across a whole space — the
      * "what can I bill right now" pool the uninvoiced report (#647) groups
-     * per engagement. Entries without an engagement can't be invoiced, so
+     * per project. Entries without an project can't be invoiced, so
      * they're excluded.
      *
      * @return list<TimeEntry>
@@ -85,7 +85,7 @@ class TimeEntryRepository extends ServiceEntityRepository
         /** @var list<TimeEntry> */
         return $this->createQueryBuilder('t')
             ->addSelect('e', 'cl')
-            ->join('t.engagement', 'e')
+            ->join('t.project', 'e')
             ->leftJoin('e.client', 'cl')
             ->andWhere('t.space = :space')
             ->andWhere('t.billable = true')
@@ -98,7 +98,7 @@ class TimeEntryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Completed, billable, not-yet-billed entries on a engagement — the pool
+     * Completed, billable, not-yet-billed entries on a project — the pool
      * an invoice draws from. Ordered by category then start so line items group.
      * An optional [$from, $toExclusive) window filters on the entry's startedAt
      * (callers pass the day AFTER the last wanted date as $toExclusive, so a
@@ -106,17 +106,17 @@ class TimeEntryRepository extends ServiceEntityRepository
      *
      * @return list<TimeEntry>
      */
-    public function findInvoiceableForEngagement(
-        Engagement $engagement,
+    public function findInvoiceableForProject(
+        Project $project,
         ?\DateTimeImmutable $from = null,
         ?\DateTimeImmutable $toExclusive = null,
     ): array {
         $qb = $this->createQueryBuilder('t')
-            ->andWhere('t.engagement = :bp')
+            ->andWhere('t.project = :bp')
             ->andWhere('t.billable = true')
             ->andWhere('t.endedAt IS NOT NULL')
             ->andWhere('t.billedAt IS NULL')
-            ->setParameter('bp', $engagement)
+            ->setParameter('bp', $project)
             ->leftJoin('t.category', 'c')
             ->orderBy('c.position', 'ASC')
             ->addOrderBy('t.startedAt', 'ASC');

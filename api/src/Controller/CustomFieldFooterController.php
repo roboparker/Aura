@@ -125,7 +125,7 @@ class CustomFieldFooterController extends AbstractController
             ->from(Task::class, 't')
             ->join('t.board', 'p')
             ->where('p = :board')
-            ->andWhere(SpaceMembershipDql::userBelongsToProjectSpace('p'))
+            ->andWhere(SpaceMembershipDql::userBelongsToBoardSpace('p'))
             ->setParameter('board', $board)
             ->setParameter('user', $user);
 

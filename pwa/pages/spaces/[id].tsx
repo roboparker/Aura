@@ -36,7 +36,7 @@ import AttachmentsPanel, {
 import {
   SpaceDiscussionsList,
   SpacePagesList,
-  SpaceProjectsList,
+  SpaceBoardsList,
   SpaceTasksList,
 } from "@/components/spaces/SpaceContentTabs";
 import SpaceTile from "@/components/spaces/SpaceTile";
@@ -152,7 +152,7 @@ const SpaceDetail = () => {
   // endpoints' totalItems. `null` = still loading / unavailable.
   const [discussionsCount, setDiscussionsCount] = useState<number | null>(null);
   const [tasksCount, setTasksCount] = useState<number | null>(null);
-  const [boardsPreview, setProjectsPreview] = useState<BoardPreview[]>([]);
+  const [boardsPreview, setBoardsPreview] = useState<BoardPreview[]>([]);
   const [activity, setActivity] = useState<ActivityFeed | null>(null);
 
   const handleAttach = async (mediaObjectIri: string) => {
@@ -313,7 +313,7 @@ const SpaceDetail = () => {
         if (!res.ok) return;
         const data = await res.json();
         const list: BoardPreview[] = data["hydra:member"] ?? data.member ?? [];
-        if (!cancelled) setProjectsPreview(list);
+        if (!cancelled) setBoardsPreview(list);
       } catch {
         /* preview is best-effort */
       }
@@ -748,7 +748,7 @@ const SpaceDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="boards" className="mt-0">
-                  <SpaceProjectsList
+                  <SpaceBoardsList
                     spaceIri={space["@id"]}
                     enabled={activeTab === "boards"}
                   />

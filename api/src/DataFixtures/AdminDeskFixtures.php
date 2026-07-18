@@ -9,8 +9,8 @@ use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
 use App\Entity\Discussion;
-use App\Entity\Engagement;
-use App\Entity\EngagementCategory;
+use App\Entity\Project;
+use App\Entity\Service;
 use App\Entity\Estimate;
 use App\Entity\EstimateLineItem;
 use App\Entity\Expense;
@@ -28,7 +28,7 @@ use App\Entity\Task;
 use App\Entity\TaskRelationship;
 use App\Entity\TaskSection;
 use App\Entity\TimeEntry;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use Doctrine\Bundle\FixturesBundle\Fixture;
@@ -45,7 +45,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *    with a reminder, a custom field & value, a task relationship, and task
  *    comments), a page with a sub-page and a page comment, a discussion +
  *    comment, tags, groups, and the **full billing chain**: client (with a
- *    portal link + address) → engagement (with a fees budget) with a
+ *    portal link + address) → project (with a fees budget) with a
  *    category/rate → tracked time → a draft invoice, plus every
  *    Harvest-parity surface — invoice branding (logo/terms/number series),
  *    per-person cost rates, managed expense categories (incl. a unit-priced
@@ -272,32 +272,32 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         $finance->addMember($emma);
         $manager->persist($finance);
 
-        // Billing chain: client → engagement (+ category/rate) → tracked time → a draft invoice.
+        // Billing chain: client → project (+ category/rate) → tracked time → a draft invoice.
         $client = (new Client())
             ->setSpace($desk)->setCreatedBy($ada)
             ->setName('Acme Co')->setEmail('billing@acme.example')->setCurrency('USD')
             ->setDefaultRateAmount(12000);
         $manager->persist($client);
 
-        $devCategory = (new EngagementCategory())->setName('Development')->setRateAmount(12000)->setPosition(0);
-        $engagement = (new Engagement())
+        $devCategory = (new Service())->setName('Development')->setBillingRate(12000)->setPosition(0);
+        $project = (new Project())
             ->setSpace($desk)->setClient($client)->setCreatedBy($ada)
             ->setName('Acme website')->setCurrency('USD')
             // Fees budget (#651): $10,000, with ~$2,400 tracked so the budget
             // meter shows partial consumption (not empty, not over).
-            ->setBudgetType(Engagement::BUDGET_FEES)->setBudgetAmount(1000000)->setBudgetSpent(240000)
+            ->setBudgetType(Project::BUDGET_FEES)->setBudgetAmount(1000000)->setBudgetSpent(240000)
             ->setDescription(
                 "## Scope\n\nBuild + launch the Acme marketing site.\n\n"
                 . "- Net-30 terms\n- Weekly status call\n- Contract on file in the Files tab",
             );
-        $engagement->addCategory($devCategory);
-        $manager->persist($engagement);
-        // Roll the admin board up to this engagement.
-        $board->setEngagement($engagement);
+        $project->addCategory($devCategory);
+        $manager->persist($project);
+        // Roll the admin board up to this project.
+        $board->setProject($project);
 
-        // A fake signed contract file attached to the engagement (Files tab).
+        // A fake signed contract file attached to the project (Files tab).
         $contractBody = "ACME MASTER SERVICES AGREEMENT\n\n"
-            . "This sample agreement is seeded so the engagement's contract files "
+            . "This sample agreement is seeded so the project's contract files "
             . "have something to show.\n\n- Term: 12 months\n- Billing: Net-30\n"
             . "- Signed: Ada Admin\n";
         $contractPath = 'attachments/fixture-acme-contract.txt';
@@ -310,11 +310,11 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
             ->setMimeType('text/plain')
             ->setByteSize(\strlen($contractBody));
         $manager->persist($contract);
-        $engagement->addAttachment($contract);
+        $project->addAttachment($contract);
 
         $entry = (new TimeEntry())
             ->setSpace($desk)->setUser($ada)
-            ->setEngagement($engagement)->setCategory($devCategory)
+            ->setProject($project)->setCategory($devCategory)
             ->setDescription('Set up the staging environment.')
             ->setStartedAt(new \DateTimeImmutable('-2 days 09:00'))
             ->setEndedAt(new \DateTimeImmutable('-2 days 11:00'));
@@ -396,7 +396,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
             $manager->persist($receipt);
         }
         $hotel = (new Expense())
-            ->setSpace($desk)->setEngagement($engagement)->setUser($ada)
+            ->setSpace($desk)->setProject($project)->setUser($ada)
             ->setSpentOn(new \DateTimeImmutable('-4 days'))
             ->setExpenseCategory($catTravel)->setDescription('Hotel — onsite kickoff')
             ->setAmount(8420)->setCurrency('USD')->setBillable(true);
@@ -406,7 +406,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         $manager->persist($hotel);
         $manager->persist(
             (new Expense())
-                ->setSpace($desk)->setEngagement($engagement)->setUser($ada)
+                ->setSpace($desk)->setProject($project)->setUser($ada)
                 ->setSpentOn(new \DateTimeImmutable('-3 days'))
                 ->setExpenseCategory($catSoftware)->setDescription('Figma seat')
                 ->setAmount(1500)->setCurrency('USD')->setBillable(false),
@@ -469,12 +469,12 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         );
         $manager->persist($sentInvoice);
 
-        // A pending timesheet submission (#654) awaiting Ada's approval, so
+        // A pending timesheet approval (#654) awaiting Ada's review, so
         // the /approvals queue has a row.
         $manager->persist(
-            (new TimesheetSubmission())->setSpace($desk)->setUser($noah)
+            (new TimesheetApproval())->setSpace($desk)->setUser($noah)
                 ->setWeekStart(new \DateTimeImmutable('monday last week'))
-                ->setStatus(TimesheetSubmission::STATUS_PENDING),
+                ->setStatus(TimesheetApproval::STATUS_PENDING),
         );
 
         // A second, deliberately empty board — for exercising the empty-state UI.

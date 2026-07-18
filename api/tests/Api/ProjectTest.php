@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Client;
 use App\Entity\Board;
 use App\Entity\MediaObject;
@@ -15,10 +15,10 @@ use League\Flysystem\FilesystemOperator;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Engagements (Harvest model): admin-managed (invoices-gated) CRUD with
+ * Projects (Harvest model): admin-managed (invoices-gated) CRUD with
  * embedded categories, and assigning task-management boards to them.
  */
-class EngagementTest extends ApiTestCase
+class ProjectTest extends ApiTestCase
 {
     private EntityManagerInterface $entityManager;
     private FilesystemOperator $storage;
@@ -33,8 +33,8 @@ class EngagementTest extends ApiTestCase
         $this->storage = $container->get('media.storage');
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
@@ -43,7 +43,7 @@ class EngagementTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testAdminCreatesEngagementWithCategories(): void
+    public function testAdminCreatesProjectWithCategories(): void
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
@@ -56,14 +56,14 @@ class EngagementTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $body = $client->request('POST', '/engagements', [
+        $body = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientRow['@id'],
                 'name' => 'Website',
                 'categories' => [
-                    ['name' => 'Design', 'rateAmount' => 9000, 'position' => 0],
-                    ['name' => 'Dev', 'rateAmount' => 12000, 'position' => 1],
+                    ['name' => 'Design', 'billingRate' => 9000, 'position' => 0],
+                    ['name' => 'Dev', 'billingRate' => 12000, 'position' => 1],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -93,14 +93,14 @@ class EngagementTest extends ApiTestCase
         ])->toArray();
 
         $adminClient->loginUser($member);
-        $adminClient->request('POST', '/engagements', [
+        $adminClient->request('POST', '/projects', [
             'json' => ['space' => $spaceIri, 'client' => $clientRow['@id'], 'name' => 'Sneaky'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(403);
     }
 
-    public function testAssignProjectsToEngagement(): void
+    public function testAssignProjectsToProject(): void
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
@@ -110,13 +110,13 @@ class EngagementTest extends ApiTestCase
         $this->entityManager->persist($taskProject);
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
         $this->entityManager->persist($client);
-        $engagement = (new Engagement())->setSpace($space)->setClient($client)->setName('Website')->setCreatedBy($admin);
-        $this->entityManager->persist($engagement);
+        $project = (new Project())->setSpace($space)->setClient($client)->setName('Website')->setCreatedBy($admin);
+        $this->entityManager->persist($project);
         $this->entityManager->flush();
 
         $httpClient = static::createClient();
         $httpClient->loginUser($admin);
-        $httpClient->request('PUT', '/engagements/' . $engagement->getId() . '/boards', [
+        $httpClient->request('PUT', '/projects/' . $project->getId() . '/boards', [
             'json' => ['boards' => ['/boards/' . $taskProject->getId()]],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
@@ -125,7 +125,7 @@ class EngagementTest extends ApiTestCase
         $this->entityManager->clear();
         $reloaded = $this->entityManager->getRepository(Board::class)->find($taskProject->getId());
         $this->assertInstanceOf(Board::class, $reloaded);
-        $this->assertSame((string) $engagement->getId(), (string) $reloaded->getEngagement()?->getId());
+        $this->assertSame((string) $project->getId(), (string) $reloaded->getProject()?->getId());
     }
 
     public function testDescriptionAndContractAttachmentRoundTrip(): void
@@ -142,14 +142,14 @@ class EngagementTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
 
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => ['space' => $spaceIri, 'client' => $clientRow['@id'], 'name' => 'Retainer'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'] ?? null;
-        $this->assertIsString($engagementIri);
+        $projectIri = $project['@id'] ?? null;
+        $this->assertIsString($projectIri);
 
-        $client->request('PATCH', $engagementIri, [
+        $client->request('PATCH', $projectIri, [
             'json' => [
                 'description' => "## Scope\n\n- Weekly retainer\n- Net-30 terms",
                 'attachments' => ['/media-objects/' . $media->getId()],
@@ -182,10 +182,10 @@ class EngagementTest extends ApiTestCase
         $media = $this->createMediaObject($admin);
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
         $this->entityManager->persist($client);
-        $engagement = (new Engagement())
+        $project = (new Project())
             ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($admin);
-        $engagement->addAttachment($media);
-        $this->entityManager->persist($engagement);
+        $project->addAttachment($media);
+        $this->entityManager->persist($project);
         $this->entityManager->flush();
 
         $downloadUrl = '/media-objects/' . $media->getId() . '/download';
@@ -207,12 +207,12 @@ class EngagementTest extends ApiTestCase
         $admin = $this->createUser('admin@example.com');
         $stranger = $this->createUser('stranger@example.com');
         $space = $this->createSharedSpace($admin);
-        $engagementIri = $this->seedEngagement($admin, $space);
+        $projectIri = $this->seedProject($admin, $space);
         $media = $this->createMediaObject($stranger);
 
         $client = static::createClient();
         $client->loginUser($admin);
-        $client->request('PATCH', $engagementIri, [
+        $client->request('PATCH', $projectIri, [
             'json' => ['attachments' => ['/media-objects/' . $media->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
@@ -223,22 +223,22 @@ class EngagementTest extends ApiTestCase
     {
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);
-        $engagementIri = $this->seedEngagement($admin, $space);
+        $projectIri = $this->seedProject($admin, $space);
         $avatar = $this->createMediaObject($admin, MediaObject::KIND_AVATAR);
 
         $client = static::createClient();
         $client->loginUser($admin);
-        $client->request('PATCH', $engagementIri, [
+        $client->request('PATCH', $projectIri, [
             'json' => ['attachments' => ['/media-objects/' . $avatar->getId()]],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
     }
 
-    public function testGlobalAdminCanDownloadEngagementContract(): void
+    public function testGlobalAdminCanDownloadProjectContract(): void
     {
         // A ROLE_ADMIN who isn't a member of the space can still download an
-        // engagement contract (mirrors the Engagement GET admin bypass).
+        // project contract (mirrors the Project GET admin bypass).
         $owner = $this->createUser('owner@example.com');
         $superAdmin = $this->createUser('super@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
         $space = $this->createSharedSpace($owner);
@@ -246,10 +246,10 @@ class EngagementTest extends ApiTestCase
 
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($owner);
         $this->entityManager->persist($client);
-        $engagement = (new Engagement())
+        $project = (new Project())
             ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($owner);
-        $engagement->addAttachment($media);
-        $this->entityManager->persist($engagement);
+        $project->addAttachment($media);
+        $this->entityManager->persist($project);
         $this->entityManager->flush();
 
         $httpClient = static::createClient();
@@ -258,23 +258,23 @@ class EngagementTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
     }
 
-    /** Creates a client + engagement for $admin in $space; returns the engagement IRI. */
-    private function seedEngagement(User $admin, Space $space): string
+    /** Creates a client + project for $admin in $space; returns the project IRI. */
+    private function seedProject(User $admin, Space $space): string
     {
         $client = (new Client())->setSpace($space)->setName('Acme')->setCreatedBy($admin);
         $this->entityManager->persist($client);
-        $engagement = (new Engagement())
+        $project = (new Project())
             ->setSpace($space)->setClient($client)->setName('Retainer')->setCreatedBy($admin);
-        $this->entityManager->persist($engagement);
+        $this->entityManager->persist($project);
         $this->entityManager->flush();
 
-        return '/engagements/' . $engagement->getId();
+        return '/projects/' . $project->getId();
     }
 
     private function createMediaObject(User $owner, string $kind = MediaObject::KIND_ATTACHMENT): MediaObject
     {
         $bytes = 'CONTRACT-PDF';
-        $path = 'attachments/engagement-test-' . bin2hex(random_bytes(4)) . '-contract.pdf';
+        $path = 'attachments/project-test-' . bin2hex(random_bytes(4)) . '-contract.pdf';
         $this->storage->write($path, $bytes);
 
         $media = (new MediaObject())

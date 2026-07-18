@@ -81,7 +81,7 @@ export interface Space {
   invoiceTerms?: string | null;
   invoiceNumberPrefix?: string | null;
   invoiceNumberNext?: number | null;
-  /** EXTRA_LAZY-counted on the API (`Space::getProjectsCount`). */
+  /** EXTRA_LAZY-counted on the API (`Space::getBoardsCount`). */
   boardsCount: number;
   /** EXTRA_LAZY-counted on the API (`Space::getPagesCount`). */
   pagesCount: number;
