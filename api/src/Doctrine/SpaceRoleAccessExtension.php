@@ -61,7 +61,7 @@ final class SpaceRoleAccessExtension implements QueryCollectionExtensionInterfac
         $rootAlias = $queryBuilder->getRootAliases()[0];
         $queryBuilder
             ->andWhere(
-                SpaceMembershipDql::userBelongsToProjectSpace($rootAlias, 'space_role_access', 'currentUser'),
+                SpaceMembershipDql::userBelongsToBoardSpace($rootAlias, 'space_role_access', 'currentUser'),
             )
             ->setParameter('currentUser', $user);
     }

@@ -28,9 +28,9 @@ use Symfony\Component\Validator\Constraint;
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final class ValidCustomFieldValues extends Constraint
 {
-    public string $messageNoProject = 'Custom fields require the task to belong to a board.';
+    public string $messageNoBoard = 'Custom fields require the task to belong to a board.';
     public string $messageDefinitionSource = 'A custom field value must reference exactly one definition (space or global).';
-    public string $messageWrongProject = 'Custom field "{{ name }}" does not belong to this task\'s board.';
+    public string $messageWrongBoard = 'Custom field "{{ name }}" does not belong to this task\'s board.';
     public string $messageDuplicate = 'Custom field "{{ name }}" is set more than once.';
     public string $messageRequired = 'Custom field "{{ name }}" is required.';
     public string $messageUnknownType = 'Custom field "{{ name }}" has an unknown type "{{ key }}".';

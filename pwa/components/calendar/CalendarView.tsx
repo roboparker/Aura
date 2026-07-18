@@ -45,7 +45,7 @@ const CalendarView = ({
   const [range, setRange] = useState<{ start: string; end: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [boardFilter, setProjectFilter] = useState<Set<string>>(new Set());
+  const [boardFilter, setBoardFilter] = useState<Set<string>>(new Set());
   const [assigneeFilter, setAssigneeFilter] = useState<Set<string>>(new Set());
 
   const loadEntries = useCallback(async () => {
@@ -186,7 +186,7 @@ const CalendarView = ({
             label="Boards"
             options={boardOptions}
             selected={boardFilter}
-            onChange={setProjectFilter}
+            onChange={setBoardFilter}
             testId="calendar-board-filter"
           />
         )}

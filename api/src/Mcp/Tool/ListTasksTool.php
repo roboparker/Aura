@@ -125,7 +125,7 @@ final class ListTasksTool implements McpToolInterface
         return $this->em->getRepository(Task::class)
             ->createQueryBuilder('t')
             ->leftJoin('t.board', 'p')
-            ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_tasks'))
+            ->where('t.owner = :user OR ' . \App\Doctrine\SpaceMembershipDql::userBelongsToBoardSpace('p', 'list_tasks'))
             ->setParameter('user', $user);
     }
 }

@@ -81,10 +81,10 @@ final class CalendarController extends AbstractController
         // Optional narrowing to one board (the board-tab calendar). Only
         // the trailing id matters; the query still requires it to live in the
         // space, so a foreign board id simply yields nothing.
-        $rawProject = $request->query->getString('board');
+        $rawBoard = $request->query->getString('board');
         $boardId = null;
-        if ('' !== $rawProject) {
-            $segment = 1 === preg_match('#([0-9a-f-]+)$#i', $rawProject, $m) ? $m[1] : '';
+        if ('' !== $rawBoard) {
+            $segment = 1 === preg_match('#([0-9a-f-]+)$#i', $rawBoard, $m) ? $m[1] : '';
             if (!Uuid::isValid($segment)) {
                 return $this->json(['error' => 'Invalid `board`.'], 400);
             }

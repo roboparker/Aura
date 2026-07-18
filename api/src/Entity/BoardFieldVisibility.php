@@ -25,11 +25,11 @@ use Symfony\Component\Uid\Uuid;
 #[ORM\Entity(repositoryClass: BoardFieldVisibilityRepository::class)]
 #[ORM\Table(name: 'board_field_visibility')]
 #[ORM\UniqueConstraint(
-    name: 'uniq_pfv_project_definition',
+    name: 'uniq_pfv_board_definition',
     columns: ['board_id', 'definition_id'],
 )]
 #[ORM\UniqueConstraint(
-    name: 'uniq_pfv_project_global_definition',
+    name: 'uniq_pfv_board_global_definition',
     columns: ['board_id', 'global_definition_id'],
 )]
 #[ORM\Index(columns: ['definition_id'], name: 'idx_pfv_definition')]

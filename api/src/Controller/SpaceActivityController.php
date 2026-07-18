@@ -67,7 +67,7 @@ class SpaceActivityController extends AbstractController
             $pages,
         ))];
         foreach ($boards as $board) {
-            foreach ($this->scope->groupsForProject($board) as $class => $ids) {
+            foreach ($this->scope->groupsForBoard($board) as $class => $ids) {
                 $groups[$class] = array_values(array_unique([
                     ...($groups[$class] ?? []),
                     ...$ids,

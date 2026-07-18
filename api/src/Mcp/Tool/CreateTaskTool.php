@@ -80,7 +80,7 @@ final class CreateTaskTool implements McpToolInterface
 
         if (null !== $boardId) {
             $board = $this->em->getRepository(Board::class)->find($boardId);
-            if (null === $board || !$this->authz->canEditProject($board, $user)) {
+            if (null === $board || !$this->authz->canEditBoard($board, $user)) {
                 throw McpException::notFound(sprintf('Board %s', $boardId));
             }
             $task->setBoard($board);

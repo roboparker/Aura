@@ -48,7 +48,7 @@ final class UpdateBoardTool implements McpToolInterface
     {
         $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
         $board = $this->em->getRepository(Board::class)->find($boardId);
-        if (null === $board || !$this->authz->canEditProject($board, $user)) {
+        if (null === $board || !$this->authz->canEditBoard($board, $user)) {
             throw McpException::notFound(sprintf('Board %s', $boardId));
         }
 

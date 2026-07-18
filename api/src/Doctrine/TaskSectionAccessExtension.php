@@ -33,6 +33,6 @@ final class TaskSectionAccessExtension extends AbstractSpaceAccessExtension
     protected function getPermissionCategory(): string
     {
         // Sections ride the boards category.
-        return SpacePermission::PROJECTS;
+        return SpacePermission::BOARDS;
     }
 }

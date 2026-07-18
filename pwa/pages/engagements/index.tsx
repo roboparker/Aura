@@ -57,7 +57,7 @@ interface Engagement {
   client: string;
   categories: CategoryRow[];
   attachments: Attachment[];
-  assignedProjectList: { id: string; title: string }[];
+  assignedBoardList: { id: string; title: string }[];
   budgetType: "hours" | "fees" | null;
   budgetAmount: number | null;
   budgetSpent: number | null;
@@ -133,7 +133,7 @@ const EngagementsPage = () => {
   const router = useRouter();
 
   const spaceIri = activeSpace?.["@id"] ?? null;
-  const [projects, setProjects] = useState<Engagement[]>([]);
+  const [engagements, setEngagements] = useState<Engagement[]>([]);
   const [clients, setClients] = useState<ClientRow[]>([]);
   const [taskBoards, setTaskBoards] = useState<BoardRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,7 +174,7 @@ const EngagementsPage = () => {
         apiGetCollection<BoardRow>(`/boards${q}`),
         apiGet<{ userMemberships?: SpaceMemberRow[] }>(spaceIri),
       ]);
-      setProjects(bps);
+      setEngagements(bps);
       setClients(cls);
       setTaskBoards(prj);
       setMembers(space.userMemberships ?? []);
@@ -194,8 +194,8 @@ const EngagementsPage = () => {
   }, [isAuthenticated, spaceIri, load]);
 
   const editing = useMemo(
-    () => (sheetFor && sheetFor !== NEW ? projects.find((p) => p["@id"] === sheetFor) ?? null : null),
-    [sheetFor, projects],
+    () => (sheetFor && sheetFor !== NEW ? engagements.find((p) => p["@id"] === sheetFor) ?? null : null),
+    [sheetFor, engagements],
   );
 
   const openCreate = () => {
@@ -234,7 +234,7 @@ const EngagementsPage = () => {
     setUserRates(
       (bp.userRates ?? []).map((r) => ({ user: r.user, rate: toMajor(r.rateAmount) })),
     );
-    setAssigned(bp.assignedProjectList.map((p) => `/boards/${p.id}`));
+    setAssigned(bp.assignedBoardList.map((p) => `/boards/${p.id}`));
     setAttachments(bp.attachments ?? []);
     setFormError(null);
     setSheetFor(bp["@id"]);
@@ -401,14 +401,14 @@ const EngagementsPage = () => {
                     </td>
                   </tr>
 
-                  {projects.length === 0 ? (
+                  {engagements.length === 0 ? (
                     <tr>
                       <td colSpan={COL_COUNT} className="px-4 py-10 text-center text-muted-foreground">
                         No engagements yet. Use “Add engagement” to create one.
                       </td>
                     </tr>
                   ) : (
-                    projects.map((bp) => (
+                    engagements.map((bp) => (
                       <tr
                         key={bp["@id"]}
                         onClick={() => openEdit(bp)}

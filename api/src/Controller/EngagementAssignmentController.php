@@ -77,7 +77,7 @@ class EngagementAssignmentController extends AbstractController
         }
 
         // Unassign boards currently on this engagement but no longer wanted.
-        foreach ($engagement->getAssignedProjects() as $current) {
+        foreach ($engagement->getAssignedBoards() as $current) {
             if (!isset($wanted[(string) $current->getId()])) {
                 $current->setEngagement(null);
             }

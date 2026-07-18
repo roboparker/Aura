@@ -221,7 +221,7 @@ const SearchPage = () => {
   const filters = useMemo<FilterState>(() => readFilters(router.query), [router.query]);
 
   const [tags, setTags] = useState<TagRef[]>([]);
-  const [boards, setProjects] = useState<BoardRef[]>([]);
+  const [boards, setBoards] = useState<BoardRef[]>([]);
   const [assignables, setAssignables] = useState<AssignableUser[]>([]);
 
   useEffect(() => {
@@ -238,7 +238,7 @@ const SearchPage = () => {
       fetch(`${ENTRYPOINT}/me/assignable-users`, { credentials: "include" }),
     ]).then(async ([t, p, a]) => {
       if (t.ok) setTags(collectionMembers<TagRef>(await t.json()));
-      if (p.ok) setProjects(collectionMembers<BoardRef>(await p.json()));
+      if (p.ok) setBoards(collectionMembers<BoardRef>(await p.json()));
       if (a.ok) {
         const data = await a.json();
         setAssignables(Array.isArray(data) ? data : collectionMembers<AssignableUser>(data));

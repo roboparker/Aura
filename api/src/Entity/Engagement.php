@@ -200,7 +200,7 @@ class Engagement
      * @var Collection<int, Board>
      */
     #[ORM\OneToMany(mappedBy: 'engagement', targetEntity: Board::class)]
-    private Collection $assignedProjects;
+    private Collection $assignedBoards;
 
     /**
      * Contract + supporting files attached to this engagement. Same upload
@@ -235,7 +235,7 @@ class Engagement
     {
         $this->categories = new ArrayCollection();
         $this->userRates = new ArrayCollection();
-        $this->assignedProjects = new ArrayCollection();
+        $this->assignedBoards = new ArrayCollection();
         $this->attachments = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
     }
@@ -512,9 +512,9 @@ class Engagement
     /**
      * @return Collection<int, Board>
      */
-    public function getAssignedProjects(): Collection
+    public function getAssignedBoards(): Collection
     {
-        return $this->assignedProjects;
+        return $this->assignedBoards;
     }
 
     /**
@@ -524,10 +524,10 @@ class Engagement
      * @return list<array{id: string, title: string}>
      */
     #[Groups(['engagement:read'])]
-    public function getAssignedProjectList(): array
+    public function getAssignedBoardList(): array
     {
         $out = [];
-        foreach ($this->assignedProjects as $board) {
+        foreach ($this->assignedBoards as $board) {
             $out[] = ['id' => (string) $board->getId(), 'title' => $board->getTitle()];
         }
 

@@ -81,11 +81,11 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             $space = $key->getSpace();
             $queryBuilder
                 ->leftJoin(sprintf('%s.task', $rootAlias), 'ck_task')
-                ->leftJoin('ck_task.board', 'ck_project')
+                ->leftJoin('ck_task.board', 'ck_board')
                 ->leftJoin(sprintf('%s.page', $rootAlias), 'ck_page')
                 ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ck_discussion')
                 ->andWhere(
-                    'IDENTITY(ck_project.space) = :comment_key_space'
+                    'IDENTITY(ck_board.space) = :comment_key_space'
                     . ' OR IDENTITY(ck_page.space) = :comment_key_space'
                     . ' OR IDENTITY(ck_discussion.space) = :comment_key_space',
                 )
@@ -100,11 +100,11 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         // doesn't match this branch rather than blowing up the row.
         $taskOwnerCheck = 'ca_task.owner = :currentUser';
         $taskSpaceDirect = sprintf(
-            'SELECT 1 FROM %s ca_t_direct WHERE ca_t_direct.space = ca_project.space AND ca_t_direct.user = :currentUser',
+            'SELECT 1 FROM %s ca_t_direct WHERE ca_t_direct.space = ca_board.space AND ca_t_direct.user = :currentUser',
             SpaceMembership::class,
         );
         $taskSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp_obj.space = ca_project.space AND ca_t_grp_member.user = :currentUser',
+            'SELECT 1 FROM %s ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp_obj.space = ca_board.space AND ca_t_grp_member.user = :currentUser',
             UserGroup::class,
         );
 
@@ -135,7 +135,7 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         // ticket's comments — the branch just needs the FK to be set.
         $queryBuilder
             ->leftJoin(sprintf('%s.task', $rootAlias), 'ca_task')
-            ->leftJoin('ca_task.board', 'ca_project')
+            ->leftJoin('ca_task.board', 'ca_board')
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
             ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ca_discussion')
             ->leftJoin(sprintf('%s.feedback', $rootAlias), 'ca_feedback')

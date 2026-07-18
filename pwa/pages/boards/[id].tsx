@@ -189,7 +189,7 @@ const BoardDetail = () => {
   const boardId = typeof id === "string" ? id : null;
   const currentUserIri = user ? `/users/${user.id}` : null;
 
-  const [board, setProject] = useState<Board | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
   const [tasks, setTasks] = useState<BoardTask[]>([]);
   // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
   const [calendarRefresh, setCalendarRefresh] = useState(0);
@@ -207,7 +207,7 @@ const BoardDetail = () => {
   // Which detail tab is active (list | board | activity | settings) —
   // controlled so the header's "New task" button shows on the List tab only.
   const [activeTab, setActiveTab] = useState("list");
-  const [confirmDeleteProjectOpen, setConfirmDeleteProjectOpen] =
+  const [confirmDeleteBoardOpen, setConfirmDeleteBoardOpen] =
     useState(false);
 
   // Editable board name + description (Settings tab → Board details).
@@ -342,7 +342,7 @@ const BoardDetail = () => {
       }
       if (!boardRes.ok) throw new Error("Failed to load board.");
       const boardData: Board = await boardRes.json();
-      setProject(boardData);
+      setBoard(boardData);
 
       const boardIri = boardData["@id"];
       const [tasksRes, defsRes, globalDefsRes, sectionsRes, usersRes, tagsRes] =
@@ -438,7 +438,7 @@ const BoardDetail = () => {
   // Attach a field to this board (per-board selection M2M). Space and
   // global fields live in separate join tables, so PATCH the matching key
   // with the full current set of that source plus the new IRI.
-  const attachFieldToProject = useCallback(
+  const attachFieldToBoard = useCallback(
     async (defIri: string) => {
       if (!board) return;
       if (definitions.some((d) => d["@id"] === defIri)) return;
@@ -880,7 +880,7 @@ const BoardDetail = () => {
           data.detail || data.error || data["hydra:description"] || "Failed to save changes.",
         );
       }
-      setProject((prev) => (prev ? { ...prev, ...data } : prev));
+      setBoard((prev) => (prev ? { ...prev, ...data } : prev));
       setDetailsMessage({ text: "Saved.", kind: "success" });
     } catch (err) {
       setDetailsMessage({
@@ -965,7 +965,7 @@ const BoardDetail = () => {
     }
   };
 
-  const handleDeleteProject = async () => {
+  const handleDeleteBoard = async () => {
     if (!board) return;
     const res = await fetch(
       `${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`,
@@ -1438,7 +1438,7 @@ const BoardDetail = () => {
                                 type="button"
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => setConfirmDeleteProjectOpen(true)}
+                                onClick={() => setConfirmDeleteBoardOpen(true)}
                                 data-testid="board-delete"
                               >
                                 <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete board
@@ -1449,12 +1449,12 @@ const BoardDetail = () => {
                   </div>
 
                   <ConfirmDialog
-                    open={confirmDeleteProjectOpen}
-                    onOpenChange={setConfirmDeleteProjectOpen}
+                    open={confirmDeleteBoardOpen}
+                    onOpenChange={setConfirmDeleteBoardOpen}
                     title="Delete this board?"
                     description={`"${board.title}" and all of its tasks will be permanently deleted. This can't be undone.`}
                     confirmLabel="Delete board"
-                    onConfirm={handleDeleteProject}
+                    onConfirm={handleDeleteBoard}
                   />
                 </TabsContent>
 
@@ -1754,7 +1754,7 @@ const BoardDetail = () => {
             setEditFieldDef(null);
             // A field created from a board auto-attaches to it.
             if (wasCreate && def?.["@id"]) {
-              void attachFieldToProject(def["@id"]).then(
+              void attachFieldToBoard(def["@id"]).then(
                 () => void reloadDefinitions(),
               );
             } else {

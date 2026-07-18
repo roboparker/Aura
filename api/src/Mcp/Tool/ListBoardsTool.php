@@ -46,7 +46,7 @@ final class ListBoardsTool implements McpToolInterface
 
         $qb = $this->em->getRepository(Board::class)
             ->createQueryBuilder('p')
-            ->where(\App\Doctrine\SpaceMembershipDql::userBelongsToProjectSpace('p', 'list_boards'))
+            ->where(\App\Doctrine\SpaceMembershipDql::userBelongsToBoardSpace('p', 'list_boards'))
             ->setParameter('user', $user)
             ->orderBy('p.createdOn', 'DESC')
             ->setFirstResult(($page - 1) * $limit)

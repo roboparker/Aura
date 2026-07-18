@@ -24,7 +24,7 @@ final class SpacePermission
     /** @var list<string> */
     public const ACTIONS = [self::CREATE, self::READ, self::UPDATE, self::DELETE];
 
-    public const PROJECTS = 'boards';
+    public const BOARDS = 'boards';
     public const TASKS = 'tasks';
     public const PAGES = 'pages';
     public const DISCUSSIONS = 'discussions';
@@ -40,7 +40,7 @@ final class SpacePermission
 
     /** @var list<string> */
     public const CATEGORIES = [
-        self::PROJECTS,
+        self::BOARDS,
         self::TASKS,
         self::PAGES,
         self::DISCUSSIONS,

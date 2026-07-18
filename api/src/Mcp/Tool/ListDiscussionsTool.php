@@ -59,7 +59,7 @@ final class ListDiscussionsTool implements McpToolInterface
 
         $qb = $this->em->getRepository(Discussion::class)
             ->createQueryBuilder('d')
-            ->where(SpaceMembershipDql::userBelongsToProjectSpace('d', 'discussion_list'))
+            ->where(SpaceMembershipDql::userBelongsToBoardSpace('d', 'discussion_list'))
             ->setParameter('user', $user)
             ->orderBy('d.isPinned', 'DESC')
             ->addOrderBy('d.createdAt', 'DESC')

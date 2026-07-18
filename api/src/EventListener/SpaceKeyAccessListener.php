@@ -29,7 +29,7 @@ final class SpaceKeyAccessListener
 {
     /** First path segment → permission category. Anything else is denied. */
     private const PREFIX_TO_CATEGORY = [
-        'boards' => SpacePermission::PROJECTS,
+        'boards' => SpacePermission::BOARDS,
         'tasks' => SpacePermission::TASKS,
         'pages' => SpacePermission::PAGES,
         'discussions' => SpacePermission::DISCUSSIONS,
@@ -38,7 +38,7 @@ final class SpaceKeyAccessListener
         'custom_field_values' => SpacePermission::CUSTOM_FIELDS,
         'tags' => SpacePermission::TAGS,
         'groups' => SpacePermission::GROUPS,
-        'task_sections' => SpacePermission::PROJECTS,
+        'task_sections' => SpacePermission::BOARDS,
         'task_relationships' => SpacePermission::TASKS,
         'media-objects' => SpacePermission::FILES,
         'media_objects' => SpacePermission::FILES,

@@ -57,7 +57,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ApiFilter(OrderFilter::class, properties: ['position'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: TaskSectionRepository::class)]
 #[ORM\Table(name: 'task_section')]
-#[ORM\Index(columns: ['board_id', 'position'], name: 'idx_task_section_project_position')]
+#[ORM\Index(columns: ['board_id', 'position'], name: 'idx_task_section_board_position')]
 #[ORM\Index(columns: ['space_id'], name: 'idx_task_section_space')]
 #[ORM\HasLifecycleCallbacks]
 class TaskSection
@@ -99,11 +99,11 @@ class TaskSection
     /**
      * Denormalise the parent board's space on insert so the access extension
      * can scope by `space` without joining through `board` (mirrors
-     * CustomFieldDefinition::syncSpaceFromProject).
+     * CustomFieldDefinition::syncSpaceFromBoard).
      */
     #[ORM\PrePersist]
     #[ORM\PreUpdate]
-    public function syncSpaceFromProject(): void
+    public function syncSpaceFromBoard(): void
     {
         if (null !== $this->board) {
             $this->space = $this->board->getSpace();

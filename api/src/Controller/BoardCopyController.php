@@ -116,7 +116,7 @@ class BoardCopyController extends AbstractController
         // the target space or clones it there.
         // Per-board visibility (#custom-fields-board) carries over too: the
         // clone keeps the source's per-board visibility for each field.
-        $sourceVisibility = $this->fieldVisibility->visibilityMapForProject($source);
+        $sourceVisibility = $this->fieldVisibility->visibilityMapForBoard($source);
         foreach ($source->getCustomFieldDefinitions() as $sourceDefinition) {
             $effective = $sourceVisibility[(string) $sourceDefinition->getId()]
                 ?? $sourceDefinition->getVisibility();

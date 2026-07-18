@@ -112,7 +112,7 @@ const Pricing = () => {
             </h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Start free and upgrade when your team grows. Every plan includes
-              the full Madori workspace — tasks, projects, pages, calendar, and
+              the full Madori workspace — tasks, boards, pages, calendar, and
               programmatic API access.
             </p>
           </header>

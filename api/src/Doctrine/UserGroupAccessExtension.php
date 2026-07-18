@@ -99,7 +99,7 @@ final class UserGroupAccessExtension implements QueryCollectionExtensionInterfac
         // EXISTS (not a join) so the collection isn't partially hydrated.
         $queryBuilder
             ->andWhere(
-                SpaceMembershipDql::userBelongsToProjectSpace($rootAlias, 'ug_access', 'currentUser'),
+                SpaceMembershipDql::userBelongsToBoardSpace($rootAlias, 'ug_access', 'currentUser'),
             )
             ->setParameter('currentUser', $user);
     }

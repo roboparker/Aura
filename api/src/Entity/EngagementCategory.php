@@ -30,7 +30,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 #[ORM\Entity(repositoryClass: EngagementCategoryRepository::class)]
 #[ORM\Table(name: 'engagement_category')]
-#[ORM\Index(columns: ['engagement_id'], name: 'idx_engagement_category_project')]
+#[ORM\Index(columns: ['engagement_id'], name: 'idx_engagement_category_engagement')]
 class EngagementCategory
 {
     public const MAX_NAME_LENGTH = 120;

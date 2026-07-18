@@ -49,7 +49,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
         // definition is board-scoped. Only flag this when the client
         // actually sent values; bare boardless tasks are fine.
         if (count($values) > 0 && null === $board) {
-            $this->context->buildViolation($constraint->messageNoProject)
+            $this->context->buildViolation($constraint->messageNoBoard)
                 ->atPath('customFieldValues')
                 ->addViolation();
             return;
@@ -85,7 +85,7 @@ final class ValidCustomFieldValuesValidator extends ConstraintValidator
                     : $this->boardHasDefinition($board->getGlobalCustomFieldDefinitions(), $definition)
             );
             if (!$attached) {
-                $this->context->buildViolation($constraint->messageWrongProject)
+                $this->context->buildViolation($constraint->messageWrongBoard)
                     ->setParameter('{{ name }}', $definition->getName())
                     ->atPath(sprintf('customFieldValues[%d].definition', $index))
                     ->addViolation();

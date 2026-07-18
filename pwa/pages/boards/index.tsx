@@ -83,7 +83,7 @@ const Boards = () => {
       ),
   });
   const boards = boardsQuery.data ?? [];
-  const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["boards"] });
+  const refreshBoards = () => queryClient.invalidateQueries({ queryKey: ["boards"] });
 
   const boardsMeta = contentSectionFor("boards");
   const BoardsIcon = boardsMeta.icon;
@@ -109,7 +109,7 @@ const Boards = () => {
       trackEvent("board-create");
       // Refresh the list (and the sidebar, which shares the ["boards"]
       // key prefix), then jump straight into the new board.
-      void refreshProjects();
+      void refreshBoards();
       if (created) void router.push(`/boards/${created.id}`);
     },
     onError: (err) => setActionError(errorMessage(err, "Failed to create board.")),
@@ -128,7 +128,7 @@ const Boards = () => {
     onSuccess: () => {
       setEditingId(null);
       setActionError(null);
-      void refreshProjects();
+      void refreshBoards();
     },
     onError: (err) => setActionError(errorMessage(err, "Failed to update board.")),
   });
@@ -138,7 +138,7 @@ const Boards = () => {
       apiSend("DELETE", board["@id"], { errorMessage: "Failed to delete board." }),
     onSuccess: () => {
       setActionError(null);
-      void refreshProjects();
+      void refreshBoards();
     },
     onError: (err) => setActionError(errorMessage(err, "Failed to delete board.")),
   });
