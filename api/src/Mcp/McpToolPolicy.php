@@ -41,12 +41,12 @@ final class McpToolPolicy
         'download_file' => ['category' => 'files', 'write' => false],
         'upload_file' => ['category' => 'files', 'write' => true],
         // boards (incl. custom field schema)
-        'list_projects' => ['category' => 'boards', 'write' => false],
-        'get_project' => ['category' => 'boards', 'write' => false],
+        'list_boards' => ['category' => 'boards', 'write' => false],
+        'get_board' => ['category' => 'boards', 'write' => false],
         'get_custom_fields' => ['category' => 'boards', 'write' => false],
-        'create_project' => ['category' => 'boards', 'write' => true],
-        'update_project' => ['category' => 'boards', 'write' => true],
-        'delete_project' => ['category' => 'boards', 'write' => true],
+        'create_board' => ['category' => 'boards', 'write' => true],
+        'update_board' => ['category' => 'boards', 'write' => true],
+        'delete_board' => ['category' => 'boards', 'write' => true],
         // spaces — no dedicated AccessPolicy category; spaces are the
         // container for boards, so listing them rides the boards
         // read scope (it's read-only metadata either way).

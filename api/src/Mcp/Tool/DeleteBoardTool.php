@@ -20,7 +20,7 @@ final class DeleteBoardTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'delete_project';
+        return 'delete_board';
     }
 
     public function getDescription(): string

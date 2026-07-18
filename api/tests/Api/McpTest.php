@@ -121,7 +121,7 @@ class McpTest extends ApiTestCase
         foreach (
             [
             'create_task', 'get_task', 'update_task', 'delete_task', 'list_tasks', 'search_tasks',
-            'create_project', 'get_project', 'update_project', 'delete_project', 'list_projects',
+            'create_board', 'get_board', 'update_board', 'delete_board', 'list_boards',
             'assign_task', 'unassign_task', 'get_my_tasks',
             'add_task_comment', 'list_task_comments',
             'upload_file', 'list_files', 'download_file',
@@ -207,7 +207,7 @@ class McpTest extends ApiTestCase
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'list_projects',
+            'name' => 'list_boards',
             'arguments' => [],
         ]);
         $structured = $body['result']['structuredContent'] ?? null;

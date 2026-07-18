@@ -1,6 +1,6 @@
 # MCP server
 
-Madori ships an integrated [Model Context Protocol](https://modelcontextprotocol.io/) server so AI assistants like Claude Desktop and Claude Code can read and edit tasks, projects, and comments through the same authorization rules as the PWA.
+Madori ships an integrated [Model Context Protocol](https://modelcontextprotocol.io/) server so AI assistants like Claude Desktop and Claude Code can read and edit tasks, boards, and comments through the same authorization rules as the PWA.
 
 The server is mounted at `POST /mcp` on the same FrankenPHP process that serves the API. There is no separate process to run.
 
@@ -43,13 +43,13 @@ A token acts **as its owner**. By default (`accessPolicy: null`) it can do exact
 {
   "name": "Read-only support bot",
   "accessPolicy": {
-    "categories": { "tasks": "view", "projects": "view" },
-    "items": { "project": { "<uuid>": "edit" } }
+    "categories": { "tasks": "view", "boards": "view" },
+    "items": { "board": { "<uuid>": "edit" } }
   }
 }
 ```
 
-`categories` keys are `tasks` / `projects` / `pages` / `discussions` / `comments` / `notifications` / `files`; `items` keys are `project` / `page` / `task` / `discussion` mapping a UUID to a level (an item override wins over its category). Omitted categories default to `none`. The **same policy governs both the REST API and MCP**: REST requests are gated by `App\EventListener\AccessPolicyListener` (path→category, method→view/edit) + per-item collection filtering; MCP tool calls are gated by `App\Mcp\McpToolPolicy` (each tool → category + read/write). MCP enforcement is category-level (tool ids aren't parsed for per-item overrides).
+`categories` keys are `tasks` / `boards` / `pages` / `discussions` / `comments` / `notifications` / `files`; `items` keys are `board` / `page` / `task` / `discussion` mapping a UUID to a level (an item override wins over its category). Omitted categories default to `none`. The **same policy governs both the REST API and MCP**: REST requests are gated by `App\EventListener\AccessPolicyListener` (path→category, method→view/edit) + per-item collection filtering; MCP tool calls are gated by `App\Mcp\McpToolPolicy` (each tool → category + read/write). MCP enforcement is category-level (tool ids aren't parsed for per-item overrides).
 
 Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and the main REST firewall (the authenticator only engages when the Bearer header is present and keeps the request stateless). `POST /api-tokens` and `GET /api-tokens` themselves use the cookie-based PWA session.
 
@@ -62,7 +62,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Category    | Tool                                                                           |
 | ----------- | ------------------------------------------------------------------------------ |
 | Task        | `create_task`, `get_task`, `update_task`, `delete_task`, `list_tasks`, `search_tasks` |
-| Project     | `create_project`, `get_project`, `update_project`, `delete_project`, `list_projects` |
+| Board       | `create_board`, `get_board`, `update_board`, `delete_board`, `list_boards` |
 | Space       | `list_spaces`                                                                   |
 | Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
 | Discussion  | `create_discussion`, `get_discussion`, `list_discussions`                      |
@@ -74,7 +74,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
 
-Create tools that target a space (`create_project`, `create_page`, `create_discussion`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
+Create tools that target a space (`create_board`, `create_page`, `create_discussion`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
 
 > **Custom field values** — `get_custom_fields` returns a project's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
 

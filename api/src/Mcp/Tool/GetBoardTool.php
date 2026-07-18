@@ -23,7 +23,7 @@ final class GetBoardTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'get_project';
+        return 'get_board';
     }
 
     public function getDescription(): string

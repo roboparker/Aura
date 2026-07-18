@@ -33,7 +33,7 @@ const TIERS: Tier[] = [
     monthly: 0,
     cta: { label: "Get started", href: "/signup" },
     features: [
-      "Unlimited personal tasks, projects & pages",
+      "Unlimited personal tasks, boards & pages",
       "Up to 5 members per shared space",
       "100 MCP (programmatic API) calls per day",
       "Calendar, discussions & file attachments",

@@ -17,7 +17,7 @@ const SECTIONS: Section[] = [
     items: [
       {
         q: "What is Madori?",
-        a: "Madori is a collaborative workspace for tasks, projects, long-form pages, discussions, and a shared calendar — with programmatic API access for automation.",
+        a: "Madori is a collaborative workspace for tasks, boards, long-form pages, discussions, and a shared calendar — with programmatic API access for automation.",
       },
       {
         q: "Is there a free plan?",

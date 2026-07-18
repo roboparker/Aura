@@ -22,7 +22,7 @@ final class UpdateBoardTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'update_project';
+        return 'update_board';
     }
 
     public function getDescription(): string

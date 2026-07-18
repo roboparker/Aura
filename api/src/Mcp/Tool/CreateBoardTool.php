@@ -21,7 +21,7 @@ final class CreateBoardTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'create_project';
+        return 'create_board';
     }
 
     public function getDescription(): string
