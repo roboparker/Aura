@@ -6,9 +6,9 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Notification;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use App\Service\TimesheetNudgeDispatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -32,7 +32,7 @@ class TimesheetNudgeTest extends ApiTestCase
         $this->entityManager = $em;
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetSubmission')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetApproval')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
@@ -45,7 +45,7 @@ class TimesheetNudgeTest extends ApiTestCase
     public function testNudgesUnsubmittedTrackersOnceAndSkipsSubmitted(): void
     {
         $now = new \DateTimeImmutable();
-        $lastWeekStart = TimesheetSubmissionRepository::weekStartOf($now)->modify('-7 days');
+        $lastWeekStart = TimesheetApprovalRepository::weekStartOf($now)->modify('-7 days');
 
         $admin = $this->createUser('admin@example.com');
         $member = $this->createUser('member@example.com');
@@ -58,11 +58,11 @@ class TimesheetNudgeTest extends ApiTestCase
         $this->entityManager->persist($extraMembership);
 
         // Approvals are "in use" here: an older decided submission exists.
-        $history = (new TimesheetSubmission())
+        $history = (new TimesheetApproval())
             ->setSpace($space)
             ->setUser($admin)
             ->setWeekStart($lastWeekStart->modify('-14 days'))
-            ->setStatus(TimesheetSubmission::STATUS_APPROVED);
+            ->setStatus(TimesheetApproval::STATUS_APPROVED);
         $this->entityManager->persist($history);
         $this->entityManager->flush();
 
@@ -150,7 +150,7 @@ class TimesheetNudgeTest extends ApiTestCase
     public function testSpacesWithoutApprovalHistoryAreLeftAlone(): void
     {
         $now = new \DateTimeImmutable();
-        $lastWeekStart = TimesheetSubmissionRepository::weekStartOf($now)->modify('-7 days');
+        $lastWeekStart = TimesheetApprovalRepository::weekStartOf($now)->modify('-7 days');
 
         $admin = $this->createUser('admin@example.com');
         $space = $this->createSharedSpace($admin);

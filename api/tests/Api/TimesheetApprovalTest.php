@@ -27,7 +27,7 @@ class TimesheetApprovalTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetSubmission')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetApproval')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();

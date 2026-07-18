@@ -28,7 +28,7 @@ use App\Entity\Task;
 use App\Entity\TaskRelationship;
 use App\Entity\TaskSection;
 use App\Entity\TimeEntry;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use Doctrine\Bundle\FixturesBundle\Fixture;
@@ -469,12 +469,12 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
         );
         $manager->persist($sentInvoice);
 
-        // A pending timesheet submission (#654) awaiting Ada's approval, so
+        // A pending timesheet approval (#654) awaiting Ada's review, so
         // the /approvals queue has a row.
         $manager->persist(
-            (new TimesheetSubmission())->setSpace($desk)->setUser($noah)
+            (new TimesheetApproval())->setSpace($desk)->setUser($noah)
                 ->setWeekStart(new \DateTimeImmutable('monday last week'))
-                ->setStatus(TimesheetSubmission::STATUS_PENDING),
+                ->setStatus(TimesheetApproval::STATUS_PENDING),
         );
 
         // A second, deliberately empty board — for exercising the empty-state UI.

@@ -5,7 +5,7 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\TimeEntry;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
@@ -29,7 +29,7 @@ final class TimeEntryDeleteProcessor implements ProcessorInterface
     public function __construct(
         #[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
         private ProcessorInterface $removeProcessor,
-        private TimesheetSubmissionRepository $timesheets,
+        private TimesheetApprovalRepository $timesheets,
     ) {
     }
 

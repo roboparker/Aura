@@ -6,7 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\TimeEntry;
 use App\Repository\TimeEntryRepository;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use App\Security\AuthenticatedUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -37,7 +37,7 @@ final class TimeEntryUserProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private AuthenticatedUserResolver $auth,
         private TimeEntryRepository $timeEntries,
-        private TimesheetSubmissionRepository $timesheets,
+        private TimesheetApprovalRepository $timesheets,
         private EntityManagerInterface $em,
     ) {
     }
