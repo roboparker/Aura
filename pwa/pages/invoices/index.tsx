@@ -25,8 +25,8 @@ import {
 
 type InvoiceAction = "issue" | "send" | "mark-paid" | "void";
 
-/** Minimal engagement shape for the "generate from time" picker. */
-interface EngagementLite {
+/** Minimal project shape for the "generate from time" picker. */
+interface ProjectLite {
   "@id": string;
   name: string;
 }
@@ -68,7 +68,7 @@ const InvoicesPage = () => {
   const queryClient = useQueryClient();
 
   const [showComposer, setShowComposer] = useState(false);
-  const [genEngagement, setGenEngagement] = useState("");
+  const [genProject, setGenProject] = useState("");
   const [genFrom, setGenFrom] = useState("");
   const [genTo, setGenTo] = useState("");
   const [preview, setPreview] = useState<GenPreview | null>(null);
@@ -83,15 +83,15 @@ const InvoicesPage = () => {
     }
   }, [authLoading, isAuthenticated, router]);
 
-  // Deep link from the uninvoiced report (#666): /invoices?generate={engagementId}
-  // opens the composer with the engagement preselected and previews it.
+  // Deep link from the uninvoiced report (#666): /invoices?generate={projectId}
+  // opens the composer with the project preselected and previews it.
   const [autoPreview, setAutoPreview] = useState(false);
   useEffect(() => {
     if (!router.isReady) return;
     const generateParam = router.query.generate;
     if (typeof generateParam !== "string" || generateParam === "") return;
     setShowComposer(true);
-    setGenEngagement(`/engagements/${generateParam}`);
+    setGenProject(`/projects/${generateParam}`);
     setAutoPreview(true);
     void router.replace("/invoices", undefined, { shallow: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,30 +108,30 @@ const InvoicesPage = () => {
         { errorMessage: "Failed to load invoices." },
       ),
   });
-  // Invoices generate from an *engagement* (Harvest model): the engagement
+  // Invoices generate from an *project* (Harvest model): the project
   // carries the client + currency and its unbilled time becomes line items.
-  const engagementsQuery = useQuery({
-    queryKey: ["engagements", spaceIri],
+  const projectsQuery = useQuery({
+    queryKey: ["projects", spaceIri],
     enabled: isAuthenticated && can("invoices", "create"),
     queryFn: () =>
-      apiGetCollection<EngagementLite>(
-        spaceIri ? `/engagements?space=${encodeURIComponent(spaceIri)}` : "/engagements",
-        { errorMessage: "Failed to load engagements." },
+      apiGetCollection<ProjectLite>(
+        spaceIri ? `/projects?space=${encodeURIComponent(spaceIri)}` : "/projects",
+        { errorMessage: "Failed to load projects." },
       ),
   });
   const invoices = invoicesQuery.data ?? [];
-  const engagements = engagementsQuery.data ?? [];
+  const projects = projectsQuery.data ?? [];
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["invoices"] });
 
-  // Engagement + optional inclusive date range — shared by preview and generate.
+  // Project + optional inclusive date range — shared by preview and generate.
   const rangeBody = () => ({
-    engagement: genEngagement,
+    project: genProject,
     ...(genFrom ? { from: genFrom } : {}),
     ...(genTo ? { to: genTo } : {}),
   });
 
   const resetComposer = () => {
-    setGenEngagement("");
+    setGenProject("");
     setGenFrom("");
     setGenTo("");
     setPreview(null);
@@ -164,14 +164,14 @@ const InvoicesPage = () => {
     onError: (e) => setError(e instanceof Error ? e.message : "Failed to load unbilled time."),
   });
 
-  // Fire the deep-linked preview once the preselected engagement is in state.
+  // Fire the deep-linked preview once the preselected project is in state.
   useEffect(() => {
-    if (autoPreview && genEngagement !== "") {
+    if (autoPreview && genProject !== "") {
       setAutoPreview(false);
       loadPreview.mutate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoPreview, genEngagement]);
+  }, [autoPreview, genProject]);
 
   const generate = useMutation({
     mutationFn: () =>
@@ -325,18 +325,18 @@ const InvoicesPage = () => {
                           <td colSpan={4} className="px-4 py-4">
                             <div className="flex flex-wrap items-end gap-3">
                               <div className="space-y-1.5">
-                                <Label htmlFor="gen-engagement">Generate from tracked time</Label>
+                                <Label htmlFor="gen-project">Generate from tracked time</Label>
                                 <select
-                                  id="gen-engagement"
-                                  value={genEngagement}
+                                  id="gen-project"
+                                  value={genProject}
                                   onChange={(e) => {
-                                    setGenEngagement(e.target.value);
+                                    setGenProject(e.target.value);
                                     clearPreview();
                                   }}
                                   className="h-9 w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                  <option value="">Select an engagement…</option>
-                                  {engagements.map((eng) => (
+                                  <option value="">Select an project…</option>
+                                  {projects.map((eng) => (
                                     <option key={eng["@id"]} value={eng["@id"]}>
                                       {eng.name}
                                     </option>
@@ -372,18 +372,18 @@ const InvoicesPage = () => {
                               <Button
                                 size="sm"
                                 onClick={() => loadPreview.mutate()}
-                                disabled={!genEngagement || loadPreview.isPending}
+                                disabled={!genProject || loadPreview.isPending}
                               >
                                 {loadPreview.isPending ? "Loading…" : "Preview"}
                               </Button>
                               <Button variant="ghost" size="sm" onClick={resetComposer}>
                                 Cancel
                               </Button>
-                              {engagements.length === 0 && (
+                              {projects.length === 0 && (
                                 <p className="text-sm text-muted-foreground">
                                   Add an{" "}
-                                  <Link href="/engagements" className="text-primary hover:underline">
-                                    engagement
+                                  <Link href="/projects" className="text-primary hover:underline">
+                                    project
                                   </Link>{" "}
                                   first.
                                 </p>
@@ -395,7 +395,7 @@ const InvoicesPage = () => {
                               preview.expenses.length === 0 && (
                               <p className="mt-3 text-sm text-muted-foreground">
                                 No unbilled billable time or expenses
-                                {genFrom || genTo ? " in this range" : ""} for this engagement.
+                                {genFrom || genTo ? " in this range" : ""} for this project.
                               </p>
                             )}
 

@@ -2,28 +2,28 @@
 
 namespace App\Service;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Notification;
 use App\Entity\Space;
-use App\Repository\EngagementRepository;
+use App\Repository\ProjectRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
  * The nightly budget alert sweep (#651): for every budgeted, non-archived
- * engagement, computes consumption and alerts the space's admins when a
+ * project, computes consumption and alerts the space's admins when a
  * threshold (80% / 100%) is crossed — once per threshold, stamped in the
- * engagement's budgetAlertsSent ledger so re-runs are idempotent. Editing the
+ * project's budgetAlertsSent ledger so re-runs are idempotent. Editing the
  * budget clears the ledger, so a raised budget re-alerts when re-crossed.
  *
  * Alerts flow through NotificationDispatcher (#667): an in-app bell row plus
  * push + email under each admin's own preference matrix / quiet hours.
  */
-final class EngagementBudgetAlerter
+final class ProjectBudgetAlerter
 {
     public function __construct(
-        private readonly EngagementRepository $engagements,
-        private readonly EngagementBudgetCalculator $calculator,
+        private readonly ProjectRepository $projects,
+        private readonly ProjectBudgetCalculator $calculator,
         private readonly NotificationDispatcher $notifier,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
@@ -33,34 +33,34 @@ final class EngagementBudgetAlerter
     /** Returns how many alerts were dispatched (one per admin per threshold). */
     public function dispatchDue(): int
     {
-        $budgeted = $this->engagements->findBudgeted();
+        $budgeted = $this->projects->findBudgeted();
         if ([] === $budgeted) {
             return 0;
         }
 
-        $spentMap = $this->calculator->spentByEngagement($budgeted);
+        $spentMap = $this->calculator->spentByProject($budgeted);
         $sent = 0;
         $stamped = false;
-        foreach ($budgeted as $engagement) {
-            $budget = $engagement->getBudgetAmount();
+        foreach ($budgeted as $project) {
+            $budget = $project->getBudgetAmount();
             if (null === $budget || $budget <= 0) {
                 continue;
             }
-            $row = $spentMap[(string) $engagement->getId()] ?? ['seconds' => 0, 'fees' => 0];
-            $spent = Engagement::BUDGET_HOURS === $engagement->getBudgetType()
+            $row = $spentMap[(string) $project->getId()] ?? ['seconds' => 0, 'fees' => 0];
+            $spent = Project::BUDGET_HOURS === $project->getBudgetType()
                 ? intdiv($row['seconds'], 60)
                 : $row['fees'];
             $percent = (int) floor($spent / $budget * 100);
 
-            foreach (Engagement::BUDGET_ALERT_THRESHOLDS as $threshold) {
+            foreach (Project::BUDGET_ALERT_THRESHOLDS as $threshold) {
                 if ($percent < $threshold) {
                     continue;
                 }
-                if (in_array($threshold, $engagement->getBudgetAlertsSent(), true)) {
+                if (in_array($threshold, $project->getBudgetAlertsSent(), true)) {
                     continue;
                 }
-                $sent += $this->alertAdmins($engagement, $threshold, $spent, $budget, $percent);
-                $engagement->addBudgetAlertSent($threshold);
+                $sent += $this->alertAdmins($project, $threshold, $spent, $budget, $percent);
+                $project->addBudgetAlertSent($threshold);
                 $stamped = true;
             }
         }
@@ -69,20 +69,20 @@ final class EngagementBudgetAlerter
             $this->em->flush();
         }
         if ($sent > 0) {
-            $this->logger->info(sprintf('Sent %d engagement budget alert(s).', $sent));
+            $this->logger->info(sprintf('Sent %d project budget alert(s).', $sent));
         }
 
         return $sent;
     }
 
-    private function alertAdmins(Engagement $engagement, int $threshold, int $spent, int $budget, int $percent): int
+    private function alertAdmins(Project $project, int $threshold, int $spent, int $budget, int $percent): int
     {
-        $space = $engagement->getSpace();
+        $space = $project->getSpace();
         if (null === $space) {
             return 0;
         }
 
-        $body = Engagement::BUDGET_HOURS === $engagement->getBudgetType()
+        $body = Project::BUDGET_HOURS === $project->getBudgetType()
             ? sprintf(
                 '%s of the %s-hour budget is used (%d%%, %d%% threshold).',
                 number_format($spent / 60, 1),
@@ -112,9 +112,9 @@ final class EngagementBudgetAlerter
                 recipient: $admin,
                 type: Notification::TYPE_BUDGET_ALERT,
                 actor: null,
-                title: sprintf('%s has used %d%% of its budget', $engagement->getName(), $percent),
+                title: sprintf('%s has used %d%% of its budget', $project->getName(), $percent),
                 body: $body,
-                targetPath: '/engagements',
+                targetPath: '/projects',
             );
             if (null !== $notification) {
                 ++$sent;

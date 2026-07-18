@@ -11,7 +11,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Billing reports (#647): the time summary (period + group-by) and the
- * per-engagement uninvoiced pool, both gated on the admin-reserved `invoices`
+ * per-project uninvoiced pool, both gated on the admin-reserved `invoices`
  * category and exportable as CSV.
  */
 class ReportTest extends ApiTestCase
@@ -29,8 +29,8 @@ class ReportTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -51,7 +51,7 @@ class ReportTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // 1h Dev @6000 + 30m Build @8000 (billable) + 2h Internal (non-billable).
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
@@ -123,7 +123,7 @@ class ReportTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
         $this->trackTime($client, $spaceIri, $bpIri, $buildCat, '2026-07-03T11:00:00+00:00', '2026-07-03T11:30:00+00:00');
@@ -137,16 +137,16 @@ class ReportTest extends ApiTestCase
         $this->assertCount(1, $rows);
         $row = $rows[0];
         $this->assertIsArray($row);
-        $this->assertSame('Acme Website', $row['engagement'] ?? null);
+        $this->assertSame('Acme Website', $row['project'] ?? null);
         $this->assertSame('Acme Co', $row['client'] ?? null);
         $this->assertSame(2, $row['entryCount'] ?? null);
         $this->assertSame(1.5, $row['hours'] ?? null);
         $this->assertSame(10000, $row['amount'] ?? null);
         $this->assertSame('USD', $row['currency'] ?? null);
 
-        // Invoicing the engagement drains the pool.
+        // Invoicing the project drains the pool.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -155,27 +155,27 @@ class ReportTest extends ApiTestCase
     }
 
     /**
-     * Admin creates a engagement (for $clientIri) with two billable categories
+     * Admin creates a project (for $clientIri) with two billable categories
      * ("Dev" @ 6000, "Build" @ 8000) and one non-billable ("Internal" @ 0).
-     * Returns [engagementIri, devCategoryIri, buildCategoryIri, internalCategoryIri].
+     * Returns [projectIri, devCategoryIri, buildCategoryIri, internalCategoryIri].
      *
      * @return array{0: string, 1: string, 2: string, 3: string}
      */
-    private function createEngagement(
+    private function createProject(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
         string $clientIri,
     ): array {
-        $row = $client->request('POST', '/engagements', [
+        $row = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
                 'name' => 'Acme Website',
                 'currency' => 'USD',
                 'categories' => [
-                    ['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0],
-                    ['name' => 'Build', 'rateAmount' => 8000, 'position' => 1],
-                    ['name' => 'Internal', 'rateAmount' => 0, 'position' => 2, 'billable' => false],
+                    ['name' => 'Dev', 'billingRate' => 6000, 'position' => 0],
+                    ['name' => 'Build', 'billingRate' => 8000, 'position' => 1],
+                    ['name' => 'Internal', 'billingRate' => 0, 'position' => 2, 'billable' => false],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -204,7 +204,7 @@ class ReportTest extends ApiTestCase
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
-        string $engagementIri,
+        string $projectIri,
         string $categoryIri,
         string $startedAt,
         string $endedAt,
@@ -212,7 +212,7 @@ class ReportTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => $startedAt,
                 'endedAt' => $endedAt,

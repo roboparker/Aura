@@ -2,13 +2,13 @@
 
 namespace App\Service;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Expense;
 use App\Entity\TimeEntry;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Computes budget consumption for engagements (#651) in one grouped query —
+ * Computes budget consumption for projects (#651) in one grouped query —
  * shared by the read-side provider (progress bars) and the nightly alert
  * sweep so the two can never disagree.
  *
@@ -17,35 +17,35 @@ use Doctrine\ORM\EntityManagerInterface;
  * 3600, minor units) **plus billable expenses** (#666) — a cheap SQL
  * approximation of the invoice math, close enough for progress + alerts.
  */
-final class EngagementBudgetCalculator
+final class ProjectBudgetCalculator
 {
     public function __construct(private readonly EntityManagerInterface $em)
     {
     }
 
     /**
-     * Spent-per-engagement for the given rows, keyed by engagement id:
+     * Spent-per-project for the given rows, keyed by project id:
      * `['seconds' => total tracked, 'fees' => billable minor units]`.
      *
-     * @param list<Engagement> $engagements
+     * @param list<Project> $projects
      *
      * @return array<string, array{seconds: int, fees: int}>
      */
-    public function spentByEngagement(array $engagements): array
+    public function spentByProject(array $projects): array
     {
-        if ([] === $engagements) {
+        if ([] === $projects) {
             return [];
         }
 
         /** @var list<array{eid: string|null, totalSec: string|int|null, feeSec: string|int|null}> $rows */
         $rows = $this->em->createQuery(
-            'SELECT IDENTITY(t.engagement) AS eid,
+            'SELECT IDENTITY(t.project) AS eid,
                     COALESCE(SUM(t.durationSeconds), 0) AS totalSec,
                     COALESCE(SUM(CASE WHEN t.billable = true THEN t.durationSeconds * COALESCE(t.rateAmount, 0) ELSE 0 END), 0) AS feeSec
              FROM ' . TimeEntry::class . ' t
-             WHERE t.engagement IN (:engagements) AND t.endedAt IS NOT NULL
-             GROUP BY t.engagement',
-        )->setParameter('engagements', $engagements)->getResult();
+             WHERE t.project IN (:projects) AND t.endedAt IS NOT NULL
+             GROUP BY t.project',
+        )->setParameter('projects', $projects)->getResult();
 
         $map = [];
         foreach ($rows as $row) {
@@ -58,16 +58,16 @@ final class EngagementBudgetCalculator
             ];
         }
 
-        // Billable expenses consume a fees budget too (#666) — an engagement
+        // Billable expenses consume a fees budget too (#666) — an project
         // that burns its budget on costs rather than hours still alerts.
         /** @var list<array{eid: string|null, amount: string|int|null}> $expenseRows */
         $expenseRows = $this->em->createQuery(
-            'SELECT IDENTITY(x.engagement) AS eid,
+            'SELECT IDENTITY(x.project) AS eid,
                     COALESCE(SUM(x.amount), 0) AS amount
              FROM ' . Expense::class . ' x
-             WHERE x.engagement IN (:engagements) AND x.billable = true
-             GROUP BY x.engagement',
-        )->setParameter('engagements', $engagements)->getResult();
+             WHERE x.project IN (:projects) AND x.billable = true
+             GROUP BY x.project',
+        )->setParameter('projects', $projects)->getResult();
 
         foreach ($expenseRows as $row) {
             if (null === $row['eid']) {
@@ -82,18 +82,18 @@ final class EngagementBudgetCalculator
     }
 
     /**
-     * Spent against THIS engagement's budget, in the budget's own unit
+     * Spent against THIS project's budget, in the budget's own unit
      * (minutes for hours, minor units for fees). Null when it has no budget.
      */
-    public function spentFor(Engagement $engagement): ?int
+    public function spentFor(Project $project): ?int
     {
-        if (null === $engagement->getBudgetType()) {
+        if (null === $project->getBudgetType()) {
             return null;
         }
-        $id = (string) $engagement->getId();
-        $spent = $this->spentByEngagement([$engagement])[$id] ?? ['seconds' => 0, 'fees' => 0];
+        $id = (string) $project->getId();
+        $spent = $this->spentByProject([$project])[$id] ?? ['seconds' => 0, 'fees' => 0];
 
-        return Engagement::BUDGET_HOURS === $engagement->getBudgetType()
+        return Project::BUDGET_HOURS === $project->getBudgetType()
             ? intdiv($spent['seconds'], 60)
             : $spent['fees'];
     }

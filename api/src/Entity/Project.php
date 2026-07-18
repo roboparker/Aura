@@ -13,10 +13,10 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use App\Repository\EngagementRepository;
-use App\State\EngagementBudgetProvider;
-use App\State\EngagementCreatorProcessor;
-use App\Validator\ValidEngagementAttachments;
+use App\Repository\ProjectRepository;
+use App\State\ProjectBudgetProvider;
+use App\State\ProjectCreatorProcessor;
+use App\Validator\ValidProjectAttachments;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -28,30 +28,30 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 /**
  * A billable board (Harvest-style): the unit that time is tracked against and
  * invoiced from. It belongs to a {@see Client} and defines a set of
- * {@see EngagementCategory} rows (named work + hourly rate). Time entries select a
- * engagement + one of its categories, which fixes the rate. Task-management
- * {@see Board}s can be assigned to a engagement (their `engagement` FK).
+ * {@see Service} rows (named work + hourly rate). Time entries select a
+ * project + one of its categories, which fixes the rate. Task-management
+ * {@see Board}s can be assigned to a project (their `project` FK).
  *
  * Space-scoped and admin-managed like {@see Client}: the `invoices` permission
- * category gates create/read/update/delete via {@see \App\Doctrine\EngagementAccessExtension}.
+ * category gates create/read/update/delete via {@see \App\Doctrine\ProjectAccessExtension}.
  * Members select from it through the minimal picker
- * ({@see \App\Controller\EngagementOptionsController}).
+ * ({@see \App\Controller\ProjectOptionsController}).
  */
 #[ApiResource(
-    shortName: 'Engagement',
+    shortName: 'Project',
     operations: [
         new GetCollection(
             security: "is_granted('ROLE_USER')",
-            provider: EngagementBudgetProvider::class,
+            provider: ProjectBudgetProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
             securityPostDenormalize: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace() !== null and object.getSpace().hasMember(user) and is_granted('space.invoices.create', object)))",
-            processor: EngagementCreatorProcessor::class,
+            processor: ProjectCreatorProcessor::class,
         ),
         new Get(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.getSpace().hasMember(user) and is_granted('space.invoices.read', object)))",
-            provider: EngagementBudgetProvider::class,
+            provider: ProjectBudgetProvider::class,
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.invoices.update', object)))",
@@ -60,21 +60,21 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getSpace().isAdmin(user) or (object.getSpace().hasMember(user) and is_granted('space.invoices.delete', object)))",
         ),
     ],
-    normalizationContext: ['groups' => ['engagement:read']],
-    denormalizationContext: ['groups' => ['engagement:write']],
+    normalizationContext: ['groups' => ['project:read']],
+    denormalizationContext: ['groups' => ['project:write']],
     order: ['name' => 'ASC'],
 )]
 #[ApiFilter(SearchFilter::class, properties: ['space' => 'exact', 'client' => 'exact', 'name' => 'partial'])]
 #[ApiFilter(BooleanFilter::class, properties: ['archived'])]
 #[ApiFilter(OrderFilter::class, properties: ['name', 'createdAt'])]
-#[ORM\Entity(repositoryClass: EngagementRepository::class)]
-#[ORM\Table(name: 'engagement')]
-#[ORM\Index(columns: ['space_id', 'name'], name: 'idx_engagement_space_name')]
-#[ORM\Index(columns: ['client_id'], name: 'idx_engagement_client')]
+#[ORM\Entity(repositoryClass: ProjectRepository::class)]
+#[ORM\Table(name: 'project')]
+#[ORM\Index(columns: ['space_id', 'name'], name: 'idx_project_space_name')]
+#[ORM\Index(columns: ['client_id'], name: 'idx_project_client')]
 #[ORM\HasLifecycleCallbacks]
 #[Assert\Callback('validateConsistency')]
-#[ValidEngagementAttachments]
-class Engagement
+#[ValidProjectAttachments]
+class Project
 {
     public const MAX_NAME_LENGTH = 200;
 
@@ -91,41 +91,41 @@ class Engagement
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['engagement:read', 'time_entry:read'])]
+    #[Groups(['project:read', 'time_entry:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: Space::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'Space is required.')]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private ?Space $space = null;
 
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: Client::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Assert\NotNull(message: 'A client is required.')]
-    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
+    #[Groups(['project:read', 'project:write', 'time_entry:read'])]
     private ?Client $client = null;
 
     #[ORM\Column(length: self::MAX_NAME_LENGTH)]
     #[Assert\NotBlank(message: 'A board name is required.')]
     #[Assert\Length(max: self::MAX_NAME_LENGTH)]
-    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
+    #[Groups(['project:read', 'project:write', 'time_entry:read'])]
     private string $name = '';
 
     /** ISO 4217 currency for every category rate; defaults to the client's on create. */
     #[ORM\Column(type: 'string', length: 3, nullable: true)]
     #[Assert\Currency]
-    #[Groups(['engagement:read', 'engagement:write', 'time_entry:read'])]
+    #[Groups(['project:read', 'project:write', 'time_entry:read'])]
     private ?string $currency = null;
 
     /** Optional long-form notes (markdown) — scope, terms, key contacts. */
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private ?string $description = null;
 
     #[ORM\Column(type: 'boolean')]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private bool $archived = false;
 
     /**
@@ -135,13 +135,13 @@ class Engagement
      */
     #[ORM\Column(length: 10, nullable: true)]
     #[Assert\Choice(choices: self::BUDGET_TYPES, message: 'Invalid budget type.')]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private ?string $budgetType = null;
 
     /** Minutes for an hours budget, minor units for a fees budget. */
     #[ORM\Column(type: 'integer', nullable: true)]
     #[Assert\Positive(message: 'The budget must be positive.')]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private ?int $budgetAmount = null;
 
     /**
@@ -152,83 +152,83 @@ class Engagement
      * @var list<int>|null
      */
     #[ORM\Column(type: 'json', nullable: true)]
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     private ?array $budgetAlertsSent = null;
 
     /**
      * Transient (#651): consumption against the budget, set per-read by
-     * {@see EngagementBudgetProvider} — minutes for hours budgets, minor
+     * {@see ProjectBudgetProvider} — minutes for hours budgets, minor
      * units for fees. Null when no budget is set.
      */
     #[ApiProperty(writable: false)]
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     private ?int $budgetSpent = null;
 
     /**
-     * @var Collection<int, EngagementCategory>
+     * @var Collection<int, Service>
      */
     #[ORM\OneToMany(
-        mappedBy: 'engagement',
-        targetEntity: EngagementCategory::class,
+        mappedBy: 'project',
+        targetEntity: Service::class,
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
     #[ORM\OrderBy(['position' => 'ASC', 'name' => 'ASC'])]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private Collection $categories;
 
     /**
      * Per-person billable rate overrides (#653) — when a user has a row
      * here, their tracked time snapshots this rate instead of the
-     * category's. Written as part of the engagement like categories.
+     * category's. Written as part of the project like categories.
      *
-     * @var Collection<int, EngagementUserRate>
+     * @var Collection<int, ProjectUserRate>
      */
     #[ORM\OneToMany(
-        mappedBy: 'engagement',
-        targetEntity: EngagementUserRate::class,
+        mappedBy: 'project',
+        targetEntity: ProjectUserRate::class,
         cascade: ['persist', 'remove'],
         orphanRemoval: true,
     )]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private Collection $userRates;
 
     /**
-     * Task-management boards assigned to this engagement (inverse of
-     * {@see Board::$engagement}). Read-only summary for the detail page.
+     * Task-management boards assigned to this project (inverse of
+     * {@see Board::$project}). Read-only summary for the detail page.
      *
      * @var Collection<int, Board>
      */
-    #[ORM\OneToMany(mappedBy: 'engagement', targetEntity: Board::class)]
+    #[ORM\OneToMany(mappedBy: 'project', targetEntity: Board::class)]
     private Collection $assignedBoards;
 
     /**
-     * Contract + supporting files attached to this engagement. Same upload
+     * Contract + supporting files attached to this project. Same upload
      * flow as {@see Space::$attachments}: PATCH an `attachments` array of
      * MediaObject IRIs after POST /media-objects (kind=attachment).
-     * {@see ValidEngagementAttachments} enforces uploader-is-member + kind.
+     * {@see ValidProjectAttachments} enforces uploader-is-member + kind.
      *
      * @var Collection<int, MediaObject>
      */
     #[ORM\ManyToMany(targetEntity: MediaObject::class)]
-    #[ORM\JoinTable(name: 'engagement_attachment')]
-    #[ORM\JoinColumn(name: 'engagement_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
+    #[ORM\JoinTable(name: 'project_attachment')]
+    #[ORM\JoinColumn(name: 'project_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
     #[ORM\InverseJoinColumn(name: 'media_object_id', referencedColumnName: 'id', onDelete: 'CASCADE')]
-    #[Groups(['engagement:read', 'engagement:write'])]
+    #[Groups(['project:read', 'project:write'])]
     private Collection $attachments;
 
     #[ApiProperty(readableLink: false)]
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     private ?User $createdBy = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
@@ -460,24 +460,24 @@ class Engagement
     }
 
     /**
-     * @return Collection<int, EngagementCategory>
+     * @return Collection<int, Service>
      */
     public function getCategories(): Collection
     {
         return $this->categories;
     }
 
-    public function addCategory(EngagementCategory $category): self
+    public function addCategory(Service $category): self
     {
         if (!$this->categories->contains($category)) {
             $this->categories->add($category);
-            $category->setEngagement($this);
+            $category->setProject($this);
         }
 
         return $this;
     }
 
-    public function removeCategory(EngagementCategory $category): self
+    public function removeCategory(Service $category): self
     {
         $this->categories->removeElement($category);
 
@@ -485,24 +485,24 @@ class Engagement
     }
 
     /**
-     * @return Collection<int, EngagementUserRate>
+     * @return Collection<int, ProjectUserRate>
      */
     public function getUserRates(): Collection
     {
         return $this->userRates;
     }
 
-    public function addUserRate(EngagementUserRate $userRate): self
+    public function addUserRate(ProjectUserRate $userRate): self
     {
         if (!$this->userRates->contains($userRate)) {
             $this->userRates->add($userRate);
-            $userRate->setEngagement($this);
+            $userRate->setProject($this);
         }
 
         return $this;
     }
 
-    public function removeUserRate(EngagementUserRate $userRate): self
+    public function removeUserRate(ProjectUserRate $userRate): self
     {
         $this->userRates->removeElement($userRate);
 
@@ -523,7 +523,7 @@ class Engagement
      *
      * @return list<array{id: string, title: string}>
      */
-    #[Groups(['engagement:read'])]
+    #[Groups(['project:read'])]
     public function getAssignedBoardList(): array
     {
         $out = [];

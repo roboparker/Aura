@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Security\Permission;
 
-use App\Entity\EngagementCategory;
-use App\Entity\Engagement;
+use App\Entity\Service;
+use App\Entity\Project;
 use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
@@ -95,8 +95,8 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof TaskSection => $subject->getBoard()?->getSpace(),
             $subject instanceof TimeEntry => $subject->getSpace(),
             $subject instanceof Client => $subject->getSpace(),
-            $subject instanceof Engagement => $subject->getSpace(),
-            $subject instanceof EngagementCategory => $subject->getEngagement()?->getSpace(),
+            $subject instanceof Project => $subject->getSpace(),
+            $subject instanceof Service => $subject->getProject()?->getSpace(),
             $subject instanceof Invoice => $subject->getSpace(),
             $subject instanceof Estimate => $subject->getSpace(),
             $subject instanceof Expense => $subject->getSpace(),

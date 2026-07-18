@@ -75,7 +75,7 @@ final class TimeEntryUserProcessor implements ProcessorInterface
 
         // Timesheet approvals (#654): a submitted (pending/approved) week is
         // frozen for the entry's tracker — creates and edits both bounce.
-        $space = $data->getSpace() ?? $data->getEngagement()?->getSpace();
+        $space = $data->getSpace() ?? $data->getProject()?->getSpace();
         $tracker = $data->getUser();
         $startedAt = $data->getStartedAt();
         if (

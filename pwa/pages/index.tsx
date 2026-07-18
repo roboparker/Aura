@@ -663,7 +663,7 @@ const SPACE_BULLETS = [
 const BILLING_BULLETS = [
   {
     b: "Time and expenses become line items.",
-    t: "Log hours against a client engagement and add billable expenses; they flow onto the invoice at the right rate, with per-line tax.",
+    t: "Log hours against a client project and add billable expenses; they flow onto the invoice at the right rate, with per-line tax.",
   },
   {
     b: "Invoices, estimates, and retainers.",
@@ -869,7 +869,7 @@ const Home = () => {
                   Track the work. Bill the client.
                 </h2>
                 <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
-                  Log time and expenses against a client engagement, then turn
+                  Log time and expenses against a client project, then turn
                   them into a polished invoice in a click — no spreadsheet
                   handoff.
                 </p>

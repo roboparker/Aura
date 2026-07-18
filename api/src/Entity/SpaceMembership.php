@@ -56,7 +56,7 @@ class SpaceMembership
      * Internal cost rate (#653): what an hour of this member costs the team,
      * in minor units — the profitability reports subtract it from billable
      * amounts. Admin-set via POST /spaces/{id}/members/{userId}/cost-rate;
-     * space-level so it follows the person across engagements.
+     * space-level so it follows the person across projects.
      */
     #[ORM\Column(type: 'integer', nullable: true)]
     #[Groups(['space:read'])]

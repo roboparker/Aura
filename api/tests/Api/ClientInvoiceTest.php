@@ -31,8 +31,8 @@ class ClientInvoiceTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Invoice')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -142,7 +142,7 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat, $buildCat, $internalCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // Two billable completed entries (distinct category rates) + one on the
         // non-billable "Internal" category (excluded from the invoice).
@@ -151,7 +151,7 @@ class ClientInvoiceTest extends ApiTestCase
         $this->trackTime($client, $spaceIri, $bpIri, $internalCat, '2026-07-03T12:00:00+00:00', '2026-07-03T13:00:00+00:00');
 
         $response = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertSame(201, $response->getStatusCode(), $response->getContent(false));
@@ -163,7 +163,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         // The pulled entries are now billed, so a second run has nothing to bill.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -181,13 +181,13 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-04T09:00:00+00:00', '2026-07-04T09:30:00+00:00');
 
         $preview = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri, 'preview' => true],
+            'json' => ['project' => $bpIri, 'preview' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseIsSuccessful();
@@ -197,7 +197,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         // Preview stamped nothing — a real generation afterwards still pulls both.
         $result = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
@@ -216,7 +216,7 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // One hour on each of July 1, 2 and 3.
         foreach (['01', '02', '03'] as $day) {
@@ -232,7 +232,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         // A range preview scopes the pool (July 2 only) and yields the entry id.
         $preview = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri, 'from' => '2026-07-02', 'to' => '2026-07-02', 'preview' => true],
+            'json' => ['project' => $bpIri, 'from' => '2026-07-02', 'to' => '2026-07-02', 'preview' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseIsSuccessful();
@@ -247,7 +247,7 @@ class ClientInvoiceTest extends ApiTestCase
         // Generate July 1–2 but explicitly select only the July 2 entry.
         $result = $client->request('POST', '/invoices/from-time-entries', [
             'json' => [
-                'engagement' => $bpIri,
+                'project' => $bpIri,
                 'from' => '2026-07-01',
                 'to' => '2026-07-02',
                 'entries' => [$july2Iri],
@@ -260,7 +260,7 @@ class ClientInvoiceTest extends ApiTestCase
 
         // July 1 and July 3 stay invoiceable for a later invoice.
         $rest = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri, 'preview' => true],
+            'json' => ['project' => $bpIri, 'preview' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertSame(2, $rest['count'] ?? null);
@@ -279,12 +279,12 @@ class ClientInvoiceTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $clientIri = $this->iri($clientRow);
-        [$bpA] = $this->createEngagement($client, $spaceIri, $clientIri);
-        [$bpB, $devB] = $this->createEngagement($client, $spaceIri, $clientIri);
+        [$bpA] = $this->createProject($client, $spaceIri, $clientIri);
+        [$bpB, $devB] = $this->createProject($client, $spaceIri, $clientIri);
 
         $this->trackTime($client, $spaceIri, $bpB, $devB, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
         $previewB = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpB, 'preview' => true],
+            'json' => ['project' => $bpB, 'preview' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $rowsB = $previewB['entries'];
@@ -294,16 +294,16 @@ class ClientInvoiceTest extends ApiTestCase
         $entryBIri = $firstB['@id'];
         $this->assertIsString($entryBIri);
 
-        // Selecting engagement B's entry while invoicing engagement A → 422.
+        // Selecting project B's entry while invoicing project A → 422.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpA, 'entries' => [$entryBIri]],
+            'json' => ['project' => $bpA, 'entries' => [$entryBIri]],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
 
         // Malformed dates are rejected too.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpB, 'from' => 'not-a-date'],
+            'json' => ['project' => $bpB, 'from' => 'not-a-date'],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -321,10 +321,10 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $invoiceIri = $invoice['@id'];
@@ -367,11 +367,11 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri, $devCat] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri, $devCat] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
         $this->trackTime($client, $spaceIri, $bpIri, $devCat, '2026-07-03T09:00:00+00:00', '2026-07-03T10:00:00+00:00');
 
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
 
@@ -383,7 +383,7 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
 
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(201);
@@ -911,13 +911,13 @@ class ClientInvoiceTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        [$bpIri] = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        [$bpIri] = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // A billable expense with the receipt, invoiced on its own.
         $client->request('POST', '/expenses', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $bpIri,
+                'project' => $bpIri,
                 'spentOn' => '2026-07-10',
                 'category' => 'Travel',
                 'description' => 'Taxi to the site',
@@ -928,7 +928,7 @@ class ClientInvoiceTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(201);
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
@@ -1101,7 +1101,7 @@ class ClientInvoiceTest extends ApiTestCase
     private function trackTime(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
-        string $engagementIri,
+        string $projectIri,
         string $categoryIri,
         string $startedAt,
         string $endedAt,
@@ -1110,7 +1110,7 @@ class ClientInvoiceTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => $startedAt,
                 'endedAt' => $endedAt,
@@ -1121,29 +1121,29 @@ class ClientInvoiceTest extends ApiTestCase
     }
 
     /**
-     * Admin creates a engagement (for $clientIri) with three categories — two
+     * Admin creates a project (for $clientIri) with three categories — two
      * billable ("Dev" @ 6000, "Build" @ 8000) with distinct rates and one
      * non-billable ("Internal" @ 0) — so tracked-time tests can hit distinct
      * rates and the non-billable exclusion. Billability is a per-category flag.
-     * Returns [engagementIri, devCategoryIri, buildCategoryIri, internalCategoryIri].
+     * Returns [projectIri, devCategoryIri, buildCategoryIri, internalCategoryIri].
      *
      * @return array{0: string, 1: string, 2: string, 3: string}
      */
-    private function createEngagement(
+    private function createProject(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
         string $clientIri,
     ): array {
-        $row = $client->request('POST', '/engagements', [
+        $row = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
                 'name' => 'Acme Website',
                 'currency' => 'USD',
                 'categories' => [
-                    ['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0],
-                    ['name' => 'Build', 'rateAmount' => 8000, 'position' => 1],
-                    ['name' => 'Internal', 'rateAmount' => 0, 'position' => 2, 'billable' => false],
+                    ['name' => 'Dev', 'billingRate' => 6000, 'position' => 0],
+                    ['name' => 'Build', 'billingRate' => 8000, 'position' => 1],
+                    ['name' => 'Internal', 'billingRate' => 0, 'position' => 2, 'billable' => false],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],

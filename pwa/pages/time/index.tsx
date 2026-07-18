@@ -9,7 +9,7 @@ import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import {
-  EngagementOption,
+  ProjectOption,
   TimeEntry,
   elapsedSeconds,
   formatClock,
@@ -67,7 +67,7 @@ const TimePage = () => {
   const [workDate, setWorkDate] = useState(() => dateInput(new Date()));
   const [startTime, setStartTime] = useState(() => timeInput(new Date()));
   const [endTime, setEndTime] = useState(() => timeInput(new Date()));
-  const [engagementIri, setEngagementIri] = useState("");
+  const [projectIri, setProjectIri] = useState("");
   const [categoryIri, setCategoryIri] = useState("");
   const [editingIri, setEditingIri] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -95,35 +95,35 @@ const TimePage = () => {
   const entries = useMemo(() => entriesQuery.data ?? [], [entriesQuery.data]);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["time_entries"] });
 
-  // Engagements + categories the member may pick from.
-  const engagementsQuery = useQuery({
-    queryKey: ["billing_engagement_options", spaceId],
+  // Projects + categories the member may pick from.
+  const projectsQuery = useQuery({
+    queryKey: ["billing_project_options", spaceId],
     enabled: isAuthenticated && !!spaceId,
     queryFn: () =>
-      apiGet<{ options: EngagementOption[] }>(`/spaces/${spaceId}/engagement-options`, {
-        errorMessage: "Failed to load engagements.",
+      apiGet<{ options: ProjectOption[] }>(`/spaces/${spaceId}/project-options`, {
+        errorMessage: "Failed to load projects.",
       }).then((r) => r.options ?? []),
   });
-  const engagements = useMemo(() => engagementsQuery.data ?? [], [engagementsQuery.data]);
-  const noEngagements = !engagementsQuery.isLoading && engagements.length === 0;
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+  const noProjects = !projectsQuery.isLoading && projects.length === 0;
 
-  const selectedEngagement = engagements.find((p) => p["@id"] === engagementIri) ?? null;
-  const categories = useMemo(() => selectedEngagement?.categories ?? [], [selectedEngagement]);
-  const engagementName = useMemo(() => {
+  const selectedProject = projects.find((p) => p["@id"] === projectIri) ?? null;
+  const categories = useMemo(() => selectedProject?.categories ?? [], [selectedProject]);
+  const projectName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of engagements) m.set(p["@id"], p.name);
+    for (const p of projects) m.set(p["@id"], p.name);
     return m;
-  }, [engagements]);
+  }, [projects]);
   const categoryName = useMemo(() => {
     const m = new Map<string, string>();
-    for (const p of engagements) for (const c of p.categories) m.set(c["@id"], c.name);
+    for (const p of projects) for (const c of p.categories) m.set(c["@id"], c.name);
     return m;
-  }, [engagements]);
+  }, [projects]);
 
-  // Default the pickers once loaded / when the engagement changes.
+  // Default the pickers once loaded / when the project changes.
   useEffect(() => {
-    if (!engagementIri && engagements.length > 0) setEngagementIri(engagements[0]["@id"]);
-  }, [engagements, engagementIri]);
+    if (!projectIri && projects.length > 0) setProjectIri(projects[0]["@id"]);
+  }, [projects, projectIri]);
   useEffect(() => {
     if (categories.length > 0 && !categories.some((c) => c["@id"] === categoryIri)) {
       setCategoryIri(categories[0]["@id"]);
@@ -139,8 +139,8 @@ const TimePage = () => {
     return () => clearInterval(t);
   }, [runningIri]);
 
-  const engagementCategoryBody = () => ({
-    engagement: engagementIri,
+  const projectCategoryBody = () => ({
+    project: projectIri,
     category: categoryIri,
     ...(spaceIri ? { space: spaceIri } : {}),
   });
@@ -153,7 +153,7 @@ const TimePage = () => {
           description: description.trim() || null,
           startedAt: composeIso(workDate, startTime),
           endedAt: endTime ? composeIso(workDate, endTime) : null,
-          ...engagementCategoryBody(),
+          ...projectCategoryBody(),
         },
       }),
     onSuccess: () => {
@@ -172,7 +172,7 @@ const TimePage = () => {
     mutationFn: () =>
       apiSend<TimeEntry>("POST", "/time_entries", {
         errorMessage: "Failed to start the timer.",
-        body: { startedAt: new Date().toISOString(), ...engagementCategoryBody() },
+        body: { startedAt: new Date().toISOString(), ...projectCategoryBody() },
       }),
     onSuccess: () => {
       setActionError(null);
@@ -258,7 +258,7 @@ const TimePage = () => {
   const hasCompleted = grouped.length > 0;
 
   const canCreate = can("time_entries", "create");
-  const canTrack = !!engagementIri && !!categoryIri;
+  const canTrack = !!projectIri && !!categoryIri;
   const isOwn = (entry: TimeEntry) =>
     !!currentUserIri && entry.user === currentUserIri;
   const canModify = (entry: TimeEntry) =>
@@ -273,21 +273,21 @@ const TimePage = () => {
     );
   }
 
-  const engagementCategoryPickers = (
+  const projectCategoryPickers = (
     <div className="grid gap-3 sm:grid-cols-2">
       <div className="space-y-1.5">
-        <Label htmlFor="te-engagement">Engagement</Label>
+        <Label htmlFor="te-project">Project</Label>
         <select
-          id="te-engagement"
-          value={engagementIri}
-          onChange={(e) => setEngagementIri(e.target.value)}
-          disabled={noEngagements}
+          id="te-project"
+          value={projectIri}
+          onChange={(e) => setProjectIri(e.target.value)}
+          disabled={noProjects}
           className={SELECT_CLASS}
         >
-          {noEngagements ? (
-            <option value="">No engagements</option>
+          {noProjects ? (
+            <option value="">No projects</option>
           ) : (
-            engagements.map((p) => (
+            projects.map((p) => (
               <option key={p["@id"]} value={p["@id"]}>
                 {p.name}
               </option>
@@ -296,7 +296,7 @@ const TimePage = () => {
         </select>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="te-category">Category</Label>
+        <Label htmlFor="te-category">Service</Label>
         <select
           id="te-category"
           value={categoryIri}
@@ -330,11 +330,11 @@ const TimePage = () => {
             icon={<Clock className="size-6 text-orange-600 dark:text-orange-400" />}
           />
 
-          {canCreate && noEngagements && (
+          {canCreate && noProjects && (
             <Alert className="mb-4">
               <AlertDescription>
-                You need a engagement to track time.{" "}
-                <Link href="/engagements" className="underline">
+                You need a project to track time.{" "}
+                <Link href="/projects" className="underline">
                   Set one up
                 </Link>{" "}
                 (or ask a space admin).
@@ -372,8 +372,8 @@ const TimePage = () => {
           {view === "week" ? (
             <WeekTimesheet
               spaceIri={spaceIri}
-              engagements={engagements}
-              canCreate={canCreate && !noEngagements}
+              projects={projects}
+              canCreate={canCreate && !noProjects}
               canModify={canModify}
               onError={setActionError}
             />
@@ -386,8 +386,8 @@ const TimePage = () => {
                   <thead>
                     <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                       <th className="px-4 py-2 font-medium">Description</th>
-                      <th className="px-4 py-2 font-medium">Engagement</th>
-                      <th className="px-4 py-2 font-medium">Category</th>
+                      <th className="px-4 py-2 font-medium">Project</th>
+                      <th className="px-4 py-2 font-medium">Service</th>
                       <th className="px-4 py-2 font-medium">Time</th>
                       <th className="px-4 py-2 font-medium">Billable</th>
                       <th className="px-4 py-2 text-right font-medium">Duration</th>
@@ -396,12 +396,12 @@ const TimePage = () => {
                   </thead>
                   <tbody>
                     {/* Inline "Add time" row, pinned to the top of the table. */}
-                    {canCreate && !noEngagements &&
+                    {canCreate && !noProjects &&
                       (showComposer ? (
                         <tr className="border-b bg-muted/10">
                           <td colSpan={7} className="px-4 py-4">
                             <form onSubmit={handleLog} className="space-y-4">
-                              {engagementCategoryPickers}
+                              {projectCategoryPickers}
                               <div className="space-y-1.5">
                                 <Label htmlFor="te-desc">
                                   Description{" "}
@@ -495,8 +495,8 @@ const TimePage = () => {
                                   disabled={!canTrack || startTimer.isPending}
                                   title={
                                     canTrack
-                                      ? `Start a timer on ${engagementName.get(engagementIri) ?? "…"} · ${categoryName.get(categoryIri) ?? "…"} (change via Add time)`
-                                      : "Pick an engagement first"
+                                      ? `Start a timer on ${projectName.get(projectIri) ?? "…"} · ${categoryName.get(categoryIri) ?? "…"} (change via Add time)`
+                                      : "Pick an project first"
                                   }
                                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                 >
@@ -523,8 +523,8 @@ const TimePage = () => {
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
-                          {running.engagement
-                            ? engagementName.get(running.engagement) ?? "—"
+                          {running.project
+                            ? projectName.get(running.project) ?? "—"
                             : "—"}
                         </td>
                         <td className="px-4 py-2.5 text-muted-foreground">
@@ -575,7 +575,7 @@ const TimePage = () => {
                               <EditEntryRow
                                 key={entry["@id"]}
                                 entry={entry}
-                                engagements={engagements}
+                                projects={projects}
                                 pending={updateEntry.isPending}
                                 onCancel={() => setEditingIri(null)}
                                 onSave={(body) =>
@@ -593,8 +593,8 @@ const TimePage = () => {
                                   )}
                                 </td>
                                 <td className="px-4 py-2.5 text-muted-foreground">
-                                  {entry.engagement
-                                    ? engagementName.get(entry.engagement) ?? "—"
+                                  {entry.project
+                                    ? projectName.get(entry.project) ?? "—"
                                     : "—"}
                                 </td>
                                 <td className="px-4 py-2.5 text-muted-foreground">
@@ -665,13 +665,13 @@ const TimePage = () => {
  */
 const EditEntryRow = ({
   entry,
-  engagements,
+  projects,
   pending,
   onSave,
   onCancel,
 }: {
   entry: TimeEntry;
-  engagements: EngagementOption[];
+  projects: ProjectOption[];
   pending: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onCancel: () => void;
@@ -682,10 +682,10 @@ const EditEntryRow = ({
   const [eEnd, setEEnd] = useState(() =>
     entry.endedAt ? timeInput(new Date(entry.endedAt)) : "",
   );
-  const [eEngagement, setEEngagement] = useState(entry.engagement ?? "");
+  const [eProject, setEProject] = useState(entry.project ?? "");
   const [eCategory, setECategory] = useState(entry.category ?? "");
 
-  const cats = engagements.find((p) => p["@id"] === eEngagement)?.categories ?? [];
+  const cats = projects.find((p) => p["@id"] === eProject)?.categories ?? [];
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -693,7 +693,7 @@ const EditEntryRow = ({
       description: eDescription.trim() || null,
       startedAt: composeIso(eDate, eStart),
       endedAt: eEnd ? composeIso(eDate, eEnd) : null,
-      engagement: eEngagement,
+      project: eProject,
       category: eCategory,
     });
   };
@@ -704,20 +704,20 @@ const EditEntryRow = ({
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="tee-engagement">Engagement</Label>
+              <Label htmlFor="tee-project">Project</Label>
               <select
-                id="tee-engagement"
-                value={eEngagement}
+                id="tee-project"
+                value={eProject}
                 onChange={(e) => {
                   const next = e.target.value;
-                  setEEngagement(next);
+                  setEProject(next);
                   const nextCats =
-                    engagements.find((p) => p["@id"] === next)?.categories ?? [];
+                    projects.find((p) => p["@id"] === next)?.categories ?? [];
                   setECategory(nextCats[0]?.["@id"] ?? "");
                 }}
                 className={SELECT_CLASS}
               >
-                {engagements.map((p) => (
+                {projects.map((p) => (
                   <option key={p["@id"]} value={p["@id"]}>
                     {p.name}
                   </option>
@@ -725,7 +725,7 @@ const EditEntryRow = ({
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="tee-category">Category</Label>
+              <Label htmlFor="tee-category">Service</Label>
               <select
                 id="tee-category"
                 value={eCategory}
@@ -787,7 +787,7 @@ const EditEntryRow = ({
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={pending || !eEngagement || !eCategory}>
+            <Button type="submit" size="sm" disabled={pending || !eProject || !eCategory}>
               {pending ? "Saving…" : "Save changes"}
             </Button>
           </div>

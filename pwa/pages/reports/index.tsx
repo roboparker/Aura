@@ -17,9 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const GROUP_BYS = [
-  { value: "engagement", label: "Engagement" },
+  { value: "project", label: "Project" },
   { value: "client", label: "Client" },
-  { value: "category", label: "Category" },
+  { value: "category", label: "Service" },
   { value: "person", label: "Person" },
 ] as const;
 
@@ -52,8 +52,8 @@ interface SummaryReport {
 }
 
 interface UninvoicedRow {
-  engagementId: string;
-  engagement: string;
+  projectId: string;
+  project: string;
   client: string | null;
   entryCount: number;
   seconds: number;
@@ -84,7 +84,7 @@ const todayInput = (): string => {
 
 /**
  * Billing reports (#647): a time summary (period + group-by) and the
- * per-engagement uninvoiced pool, each with a CSV export mirroring the same
+ * per-project uninvoiced pool, each with a CSV export mirroring the same
  * filters server-side.
  */
 const ReportsPage = () => {
@@ -95,7 +95,7 @@ const ReportsPage = () => {
   const [tab, setTab] = useState<"summary" | "uninvoiced">("summary");
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(todayInput);
-  const [groupBy, setGroupBy] = useState("engagement");
+  const [groupBy, setGroupBy] = useState("project");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -343,7 +343,7 @@ const ReportsPage = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                          <th className="px-4 py-2 font-medium">Engagement</th>
+                          <th className="px-4 py-2 font-medium">Project</th>
                           <th className="px-4 py-2 font-medium">Client</th>
                           <th className="px-4 py-2 text-right font-medium">Entries</th>
                           <th className="px-4 py-2 text-right font-medium">Hours</th>
@@ -366,8 +366,8 @@ const ReportsPage = () => {
                           </tr>
                         ) : (
                           uninvoiced.map((row) => (
-                            <tr key={row.engagementId} className="border-b last:border-0">
-                              <td className="px-4 py-2.5 font-medium">{row.engagement}</td>
+                            <tr key={row.projectId} className="border-b last:border-0">
+                              <td className="px-4 py-2.5 font-medium">{row.project}</td>
                               <td className="px-4 py-2.5 text-muted-foreground">
                                 {row.client ?? "—"}
                               </td>
@@ -382,7 +382,7 @@ const ReportsPage = () => {
                               </td>
                               <td className="px-4 py-2.5 text-right">
                                 <Link
-                                  href={`/invoices?generate=${encodeURIComponent(row.engagementId)}`}
+                                  href={`/invoices?generate=${encodeURIComponent(row.projectId)}`}
                                   className="text-sm text-primary hover:underline"
                                 >
                                   Create invoice

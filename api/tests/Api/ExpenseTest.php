@@ -13,7 +13,7 @@ use League\Flysystem\FilesystemOperator;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Expenses (#650): members log their own engagement-scoped costs, billed
+ * Expenses (#650): members log their own project-scoped costs, billed
  * expenses are frozen, and invoice generation pulls the unbilled billable
  * pool (stamping billedAt; void releases it again).
  */
@@ -36,8 +36,8 @@ class ExpenseTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\ExpenseCategory')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -57,15 +57,15 @@ class ExpenseTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $bpIri = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // A plain member logs their own expense; the spender is stamped
-        // server-side and the currency defaults from the engagement.
+        // server-side and the currency defaults from the project.
         $client->loginUser($member);
         $expense = $client->request('POST', '/expenses', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $bpIri,
+                'project' => $bpIri,
                 'spentOn' => '2026-07-10',
                 'category' => 'Travel',
                 'description' => 'Taxi to the site',
@@ -118,13 +118,13 @@ class ExpenseTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $bpIri = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         $makeExpense = function (int $amount, bool $billable, string $description) use ($client, $spaceIri, $bpIri): array {
             $row = $client->request('POST', '/expenses', [
                 'json' => [
                     'space' => $spaceIri,
-                    'engagement' => $bpIri,
+                    'project' => $bpIri,
                     'spentOn' => '2026-07-10',
                     'category' => 'Travel',
                     'description' => $description,
@@ -142,7 +142,7 @@ class ExpenseTest extends ApiTestCase
 
         // Preview lists the billable expense in its own section.
         $previewed = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri, 'preview' => true],
+            'json' => ['project' => $bpIri, 'preview' => true],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(200);
@@ -154,7 +154,7 @@ class ExpenseTest extends ApiTestCase
         // Generation (no tracked time — an expense-only invoice is fine)
         // pulls the expense as a line item and stamps billedAt.
         $invoice = $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
@@ -176,7 +176,7 @@ class ExpenseTest extends ApiTestCase
 
         // Nothing left to bill: a second generation 422s.
         $client->request('POST', '/invoices/from-time-entries', [
-            'json' => ['engagement' => $bpIri],
+            'json' => ['project' => $bpIri],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -204,7 +204,7 @@ class ExpenseTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $bpIri = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // Admin curates the list (one unit-priced, one plain).
         $mileage = $client->request('POST', '/expense_categories', [
@@ -232,7 +232,7 @@ class ExpenseTest extends ApiTestCase
         $expense = $client->request('POST', '/expenses', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $bpIri,
+                'project' => $bpIri,
                 'spentOn' => '2026-07-10',
                 'expenseCategory' => $this->iri($travel),
                 'amount' => 2500,
@@ -271,14 +271,14 @@ class ExpenseTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $bpIri = $this->createEngagement($client, $spaceIri, $this->iri($clientRow));
+        $bpIri = $this->createProject($client, $spaceIri, $this->iri($clientRow));
 
         // The member attaches their uploaded receipt to a new expense.
         $client->loginUser($member);
         $client->request('POST', '/expenses', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $bpIri,
+                'project' => $bpIri,
                 'spentOn' => '2026-07-10',
                 'category' => 'Travel',
                 'amount' => 2500,
@@ -327,22 +327,22 @@ class ExpenseTest extends ApiTestCase
     }
 
     /**
-     * Admin creates an engagement (for $clientIri) with one billable "Dev"
-     * category — expenses only need the engagement itself.
+     * Admin creates an project (for $clientIri) with one billable "Dev"
+     * category — expenses only need the project itself.
      */
-    private function createEngagement(
+    private function createProject(
         \ApiPlatform\Symfony\Bundle\Test\Client $client,
         string $spaceIri,
         string $clientIri,
     ): string {
-        $row = $client->request('POST', '/engagements', [
+        $row = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
                 'name' => 'Acme Website',
                 'currency' => 'USD',
                 'categories' => [
-                    ['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0],
+                    ['name' => 'Dev', 'billingRate' => 6000, 'position' => 0],
                 ],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],

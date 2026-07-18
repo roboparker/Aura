@@ -3,7 +3,7 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
@@ -11,11 +11,11 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Engagement budgets + threshold alerts (#651): hours/fees budgets, the
+ * Project budgets + threshold alerts (#651): hours/fees budgets, the
  * transient budgetSpent read-side, and the nightly 80%/100% alert sweep with
  * its per-threshold idempotency ledger.
  */
-class EngagementBudgetTest extends ApiTestCase
+class ProjectBudgetTest extends ApiTestCase
 {
     use SpaceMembershipFixture;
 
@@ -30,8 +30,8 @@ class EngagementBudgetTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\Expense')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -54,7 +54,7 @@ class EngagementBudgetTest extends ApiTestCase
         $this->assertIsString($clientIri);
 
         // A budget type without an amount is rejected.
-        $client->request('POST', '/engagements', [
+        $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
@@ -67,7 +67,7 @@ class EngagementBudgetTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
 
         // A 2-hour budget (120 minutes) with one billable category.
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
@@ -75,25 +75,25 @@ class EngagementBudgetTest extends ApiTestCase
                 'currency' => 'USD',
                 'budgetType' => 'hours',
                 'budgetAmount' => 120,
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $first = $categories[0];
         $this->assertIsArray($first);
         $categoryIri = $first['@id'];
         $this->assertIsString($categoryIri);
 
-        $track = function (string $startedAt, string $endedAt) use ($client, $spaceIri, $engagementIri, $categoryIri): void {
+        $track = function (string $startedAt, string $endedAt) use ($client, $spaceIri, $projectIri, $categoryIri): void {
             $client->request('POST', '/time_entries', [
                 'json' => [
                     'space' => $spaceIri,
-                    'engagement' => $engagementIri,
+                    'project' => $projectIri,
                     'category' => $categoryIri,
                     'startedAt' => $startedAt,
                     'endedAt' => $endedAt,
@@ -105,7 +105,7 @@ class EngagementBudgetTest extends ApiTestCase
 
         // 1h tracked = 50% — progress surfaces, no alert threshold crossed.
         $track('2026-07-10T09:00:00+00:00', '2026-07-10T10:00:00+00:00');
-        $list = $client->request('GET', '/engagements?space=' . $spaceIri)->toArray();
+        $list = $client->request('GET', '/projects?space=' . $spaceIri)->toArray();
         $members = $list['member'] ?? $list['hydra:member'] ?? null;
         $this->assertIsArray($members);
         $this->assertCount(1, $members);
@@ -121,7 +121,7 @@ class EngagementBudgetTest extends ApiTestCase
         // logger, so the counts below see only the in-process sweep sends.
         $track('2026-07-11T09:00:00+00:00', '2026-07-11T10:00:00+00:00');
 
-        $alerter = static::getContainer()->get(\App\Service\EngagementBudgetAlerter::class);
+        $alerter = static::getContainer()->get(\App\Service\ProjectBudgetAlerter::class);
         $sent = $alerter->dispatchDue();
         $this->assertSame(2, $sent);
         $this->assertEmailCount(2);
@@ -136,10 +136,10 @@ class EngagementBudgetTest extends ApiTestCase
         // Raising the budget clears the ledger; at 20% nothing re-fires yet.
         $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
-        $engagementId = $engagement['id'];
-        $this->assertIsString($engagementId);
-        $entity = $em->getRepository(Engagement::class)->find($engagementId);
-        $this->assertInstanceOf(Engagement::class, $entity);
+        $projectId = $project['id'];
+        $this->assertIsString($projectId);
+        $entity = $em->getRepository(Project::class)->find($projectId);
+        $this->assertInstanceOf(Project::class, $entity);
         $entity->setBudgetAmount(600); // 10 hours
         $em->flush();
         $this->assertSame([], $entity->getBudgetAlertsSent());
@@ -163,7 +163,7 @@ class EngagementBudgetTest extends ApiTestCase
         $this->assertIsString($clientIri);
 
         // A $100 fees budget (10000 minor units) with Dev @ $60/h.
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientIri,
@@ -171,14 +171,14 @@ class EngagementBudgetTest extends ApiTestCase
                 'currency' => 'USD',
                 'budgetType' => 'fees',
                 'budgetAmount' => 10000,
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
         $this->assertResponseStatusCodeSame(201);
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $first = $categories[0];
         $this->assertIsArray($first);
@@ -189,7 +189,7 @@ class EngagementBudgetTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-10T09:00:00+00:00',
                 'endedAt' => '2026-07-10T10:00:00+00:00',
@@ -203,7 +203,7 @@ class EngagementBudgetTest extends ApiTestCase
             $client->request('POST', '/expenses', [
                 'json' => [
                     'space' => $spaceIri,
-                    'engagement' => $engagementIri,
+                    'project' => $projectIri,
                     'spentOn' => '2026-07-10',
                     'category' => 'Travel',
                     'amount' => $amount,
@@ -214,7 +214,7 @@ class EngagementBudgetTest extends ApiTestCase
             $this->assertResponseStatusCodeSame(201);
         }
 
-        $list = $client->request('GET', '/engagements?space=' . $spaceIri)->toArray();
+        $list = $client->request('GET', '/projects?space=' . $spaceIri)->toArray();
         $members = $list['member'] ?? $list['hydra:member'] ?? null;
         $this->assertIsArray($members);
         $this->assertCount(1, $members);
@@ -225,7 +225,7 @@ class EngagementBudgetTest extends ApiTestCase
         $this->assertSame(8500, $row['budgetSpent'] ?? null);
 
         // 85% crosses the 80 threshold only — one alert.
-        $alerter = static::getContainer()->get(\App\Service\EngagementBudgetAlerter::class);
+        $alerter = static::getContainer()->get(\App\Service\ProjectBudgetAlerter::class);
         $this->assertSame(1, $alerter->dispatchDue());
         $this->assertEmailCount(1);
     }

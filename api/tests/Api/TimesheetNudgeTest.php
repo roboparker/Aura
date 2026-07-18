@@ -34,8 +34,8 @@ class TimesheetNudgeTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Notification')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetSubmission')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -72,19 +72,19 @@ class TimesheetNudgeTest extends ApiTestCase
             'json' => ['space' => '/spaces/' . $space->getId(), 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -97,7 +97,7 @@ class TimesheetNudgeTest extends ApiTestCase
             $client->request('POST', '/time_entries', [
                 'json' => [
                     'space' => '/spaces/' . $space->getId(),
-                    'engagement' => $engagementIri,
+                    'project' => $projectIri,
                     'category' => $categoryIri,
                     'startedAt' => $lastWeekStart->modify('+2 days')->setTime(9, 0)->format(\DateTimeInterface::ATOM),
                     'endedAt' => $lastWeekStart->modify('+2 days')->setTime(10, 0)->format(\DateTimeInterface::ATOM),
@@ -161,19 +161,19 @@ class TimesheetNudgeTest extends ApiTestCase
             'json' => ['space' => '/spaces/' . $space->getId(), 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -183,7 +183,7 @@ class TimesheetNudgeTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => '/spaces/' . $space->getId(),
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => $lastWeekStart->modify('+2 days')->setTime(9, 0)->format(\DateTimeInterface::ATOM),
                 'endedAt' => $lastWeekStart->modify('+2 days')->setTime(10, 0)->format(\DateTimeInterface::ATOM),

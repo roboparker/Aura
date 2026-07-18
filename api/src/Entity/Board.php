@@ -110,15 +110,15 @@ class Board
     private ?Space $space = null;
 
     /**
-     * The engagement this task-management board rolls up to (Harvest
-     * model). Nullable — set from the engagement's page. `SET NULL` so
-     * deleting a engagement just unassigns its boards.
+     * The project this task-management board rolls up to (Harvest
+     * model). Nullable — set from the project's page. `SET NULL` so
+     * deleting a project just unassigns its boards.
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Engagement::class, inversedBy: 'assignedBoards')]
-    #[ORM\JoinColumn(name: 'engagement_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'assignedBoards')]
+    #[ORM\JoinColumn(name: 'project_id', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['board:read'])]
-    private ?Engagement $engagement = null;
+    private ?Project $project = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
@@ -219,14 +219,14 @@ class Board
         return $this;
     }
 
-    public function getEngagement(): ?Engagement
+    public function getProject(): ?Project
     {
-        return $this->engagement;
+        return $this->project;
     }
 
-    public function setEngagement(?Engagement $engagement): static
+    public function setProject(?Project $project): static
     {
-        $this->engagement = $engagement;
+        $this->project = $project;
         return $this;
     }
 
