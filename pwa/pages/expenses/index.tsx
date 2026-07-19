@@ -10,7 +10,7 @@ import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { uploadAttachmentFile } from "@/lib/attachments";
 import { Expense, ExpenseCategoryRow } from "@/lib/expenseTypes";
-import { EngagementOption } from "@/lib/timeEntryTypes";
+import { ProjectOption } from "@/lib/timeEntryTypes";
 import { formatMoney } from "@/lib/invoiceTypes";
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -48,7 +48,7 @@ const openReceipt = async (receiptIri: string, onError: (m: string) => void) => 
 
 /**
  * Expense tracking (#650): inline-add list like /time — members log their
- * own expenses against an engagement, optionally attach a receipt, and
+ * own expenses against an project, optionally attach a receipt, and
  * invoice generation pulls the unbilled billable ones (billed = locked).
  */
 const ExpensesPage = () => {
@@ -59,7 +59,7 @@ const ExpensesPage = () => {
 
   const [showComposer, setShowComposer] = useState(false);
   const [spentOn, setSpentOn] = useState(todayInput);
-  const [engagementIri, setEngagementIri] = useState("");
+  const [projectIri, setProjectIri] = useState("");
   const [category, setCategory] = useState("");
   const [expenseCategoryIri, setExpenseCategoryIri] = useState("");
   const [units, setUnits] = useState("");
@@ -96,8 +96,8 @@ const ExpensesPage = () => {
     queryKey: ["billing_project_options", spaceId],
     enabled: isAuthenticated && !!spaceId,
     queryFn: () =>
-      apiGet<{ options: EngagementOption[] }>(`/spaces/${spaceId}/engagement-options`, {
-        errorMessage: "Failed to load engagements.",
+      apiGet<{ options: ProjectOption[] }>(`/spaces/${spaceId}/project-options`, {
+        errorMessage: "Failed to load projects.",
       }).then((r) => r.options ?? []),
   });
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
@@ -127,8 +127,8 @@ const ExpensesPage = () => {
   }, [projects]);
 
   useEffect(() => {
-    if (!engagementIri && projects.length > 0) setEngagementIri(projects[0]["@id"]);
-  }, [projects, engagementIri]);
+    if (!projectIri && projects.length > 0) setProjectIri(projects[0]["@id"]);
+  }, [projects, projectIri]);
 
   const resetComposer = () => {
     setSpentOn(todayInput());
@@ -159,7 +159,7 @@ const ExpensesPage = () => {
       await apiSend<Expense>("POST", "/expenses", {
         errorMessage: "Failed to log the expense.",
         body: {
-          engagement: engagementIri,
+          project: projectIri,
           spentOn,
           ...(expenseCategoryIri
             ? { expenseCategory: expenseCategoryIri }
@@ -237,8 +237,8 @@ const ExpensesPage = () => {
           {canCreate && noProjects && (
             <Alert className="mb-4">
               <AlertDescription>
-                You need an engagement to log expenses.{" "}
-                <Link href="/engagements" className="underline">
+                You need an project to log expenses.{" "}
+                <Link href="/projects" className="underline">
                   Set one up
                 </Link>{" "}
                 (or ask a space admin).
@@ -261,7 +261,7 @@ const ExpensesPage = () => {
                   <thead>
                     <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
                       <th className="px-4 py-2 font-medium">Date</th>
-                      <th className="px-4 py-2 font-medium">Engagement</th>
+                      <th className="px-4 py-2 font-medium">Project</th>
                       <th className="px-4 py-2 font-medium">Category</th>
                       <th className="px-4 py-2 font-medium">Description</th>
                       <th className="px-4 py-2 font-medium">Status</th>
@@ -287,11 +287,11 @@ const ExpensesPage = () => {
                                   />
                                 </div>
                                 <div className="space-y-1.5">
-                                  <Label htmlFor="ex-project">Engagement</Label>
+                                  <Label htmlFor="ex-project">Project</Label>
                                   <select
                                     id="ex-project"
-                                    value={engagementIri}
-                                    onChange={(e) => setEngagementIri(e.target.value)}
+                                    value={projectIri}
+                                    onChange={(e) => setProjectIri(e.target.value)}
                                     className={SELECT_CLASS}
                                   >
                                     {projects.map((p) => (
@@ -428,7 +428,7 @@ const ExpensesPage = () => {
                                 >
                                   Cancel
                                 </Button>
-                                <Button type="submit" size="sm" disabled={busy || !engagementIri}>
+                                <Button type="submit" size="sm" disabled={busy || !projectIri}>
                                   {busy ? "Saving…" : "Log expense"}
                                 </Button>
                               </div>
@@ -477,8 +477,8 @@ const ExpensesPage = () => {
                               })}
                             </td>
                             <td className="px-4 py-2.5 text-muted-foreground">
-                              {expense.engagement
-                                ? projectName.get(expense.engagement) ?? "—"
+                              {expense.project
+                                ? projectName.get(expense.project) ?? "—"
                                 : "—"}
                             </td>
                             <td className="px-4 py-2.5">{expense.category ?? "—"}</td>
@@ -563,13 +563,13 @@ const EditExpenseRow = ({
   onCancel,
 }: {
   expense: Expense;
-  projects: EngagementOption[];
+  projects: ProjectOption[];
   pending: boolean;
   onSave: (body: Record<string, unknown>) => void;
   onCancel: () => void;
 }) => {
   const [eDate, setEDate] = useState(expense.spentOn.slice(0, 10));
-  const [eEngagement, setEEngagement] = useState(expense.engagement ?? "");
+  const [eProject, setEProject] = useState(expense.project ?? "");
   const [eCategory, setECategory] = useState(expense.category ?? "");
   const [eDescription, setEDescription] = useState(expense.description ?? "");
   const [eAmount, setEAmount] = useState((expense.amount / 100).toFixed(2));
@@ -579,7 +579,7 @@ const EditExpenseRow = ({
     event.preventDefault();
     onSave({
       spentOn: eDate,
-      engagement: eEngagement,
+      project: eProject,
       category: eCategory.trim() || null,
       description: eDescription.trim() || null,
       amount: Math.round((parseFloat(eAmount) || 0) * 100),
@@ -603,11 +603,11 @@ const EditExpenseRow = ({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="exe-project">Engagement</Label>
+              <Label htmlFor="exe-project">Project</Label>
               <select
                 id="exe-project"
-                value={eEngagement}
-                onChange={(e) => setEEngagement(e.target.value)}
+                value={eProject}
+                onChange={(e) => setEProject(e.target.value)}
                 className={SELECT_CLASS}
               >
                 {projects.map((p) => (
@@ -660,7 +660,7 @@ const EditExpenseRow = ({
             <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={pending || !eEngagement}>
+            <Button type="submit" size="sm" disabled={pending || !eProject}>
               {pending ? "Saving…" : "Save changes"}
             </Button>
           </div>

@@ -122,7 +122,6 @@ export const KIND_DESCRIPTORS: Record<CustomFieldKind, KindDescriptor> = {
       { value: "task", label: "Task" },
       { value: "board", label: "Board" },
       { value: "page", label: "Page" },
-      { value: "discussion", label: "Discussion" },
     ],
     supportsMulti: true,
     footerKinds: ["count"],
@@ -224,7 +223,6 @@ const REFERENCE_TARGETS: Array<{
   { value: "task", label: "Task", description: "Link to a task in this space." },
   { value: "board", label: "Board", description: "Link to a board in this space." },
   { value: "page", label: "Page", description: "Link to a page in this space." },
-  { value: "discussion", label: "Discussion", description: "Link to a discussion in this space." },
 ];
 
 /**

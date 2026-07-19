@@ -10,7 +10,7 @@ draft: false
 
 Welcome to the Madori blog. This is where we'll share **tips, tricks, and
 progress updates** as we build an API-first workspace for tasks, docs, and
-discussions.
+boards.
 
 ## What you'll find here
 

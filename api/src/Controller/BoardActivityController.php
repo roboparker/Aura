@@ -58,7 +58,7 @@ class BoardActivityController extends AbstractController
         // `board` on their log rows. The same grouping feeds the space-level
         // feed one level up, so the hierarchy stays consistent.
         return new JsonResponse(
-            $this->activityFeed->forObjectGroups($this->scope->groupsForProject($board), $request),
+            $this->activityFeed->forObjectGroups($this->scope->groupsForBoard($board), $request),
         );
     }
 

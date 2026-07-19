@@ -20,9 +20,9 @@ use Symfony\Component\Uid\Uuid;
 /**
  * Billing reports (#647) — the Harvest-parity read side of time tracking:
  *
- *  - time-summary: period + group-by (client / engagement / category /
+ *  - time-summary: period + group-by (client / project / category /
  *    person) with hours, billable hours, and billable amount per group;
- *  - uninvoiced: per-engagement unbilled billable hours + amount — the
+ *  - uninvoiced: per-project unbilled billable hours + amount — the
  *    "what can I bill right now" view feeding the invoice generator (#644).
  *
  * Both accept `?format=csv` for a server-generated export with the same
@@ -35,7 +35,7 @@ use Symfony\Component\Uid\Uuid;
  */
 class ReportController extends AbstractController
 {
-    private const GROUP_BYS = ['client', 'engagement', 'category', 'person'];
+    private const GROUP_BYS = ['client', 'project', 'category', 'person'];
 
     public function __construct(
         private EntityManagerInterface $em,
@@ -52,7 +52,7 @@ class ReportController extends AbstractController
             return $space;
         }
 
-        $groupBy = $request->query->get('groupBy', 'engagement');
+        $groupBy = $request->query->get('groupBy', 'project');
         if (!in_array($groupBy, self::GROUP_BYS, true)) {
             return $this->json(['error' => 'groupBy must be one of: ' . implode(', ', self::GROUP_BYS) . '.'], 422);
         }
@@ -186,17 +186,17 @@ class ReportController extends AbstractController
             return $space;
         }
 
-        /** @var array<string, array{engagement: string, client: string|null, currency: string, entryCount: int, seconds: int, amount: int}> $rows */
+        /** @var array<string, array{project: string, client: string|null, currency: string, entryCount: int, seconds: int, amount: int}> $rows */
         $rows = [];
         foreach ($this->timeEntries->findUninvoicedForSpace($space) as $entry) {
-            $engagement = $entry->getEngagement();
-            if (null === $engagement) {
+            $project = $entry->getProject();
+            if (null === $project) {
                 continue;
             }
-            $key = (string) $engagement->getId();
+            $key = (string) $project->getId();
             $row = $rows[$key] ?? [
-                'engagement' => $engagement->getName(),
-                'client' => $engagement->getClient()?->getName(),
+                'project' => $project->getName(),
+                'client' => $project->getClient()?->getName(),
                 'currency' => $this->entryCurrency($entry),
                 'entryCount' => 0,
                 'seconds' => 0,
@@ -209,13 +209,13 @@ class ReportController extends AbstractController
             $rows[$key] = $row;
         }
 
-        uasort($rows, static fn (array $a, array $b): int => strcasecmp($a['engagement'], $b['engagement']));
+        uasort($rows, static fn (array $a, array $b): int => strcasecmp($a['project'], $b['project']));
 
         $list = [];
         foreach ($rows as $key => $row) {
             $list[] = [
-                'engagementId' => $key,
-                'engagement' => $row['engagement'],
+                'projectId' => $key,
+                'project' => $row['project'],
                 'client' => $row['client'],
                 'entryCount' => $row['entryCount'],
                 'seconds' => $row['seconds'],
@@ -229,7 +229,7 @@ class ReportController extends AbstractController
             $csvRows = [];
             foreach ($list as $row) {
                 $csvRows[] = [
-                    $row['engagement'],
+                    $row['project'],
                     $row['client'] ?? '',
                     (string) $row['entryCount'],
                     number_format($row['hours'], 2, '.', ''),
@@ -239,7 +239,7 @@ class ReportController extends AbstractController
 
             return $this->csv(
                 'uninvoiced.csv',
-                ['Engagement', 'Client', 'Entries', 'Hours', 'Amount'],
+                ['Project', 'Client', 'Entries', 'Hours', 'Amount'],
                 $csvRows,
             );
         }
@@ -251,7 +251,7 @@ class ReportController extends AbstractController
     private function entryAmount(TimeEntry $entry, int $seconds): int
     {
         $rate = $entry->getRateAmount()
-            ?? $entry->getEngagement()?->getClient()?->getDefaultRateAmount()
+            ?? $entry->getProject()?->getClient()?->getDefaultRateAmount()
             ?? 0;
 
         return (int) round(round($seconds / 3600, 2) * $rate);
@@ -259,11 +259,11 @@ class ReportController extends AbstractController
 
     private function entryCurrency(TimeEntry $entry): string
     {
-        $engagement = $entry->getEngagement();
+        $project = $entry->getProject();
 
         return $entry->getRateCurrency()
-            ?? $engagement?->getCurrency()
-            ?? $engagement?->getClient()?->getCurrency()
+            ?? $project?->getCurrency()
+            ?? $project?->getClient()?->getCurrency()
             ?? 'USD';
     }
 
@@ -272,7 +272,7 @@ class ReportController extends AbstractController
     {
         switch ($groupBy) {
             case 'client':
-                $client = $entry->getEngagement()?->getClient();
+                $client = $entry->getProject()?->getClient();
 
                 return null === $client
                     ? ['none', 'No client']
@@ -292,11 +292,11 @@ class ReportController extends AbstractController
 
                 return ['person:' . $person->getId(), '' !== $name ? $name : $person->getEmail()];
             default:
-                $engagement = $entry->getEngagement();
+                $project = $entry->getProject();
 
-                return null === $engagement
-                    ? ['none', 'No engagement']
-                    : ['engagement:' . $engagement->getId(), $engagement->getName()];
+                return null === $project
+                    ? ['none', 'No project']
+                    : ['project:' . $project->getId(), $project->getName()];
         }
     }
 

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, CopyPlus, Lock, Plus, Send } from "lucide-react";
 import { apiGet, apiGetCollection, apiSend } from "@/lib/apiClient";
 import {
-  EngagementOption,
+  ProjectOption,
   TimeEntry,
   formatCellDuration,
   parseDurationInput,
@@ -37,8 +37,8 @@ const localDateKey = (d: Date): string => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const rowKeyOf = (engagement: string | null, category: string | null): string =>
-  `${engagement ?? ""}|${category ?? ""}`;
+const rowKeyOf = (project: string | null, category: string | null): string =>
+  `${project ?? ""}|${category ?? ""}`;
 
 interface CellData {
   entries: TimeEntry[];
@@ -61,14 +61,14 @@ const SUBMISSION_BADGE: Record<TimesheetRow["status"], string> = {
 
 interface RowData {
   key: string;
-  engagement: string | null;
+  project: string | null;
   category: string | null;
   cells: Map<string, CellData>;
   total: number;
 }
 
 /**
- * Harvest-style week grid (#645): rows = engagement+category pairs with time
+ * Harvest-style week grid (#645): rows = project+category pairs with time
  * this week (plus any rows added via "Add row" / "Copy last week"), columns =
  * Mon–Sun, cells = editable durations. A cell edit creates/updates/deletes the
  * underlying entry: one duration-anchored entry per cell keeps the same-day
@@ -83,7 +83,7 @@ const WeekTimesheet = ({
   onError,
 }: {
   spaceIri: string | null;
-  projects: EngagementOption[];
+  projects: ProjectOption[];
   canCreate: boolean;
   canModify: (entry: TimeEntry) => boolean;
   onError: (message: string | null) => void;
@@ -94,7 +94,7 @@ const WeekTimesheet = ({
   const [extraRows, setExtraRows] = useState<Set<string>>(new Set());
   const [draft, setDraft] = useState<{ cell: string; value: string } | null>(null);
   const [addingRow, setAddingRow] = useState(false);
-  const [addEngagement, setAddEngagement] = useState("");
+  const [addProject, setAddProject] = useState("");
   const [addCategory, setAddCategory] = useState("");
   // Escape sets this so the blur it triggers discards instead of committing.
   const cancelEditRef = useRef(false);
@@ -156,11 +156,11 @@ const WeekTimesheet = ({
   const rows = useMemo((): RowData[] => {
     const weekEnd = addDays(weekStart, 7);
     const byKey = new Map<string, RowData>();
-    const ensureRow = (engagement: string | null, category: string | null): RowData => {
-      const key = rowKeyOf(engagement, category);
+    const ensureRow = (project: string | null, category: string | null): RowData => {
+      const key = rowKeyOf(project, category);
       let row = byKey.get(key);
       if (!row) {
-        row = { key, engagement, category, cells: new Map(), total: 0 };
+        row = { key, project, category, cells: new Map(), total: 0 };
         byKey.set(key, row);
       }
       return row;
@@ -170,7 +170,7 @@ const WeekTimesheet = ({
       if (entry.endedAt === null) continue; // running timer lives in list view
       const started = new Date(entry.startedAt);
       if (started < weekStart || started >= weekEnd) continue;
-      const row = ensureRow(entry.engagement, entry.category);
+      const row = ensureRow(entry.project, entry.category);
       const dayKey = localDateKey(started);
       const cell = row.cells.get(dayKey) ?? { entries: [], total: 0 };
       cell.entries.push(entry);
@@ -179,12 +179,12 @@ const WeekTimesheet = ({
       row.total += entry.durationSeconds ?? 0;
     }
     for (const key of extraRows) {
-      const [engagement, category] = key.split("|");
-      ensureRow(engagement || null, category || null);
+      const [project, category] = key.split("|");
+      ensureRow(project || null, category || null);
     }
 
     const nameOf = (row: RowData): string => {
-      const p = projects.find((x) => x["@id"] === row.engagement);
+      const p = projects.find((x) => x["@id"] === row.project);
       const c = p?.categories.find((x) => x["@id"] === row.category);
       return `${p?.name ?? "zzz"} ${c?.name ?? ""}`;
     };
@@ -202,11 +202,11 @@ const WeekTimesheet = ({
   }, [rows]);
   const grandTotal = rows.reduce((sum, row) => sum + row.total, 0);
 
-  const labelFor = (row: RowData): { engagement: string; category: string } => {
-    const p = projects.find((x) => x["@id"] === row.engagement);
+  const labelFor = (row: RowData): { project: string; category: string } => {
+    const p = projects.find((x) => x["@id"] === row.project);
     const c = p?.categories.find((x) => x["@id"] === row.category);
     return {
-      engagement: p?.name ?? "Unknown engagement",
+      project: p?.name ?? "Unknown project",
       category: c?.name ?? "—",
     };
   };
@@ -255,7 +255,7 @@ const WeekTimesheet = ({
       return apiSend("POST", "/time_entries", {
         errorMessage: "Failed to log time.",
         body: {
-          engagement: row.engagement,
+          project: row.project,
           category: row.category,
           startedAt: start.toISOString(),
           endedAt: new Date(start.getTime() + seconds * 1000).toISOString(),
@@ -283,8 +283,8 @@ const WeekTimesheet = ({
       return;
     }
     if (seconds === (cell?.total ?? 0)) return;
-    if (seconds > 0 && !cell?.entries.length && (!row.engagement || !row.category)) {
-      onError("This row has no engagement/category — edit it in the list view.");
+    if (seconds > 0 && !cell?.entries.length && (!row.project || !row.category)) {
+      onError("This row has no project/category — edit it in the list view.");
       return;
     }
     saveCell.mutate({ row, day, cell, seconds });
@@ -304,8 +304,8 @@ const WeekTimesheet = ({
         if (entry.endedAt === null) continue;
         const started = new Date(entry.startedAt);
         if (started < prevStart || started >= weekStart) continue;
-        if (!entry.engagement || !entry.category) continue;
-        const key = rowKeyOf(entry.engagement, entry.category);
+        if (!entry.project || !entry.category) continue;
+        const key = rowKeyOf(entry.project, entry.category);
         if (!keys.has(key) && !rows.some((r) => r.key === key)) {
           keys.add(key);
           added += 1;
@@ -323,7 +323,7 @@ const WeekTimesheet = ({
     setDraft(null);
   };
 
-  const addCats = projects.find((p) => p["@id"] === addEngagement)?.categories ?? [];
+  const addCats = projects.find((p) => p["@id"] === addProject)?.categories ?? [];
   const rangeLabel = `${weekStart.toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
@@ -408,7 +408,7 @@ const WeekTimesheet = ({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="min-w-48 px-4 py-2 font-medium">Engagement / category</th>
+                <th className="min-w-48 px-4 py-2 font-medium">Project / category</th>
                 {days.map((day) => (
                   <th
                     key={localDateKey(day)}
@@ -445,7 +445,7 @@ const WeekTimesheet = ({
                   return (
                     <tr key={row.key} className="border-b align-middle">
                       <td className="px-4 py-2">
-                        <span className="font-medium">{label.engagement}</span>
+                        <span className="font-medium">{label.project}</span>
                         <span className="block text-xs text-muted-foreground">
                           {label.category}
                         </span>
@@ -492,7 +492,7 @@ const WeekTimesheet = ({
                               inputMode="decimal"
                               value={display}
                               placeholder="0:00"
-                              aria-label={`${label.engagement} ${label.category} on ${dayKey}`}
+                              aria-label={`${label.project} ${label.category} on ${dayKey}`}
                               onFocus={() => setDraft({ cell: cellId, value: display })}
                               onChange={(e) =>
                                 setDraft({ cell: cellId, value: e.target.value })
@@ -529,18 +529,18 @@ const WeekTimesheet = ({
                     {addingRow ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <select
-                          value={addEngagement}
+                          value={addProject}
                           onChange={(e) => {
-                            setAddEngagement(e.target.value);
+                            setAddProject(e.target.value);
                             const cats =
                               projects.find((p) => p["@id"] === e.target.value)
                                 ?.categories ?? [];
                             setAddCategory(cats[0]?.["@id"] ?? "");
                           }}
                           className={SELECT_CLASS}
-                          aria-label="Engagement"
+                          aria-label="Project"
                         >
-                          <option value="">Engagement…</option>
+                          <option value="">Project…</option>
                           {projects.map((p) => (
                             <option key={p["@id"]} value={p["@id"]}>
                               {p.name}
@@ -566,10 +566,10 @@ const WeekTimesheet = ({
                         </select>
                         <Button
                           size="sm"
-                          disabled={!addEngagement || !addCategory}
+                          disabled={!addProject || !addCategory}
                           onClick={() => {
                             setExtraRows((prev) =>
-                              new Set(prev).add(rowKeyOf(addEngagement, addCategory)),
+                              new Set(prev).add(rowKeyOf(addProject, addCategory)),
                             );
                             setAddingRow(false);
                           }}

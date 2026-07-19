@@ -5,7 +5,6 @@ namespace App\Service;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Discussion;
 use App\Entity\MediaObject;
 use App\Entity\Page;
 use App\Entity\Board;
@@ -27,7 +26,6 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *   tasks.json        — tasks of the space's boards (values, tags,
  *                       assignees, comments, attachment references)
  *   pages.json        — pages with their comment threads
- *   discussions.json  — discussions with their comment threads
  *   attachments/      — the actual files (space + task attachments),
  *                       named "<mediaId>-<originalName>" so the JSON
  *                       references resolve unambiguously
@@ -78,8 +76,6 @@ final class SpaceExportBuilder
             ->findBy(['board' => $boards], ['createdOn' => 'ASC']);
         $pages = $this->em->getRepository(Page::class)
             ->findBy(['space' => $space], ['createdAt' => 'ASC']);
-        $discussions = $this->em->getRepository(Discussion::class)
-            ->findBy(['space' => $space], ['createdAt' => 'ASC']);
 
         // Every attachment the export references, deduped by media id:
         // the space's shared file pool plus each task's attachments.
@@ -102,7 +98,6 @@ final class SpaceExportBuilder
         try {
             $taskComments = $this->commentsFor($tasks, 'task');
             $pageComments = $this->commentsFor($pages, 'page');
-            $discussionComments = $this->commentsFor($discussions, 'discussion');
 
             $this->archive->addJson($zip, 'space.json', $this->spaceData($export));
             $this->archive->addJson($zip, 'boards.json', array_map($this->boardData(...), $boards));
@@ -113,10 +108,6 @@ final class SpaceExportBuilder
             $this->archive->addJson($zip, 'pages.json', array_map(
                 fn (Page $p): array => $this->pageData($p, $pageComments),
                 $pages,
-            ));
-            $this->archive->addJson($zip, 'discussions.json', array_map(
-                fn (Discussion $d): array => $this->discussionData($d, $discussionComments),
-                $discussions,
             ));
 
             foreach ($media as $mediaObject) {
@@ -257,29 +248,9 @@ final class SpaceExportBuilder
     }
 
     /**
-     * @param array<string, list<array<string, mixed>>> $commentsByParent
-     *
-     * @return array<string, mixed>
-     */
-    private function discussionData(Discussion $discussion, array $commentsByParent): array
-    {
-        return [
-            'id' => (string) $discussion->getId(),
-            'title' => $discussion->getTitle(),
-            'body' => $discussion->getBody(),
-            'category' => $discussion->getCategory(),
-            'isPinned' => $discussion->getIsPinned(),
-            'isLocked' => $discussion->getIsLocked(),
-            'createdAt' => $discussion->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'author' => $this->userRef($discussion->getAuthor()),
-            'comments' => $commentsByParent[(string) $discussion->getId()] ?? [],
-        ];
-    }
-
-    /**
      * One IN-query comment lookup per parent kind, grouped by parent id.
      *
-     * @param array<int, Task>|array<int, Page>|array<int, Discussion> $parents
+     * @param array<int, Task>|array<int, Page> $parents
      *
      * @return array<string, list<array<string, mixed>>>
      */

@@ -72,11 +72,11 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 #[ORM\Entity(repositoryClass: BoardRepository::class)]
 #[ORM\Table(name: 'board')]
-#[ORM\Index(columns: ['owner_id'], name: 'idx_project_owner')]
-#[ORM\Index(columns: ['space_id'], name: 'idx_project_space')]
+#[ORM\Index(columns: ['owner_id'], name: 'idx_board_owner')]
+#[ORM\Index(columns: ['space_id'], name: 'idx_board_space')]
 // Mirror the GIN index on `search_vector` from Version20260506010000 so
 // doctrine:schema:validate doesn't try to drop it on every CI run.
-#[ORM\Index(columns: ['search_vector'], name: 'idx_project_search_vector', flags: ['gin'])]
+#[ORM\Index(columns: ['search_vector'], name: 'idx_board_search_vector', flags: ['gin'])]
 #[ApiFilter(BoardSearchFilter::class)]
 #[ApiFilter(\ApiPlatform\Doctrine\Orm\Filter\SearchFilter::class, properties: ['space' => 'exact'])]
 #[Gedmo\Loggable(logEntryClass: ActivityLog::class)]
@@ -86,7 +86,7 @@ class Board
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['board:read', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'task:read'])]
     private ?Uuid $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
@@ -110,20 +110,20 @@ class Board
     private ?Space $space = null;
 
     /**
-     * The engagement this task-management board rolls up to (Harvest
-     * model). Nullable — set from the engagement's page. `SET NULL` so
-     * deleting a engagement just unassigns its boards.
+     * The project this task-management board rolls up to (Harvest
+     * model). Nullable — set from the project's page. `SET NULL` so
+     * deleting a project just unassigns its boards.
      */
     #[ApiProperty(readableLink: false)]
-    #[ORM\ManyToOne(targetEntity: Engagement::class, inversedBy: 'assignedProjects')]
-    #[ORM\JoinColumn(name: 'engagement_id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: Project::class, inversedBy: 'assignedBoards')]
+    #[ORM\JoinColumn(name: 'project_id', nullable: true, onDelete: 'SET NULL')]
     #[Groups(['board:read'])]
-    private ?Engagement $engagement = null;
+    private ?Project $project = null;
 
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Title is required.')]
     #[Assert\Length(max: 255, maxMessage: 'Title cannot be longer than {{ limit }} characters.')]
-    #[Groups(['board:read', 'board:write', 'task:read', 'discussion:read'])]
+    #[Groups(['board:read', 'board:write', 'task:read'])]
     #[Gedmo\Versioned]
     private string $title = '';
 
@@ -219,14 +219,14 @@ class Board
         return $this;
     }
 
-    public function getEngagement(): ?Engagement
+    public function getProject(): ?Project
     {
-        return $this->engagement;
+        return $this->project;
     }
 
-    public function setEngagement(?Engagement $engagement): static
+    public function setProject(?Project $project): static
     {
-        $this->engagement = $engagement;
+        $this->project = $project;
         return $this;
     }
 

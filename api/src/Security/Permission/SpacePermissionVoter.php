@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Security\Permission;
 
-use App\Entity\EngagementCategory;
-use App\Entity\Engagement;
+use App\Entity\Service;
+use App\Entity\Project;
 use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Estimate;
 use App\Entity\Expense;
 use App\Entity\ExpenseCategory;
@@ -88,15 +87,14 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof Board => $subject->getSpace(),
             $subject instanceof Task => $subject->getBoard()?->getSpace(),
             $subject instanceof Page => $subject->getSpace(),
-            $subject instanceof Discussion => $subject->getSpace(),
             $subject instanceof CustomFieldDefinition => $subject->getSpace(),
             $subject instanceof Tag => $subject->getSpace(),
             $subject instanceof UserGroup => $subject->getSpace(),
             $subject instanceof TaskSection => $subject->getBoard()?->getSpace(),
             $subject instanceof TimeEntry => $subject->getSpace(),
             $subject instanceof Client => $subject->getSpace(),
-            $subject instanceof Engagement => $subject->getSpace(),
-            $subject instanceof EngagementCategory => $subject->getEngagement()?->getSpace(),
+            $subject instanceof Project => $subject->getSpace(),
+            $subject instanceof Service => $subject->getProject()?->getSpace(),
             $subject instanceof Invoice => $subject->getSpace(),
             $subject instanceof Estimate => $subject->getSpace(),
             $subject instanceof Expense => $subject->getSpace(),
@@ -116,10 +114,6 @@ final class SpacePermissionVoter extends Voter
         $page = $comment->getPage();
         if (null !== $page) {
             return $page->getSpace();
-        }
-        $discussion = $comment->getDiscussion();
-        if (null !== $discussion) {
-            return $discussion->getSpace();
         }
 
         return null;

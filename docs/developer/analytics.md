@@ -107,9 +107,8 @@ emails**.
 | --- | --- | --- |
 | `signup` | `AuthContext.register` | `invited` (came via invite link) |
 | `task-create` | `pages/tasks.tsx` | — |
-| `project-create` | `pages/projects/index.tsx` | — |
+| `board-create` | `pages/boards/index.tsx` | — |
 | `page-create` | `pages/pages/index.tsx` | — |
-| `discussion-create` | `DiscussionsPanel` | `category` |
 | `comment-create` | `CommentsPanel` (all surfaces) | — |
 | `space-create` | `pages/spaces/new.tsx` | `visibility` |
 | `group-create` | `pages/groups/new.tsx` | — |

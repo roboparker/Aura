@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
-interface SubmissionRow {
+interface ApprovalRow {
   id: string;
   user: { "@id": string; name: string };
   weekStart: string | null;
@@ -24,7 +24,7 @@ interface SubmissionRow {
   totalSeconds: number;
 }
 
-const STATUS_BADGE: Record<SubmissionRow["status"], string> = {
+const STATUS_BADGE: Record<ApprovalRow["status"], string> = {
   pending: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   rejected: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
@@ -57,7 +57,7 @@ const ApprovalsPage = () => {
     queryKey: ["approvals", spaceId, showAll],
     enabled: isAuthenticated && !!spaceId && isActiveSpaceAdmin,
     queryFn: () =>
-      apiGet<{ rows: SubmissionRow[] }>(
+      apiGet<{ rows: ApprovalRow[] }>(
         `/spaces/${spaceId}/timesheets${showAll ? "" : "?status=pending"}`,
         { errorMessage: "Failed to load the approvals queue." },
       ),
@@ -78,7 +78,7 @@ const ApprovalsPage = () => {
     onError: (e) => setError(e instanceof Error ? e.message : "Action failed."),
   });
 
-  const reject = (row: SubmissionRow) => {
+  const reject = (row: ApprovalRow) => {
     const note = window.prompt("Add a note for the member (why is this rejected)?") ?? "";
     decide.mutate({ id: row.id, action: "reject", note: note.trim() || undefined });
   };
@@ -151,7 +151,7 @@ const ApprovalsPage = () => {
                         <tr>
                           <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
                             {showAll
-                              ? "No timesheet submissions yet."
+                              ? "No timesheets submitted yet."
                               : "Nothing waiting for approval."}
                           </td>
                         </tr>

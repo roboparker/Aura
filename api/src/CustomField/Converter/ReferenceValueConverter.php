@@ -18,7 +18,6 @@ final class ReferenceValueConverter implements CustomFieldTypeConverterInterface
         'task' => '/tasks/',
         'board' => '/boards/',
         'page' => '/pages/',
-        'discussion' => '/discussions/',
     ];
 
     public function targetKind(): string

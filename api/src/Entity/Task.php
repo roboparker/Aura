@@ -85,7 +85,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'task')]
 #[ORM\Index(columns: ['owner_id'], name: 'idx_task_owner')]
 #[ORM\Index(columns: ['owner_id', 'position'], name: 'idx_task_owner_position')]
-#[ORM\Index(columns: ['board_id'], name: 'idx_task_project')]
+#[ORM\Index(columns: ['board_id'], name: 'idx_task_board')]
 // GIN index over the FTS-only generated column. The `gin` flag is the
 // PostgreSQL DBAL platform's hook for emitting `USING GIN`. Declared
 // here (in addition to the migration) so doctrine:schema:validate

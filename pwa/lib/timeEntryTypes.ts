@@ -4,7 +4,7 @@ export interface TimeEntry {
   "@id": string;
   id: string;
   space: string;
-  engagement: string | null;
+  project: string | null;
   category: string | null;
   user: string;
   description: string | null;
@@ -24,24 +24,24 @@ export interface TimeEntryCollection {
   "hydra:member"?: TimeEntry[];
 }
 
-/** A category as returned by the engagement picker. */
-export interface CategoryOption {
+/** A category as returned by the project picker. */
+export interface ServiceOption {
   "@id": string;
   id: string;
   name: string;
-  rateAmount: number;
+  billingRate: number;
 }
 
 /**
- * A engagement + its categories from `GET /spaces/{id}/engagement-options`
+ * A project + its categories from `GET /spaces/{id}/project-options`
  * — the minimal member-facing picker for time tracking (no invoices-gated read).
  */
-export interface EngagementOption {
+export interface ProjectOption {
   "@id": string;
   id: string;
   name: string;
   currency: string | null;
-  categories: CategoryOption[];
+  categories: ServiceOption[];
 }
 
 /** A running timer has no end time yet. */

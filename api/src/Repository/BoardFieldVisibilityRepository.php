@@ -29,7 +29,7 @@ class BoardFieldVisibilityRepository extends ServiceEntityRepository
      *
      * @return array<string, string> definitionId => visibility
      */
-    public function visibilityMapForProject(Board $board): array
+    public function visibilityMapForBoard(Board $board): array
     {
         $map = [];
         foreach ($this->findBy(['board' => $board]) as $row) {

@@ -34,7 +34,7 @@ final class BoardActivityScope
      *
      * @return array<class-string, list<string>>
      */
-    public function groupsForProject(Board $board): array
+    public function groupsForBoard(Board $board): array
     {
         $boardId = (string) $board->getId();
 

@@ -5,6 +5,7 @@ namespace App\Entity;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
@@ -115,6 +116,9 @@ class Page
     #[ORM\ManyToOne(targetEntity: Page::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['page:read', 'page:write'])]
+    // Serialize as an IRI, not an embedded object: the sidebar tree keys off
+    // the parent IRI, and embedding would recursively inline every ancestor.
+    #[ApiProperty(readableLink: false)]
     private ?Page $parent = null;
 
     /**

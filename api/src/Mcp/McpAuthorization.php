@@ -2,7 +2,6 @@
 
 namespace App\Mcp;
 
-use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Task;
@@ -45,16 +44,16 @@ final class McpAuthorization
                 && $this->permissions->can($user, $task->getBoard()?->getSpace(), SpacePermission::TASKS, SpacePermission::UPDATE));
     }
 
-    public function canReadProject(Board $board, User $user): bool
+    public function canReadBoard(Board $board, User $user): bool
     {
         return $board->isAccessibleBy($user)
-            && $this->permissions->can($user, $board->getSpace(), SpacePermission::PROJECTS, SpacePermission::READ);
+            && $this->permissions->can($user, $board->getSpace(), SpacePermission::BOARDS, SpacePermission::READ);
     }
 
-    public function canEditProject(Board $board, User $user): bool
+    public function canEditBoard(Board $board, User $user): bool
     {
         return $board->isAccessibleBy($user)
-            && $this->permissions->can($user, $board->getSpace(), SpacePermission::PROJECTS, SpacePermission::UPDATE);
+            && $this->permissions->can($user, $board->getSpace(), SpacePermission::BOARDS, SpacePermission::UPDATE);
     }
 
     private function ownsTask(Task $task, User $user): bool
@@ -67,7 +66,7 @@ final class McpAuthorization
      * the rename. New code should call `Board::isAccessibleBy()`
      * directly.
      */
-    public function isProjectMember(Board $board, User $user): bool
+    public function isBoardMember(Board $board, User $user): bool
     {
         return $board->isAccessibleBy($user);
     }
@@ -96,15 +95,5 @@ final class McpAuthorization
         }
         return true === $page->getSpace()?->hasMember($user)
             && $this->permissions->can($user, $page->getSpace(), SpacePermission::PAGES, SpacePermission::UPDATE);
-    }
-
-    /**
-     * Discussions read like the rest of their space: any space member
-     * can browse (#91/#185), now role-gated.
-     */
-    public function canReadDiscussion(Discussion $discussion, User $user): bool
-    {
-        return true === $discussion->getSpace()?->hasMember($user)
-            && $this->permissions->can($user, $discussion->getSpace(), SpacePermission::DISCUSSIONS, SpacePermission::READ);
     }
 }

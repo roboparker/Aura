@@ -7,7 +7,6 @@ use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Space;
@@ -48,7 +47,6 @@ class McpTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Tag')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
@@ -121,7 +119,7 @@ class McpTest extends ApiTestCase
         foreach (
             [
             'create_task', 'get_task', 'update_task', 'delete_task', 'list_tasks', 'search_tasks',
-            'create_project', 'get_project', 'update_project', 'delete_project', 'list_projects',
+            'create_board', 'get_board', 'update_board', 'delete_board', 'list_boards',
             'assign_task', 'unassign_task', 'get_my_tasks',
             'add_task_comment', 'list_task_comments',
             'upload_file', 'list_files', 'download_file',
@@ -129,9 +127,7 @@ class McpTest extends ApiTestCase
             'list_spaces',
             'create_page', 'get_page', 'update_page', 'delete_page', 'list_pages',
             'list_tags', 'create_tag',
-            'create_discussion', 'get_discussion', 'list_discussions',
             'add_page_comment', 'list_page_comments',
-            'add_discussion_comment', 'list_discussion_comments',
             ] as $expected
         ) {
             $this->assertContains($expected, $names, sprintf('Missing tool "%s"', $expected));
@@ -207,7 +203,7 @@ class McpTest extends ApiTestCase
 
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'list_projects',
+            'name' => 'list_boards',
             'arguments' => [],
         ]);
         $structured = $body['result']['structuredContent'] ?? null;
@@ -469,49 +465,6 @@ class McpTest extends ApiTestCase
         $this->assertSame('hello world', $values[0]['value']);
     }
 
-    public function testCreateGetAndListDiscussion(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-        $space = $this->makeSpace($alice);
-        $plain = $this->mintToken($alice, 'CLI');
-
-        $client = static::createClient();
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'create_discussion',
-            'arguments' => [
-                'title' => 'Roadmap',
-                'body' => 'What next?',
-                'category' => 'ideas',
-                'spaceId' => (string) $space->getId(),
-            ],
-        ]);
-        $this->assertFalse($body['result']['isError'] ?? null);
-        $structured = $body['result']['structuredContent'] ?? null;
-        $this->assertIsArray($structured);
-        $this->assertSame('Roadmap', $structured['title']);
-        $this->assertSame('ideas', $structured['category']);
-        $discussionId = $structured['id'];
-        $this->assertIsString($discussionId);
-
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'get_discussion',
-            'arguments' => ['discussionId' => $discussionId],
-        ]);
-        $structured = $body['result']['structuredContent'] ?? null;
-        $this->assertIsArray($structured);
-        $this->assertSame('What next?', $structured['body']);
-
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'list_discussions',
-            'arguments' => ['spaceId' => (string) $space->getId()],
-        ]);
-        $structured = $body['result']['structuredContent'] ?? null;
-        $this->assertIsArray($structured);
-        $items = $structured['items'] ?? null;
-        $this->assertIsArray($items);
-        $this->assertSame(['Roadmap'], array_column($items, 'title'));
-    }
-
     public function testAddAndListPageComment(): void
     {
         $alice = $this->createUser('alice@example.com');
@@ -540,51 +493,6 @@ class McpTest extends ApiTestCase
         $items = $structured['items'] ?? null;
         $this->assertIsArray($items);
         $this->assertSame(['First note'], array_column($items, 'body'));
-    }
-
-    public function testAddAndListDiscussionComment(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-        $space = $this->makeSpace($alice);
-        $discussion = $this->makeDiscussion($alice, $space, 'Topic');
-        $plain = $this->mintToken($alice, 'CLI');
-
-        $client = static::createClient();
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'add_discussion_comment',
-            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Good point'],
-        ]);
-        $this->assertFalse($body['result']['isError'] ?? null);
-        $structured = $body['result']['structuredContent'] ?? null;
-        $this->assertIsArray($structured);
-        $this->assertSame('discussion', $structured['commentableType']);
-
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'list_discussion_comments',
-            'arguments' => ['discussionId' => (string) $discussion->getId()],
-        ]);
-        $structured = $body['result']['structuredContent'] ?? null;
-        $this->assertIsArray($structured);
-        $items = $structured['items'] ?? null;
-        $this->assertIsArray($items);
-        $this->assertSame(['Good point'], array_column($items, 'body'));
-    }
-
-    public function testLockedDiscussionRejectsNewComment(): void
-    {
-        $alice = $this->createUser('alice@example.com');
-        $space = $this->makeSpace($alice);
-        $discussion = $this->makeDiscussion($alice, $space, 'Closed');
-        $discussion->setIsLocked(true);
-        $this->entityManager->flush();
-        $plain = $this->mintToken($alice, 'CLI');
-
-        $client = static::createClient();
-        $body = $this->callMcp($client, $plain, 'tools/call', [
-            'name' => 'add_discussion_comment',
-            'arguments' => ['discussionId' => (string) $discussion->getId(), 'body' => 'Sneaky'],
-        ]);
-        $this->assertTrue($body['result']['isError'] ?? null);
     }
 
     public function testInvalidUuidProducesValidationError(): void
@@ -772,17 +680,6 @@ class McpTest extends ApiTestCase
         return $page;
     }
 
-    private function makeDiscussion(User $author, Space $space, string $title): Discussion
-    {
-        $discussion = new Discussion();
-        $discussion->setAuthor($author);
-        $discussion->setSpace($space);
-        $discussion->setTitle($title);
-        $discussion->setBody('Body of ' . $title);
-        $this->entityManager->persist($discussion);
-        $this->entityManager->flush();
-        return $discussion;
-    }
 
     private function makeTaskInProject(User $owner, Board $board, string $title): Task
     {
@@ -813,7 +710,7 @@ class McpTest extends ApiTestCase
 
     /**
      * A shared space with `$admin` as its admin. `createUser()` doesn't
-     * provision the signup-time personal space, so page/discussion tools
+     * provision the signup-time personal space, so page tools
      * that need a real space get one here.
      */
     private function makeSpace(User $admin, string $name = 'Team Space'): Space

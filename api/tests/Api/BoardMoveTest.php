@@ -71,8 +71,7 @@ class BoardMoveTest extends ApiTestCase
         // field selections belong to the SOURCE space, so the move detaches
         // them — the board starts fresh in the target and opts into the
         // target's own fields afterwards. The field itself stays in the
-        // source space. Discussions live on the space directly and are
-        // unaffected by board moves.
+        // source space.
         /** @var list<CustomFieldDefinition> $attached */
         $attached = $this->entityManager->createQuery(
             'SELECT d FROM App\Entity\CustomFieldDefinition d JOIN d.boards p WHERE p = :board',

@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
  * field value. Title/description matches are left to the client (it
  * already has those fields); this only surfaces the hidden sources.
  *
- * Mirrors {@see DiscussionAggregateProvider}: delegates to the stock
+ * Delegates to the stock
  * collection provider (so access scoping, filters, and pagination are
  * untouched), then — only when `?search=` is present — runs two batched
  * `ts_headline` queries over the page's task ids and attaches a

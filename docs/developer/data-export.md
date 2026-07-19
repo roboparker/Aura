@@ -53,7 +53,7 @@ The token is minted **at completion time, inside the handler** — never at requ
 `AccountExportBuilder` reuses [`UserDataExporter`](../../api/src/Service/UserDataExporter.php) — the same own-data scoping that backed the old synchronous export — for `account.json`, then adds the uploaded files:
 
 ```
-account.json      profile, preferences, tasks, projects, pages, discussions,
+account.json      profile, preferences, tasks, boards, pages,
                   comments, tags, API tokens, + an `attachments` manifest
 attachments/      every MediaObject the user uploaded (avatar + attachments),
                   named "<mediaId>-<originalName>"

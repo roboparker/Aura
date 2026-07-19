@@ -26,7 +26,7 @@ use Symfony\Component\Validator\Constraints as Assert;
  * the picker.
  *
  * Reads: any space member (they pick from it when logging expenses).
- * Writes: admin-reserved via the `invoices` category, like engagement and
+ * Writes: admin-reserved via the `invoices` category, like project and
  * client management.
  */
 #[ApiResource(

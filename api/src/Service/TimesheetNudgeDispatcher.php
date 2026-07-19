@@ -5,9 +5,9 @@ namespace App\Service;
 use App\Entity\Notification;
 use App\Entity\Space;
 use App\Entity\TimeEntry;
-use App\Entity\TimesheetSubmission;
+use App\Entity\TimesheetApproval;
 use App\Entity\User;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * preference gates.
  *
  * Scope: only spaces where approvals are actually in use (any
- * TimesheetSubmission row exists). A rejected submission still nudges (the
+ * TimesheetApproval row exists). A rejected week still nudges (the
  * member is expected to fix + re-submit); pending/approved doesn't.
  *
  * Idempotency: each nudge row stamps `reminderOffset` with
@@ -30,7 +30,7 @@ final class TimesheetNudgeDispatcher
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly TimesheetSubmissionRepository $submissions,
+        private readonly TimesheetApprovalRepository $approvals,
         private readonly NotificationDispatcher $notifier,
         private readonly LoggerInterface $logger,
     ) {
@@ -39,14 +39,14 @@ final class TimesheetNudgeDispatcher
     /** Returns how many nudges were sent. */
     public function dispatchDue(\DateTimeImmutable $now): int
     {
-        $weekStart = TimesheetSubmissionRepository::weekStartOf($now)->modify('-7 days');
+        $weekStart = TimesheetApprovalRepository::weekStartOf($now)->modify('-7 days');
         $weekEnd = $weekStart->modify('+7 days');
         $offsetKey = 'timesheet-nudge:' . $weekStart->format('Y-m-d');
 
         /** @var list<Space> $spaces */
         $spaces = $this->em->createQuery(
             'SELECT s FROM ' . Space::class . ' s
-             WHERE EXISTS (SELECT 1 FROM ' . TimesheetSubmission::class . ' t WHERE t.space = s)',
+             WHERE EXISTS (SELECT 1 FROM ' . TimesheetApproval::class . ' t WHERE t.space = s)',
         )->getResult();
 
         $sent = 0;
@@ -66,8 +66,8 @@ final class TimesheetNudgeDispatcher
                 ->getResult();
 
             foreach ($trackers as $tracker) {
-                $submission = $this->submissions->findForWeek($space, $tracker, $weekStart);
-                if (null !== $submission && $submission->locksWeek()) {
+                $approval = $this->approvals->findForWeek($space, $tracker, $weekStart);
+                if (null !== $approval && $approval->locksWeek()) {
                     continue; // pending or approved — nothing to nudge
                 }
                 if ($this->alreadyNudged($tracker, $offsetKey)) {
@@ -82,8 +82,8 @@ final class TimesheetNudgeDispatcher
                         "Don't forget to submit your timesheet for the week of %s",
                         $weekStart->format('M j'),
                     ),
-                    body: null !== $submission
-                        ? 'Your submission was rejected — fix the entries and submit the week again.'
+                    body: null !== $approval
+                        ? 'Your timesheet was rejected — fix the entries and submit the week again.'
                         : 'You tracked time last week but haven\'t submitted it for approval yet.',
                     targetPath: '/time',
                 );

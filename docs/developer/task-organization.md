@@ -1,17 +1,17 @@
 # Task organisation: sections, board view, and relationships
 
-Three features structure tasks beyond a flat list: **sections** group a project's tasks, a **Kanban board view** shows those sections as columns, and **relationships** link tasks to one another.
+Three features structure tasks beyond a flat list: **sections** group a board's tasks, a **Kanban board view** shows those sections as columns, and **relationships** link tasks to one another.
 
 ## Sections (#496)
 
-- **`TaskSection`** (entity, table `task_section`) — per-project `title` + `position`, exposed at `/task_sections`. Any space member can CRUD (security via `object.getProject().isAccessibleBy(user)`); the collection is scoped by `TaskSectionAccessExtension`.
+- **`TaskSection`** (entity, table `task_section`) — per-board `title` + `position`, exposed at `/task_sections`. Any space member can CRUD (security via `object.getBoard().isAccessibleBy(user)`); the collection is scoped by `TaskSectionAccessExtension`.
 - **`Task.section`** — a **nullable** FK (`onDelete: SET NULL`). `null` = the implicit default **"In progress"** group, so existing tasks need no backfill and deleting a section drops its tasks back to the default rather than orphaning them.
-- **List view** (`pwa/pages/projects/[id].tsx`): tasks render grouped into per-section tables — each its own table with an editable title, an inline add-row (new tasks land in that section), and a per-section custom-field footer. Grand-total footers bracket the whole board, top and bottom. The "New task" button is a split dropdown with an "Add section" item; each user section has a `…` menu to delete it.
-- **Footers per section**: `GET /projects/{id}/custom_field_footers` accepts `?section=<iri|none>` so each section aggregates independently (`none` = the default group; omit the param for the whole board). See the custom-field footer entry in `CLAUDE.md`.
+- **List view** (`pwa/pages/boards/[id].tsx`): tasks render grouped into per-section tables — each its own table with an editable title, an inline add-row (new tasks land in that section), and a per-section custom-field footer. Grand-total footers bracket the whole board, top and bottom. The "New task" button is a split dropdown with an "Add section" item; each user section has a `…` menu to delete it.
+- **Footers per section**: `GET /boards/{id}/custom_field_footers` accepts `?section=<iri|none>` so each section aggregates independently (`none` = the default group; omit the param for the whole board). See the custom-field footer entry in `CLAUDE.md`.
 
 ## Board (Kanban) view (#496)
 
-`pwa/components/projects/TaskBoard.tsx` (built on `@dnd-kit`) toggles alongside the list view on the project's Tasks tab. Sections become columns of task cards (title, due date, tags, assignee avatars). A card opens the task drawer on click and **drags between sections** — a drop issues `PATCH /tasks/{id}` with the new `section` IRI. A pointer activation distance keeps a plain click (open drawer) distinct from a drag. The default "In progress" group is the first column.
+`pwa/components/boards/TaskBoard.tsx` (built on `@dnd-kit`) toggles alongside the list view on the board's Tasks tab. Sections become columns of task cards (title, due date, tags, assignee avatars). A card opens the task drawer on click and **drags between sections** — a drop issues `PATCH /tasks/{id}` with the new `section` IRI. A pointer activation distance keeps a plain click (open drawer) distinct from a drag. The default "In progress" group is the first column.
 
 ## Relationships (#497)
 
@@ -33,4 +33,4 @@ Three features structure tasks beyond a flat list: **sections** group a project'
 ## Tests
 
 - `App\Tests\Api\TaskSectionTest`, `App\Tests\Api\TaskRelationshipTest` (entity access + validation).
-- `e2e/tests/*` exercise the project board UI.
+- `e2e/tests/*` exercise the board UI.

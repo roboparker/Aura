@@ -178,10 +178,10 @@ const Tasks = () => {
   // Map of board IRI → set of member IRIs. Used to filter the assignee
   // picker per task (board tasks accept only that board's members; the
   // server-side validator enforces the same rule).
-  const [boardMembers, setProjectMembers] = useState<Map<string, Set<string>>>(
+  const [boardMembers, setBoardMembers] = useState<Map<string, Set<string>>>(
     new Map(),
   );
-  const [boardTitles, setProjectTitles] = useState<Map<string, string>>(
+  const [boardTitles, setBoardTitles] = useState<Map<string, string>>(
     new Map(),
   );
   const [isLoading, setIsLoading] = useState(true);
@@ -309,8 +309,8 @@ const Tasks = () => {
         );
         titleMap.set(board["@id"], board.title);
       }
-      setProjectMembers(boardMap);
-      setProjectTitles(titleMap);
+      setBoardMembers(boardMap);
+      setBoardTitles(titleMap);
     } catch (err) {
       // AbortError is a normal control-flow signal here, not a failure —
       // the caller cancelled because the effect is being torn down.

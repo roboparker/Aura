@@ -15,7 +15,7 @@ use Symfony\Component\Uid\Uuid;
 
 /**
  * Decorates the CustomFieldDefinition collection provider to inject each
- * field's PER-PROJECT visibility (#custom-fields-board) when the collection
+ * field's PER-BOARD visibility (#custom-fields-board) when the collection
  * is fetched in a board context (`?boards={iri}`).
  *
  * Visibility lives on the (board, definition) pair via {@see
@@ -46,9 +46,9 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
     {
         $result = $this->inner->provide($operation, $uriVariables, $context);
 
-        $board = $this->resolveProject($context);
+        $board = $this->resolveBoard($context);
         if (null !== $board && is_iterable($result)) {
-            $map = $this->overrides->visibilityMapForProject($board);
+            $map = $this->overrides->visibilityMapForBoard($board);
             foreach ($result as $definition) {
                 $override = $map[(string) $definition->getId()] ?? null;
                 if (null !== $override) {
@@ -65,7 +65,7 @@ final class CustomFieldVisibilityProvider implements ProviderInterface
      *
      * @param array<string, mixed> $context
      */
-    private function resolveProject(array $context): ?Board
+    private function resolveBoard(array $context): ?Board
     {
         $filters = $context['filters'] ?? null;
         $raw = is_array($filters) ? ($filters['boards'] ?? null) : null;

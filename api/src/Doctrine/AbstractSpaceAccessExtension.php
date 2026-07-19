@@ -155,7 +155,7 @@ abstract class AbstractSpaceAccessExtension implements
         }
 
         $queryBuilder
-            ->andWhere(SpaceMembershipDql::userBelongsToProjectSpace(
+            ->andWhere(SpaceMembershipDql::userBelongsToBoardSpace(
                 $rootAlias,
                 $this->getAliasPrefix(),
                 'currentUser',

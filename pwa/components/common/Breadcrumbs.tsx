@@ -26,7 +26,6 @@ import { cn } from "@/lib/utils";
 const SECTION_LABELS: Record<string, string> = {
   spaces: "Spaces",
   boards: "Boards",
-  discussions: "Discussions",
   pages: "Pages",
   groups: "Groups",
   tasks: "Tasks",
@@ -51,7 +50,6 @@ const SECTION_LABELS: Record<string, string> = {
 const ENTITY_DISPLAY_FIELD: Record<string, string> = {
   spaces: "name",
   boards: "title",
-  discussions: "title",
   pages: "title",
   groups: "title",
 };

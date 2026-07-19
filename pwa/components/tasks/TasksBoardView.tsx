@@ -10,14 +10,14 @@ import { type Task } from "@/components/tasks/taskHelpers";
  * fields — those live only in the detail pane — and cards aren't draggable
  * (a task can't change board from here).
  */
-interface TasksProjectBoardProps {
+interface TasksBoardBoardProps {
   tasks: Task[];
   /** Board IRI → title, for the column headers. */
   boardTitles: Map<string, string>;
   onOpen: (task: Task) => void;
 }
 
-const NO_PROJECT = "__none__";
+const NO_BOARD = "__none__";
 
 const dueLabel = (iso: string): string => {
   const d = new Date(iso);
@@ -29,11 +29,11 @@ const TasksBoardView = ({
   tasks,
   boardTitles,
   onOpen,
-}: TasksProjectBoardProps) => {
+}: TasksBoardBoardProps) => {
   // Group tasks by board IRI (or the sentinel for standalone tasks).
   const groups = new Map<string, Task[]>();
   for (const task of tasks) {
-    const key = task.board ?? NO_PROJECT;
+    const key = task.board ?? NO_BOARD;
     const list = groups.get(key) ?? [];
     list.push(task);
     groups.set(key, list);
@@ -41,14 +41,14 @@ const TasksBoardView = ({
 
   // Real boards first (alphabetical by title), "No board" last.
   const columns = Array.from(groups.keys())
-    .filter((k) => k !== NO_PROJECT)
+    .filter((k) => k !== NO_BOARD)
     .sort((a, b) =>
       (boardTitles.get(a) ?? a).localeCompare(boardTitles.get(b) ?? b),
     );
-  if (groups.has(NO_PROJECT)) columns.push(NO_PROJECT);
+  if (groups.has(NO_BOARD)) columns.push(NO_BOARD);
 
   const columnTitle = (key: string): string =>
-    key === NO_PROJECT ? "No board" : boardTitles.get(key) ?? "Board";
+    key === NO_BOARD ? "No board" : boardTitles.get(key) ?? "Board";
 
   return (
     <div

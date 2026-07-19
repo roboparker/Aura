@@ -21,17 +21,29 @@ import { cn } from "@/lib/utils";
 import PagesNavTree from "./PagesNavTree";
 import SpaceSwitcher from "./SpaceSwitcher";
 
+// Shared styling for every sidebar nav item: a full-bleed row (the nav carries
+// no horizontal padding) with square edges and a 2px left accent border that
+// turns the green theme color on hover / when active. Mirrors PagesNavTree's
+// page rows so the whole sidebar reads as one system.
+const NAV_ITEM_CLASS =
+  "w-full min-w-0 justify-start gap-1.5 rounded-none border-l-2 border-l-transparent font-normal hover:border-l-emerald-500";
+const NAV_ITEM_ACTIVE_CLASS =
+  "border-l-emerald-500 bg-accent text-accent-foreground";
+// Section heading: same 2px transparent left inset so its label lines up with
+// the item rows below it.
+const NAV_HEADING_CLASS = "border-l-2 border-l-transparent";
+
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
 // see UserMenu / Navbar. The sidebar carries the space switcher, the
-// active space's content sections (projects / pages / discussions),
+// active space's content sections (boards / pages),
 // and the admin section.
 
 // The shared section is now a list of accessible spaces (rendered
 // from ActiveSpaceContext at render time, since it's per-user state).
 // "All Spaces" is the only static entry — it's the management
 // surface; each space below is a link to its tabbed detail page
-// (#nav-refresh) which is itself the hub for projects, discussions,
+// (#nav-refresh) which is itself the hub for boards,
 // pages, and tasks inside that space.
 
 // Backend tooling surfaced inside the PWA chrome. The Mercure debugger
@@ -48,7 +60,7 @@ const ADMIN_EXTERNAL_LINKS =
     ? []
     : [{ href: "/.well-known/mercure/ui/", label: "Mercure" }];
 
-// The active space's content surfaces (Projects / Pages / Discussions)
+// The active space's content surfaces (Boards / Pages)
 // are rendered as their own sidebar sections from the shared
 // CONTENT_SECTIONS map (icon + color shared with the aggregator page
 // headers). Each heading links to its top-level aggregator (scoped to
@@ -69,8 +81,8 @@ interface ResourceRow {
 }
 
 /**
- * Fetch the active space's rows for one resource (`projects` / `pages`
- * / `discussions`), scoped by `?space=<iri>` — the same filter the
+ * Fetch the active space's rows for one resource (`boards` / `pages`),
+ * scoped by `?space=<iri>` — the same filter the
  * aggregators and SpaceContentTabs use.
  *
  * Keyed under the resource's react-query prefix (e.g. `["boards", …]`)
@@ -111,6 +123,13 @@ interface SidebarNavProps {
    * variant (where there's no room for it in the top bar) sets this.
    */
   includeSpaceSwitcher?: boolean;
+  /**
+   * Fill the container's height and scroll internally. The mobile Sheet
+   * (a fixed, viewport-height panel) sets this so a long nav scrolls
+   * inside the sheet. The persistent desktop sidebar leaves it off so the
+   * nav grows with its content and the whole page scrolls as one.
+   */
+  scrollable?: boolean;
 }
 
 interface ContentSectionProps {
@@ -157,7 +176,7 @@ const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
 
   return (
     <div className="mt-3 first:mt-0">
-      <div className="flex items-center px-3 pb-1">
+      <div className={cn("flex items-center px-3 pb-1", NAV_HEADING_CLASS)}>
         {wrap(
           <Link
             href={aggregatorHref}
@@ -192,7 +211,7 @@ const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-start font-normal text-muted-foreground"
+                  className={cn(NAV_ITEM_CLASS, "text-muted-foreground")}
                 >
                   <Link href={aggregatorHref}>
                     <Plus className="size-4" />
@@ -228,9 +247,9 @@ const ContentSection = ({ section, spaceIri, wrap }: ContentSectionProps) => {
                         variant="ghost"
                         size="sm"
                         className={cn(
-                          "w-full min-w-0 justify-start font-normal",
+                          NAV_ITEM_CLASS,
                           currentPath === href &&
-                            "bg-accent text-accent-foreground",
+                            NAV_ITEM_ACTIVE_CLASS,
                         )}
                       >
                         <Link href={href}>
@@ -297,11 +316,6 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
       label: "Global custom fields",
       match: "/admin/global-custom-fields",
     },
-    {
-      href: "/admin/sentry-test",
-      label: "Sentry test",
-      match: "/admin/sentry-test",
-    },
     { href: "/feedback", label: "Feedback", match: "/feedback" },
     ...ADMIN_EXTERNAL_LINKS.map((l) => ({ ...l, match: l.href, external: true })),
   ];
@@ -313,7 +327,7 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Admin`}
-        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
       >
         <ShieldCheck className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <span className="truncate">Admin</span>
@@ -334,8 +348,8 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
               variant="ghost"
               size="sm"
               className={cn(
-                "w-full min-w-0 justify-start font-normal",
-                active && "bg-accent text-accent-foreground",
+                NAV_ITEM_CLASS,
+                active && NAV_ITEM_ACTIVE_CLASS,
               )}
             >
               {link.external ? (
@@ -425,7 +439,7 @@ const UserManagementSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} User management`}
-        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
       >
         <Users className="size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
         <span className="truncate">User management</span>
@@ -448,8 +462,8 @@ const UserManagementSection = ({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "w-full min-w-0 justify-start font-normal",
-                    active && "bg-accent text-accent-foreground",
+                    NAV_ITEM_CLASS,
+                    active && NAV_ITEM_ACTIVE_CLASS,
                   )}
                 >
                   <Link href={link.href}>
@@ -506,7 +520,7 @@ const TaxonomySection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Taxonomy`}
-        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
       >
         <Tag className="size-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
         <span className="truncate">Taxonomy</span>
@@ -529,8 +543,8 @@ const TaxonomySection = ({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "w-full min-w-0 justify-start font-normal",
-                    active && "bg-accent text-accent-foreground",
+                    NAV_ITEM_CLASS,
+                    active && NAV_ITEM_ACTIVE_CLASS,
                   )}
                 >
                   <Link href={link.href}>
@@ -580,7 +594,7 @@ const BillingSection = ({
   const links = [
     { href: "/time", label: "Time", match: "/time", show: true },
     { href: "/expenses", label: "Expenses", match: "/expenses", show: true },
-    { href: "/engagements", label: "Engagements", match: "/engagements", show: canInvoices },
+    { href: "/projects", label: "Projects", match: "/projects", show: canInvoices },
     { href: "/clients", label: "Clients", match: "/clients", show: canInvoices },
     { href: "/invoices", label: "Invoices", match: "/invoices", show: canInvoices },
     { href: "/estimates", label: "Estimates", match: "/estimates", show: canInvoices },
@@ -597,7 +611,7 @@ const BillingSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Billing`}
-        className="flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
       >
         <CreditCard className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
         <span className="truncate">Billing</span>
@@ -620,8 +634,8 @@ const BillingSection = ({
                   variant="ghost"
                   size="sm"
                   className={cn(
-                    "w-full min-w-0 justify-start font-normal",
-                    active && "bg-accent text-accent-foreground",
+                    NAV_ITEM_CLASS,
+                    active && NAV_ITEM_ACTIVE_CLASS,
                   )}
                 >
                   <Link href={href}>
@@ -647,6 +661,7 @@ const BillingSection = ({
 const SidebarNav = ({
   itemWrapper,
   includeSpaceSwitcher = false,
+  scrollable = false,
 }: SidebarNavProps) => {
   const { user, isAuthenticated } = useAuth();
   const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
@@ -660,14 +675,22 @@ const SidebarNav = ({
   const calendarActive = router.pathname === "/calendar";
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={cn("flex flex-col", scrollable && "h-full")}>
       {includeSpaceSwitcher && (
-        <div className="px-2 pt-4 pb-2">
+        // Match the navbar's height + bottom border so the switcher's bottom
+        // edge lines up with the top bar's across the two columns, and pin it
+        // to the top like the navbar so it stays put as the page scrolls.
+        <div className="sticky top-0 z-40 h-14 shrink-0 border-b bg-background">
           <SpaceSwitcher />
         </div>
       )}
 
-      <nav className="flex flex-col gap-0.5 px-2 pt-2 pb-4 flex-1 overflow-y-auto">
+      <nav
+        className={cn(
+          "flex flex-col gap-0.5 px-0 pt-2 pb-4",
+          scrollable && "flex-1 overflow-y-auto",
+        )}
+      >
         {activeSpace && (
           <span>
             {wrap(
@@ -676,8 +699,8 @@ const SidebarNav = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
-                  calendarActive && "bg-accent text-accent-foreground",
+                  NAV_ITEM_CLASS,
+                  calendarActive && NAV_ITEM_ACTIVE_CLASS,
                 )}
               >
                 <Link href="/calendar">
@@ -713,9 +736,9 @@ const SidebarNav = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "w-full min-w-0 justify-start gap-1.5 font-normal",
+                  NAV_ITEM_CLASS,
                   router.pathname === "/spaces/[id]/settings" &&
-                    "bg-accent text-accent-foreground",
+                    NAV_ITEM_ACTIVE_CLASS,
                 )}
               >
                 <Link href={`/spaces/${activeSpace.id}/settings`}>

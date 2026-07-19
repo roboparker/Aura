@@ -42,8 +42,6 @@ use Symfony\Component\Uid\Uuid;
  *    custom field values are deliberately dropped — those are
  *    user-specific state, and CFV would need an old-CFD→new-CFD
  *    mapping that's a heavier slice on its own.
- *  - Discussions live at the space level — not board — so they're
- *    never carried along on a board copy.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults
@@ -116,7 +114,7 @@ class BoardCopyController extends AbstractController
         // the target space or clones it there.
         // Per-board visibility (#custom-fields-board) carries over too: the
         // clone keeps the source's per-board visibility for each field.
-        $sourceVisibility = $this->fieldVisibility->visibilityMapForProject($source);
+        $sourceVisibility = $this->fieldVisibility->visibilityMapForBoard($source);
         foreach ($source->getCustomFieldDefinitions() as $sourceDefinition) {
             $effective = $sourceVisibility[(string) $sourceDefinition->getId()]
                 ?? $sourceDefinition->getVisibility();

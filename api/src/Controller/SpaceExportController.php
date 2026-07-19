@@ -20,7 +20,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  * Space data export (#space-export): request, status lookup, and download.
  *
  * `POST /spaces/{id}/export` is space-admin-gated — an export bundles every
- * member's content (tasks, pages, discussions, comments, attachments), so
+ * member's content (tasks, pages, comments, attachments), so
  * the bar matches the other whole-space operations (delete, member
  * management). The heavy lifting runs on the worker
  * ({@see \App\MessageHandler\GenerateSpaceExportHandler}); the requester

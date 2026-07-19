@@ -5,18 +5,23 @@ import {
   ArrowRight,
   ArrowUpDown,
   Bell,
+  BellRing,
   Boxes,
+  CalendarDays,
   Check,
   ChevronDown,
   ChevronRight,
+  Clock,
   Code2,
+  Download,
   FileText,
   Filter,
+  KeyRound,
+  Link2,
   ListTodo,
-  MessageSquare,
-  MessagesSquare,
-  Pin,
   Plus,
+  Receipt,
+  Repeat,
   Search,
   ShieldCheck,
   SlidersHorizontal,
@@ -445,16 +450,126 @@ const SpaceShowcaseMock = () => (
             House style
           </TileLine>
         </SpaceTile>
-        <SpaceTile icon={MessagesSquare} label="Discussions" count={3}>
-          <TileLine>
-            <Pin className="h-2.5 w-2.5 text-primary" />
-            Spring palette approval
-          </TileLine>
-          <TileLine dim>
-            <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
-            Earnest vs. playful?
-          </TileLine>
-        </SpaceTile>
+      </div>
+    </div>
+  </Frame>
+);
+
+// ── Billing / invoice showcase mockup ─────────────────────────────────────
+type InvoiceLine = { desc: string; meta: string; amt: string; time: boolean };
+const INVOICE_LINES: InvoiceLine[] = [
+  {
+    desc: "Design sprint — brand system",
+    meta: "12.5 hrs · $120/hr",
+    amt: "$1,500.00",
+    time: true,
+  },
+  {
+    desc: "Front-end build — marketing site",
+    meta: "8.0 hrs · $120/hr",
+    amt: "$960.00",
+    time: true,
+  },
+  {
+    desc: "Stock photography",
+    meta: "Expense · billable",
+    amt: "$180.00",
+    time: false,
+  },
+];
+
+const TotalRow = ({
+  label,
+  amt,
+  strong,
+}: {
+  label: string;
+  amt: string;
+  strong?: boolean;
+}) => (
+  <div
+    className={cn(
+      "flex items-center justify-between",
+      strong
+        ? "mt-1 border-t pt-1.5 font-medium text-foreground"
+        : "text-muted-foreground",
+    )}
+  >
+    <span>{label}</span>
+    <span className="font-mono">{amt}</span>
+  </div>
+);
+
+const BillingMock = () => (
+  <Frame>
+    <div className="flex h-[42px] items-center gap-2 border-b bg-background px-3">
+      <SpaceChip letter="A" name="Acme Studio" hue={22} />
+      <span className="ml-0.5 rounded-[3px] border bg-muted px-1.5 py-px font-mono text-[9.5px] uppercase tracking-wide text-muted-foreground">
+        invoices
+      </span>
+      <span className="flex-1" />
+      <span
+        className={cn(
+          "inline-flex items-center gap-1 rounded bg-primary px-2 py-1 text-[10.5px] font-medium text-primary-foreground",
+          GLOW,
+        )}
+      >
+        <Receipt className="h-2.5 w-2.5" /> New invoice
+      </span>
+    </div>
+    <div className="bg-card p-4">
+      <div className="flex items-start gap-2.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+              Invoice INV-0042
+            </h3>
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-px text-[10px] font-medium text-primary">
+              Sent
+            </span>
+          </div>
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            Acme Co · due Apr 15
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="font-mono text-[15px] font-semibold text-foreground">
+            $2,743.20
+          </div>
+          <div className="text-[10.5px] text-muted-foreground">total due</div>
+        </div>
+      </div>
+
+      <div className="mt-3 overflow-hidden rounded-lg border">
+        {INVOICE_LINES.map((l, i) => (
+          <div
+            key={l.desc}
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2",
+              i > 0 && "border-t",
+            )}
+          >
+            {l.time ? (
+              <Clock className="h-3 w-3 shrink-0 text-primary" />
+            ) : (
+              <Receipt className="h-3 w-3 shrink-0 text-muted-foreground" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] text-foreground">{l.desc}</div>
+              <div className="text-[10px] text-muted-foreground">{l.meta}</div>
+            </div>
+            <div className="shrink-0 font-mono text-[11.5px] text-foreground">
+              {l.amt}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-2.5 flex flex-col gap-1 text-[11.5px]">
+        <TotalRow label="Subtotal" amt="$2,640.00" />
+        <TotalRow label="Tax · 8%" amt="$211.20" />
+        <TotalRow label="Retainer applied" amt="−$108.00" />
+        <TotalRow label="Total due" amt="$2,743.20" strong />
       </div>
     </div>
   </Frame>
@@ -469,8 +584,13 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   },
   {
     icon: ListTodo,
-    title: "Tasks",
-    desc: "Capture in seconds, drag to reorder, due dates, recurrence, custom fields, and reminders.",
+    title: "Tasks & boards",
+    desc: "Capture in seconds, group into sections, and flip to a Kanban board. Due dates, recurrence, reminders, and custom fields included.",
+  },
+  {
+    icon: CalendarDays,
+    title: "Calendar",
+    desc: "A shared calendar for the whole space — month, week, and day views, drag to reschedule, with two-way Google & Microsoft sync.",
   },
   {
     icon: FileText,
@@ -478,14 +598,14 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
     desc: "Long-form docs with a nested page tree and rich markdown — your handbook, retros, and specs.",
   },
   {
-    icon: MessagesSquare,
-    title: "Discussions",
-    desc: "Lightweight forum threads per space, with categories, pins, and live replies.",
+    icon: Receipt,
+    title: "Time & invoicing",
+    desc: "Track time and expenses against clients, then turn them into branded invoices, estimates, and retainers — with reports and approvals.",
   },
   {
     icon: Search,
     title: "Search & ⌘K",
-    desc: "Full-text search across tasks, docs, and discussions — reachable from a command palette anywhere.",
+    desc: "Full-text search across tasks, docs, and boards — reachable from a command palette anywhere.",
   },
   {
     icon: Bell,
@@ -497,15 +617,20 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
 const STRIP: { icon: LucideIcon; label: string }[] = [
   { icon: Users, label: "Groups" },
   { icon: SlidersHorizontal, label: "Custom fields" },
+  { icon: KeyRound, label: "Roles & permissions" },
+  { icon: Repeat, label: "Recurrence & reminders" },
+  { icon: Link2, label: "Task relationships" },
   { icon: Zap, label: "Real-time updates" },
   { icon: ShieldCheck, label: "2FA & security" },
   { icon: Code2, label: "MCP / API access" },
+  { icon: BellRing, label: "Web push" },
+  { icon: Download, label: "Data export" },
 ];
 
 const SPACE_BULLETS = [
   {
     b: "One Space, four surfaces.",
-    t: "Boards, tasks, pages, and discussions all live together — not scattered across five disconnected tools.",
+    t: "Boards, tasks, and pages all live together — not scattered across five disconnected tools.",
   },
   {
     b: "Invite once, see everything.",
@@ -514,6 +639,21 @@ const SPACE_BULLETS = [
   {
     b: "Private by default.",
     t: "Everyone gets a private Space for their own work, alongside the shared ones they belong to.",
+  },
+];
+
+const BILLING_BULLETS = [
+  {
+    b: "Time and expenses become line items.",
+    t: "Log hours against a client project and add billable expenses; they flow onto the invoice at the right rate, with per-line tax.",
+  },
+  {
+    b: "Invoices, estimates, and retainers.",
+    t: "Send branded invoices and estimates, and draw down a client's retainer as you bill — with PDF receipts attached.",
+  },
+  {
+    b: "Reports and approvals.",
+    t: "See what's billable and what's outstanding, and route timesheets and expenses through approval before anything goes out.",
   },
 ];
 
@@ -526,7 +666,7 @@ const STEPS = [
   {
     n: "02",
     title: "Invite your team to a Space",
-    desc: "Add people or a group once — they see every board, page, and discussion inside.",
+    desc: "Add people or a group once — they see every board and page inside.",
   },
   {
     n: "03",
@@ -554,7 +694,7 @@ const Home = () => {
         <title>Madori — one calm place for your team&apos;s work</title>
         <meta
           name="description"
-          content="Madori organizes tasks, boards, long-form docs, and discussions into shared Spaces. A calm, collaborative workspace for small teams — no bloat, no busywork."
+          content="Madori brings tasks, boards, a calendar, and long-form docs — plus time tracking and invoicing — into shared Spaces. A calm, collaborative workspace for small teams."
         />
       </Head>
 
@@ -597,9 +737,9 @@ const Home = () => {
                 <span className="text-primary">calm</span> place.
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-                Tasks, boards, long-form docs, and discussions — organized
-                into shared Spaces. No bloat, no busywork. Just the work, and the
-                people doing it.
+                Tasks, boards, a calendar, and long-form docs —
+                organized into shared Spaces. No bloat, no busywork. Just the
+                work, and the people doing it.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-3">
                 {isAuthenticated ? (
@@ -645,7 +785,7 @@ const Home = () => {
               Each part stands on its own and connects to the rest — so nothing
               lives in a tool nobody opens.
             </p>
-            <div className="mt-10 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-10 grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map(({ icon: Icon, title, desc }) => (
                 <div
                   key={title}
@@ -677,7 +817,7 @@ const Home = () => {
                 </h2>
                 <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
                   A Space is a shared home for a team or an effort. It holds the
-                  boards, tasks, pages, and discussions that belong together.
+                  boards, tasks, and pages that belong together.
                 </p>
                 <div className="mt-6 flex flex-col gap-3.5">
                   {SPACE_BULLETS.map((x) => (
@@ -694,6 +834,41 @@ const Home = () => {
                 </div>
               </div>
               <SpaceShowcaseMock />
+            </div>
+          </div>
+        </section>
+
+        {/* Billing showcase */}
+        <section id="billing" className="border-t">
+          <div className={cn(WRAP, "py-16")}>
+            <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="order-last lg:order-first">
+                <BillingMock />
+              </div>
+              <div>
+                <Eyebrow>Get paid</Eyebrow>
+                <h2 className="mt-3.5 text-3xl font-semibold tracking-tight text-foreground">
+                  Track the work. Bill the client.
+                </h2>
+                <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
+                  Log time and expenses against a client project, then turn
+                  them into a polished invoice in a click — no spreadsheet
+                  handoff.
+                </p>
+                <div className="mt-6 flex flex-col gap-3.5">
+                  {BILLING_BULLETS.map((x) => (
+                    <div key={x.b} className="flex items-start gap-3">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/15 text-primary">
+                        <Check className="h-3 w-3" strokeWidth={2.4} />
+                      </span>
+                      <span className="text-[13.5px] leading-relaxed text-muted-foreground">
+                        <b className="font-semibold text-foreground">{x.b}</b>{" "}
+                        {x.t}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </section>

@@ -6,15 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
 /**
- * Inline list tabs for the space detail page: Boards / Discussions /
- * Pages / Tasks. Each tab independently fetches its own list filtered
- * by `?space=<iri>` (or `?board.space=` for tasks, which doesn't
- * carry its own space FK).
+ * Inline list tabs for the space detail page: Boards / Pages / Tasks.
+ * Each tab independently fetches its own list filtered by
+ * `?space=<iri>` (or `?board.space=` for tasks, which doesn't carry
+ * its own space FK).
  *
  * Kept intentionally lean — title + a small meta row + a link out to
  * the resource's detail page. The top-level aggregators
- * (/boards, /discussions, /pages, /tasks) remain the place for
- * filter chips, search, and bulk actions.
+ * (/boards, /pages, /tasks) remain the place for filter chips,
+ * search, and bulk actions.
  */
 
 interface SpaceRef {
@@ -102,7 +102,7 @@ interface BoardRow {
   owner: { id: string; email: string };
 }
 
-export const SpaceProjectsList = ({ spaceIri, enabled }: { spaceIri: string | null; enabled: boolean }) => {
+export const SpaceBoardsList = ({ spaceIri, enabled }: { spaceIri: string | null; enabled: boolean }) => {
   const { items, isLoading, error } = useFetchList<BoardRow>({
     spaceIri,
     enabled,
@@ -149,85 +149,6 @@ export const SpaceProjectsList = ({ spaceIri, enabled }: { spaceIri: string | nu
                   {p.description}
                 </p>
               )}
-            </CardContent>
-          </Card>
-        </li>
-      ))}
-    </ul>
-  );
-};
-
-// ---------------------------------------------------------------------
-// Discussions
-// ---------------------------------------------------------------------
-
-interface DiscussionRow {
-  "@id": string;
-  id: string;
-  title: string;
-  category: string;
-  isPinned: boolean;
-  isLocked: boolean;
-  createdAt: string;
-  updatedAt: string | null;
-  author: { id: string; email: string };
-}
-
-export const SpaceDiscussionsList = ({
-  spaceIri,
-  enabled,
-}: {
-  spaceIri: string | null;
-  enabled: boolean;
-}) => {
-  const { items, isLoading, error } = useFetchList<DiscussionRow>({
-    spaceIri,
-    enabled,
-    url: (s) =>
-      `${ENTRYPOINT}/discussions?space=${encodeURIComponent(s)}&itemsPerPage=100`,
-  });
-
-  if (error) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>{error}</AlertDescription>
-      </Alert>
-    );
-  }
-  if (isLoading) return <p className="text-muted-foreground text-sm">Loading…</p>;
-  if (items.length === 0) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground text-sm">
-            No discussions in this space yet.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-  return (
-    <ul className="space-y-2" data-testid="space-discussions-list">
-      {items.map((d) => (
-        <li key={d["@id"]} data-testid="space-discussion-item">
-          <Card>
-            <CardContent className="pt-4 pb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/discussions/${d.id}`}
-                  className="font-semibold text-foreground no-underline hover:underline"
-                >
-                  {d.title}
-                </Link>
-                {d.isPinned && <Badge variant="secondary">Pinned</Badge>}
-                {d.isLocked && <Badge variant="secondary">Locked</Badge>}
-                <Badge variant="outline" className="capitalize">
-                  {d.category.replace(/-/g, " ")}
-                </Badge>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {d.author?.email} · {formatRelative(d.createdAt)}
-              </p>
             </CardContent>
           </Card>
         </li>

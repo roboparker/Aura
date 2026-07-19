@@ -28,7 +28,7 @@ final class GetCustomFieldsTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'List custom field definitions for a board, ordered by position. Returns each field\'s name, kind/subtype (boolean.boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page,discussion}), config, optional footer aggregation descriptor, nullable flag, and visibility (list|board|both).';
+        return 'List custom field definitions for a board, ordered by position. Returns each field\'s name, kind/subtype (boolean.boolean, text.{text,rich_text,url}, numeric.{int,float,money}, date.{date,time,datetime}, select.{single,multi}, reference.{user,task,page}), config, optional footer aggregation descriptor, nullable flag, and visibility (list|board|both).';
     }
 
     public function getInputSchema(): array
@@ -47,7 +47,7 @@ final class GetCustomFieldsTool implements McpToolInterface
     {
         $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
         $board = $this->em->getRepository(Board::class)->find($boardId);
-        if (null === $board || !$this->authz->canReadProject($board, $user)) {
+        if (null === $board || !$this->authz->canReadBoard($board, $user)) {
             throw McpException::notFound(sprintf('Board %s', $boardId));
         }
 

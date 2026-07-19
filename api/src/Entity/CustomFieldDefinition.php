@@ -256,7 +256,7 @@ class CustomFieldDefinition implements CustomFieldDefinitionInterface
     /**
      * Default visibility — where the field is shown to readers: the board
      * task list (`list`), the Kanban board cards (`board`), or both. Visibility
-     * is a PER-PROJECT choice now (#custom-fields-board): a {@see
+     * is a PER-BOARD choice now (#custom-fields-board): a {@see
      * BoardFieldVisibility} row overrides this default for a given board,
      * and {@see \App\State\CustomFieldVisibilityProvider} injects the effective
      * value into the read when the field is fetched in a board context

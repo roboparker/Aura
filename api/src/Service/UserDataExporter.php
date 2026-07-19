@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Comment;
-use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Tag;
@@ -42,7 +41,6 @@ final class UserDataExporter
             'tasks' => $this->tasks($user),
             'boards' => $this->boards($user),
             'pages' => $this->pages($user),
-            'discussions' => $this->discussions($user),
             'comments' => $this->comments($user),
             'tags' => $this->tags($user),
             'apiTokens' => $this->apiTokens($user),
@@ -82,17 +80,6 @@ final class UserDataExporter
             'id' => (string) $p->getId(),
             'title' => $p->getTitle(),
             'body' => $p->getBody(),
-        ], $rows);
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function discussions(User $user): array
-    {
-        $rows = $this->em->getRepository(Discussion::class)->findBy(['author' => $user]);
-        return array_map(static fn (Discussion $d): array => [
-            'id' => (string) $d->getId(),
-            'title' => $d->getTitle(),
-            'body' => $d->getBody(),
         ], $rows);
     }
 

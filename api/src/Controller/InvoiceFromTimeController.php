@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Expense;
 use App\Entity\Invoice;
 use App\Entity\InvoiceLineItem;
@@ -21,18 +21,18 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Uid\Uuid;
 
 /**
- * Generates a draft {@see Invoice} from a {@see Engagement}'s unbilled,
+ * Generates a draft {@see Invoice} from a {@see Project}'s unbilled,
  * billable, completed {@see TimeEntry} rows (Harvest model). The client + currency
- * come from the engagement; one line item per entry (hours × the entry's
+ * come from the project; one line item per entry (hours × the entry's
  * snapshotted category rate), each back-linking its source entry, and every
  * pulled entry stamped `billedAt` so the same time can't be billed twice.
  *
- * Body: `{ engagement }` (IRI or UUID), plus optional scoping (#644):
+ * Body: `{ project }` (IRI or UUID), plus optional scoping (#644):
  *  - `from` / `to` — inclusive `Y-m-d` dates on the entry's startedAt, so
  *    "invoice just October" is possible;
  *  - `entries` — an explicit list of entry IRIs/UUIDs to pull; every selected
  *    entry must be in the invoiceable pool (unbilled, billable, completed, on
- *    this engagement, inside the range) or the whole request 422s;
+ *    this project, inside the range) or the whole request 422s;
  *  - `preview: true` — return the candidate rows + totals WITHOUT creating an
  *    invoice or stamping billedAt, so the UI can offer per-entry unticks.
  *
@@ -59,10 +59,10 @@ class InvoiceFromTimeController extends AbstractController
         }
 
         $payload = $request->toArray();
-        $engagement = $this->resolve($payload['engagement'] ?? null);
-        $space = $engagement?->getSpace();
-        if (null === $engagement || null === $space || (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user))) {
-            return $this->json(['error' => 'Engagement not found.'], 404);
+        $project = $this->resolve($payload['project'] ?? null);
+        $space = $project?->getSpace();
+        if (null === $project || null === $space || (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user))) {
+            return $this->json(['error' => 'Project not found.'], 404);
         }
         if (
             !$this->isGranted('ROLE_ADMIN')
@@ -72,9 +72,9 @@ class InvoiceFromTimeController extends AbstractController
             return $this->json(['error' => 'You cannot create invoices in this space.'], 403);
         }
 
-        $client = $engagement->getClient();
+        $client = $project->getClient();
         if (null === $client) {
-            return $this->json(['error' => 'This engagement has no client.'], 422);
+            return $this->json(['error' => 'This project has no client.'], 422);
         }
 
         $from = $this->parseDate($payload['from'] ?? null);
@@ -86,8 +86,8 @@ class InvoiceFromTimeController extends AbstractController
             return $this->json(['error' => 'The end of the range is before its start.'], 422);
         }
 
-        $entries = $this->timeEntries->findInvoiceableForEngagement(
-            $engagement,
+        $entries = $this->timeEntries->findInvoiceableForProject(
+            $project,
             $from,
             $to?->modify('+1 day'),
         );
@@ -111,19 +111,19 @@ class InvoiceFromTimeController extends AbstractController
             ));
             if (count($entries) !== count($wanted)) {
                 return $this->json([
-                    'error' => 'One or more selected entries are not invoiceable for this engagement.',
+                    'error' => 'One or more selected entries are not invoiceable for this project.',
                 ], 422);
             }
         }
 
-        $currency = $engagement->getCurrency() ?? $client->getCurrency() ?? 'USD';
+        $currency = $project->getCurrency() ?? $client->getCurrency() ?? 'USD';
 
         // Unbilled billable expenses ride along (#650) unless opted out.
         // Only same-currency expenses join — an invoice pins one currency.
         $expenses = [];
         if (false !== ($payload['includeExpenses'] ?? true)) {
             $expenses = array_values(array_filter(
-                $this->expenses->findInvoiceableForEngagement($engagement, $from, $to?->modify('+1 day')),
+                $this->expenses->findInvoiceableForProject($project, $from, $to?->modify('+1 day')),
                 static fn (Expense $x): bool => null === $x->getCurrency() || $x->getCurrency() === $currency,
             ));
         }
@@ -143,7 +143,7 @@ class InvoiceFromTimeController extends AbstractController
             ));
             if (count($expenses) !== count($wantedExpenses)) {
                 return $this->json([
-                    'error' => 'One or more selected expenses are not invoiceable for this engagement.',
+                    'error' => 'One or more selected expenses are not invoiceable for this project.',
                 ], 422);
             }
         }
@@ -329,7 +329,7 @@ class InvoiceFromTimeController extends AbstractController
         return mb_substr($label, 0, InvoiceLineItem::MAX_DESCRIPTION_LENGTH);
     }
 
-    private function resolve(mixed $iri): ?Engagement
+    private function resolve(mixed $iri): ?Project
     {
         if (!is_string($iri) || '' === trim($iri)) {
             return null;
@@ -340,6 +340,6 @@ class InvoiceFromTimeController extends AbstractController
             return null;
         }
 
-        return $this->em->getRepository(Engagement::class)->find($id);
+        return $this->em->getRepository(Project::class)->find($id);
     }
 }

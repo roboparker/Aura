@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\Engagement;
+use App\Entity\Project;
 use App\Entity\Expense;
 use App\Entity\MediaObject;
 use App\Entity\Space;
@@ -113,8 +113,8 @@ class MediaObjectDownloadController extends AbstractController
 
     /**
      * The caller may download the MediaObject if they own it OR if at least
-     * one task, space, or engagement they can read attaches it. Mirrors the
-     * Task / Space / Engagement GET security expressions.
+     * one task, space, or project they can read attaches it. Mirrors the
+     * Task / Space / Project GET security expressions.
      */
     private function canAccess(MediaObject $media, User $user): bool
     {
@@ -124,12 +124,12 @@ class MediaObjectDownloadController extends AbstractController
         if ($this->isGranted('ROLE_ADMIN')) {
             return $this->mediaIsAttachedToAnyTask($media)
                 || $this->mediaIsAttachedToAnySpace($media)
-                || $this->mediaIsAttachedToAnyEngagement($media)
+                || $this->mediaIsAttachedToAnyProject($media)
                 || $this->mediaIsAReceiptOnAnyExpense($media);
         }
         return $this->mediaIsAttachedToReadableTask($media, $user)
             || $this->mediaIsAttachedToReadableSpace($media, $user)
-            || $this->mediaIsAttachedToReadableEngagement($media, $user)
+            || $this->mediaIsAttachedToReadableProject($media, $user)
             || $this->mediaIsAReceiptOnReadableExpense($media, $user);
     }
 
@@ -213,9 +213,9 @@ class MediaObjectDownloadController extends AbstractController
         return $count > 0;
     }
 
-    private function mediaIsAttachedToAnyEngagement(MediaObject $media): bool
+    private function mediaIsAttachedToAnyProject(MediaObject $media): bool
     {
-        $count = (int) $this->em->getRepository(Engagement::class)
+        $count = (int) $this->em->getRepository(Project::class)
             ->createQueryBuilder('e')
             ->select('COUNT(e.id)')
             ->where(':media MEMBER OF e.attachments')
@@ -274,22 +274,22 @@ class MediaObjectDownloadController extends AbstractController
     }
 
     /**
-     * Engagement attachments are contract-sensitive: readable only by a space
+     * Project attachments are contract-sensitive: readable only by a space
      * admin or a member holding an explicit `invoices.read` grant — the same
-     * bar as the Engagement GET security expression. A media is attached to at
-     * most a handful of engagements, so the per-row permission check is cheap.
+     * bar as the Project GET security expression. A media is attached to at
+     * most a handful of projects, so the per-row permission check is cheap.
      */
-    private function mediaIsAttachedToReadableEngagement(MediaObject $media, User $user): bool
+    private function mediaIsAttachedToReadableProject(MediaObject $media, User $user): bool
     {
-        $engagements = $this->em->getRepository(Engagement::class)
+        $projects = $this->em->getRepository(Project::class)
             ->createQueryBuilder('e')
             ->where(':media MEMBER OF e.attachments')
             ->setParameter('media', $media)
             ->getQuery()
             ->getResult();
 
-        foreach ($engagements as $engagement) {
-            $space = $engagement->getSpace();
+        foreach ($projects as $project) {
+            $space = $project->getSpace();
             if (null === $space) {
                 continue;
             }

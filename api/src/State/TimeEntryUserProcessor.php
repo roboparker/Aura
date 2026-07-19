@@ -6,7 +6,7 @@ use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\TimeEntry;
 use App\Repository\TimeEntryRepository;
-use App\Repository\TimesheetSubmissionRepository;
+use App\Repository\TimesheetApprovalRepository;
 use App\Security\AuthenticatedUserResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -14,7 +14,7 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Stamps the current user as the time entry's tracker on create, mirroring the
- * trust model of DiscussionAuthorProcessor / TaskOwnerProcessor — the owner is
+ * trust model of TaskOwnerProcessor — the owner is
  * set server-side, never from the payload. On update the existing owner is
  * preserved (the processor also runs on Patch), so a member can't reassign a
  * time entry to someone else.
@@ -37,7 +37,7 @@ final class TimeEntryUserProcessor implements ProcessorInterface
         private ProcessorInterface $persistProcessor,
         private AuthenticatedUserResolver $auth,
         private TimeEntryRepository $timeEntries,
-        private TimesheetSubmissionRepository $timesheets,
+        private TimesheetApprovalRepository $timesheets,
         private EntityManagerInterface $em,
     ) {
     }
@@ -75,7 +75,7 @@ final class TimeEntryUserProcessor implements ProcessorInterface
 
         // Timesheet approvals (#654): a submitted (pending/approved) week is
         // frozen for the entry's tracker — creates and edits both bounce.
-        $space = $data->getSpace() ?? $data->getEngagement()?->getSpace();
+        $space = $data->getSpace() ?? $data->getProject()?->getSpace();
         $tracker = $data->getUser();
         $startedAt = $data->getStartedAt();
         if (

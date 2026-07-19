@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * sequence, then hands off to the default Doctrine persist processor.
  *
  * Both fields are set server-side and read-only on the wire — the same
- * trust model as DiscussionAuthorProcessor (author) and
+ * trust model as PageAuthorProcessor (author) and
  * UserGroupOwnerProcessor (slug). Using a DB sequence for the number
  * keeps it concurrency-safe: two simultaneous POSTs get distinct values
  * without a MAX()+1 race or a unique-constraint retry loop.

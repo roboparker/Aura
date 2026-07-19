@@ -23,8 +23,8 @@ use Symfony\Bundle\SecurityBundle\Security;
  *    board's space (#185). Standalone (boardless) tasks fall back
  *    to owner-only.
  *  - Page comments: visible to any member of the page's space.
- *  - Discussion comments: visible to any member of the discussion's
- *    space.
+ *  - Feedback comments: the feedback board is instance-level, so any
+ *    authenticated user can read every ticket's comments.
  *
  * The branches OR together, and the per-comment commentable_type
  * keeps them mutually exclusive on a given row.
@@ -81,13 +81,11 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             $space = $key->getSpace();
             $queryBuilder
                 ->leftJoin(sprintf('%s.task', $rootAlias), 'ck_task')
-                ->leftJoin('ck_task.board', 'ck_project')
+                ->leftJoin('ck_task.board', 'ck_board')
                 ->leftJoin(sprintf('%s.page', $rootAlias), 'ck_page')
-                ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ck_discussion')
                 ->andWhere(
-                    'IDENTITY(ck_project.space) = :comment_key_space'
-                    . ' OR IDENTITY(ck_page.space) = :comment_key_space'
-                    . ' OR IDENTITY(ck_discussion.space) = :comment_key_space',
+                    'IDENTITY(ck_board.space) = :comment_key_space'
+                    . ' OR IDENTITY(ck_page.space) = :comment_key_space',
                 )
                 ->setParameter('comment_key_space', null === $space ? null : (string) $space->getId());
 
@@ -100,11 +98,11 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
         // doesn't match this branch rather than blowing up the row.
         $taskOwnerCheck = 'ca_task.owner = :currentUser';
         $taskSpaceDirect = sprintf(
-            'SELECT 1 FROM %s ca_t_direct WHERE ca_t_direct.space = ca_project.space AND ca_t_direct.user = :currentUser',
+            'SELECT 1 FROM %s ca_t_direct WHERE ca_t_direct.space = ca_board.space AND ca_t_direct.user = :currentUser',
             SpaceMembership::class,
         );
         $taskSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp_obj.space = ca_project.space AND ca_t_grp_member.user = :currentUser',
+            'SELECT 1 FROM %s ca_t_grp_obj JOIN ca_t_grp_obj.memberships ca_t_grp_member WHERE ca_t_grp_obj.space = ca_board.space AND ca_t_grp_member.user = :currentUser',
             UserGroup::class,
         );
 
@@ -119,38 +117,23 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             UserGroup::class,
         );
 
-        // Discussion branch: comment is on a discussion whose space
-        // contains the caller (direct or via group).
-        $discussionSpaceDirect = sprintf(
-            'SELECT 1 FROM %s ca_d_direct WHERE ca_d_direct.space = ca_discussion.space AND ca_d_direct.user = :currentUser',
-            SpaceMembership::class,
-        );
-        $discussionSpaceGroup = sprintf(
-            'SELECT 1 FROM %s ca_d_grp_obj JOIN ca_d_grp_obj.memberships ca_d_grp_member WHERE ca_d_grp_obj.space = ca_discussion.space AND ca_d_grp_member.user = :currentUser',
-            UserGroup::class,
-        );
-
         // Feedback branch: the feedback board is instance-level, so any
         // authenticated user (already guaranteed above) can read every
         // ticket's comments — the branch just needs the FK to be set.
         $queryBuilder
             ->leftJoin(sprintf('%s.task', $rootAlias), 'ca_task')
-            ->leftJoin('ca_task.board', 'ca_project')
+            ->leftJoin('ca_task.board', 'ca_board')
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
-            ->leftJoin(sprintf('%s.discussion', $rootAlias), 'ca_discussion')
             ->leftJoin(sprintf('%s.feedback', $rootAlias), 'ca_feedback')
             ->andWhere(sprintf(
                 '(ca_task.id IS NOT NULL AND (%s OR EXISTS(%s) OR EXISTS(%s)))
                  OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
-                 OR (ca_discussion.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
                  OR ca_feedback.id IS NOT NULL',
                 $taskOwnerCheck,
                 $taskSpaceDirect,
                 $taskSpaceGroup,
                 $pageSpaceDirect,
                 $pageSpaceGroup,
-                $discussionSpaceDirect,
-                $discussionSpaceGroup,
             ))
             ->setParameter('currentUser', $user);
     }

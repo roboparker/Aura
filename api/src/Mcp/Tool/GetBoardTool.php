@@ -23,7 +23,7 @@ final class GetBoardTool implements McpToolInterface
 
     public function getName(): string
     {
-        return 'get_project';
+        return 'get_board';
     }
 
     public function getDescription(): string
@@ -47,7 +47,7 @@ final class GetBoardTool implements McpToolInterface
     {
         $boardId = $this->input->requireUuid('boardId', $arguments['boardId'] ?? null);
         $board = $this->em->getRepository(Board::class)->find($boardId);
-        if (null === $board || !$this->authz->canReadProject($board, $user)) {
+        if (null === $board || !$this->authz->canReadBoard($board, $user)) {
             throw McpException::notFound(sprintf('Board %s', $boardId));
         }
 

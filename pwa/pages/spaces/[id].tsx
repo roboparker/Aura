@@ -8,7 +8,6 @@ import {
   Clock,
   FileText,
   FolderKanban,
-  MessageSquare,
   Paperclip,
   Plus,
   Settings,
@@ -34,9 +33,8 @@ import AttachmentsPanel, {
   type Attachment,
 } from "@/components/tasks/AttachmentsPanel";
 import {
-  SpaceDiscussionsList,
   SpacePagesList,
-  SpaceProjectsList,
+  SpaceBoardsList,
   SpaceTasksList,
 } from "@/components/spaces/SpaceContentTabs";
 import SpaceTile from "@/components/spaces/SpaceTile";
@@ -129,7 +127,7 @@ const fileLabel = (name: string, mime: string): string => {
 // Tab keys live in the URL (`?tab=...`) so deep links and the
 // browser back-button work naturally. Unknown values fall back to
 // the Overview tab.
-const TABS = ["overview", "boards", "discussions", "pages", "tasks", "files"] as const;
+const TABS = ["overview", "boards", "pages", "tasks", "files"] as const;
 type TabKey = (typeof TABS)[number];
 const isTabKey = (v: unknown): v is TabKey =>
   typeof v === "string" && (TABS as readonly string[]).includes(v);
@@ -148,11 +146,10 @@ const SpaceDetail = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Dashboard (Overview) data. Boards + pages counts ride on the
-  // space object; discussions + tasks counts come from the list
-  // endpoints' totalItems. `null` = still loading / unavailable.
-  const [discussionsCount, setDiscussionsCount] = useState<number | null>(null);
+  // space object; the tasks count comes from the list endpoint's
+  // totalItems. `null` = still loading / unavailable.
   const [tasksCount, setTasksCount] = useState<number | null>(null);
-  const [boardsPreview, setProjectsPreview] = useState<BoardPreview[]>([]);
+  const [boardsPreview, setBoardsPreview] = useState<BoardPreview[]>([]);
   const [activity, setActivity] = useState<ActivityFeed | null>(null);
 
   const handleAttach = async (mediaObjectIri: string) => {
@@ -272,10 +269,10 @@ const SpaceDetail = () => {
     if (match) setActiveSpace(match);
   }, [spaceId, spaces, activeSpace?.id, setActiveSpace]);
 
-  // Overview dashboard data: discussions/tasks counts (via totalItems)
-  // and a short boards preview. Kept separate from the main space
-  // load so it refreshes when the space changes without blocking the
-  // header render.
+  // Overview dashboard data: the tasks count (via totalItems) and a
+  // short boards preview. Kept separate from the main space load so it
+  // refreshes when the space changes without blocking the header
+  // render.
   const spaceIri = space?.["@id"] ?? null;
   useEffect(() => {
     if (!spaceIri) return;
@@ -296,12 +293,8 @@ const SpaceDetail = () => {
     };
     const enc = encodeURIComponent(spaceIri);
     void (async () => {
-      const [d, t] = await Promise.all([
-        totalOf(`${ENTRYPOINT}/discussions?space=${enc}&itemsPerPage=1`),
-        totalOf(`${ENTRYPOINT}/tasks?board.space=${enc}&itemsPerPage=1`),
-      ]);
+      const t = await totalOf(`${ENTRYPOINT}/tasks?board.space=${enc}&itemsPerPage=1`);
       if (cancelled) return;
-      setDiscussionsCount(d);
       setTasksCount(t);
     })();
     void (async () => {
@@ -313,7 +306,7 @@ const SpaceDetail = () => {
         if (!res.ok) return;
         const data = await res.json();
         const list: BoardPreview[] = data["hydra:member"] ?? data.member ?? [];
-        if (!cancelled) setProjectsPreview(list);
+        if (!cancelled) setBoardsPreview(list);
       } catch {
         /* preview is best-effort */
       }
@@ -456,12 +449,6 @@ const SpaceDetail = () => {
                   onClick={() => handleTabChange("pages")}
                 />
                 <StatCard
-                  icon={MessageSquare}
-                  label="Discussions"
-                  count={discussionsCount}
-                  onClick={() => handleTabChange("discussions")}
-                />
-                <StatCard
                   icon={CheckSquare}
                   label="Tasks"
                   count={tasksCount}
@@ -473,7 +460,6 @@ const SpaceDetail = () => {
                 <TabsList className="mb-4">
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   <TabsTrigger value="boards">Boards</TabsTrigger>
-                  <TabsTrigger value="discussions">Discussions</TabsTrigger>
                   <TabsTrigger value="pages">Pages</TabsTrigger>
                   <TabsTrigger value="tasks">Tasks</TabsTrigger>
                   <TabsTrigger value="files">Files</TabsTrigger>
@@ -735,11 +721,6 @@ const SpaceDetail = () => {
                               label="New page"
                               href="/pages"
                             />
-                            <QuickAction
-                              icon={MessageSquare}
-                              label="New discussion"
-                              href="/discussions"
-                            />
                           </div>
                         </CardContent>
                       </Card>
@@ -748,16 +729,9 @@ const SpaceDetail = () => {
                 </TabsContent>
 
                 <TabsContent value="boards" className="mt-0">
-                  <SpaceProjectsList
+                  <SpaceBoardsList
                     spaceIri={space["@id"]}
                     enabled={activeTab === "boards"}
-                  />
-                </TabsContent>
-
-                <TabsContent value="discussions" className="mt-0">
-                  <SpaceDiscussionsList
-                    spaceIri={space["@id"]}
-                    enabled={activeTab === "discussions"}
                   />
                 </TabsContent>
 

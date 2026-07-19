@@ -62,11 +62,11 @@ This single class auto-generates (API resources mount at the root — there is *
 
 ## Project conventions
 
-Beyond the framework defaults, the codebase has converged on a few patterns. Read an existing entity such as [`Discussion`](../../api/src/Entity/Discussion.php) for a full worked example.
+Beyond the framework defaults, the codebase has converged on a few patterns. Read an existing entity such as [`Page`](../../api/src/Entity/Page.php) for a full worked example.
 
 - **Per-operation security.** Each operation carries a `security:` (and, for writes, `securityPostDenormalize:`) Symfony expression rather than a blanket firewall rule — e.g. `is_granted('ROLE_USER') and object.getSpace().hasMember(user)`. Access for *listings* is enforced separately by **Doctrine query extensions** under `api/src/Doctrine/` / per-entity `*AccessExtension` classes, which add an EXISTS sub-query so a user only sees rows they may read (item lookups for non-members 404).
-- **State processors** (`api/src/State/*Processor.php`) stamp server-owned fields on write — e.g. `DiscussionAuthorProcessor` sets `author` from the authenticated user so a client can't post on someone else's behalf. Server-owned fields are kept out of the `*:write` serialization group.
-- **State providers** (`api/src/State/*Provider.php`) decorate the stock Doctrine provider to attach computed/transient fields (e.g. `DiscussionAggregateProvider` adds reply counts in one batched query, no N+1).
+- **State processors** (`api/src/State/*Processor.php`) stamp server-owned fields on write — e.g. `PageAuthorProcessor` sets `createdBy` from the authenticated user so a client can't post on someone else's behalf. Server-owned fields are kept out of the `*:write` serialization group.
+- **State providers** (`api/src/State/*Provider.php`) decorate the stock Doctrine provider to attach computed/transient fields (e.g. `FeedbackAggregateProvider` adds reply counts in one batched query, no N+1).
 - **Custom filters** live in `api/src/Filter/` (e.g. the Postgres full-text `*SearchFilter` classes); register them on the entity with `#[ApiFilter(...)]`.
 - **Serialization groups.** Expose fields explicitly via `#[Groups(['x:read', 'x:write'])]` and declare the read/write contexts on the `#[ApiResource]` attribute as shown above.
 

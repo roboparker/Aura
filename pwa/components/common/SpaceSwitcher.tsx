@@ -31,7 +31,9 @@ const SpaceSwitcher = () => {
 
   if (isLoading && spaces.length === 0) {
     return (
-      <div className="px-2 text-xs text-muted-foreground">Loading…</div>
+      <div className="flex h-full items-center px-3 text-xs text-muted-foreground">
+        Loading…
+      </div>
     );
   }
 
@@ -66,8 +68,8 @@ const SpaceSwitcher = () => {
           data-testid="space-switcher"
           aria-label={`Active space: ${activeSpace.name}`}
           className={cn(
-            "w-full flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-sm",
-            "hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring",
+            "flex h-full w-full items-center gap-2 px-3 text-sm",
+            "hover:bg-accent focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ring",
           )}
         >
           <SpaceTile

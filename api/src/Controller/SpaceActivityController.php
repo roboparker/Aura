@@ -26,7 +26,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Access mirrors the Space GET visibility: any space member can read;
  * everyone else gets a 404 so the endpoint never leaks a space's
- * existence. Discussions and comments aren't Loggable yet, so they
+ * existence. Comments aren't Loggable yet, so they
  * don't appear in the feed — a future enhancement.
  */
 class SpaceActivityController extends AbstractController
@@ -67,7 +67,7 @@ class SpaceActivityController extends AbstractController
             $pages,
         ))];
         foreach ($boards as $board) {
-            foreach ($this->scope->groupsForProject($board) as $class => $ids) {
+            foreach ($this->scope->groupsForBoard($board) as $class => $ids) {
                 $groups[$class] = array_values(array_unique([
                     ...($groups[$class] ?? []),
                     ...$ids,

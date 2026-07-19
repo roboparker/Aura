@@ -29,7 +29,7 @@ export const NOTIFICATION_ROWS: NotificationRow[] = [
   {
     key: "replies",
     label: "Replies in threads I follow",
-    description: "Replies inside discussion threads you're subscribed to.",
+    description: "Replies inside comment threads you're subscribed to.",
   },
   {
     key: "status",
@@ -50,7 +50,7 @@ export const NOTIFICATION_ROWS: NotificationRow[] = [
   {
     key: "budgets",
     label: "Budget alerts",
-    description: "An engagement you administer crosses 80% or 100% of its budget.",
+    description: "An project you administer crosses 80% or 100% of its budget.",
   },
 ];
 

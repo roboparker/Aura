@@ -27,10 +27,10 @@ class TimesheetApprovalTest extends ApiTestCase
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
-        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetSubmission')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\TimesheetApproval')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\TimeEntry')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\EngagementCategory')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Engagement')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Service')->execute();
+        $this->entityManager->createQuery('DELETE FROM App\Entity\Project')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Client')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceMembership')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -51,19 +51,19 @@ class TimesheetApprovalTest extends ApiTestCase
             'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagement = $client->request('POST', '/engagements', [
+        $project = $client->request('POST', '/projects', [
             'json' => [
                 'space' => $spaceIri,
                 'client' => $clientRow['@id'],
                 'name' => 'Acme Website',
                 'currency' => 'USD',
-                'categories' => [['name' => 'Dev', 'rateAmount' => 6000, 'position' => 0]],
+                'categories' => [['name' => 'Dev', 'billingRate' => 6000, 'position' => 0]],
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ])->toArray();
-        $engagementIri = $engagement['@id'];
-        $this->assertIsString($engagementIri);
-        $categories = $engagement['categories'] ?? null;
+        $projectIri = $project['@id'];
+        $this->assertIsString($projectIri);
+        $categories = $project['categories'] ?? null;
         $this->assertIsArray($categories);
         $firstCategory = $categories[0];
         $this->assertIsArray($firstCategory);
@@ -75,7 +75,7 @@ class TimesheetApprovalTest extends ApiTestCase
         $entry = $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-15T09:00:00+00:00',
                 'endedAt' => '2026-07-15T10:00:00+00:00',
@@ -109,7 +109,7 @@ class TimesheetApprovalTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-17T09:00:00+00:00',
                 'endedAt' => '2026-07-17T10:00:00+00:00',
@@ -124,7 +124,7 @@ class TimesheetApprovalTest extends ApiTestCase
         $client->request('POST', '/time_entries', [
             'json' => [
                 'space' => $spaceIri,
-                'engagement' => $engagementIri,
+                'project' => $projectIri,
                 'category' => $categoryIri,
                 'startedAt' => '2026-07-21T09:00:00+00:00',
                 'endedAt' => '2026-07-21T10:00:00+00:00',
