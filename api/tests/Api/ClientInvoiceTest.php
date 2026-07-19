@@ -627,6 +627,120 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame(2, $list['totalItems'] ?? null);
     }
 
+    public function testRecurringInvoiceStopsAfterCount(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceCount' => 1,
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $invoiceIri = $this->iri($invoice);
+
+        $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
+        // First run spawns the one allowed occurrence and ends the recurrence.
+        $this->assertSame(1, $spawner->spawnDue(new \DateTimeImmutable('today')));
+        // Second run finds nothing — the template is no longer recurring.
+        $this->assertSame(0, $spawner->spawnDue(new \DateTimeImmutable('today')));
+
+        // Recurrence ended: the now-null fields are skipped from the read payload.
+        $template = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertArrayNotHasKey('recurrenceFrequency', $template);
+        $this->assertArrayNotHasKey('recurrenceCount', $template);
+        $this->assertArrayNotHasKey('nextIssueDate', $template);
+
+        // Exactly one clone was produced (template + one draft).
+        $list = $client->request('GET', '/invoices?space=' . $spaceIri)->toArray();
+        $this->assertSame(2, $list['totalItems'] ?? null);
+    }
+
+    public function testRecurringInvoiceStopsAtEndDate(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        // Next issue 2020-01-01, ends 2020-01-15: after one monthly step the next
+        // occurrence (2020-02-01) falls past the end date, so recurrence stops.
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceEndDate' => '2020-01-15',
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $invoiceIri = $this->iri($invoice);
+
+        $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
+        $this->assertSame(1, $spawner->spawnDue(new \DateTimeImmutable('today')));
+        $this->assertSame(0, $spawner->spawnDue(new \DateTimeImmutable('today')));
+
+        // Recurrence ended: the now-null fields are skipped from the read payload.
+        $template = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertArrayNotHasKey('recurrenceFrequency', $template);
+        $this->assertArrayNotHasKey('recurrenceEndDate', $template);
+    }
+
+    public function testRecurringInvoiceRejectsTwoEndConditions(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceEndDate' => '2020-06-01',
+                'recurrenceCount' => 3,
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
     public function testInvoicePdfRenders(): void
     {
         $admin = $this->createUser('admin@example.com');

@@ -73,6 +73,10 @@ export interface Invoice {
   recurrenceFrequency: "weekly" | "monthly" | "yearly" | null;
   recurrenceInterval: number | null;
   nextIssueDate: string | null;
+  /** Optional recurrence end: stop once the next issue date passes this. */
+  recurrenceEndDate: string | null;
+  /** Optional recurrence end: remaining invoices to generate. */
+  recurrenceCount: number | null;
   remindersEnabled: boolean;
   remindersSentAt: string[] | null;
   sentAt: string | null;

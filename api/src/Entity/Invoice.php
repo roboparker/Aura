@@ -176,7 +176,10 @@ class Invoice
     /**
      * When set, this invoice is a recurring template: the sweep clones it into a
      * fresh draft each time {@see $nextIssueDate} arrives. One of weekly / monthly
-     * / yearly, repeated every {@see $recurrenceInterval}.
+     * / yearly, repeated every {@see $recurrenceInterval}. Recurrence runs forever
+     * unless an end condition is set — at most one of {@see $recurrenceEndDate}
+     * (stop once the next issue date passes it) or {@see $recurrenceCount}
+     * (remaining invoices to generate; decremented on each spawn).
      */
     #[ORM\Column(length: 10, nullable: true)]
     #[Assert\Choice(choices: self::FREQUENCIES, message: 'Invalid recurrence frequency.')]
@@ -191,6 +194,24 @@ class Invoice
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     #[Groups(['invoice:read', 'invoice:write'])]
     private ?\DateTimeImmutable $nextIssueDate = null;
+
+    /**
+     * "Until" end condition: recurrence stops once the advanced next issue date
+     * would pass this date. Mutually exclusive with {@see $recurrenceCount}.
+     */
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?\DateTimeImmutable $recurrenceEndDate = null;
+
+    /**
+     * "After N invoices" end condition: the number of invoices still to be
+     * generated from this template. Decremented on each spawn; recurrence ends
+     * when it reaches zero. Mutually exclusive with {@see $recurrenceEndDate}.
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    #[Assert\Positive]
+    #[Groups(['invoice:read', 'invoice:write'])]
+    private ?int $recurrenceCount = null;
 
     /**
      * @var Collection<int, InvoiceLineItem>
@@ -330,6 +351,25 @@ class Invoice
                     ->atPath('nextIssueDate')
                     ->addViolation();
             }
+            if (null !== $this->recurrenceEndDate && null !== $this->recurrenceCount) {
+                $context->buildViolation('Choose one end condition: an end date or a number of invoices, not both.')
+                    ->atPath('recurrenceEndDate')
+                    ->addViolation();
+            }
+            if (
+                null !== $this->recurrenceEndDate && null !== $this->nextIssueDate
+                && $this->recurrenceEndDate < $this->nextIssueDate
+            ) {
+                $context->buildViolation('The recurrence end date must be on or after the next issue date.')
+                    ->atPath('recurrenceEndDate')
+                    ->addViolation();
+            }
+        } elseif (null !== $this->recurrenceEndDate || null !== $this->recurrenceCount) {
+            // End conditions are meaningless without a recurrence — reject rather
+            // than silently store dangling values.
+            $context->buildViolation('An end condition requires a recurrence frequency.')
+                ->atPath('recurrenceFrequency')
+                ->addViolation();
         }
     }
 
@@ -386,6 +426,46 @@ class Invoice
     public function setNextIssueDate(?\DateTimeImmutable $nextIssueDate): self
     {
         $this->nextIssueDate = $nextIssueDate;
+
+        return $this;
+    }
+
+    public function getRecurrenceEndDate(): ?\DateTimeImmutable
+    {
+        return $this->recurrenceEndDate;
+    }
+
+    public function setRecurrenceEndDate(?\DateTimeImmutable $recurrenceEndDate): self
+    {
+        $this->recurrenceEndDate = $recurrenceEndDate;
+
+        return $this;
+    }
+
+    public function getRecurrenceCount(): ?int
+    {
+        return $this->recurrenceCount;
+    }
+
+    public function setRecurrenceCount(?int $recurrenceCount): self
+    {
+        $this->recurrenceCount = $recurrenceCount;
+
+        return $this;
+    }
+
+    /**
+     * Stops recurrence: clears the frequency/interval/next-issue-date and both
+     * end conditions so the template drops out of the due-recurring sweep and
+     * reads as a plain (non-recurring) invoice.
+     */
+    public function endRecurrence(): self
+    {
+        $this->recurrenceFrequency = null;
+        $this->recurrenceInterval = null;
+        $this->nextIssueDate = null;
+        $this->recurrenceEndDate = null;
+        $this->recurrenceCount = null;
 
         return $this;
     }
