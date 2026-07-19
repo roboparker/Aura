@@ -12,9 +12,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Enriches project reads with budget consumption (#651) — the transient
  * `budgetSpent` field the PWA's progress bars render — in one grouped query
- * per page, mirroring {@see DiscussionAggregateProvider}. Delegates to the
- * stock Doctrine providers so access scoping / pagination / 404s behave
- * exactly as before.
+ * per page. Delegates to the stock Doctrine providers so access scoping /
+ * pagination / 404s behave exactly as before.
  *
  * @implements ProviderInterface<Project>
  */

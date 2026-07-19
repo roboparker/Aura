@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 /**
  * Stamps the current user as the client's creator on create (preserved on
  * update), server-side rather than from the payload — matching
- * DiscussionAuthorProcessor's trust model.
+ * PageAuthorProcessor's trust model.
  *
  * @implements ProcessorInterface<Client, Client>
  */

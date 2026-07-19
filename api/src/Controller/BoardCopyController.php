@@ -42,8 +42,6 @@ use Symfony\Component\Uid\Uuid;
  *    custom field values are deliberately dropped — those are
  *    user-specific state, and CFV would need an old-CFD→new-CFD
  *    mapping that's a heavier slice on its own.
- *  - Discussions live at the space level — not board — so they're
- *    never carried along on a board copy.
  *
  * Auth bar: caller must be able to read the source (membership in
  * its space) AND be a member of the target space. Target defaults

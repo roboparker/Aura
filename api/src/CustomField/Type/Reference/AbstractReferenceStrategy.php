@@ -21,7 +21,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * Scope rule (#227-locked): every reference type scopes to the field's
  * space. `reference.user` resolves through `space.getEffectiveUsers()`;
- * the entity-backed subtypes (`task`, `page`, `discussion`) inner-join
+ * the entity-backed subtypes (`task`, `page`) inner-join
  * the target's `space` column. Cross-space references are rejected
  * during validation — a 404 from the API would be more familiar to
  * clients than a 422, but the validation layer is what catches the

@@ -36,14 +36,14 @@ const NAV_HEADING_CLASS = "border-l-2 border-l-transparent";
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
 // see UserMenu / Navbar. The sidebar carries the space switcher, the
-// active space's content sections (boards / pages / discussions),
+// active space's content sections (boards / pages),
 // and the admin section.
 
 // The shared section is now a list of accessible spaces (rendered
 // from ActiveSpaceContext at render time, since it's per-user state).
 // "All Spaces" is the only static entry — it's the management
 // surface; each space below is a link to its tabbed detail page
-// (#nav-refresh) which is itself the hub for boards, discussions,
+// (#nav-refresh) which is itself the hub for boards,
 // pages, and tasks inside that space.
 
 // Backend tooling surfaced inside the PWA chrome. The Mercure debugger
@@ -60,7 +60,7 @@ const ADMIN_EXTERNAL_LINKS =
     ? []
     : [{ href: "/.well-known/mercure/ui/", label: "Mercure" }];
 
-// The active space's content surfaces (Boards / Pages / Discussions)
+// The active space's content surfaces (Boards / Pages)
 // are rendered as their own sidebar sections from the shared
 // CONTENT_SECTIONS map (icon + color shared with the aggregator page
 // headers). Each heading links to its top-level aggregator (scoped to
@@ -81,8 +81,8 @@ interface ResourceRow {
 }
 
 /**
- * Fetch the active space's rows for one resource (`boards` / `pages`
- * / `discussions`), scoped by `?space=<iri>` — the same filter the
+ * Fetch the active space's rows for one resource (`boards` / `pages`),
+ * scoped by `?space=<iri>` — the same filter the
  * aggregators and SpaceContentTabs use.
  *
  * Keyed under the resource's react-query prefix (e.g. `["boards", …]`)

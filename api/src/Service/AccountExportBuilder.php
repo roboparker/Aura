@@ -14,7 +14,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Layout inside the archive:
  *
  *   account.json      — the requester's own data (profile, preferences,
- *                       tasks, boards, pages, discussions, comments, tags,
+ *                       tasks, boards, pages, comments, tags,
  *                       API tokens) plus an `attachments` manifest
  *   attachments/      — the actual files the user uploaded (avatar +
  *                       attachments), named "<mediaId>-<originalName>" so the

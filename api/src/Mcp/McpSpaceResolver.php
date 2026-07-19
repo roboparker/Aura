@@ -10,8 +10,8 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * Resolves the {@see Space} a tool call should write into.
  *
- * Spaces gate every higher-level content type (pages, discussions,
- * boards), but the existing PWA — and most quick "just jot this down"
+ * Spaces gate every higher-level content type (pages, boards),
+ * but the existing PWA — and most quick "just jot this down"
  * tool calls — don't supply one. So the rule mirrors the REST default:
  * an omitted space falls back to the caller's personal space (where
  * they're always an admin), and an explicit space id must be one the
