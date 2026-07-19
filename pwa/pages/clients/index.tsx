@@ -2,7 +2,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link2, PiggyBank, Plus, Users } from "lucide-react";
+import { Link2, Pencil, PiggyBank, Plus, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
@@ -26,6 +26,7 @@ const ClientsPage = () => {
   const queryClient = useQueryClient();
 
   const [showComposer, setShowComposer] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
@@ -53,37 +54,71 @@ const ClientsPage = () => {
   const clients = clientsQuery.data ?? [];
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["clients"] });
 
-  const createMutation = useMutation({
-    mutationFn: () => {
-      const rateMinor = defaultRate.trim() ? Math.round(parseFloat(defaultRate) * 100) : null;
-      return apiSend<Client>("POST", "/clients", {
-        errorMessage: "Failed to create client.",
-        body: {
-          name: name.trim(),
-          email: email.trim() || null,
-          address: address.trim() || null,
-          currency,
-          ...(rateMinor !== null ? { defaultRateAmount: rateMinor } : {}),
-          ...(spaceIri ? { space: spaceIri } : {}),
-        },
-      });
-    },
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setEmail("");
+    setAddress("");
+    setCurrency("USD");
+    setDefaultRate("");
+    setShowComposer(false);
+  };
+
+  const startCreate = () => {
+    resetForm();
+    setShowComposer(true);
+  };
+
+  const startEdit = (client: Client) => {
+    setEditingId(client.id);
+    setName(client.name);
+    setEmail(client.email ?? "");
+    setAddress(client.address ?? "");
+    setCurrency(client.currency ?? "USD");
+    setDefaultRate(
+      client.defaultRateAmount != null ? (client.defaultRateAmount / 100).toFixed(2) : "",
+    );
+    setActionError(null);
+    setShowComposer(true);
+  };
+
+  // The rate field is only cleared (→ null) when explicitly emptied on an edit;
+  // on create an empty field simply omits the key.
+  const clientBody = () => {
+    const rateMinor = defaultRate.trim() ? Math.round(parseFloat(defaultRate) * 100) : null;
+    return {
+      name: name.trim(),
+      email: email.trim() || null,
+      address: address.trim() || null,
+      currency,
+      defaultRateAmount: rateMinor,
+    };
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      editingId !== null
+        ? apiSend<Client>("PATCH", `/clients/${editingId}`, {
+            contentType: "application/merge-patch+json",
+            errorMessage: "Failed to save client.",
+            body: clientBody(),
+          })
+        : apiSend<Client>("POST", "/clients", {
+            errorMessage: "Failed to create client.",
+            body: { ...clientBody(), ...(spaceIri ? { space: spaceIri } : {}) },
+          }),
     onSuccess: () => {
-      setName("");
-      setEmail("");
-      setAddress("");
-      setDefaultRate("");
-      setShowComposer(false);
       setActionError(null);
+      resetForm();
       void refresh();
     },
-    onError: (e) => setActionError(e instanceof Error ? e.message : "Failed to create client."),
+    onError: (e) => setActionError(e instanceof Error ? e.message : "Failed to save client."),
   });
 
-  const handleCreate = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!name.trim()) return;
-    createMutation.mutate();
+    saveMutation.mutate();
   };
 
   // Client portal link (#674): mint/rotate, copy to clipboard, optional email.
@@ -153,6 +188,7 @@ const ClientsPage = () => {
   };
 
   const canCreate = can("invoices", "create");
+  const canUpdate = can("invoices", "update");
   const error = actionError || (clientsQuery.isError ? "Failed to load clients." : null);
 
   if (authLoading || !isAuthenticated) {
@@ -202,12 +238,12 @@ const ClientsPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Inline "Add client" row, pinned to the top. */}
-                    {canCreate &&
+                    {/* Inline add/edit client row, pinned to the top. */}
+                    {(canCreate || (canUpdate && editingId !== null)) &&
                       (showComposer ? (
                         <tr className="border-b bg-muted/10">
                           <td colSpan={5} className="px-4 py-4">
-                            <form onSubmit={handleCreate} className="space-y-4">
+                            <form onSubmit={handleSubmit} className="space-y-4">
                               <div className="space-y-1.5">
                                 <Label htmlFor="cl-name">Name</Label>
                                 <Input
@@ -279,33 +315,39 @@ const ClientsPage = () => {
                                   type="button"
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => setShowComposer(false)}
+                                  onClick={resetForm}
                                 >
                                   Cancel
                                 </Button>
                                 <Button
                                   type="submit"
                                   size="sm"
-                                  disabled={createMutation.isPending || !name.trim()}
+                                  disabled={saveMutation.isPending || !name.trim()}
                                 >
-                                  {createMutation.isPending ? "Saving…" : "Create client"}
+                                  {saveMutation.isPending
+                                    ? "Saving…"
+                                    : editingId !== null
+                                      ? "Save changes"
+                                      : "Create client"}
                                 </Button>
                               </div>
                             </form>
                           </td>
                         </tr>
                       ) : (
-                        <tr className="border-b">
-                          <td colSpan={5} className="px-4 py-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowComposer(true)}
-                              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-                            >
-                              <Plus className="h-4 w-4" /> Add client
-                            </button>
-                          </td>
-                        </tr>
+                        canCreate && (
+                          <tr className="border-b">
+                            <td colSpan={5} className="px-4 py-2">
+                              <button
+                                type="button"
+                                onClick={startCreate}
+                                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                              >
+                                <Plus className="h-4 w-4" /> Add client
+                              </button>
+                            </td>
+                          </tr>
+                        )
                       ))}
 
                     {clients.length === 0 ? (
@@ -326,6 +368,16 @@ const ClientsPage = () => {
                               : "—"}
                           </td>
                           <td className="whitespace-nowrap px-2 py-3 text-right">
+                            {canUpdate && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => startEdit(client)}
+                                title="Edit this client's details"
+                              >
+                                <Pencil className="h-3.5 w-3.5" /> Edit
+                              </Button>
+                            )}
                             {canCreate && (
                               <>
                                 <Button
