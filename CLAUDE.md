@@ -256,6 +256,7 @@ Developer docs:
 - `docs/developer/web-push.md` - Web Push (#100): PushSubscription, WebPushSender, the service worker + enable flow, VAPID key setup
 - `docs/developer/task-organization.md` - Task sections, the Kanban board view, and task relationships (entities, endpoints, validation, UI)
 - `docs/developer/billing.md` - Billing & the freemium gate: the Team plan, hybrid seat/usage caps, Stripe Checkout/Portal + webhook, enforcement flag, going-live setup
+- `docs/developer/time-tracking-invoicing.md` - Client-facing time tracking + invoicing: the Client→Project→Service→TimeEntry→Invoice chain, entities, endpoints, permission model, the payment-gateway registry, and the recurring/overdue jobs
 - `docs/developer/blog.md` - Public file-based blog: markdown posts + frontmatter, SSG rendering, SEO meta, generated sitemap, drafts
 
 User docs:
