@@ -590,6 +590,36 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertCount(2, $aEntity->getRemindersSentAt());
     }
 
+    public function testClientCanBeEdited(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $row = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $updated = $client->request('PATCH', $this->iri($row), [
+            'json' => [
+                'name' => 'Acme Corporation',
+                'email' => 'billing@acme.test',
+                'address' => "1 Loop\nCupertino",
+                'currency' => 'EUR',
+                'defaultRateAmount' => 15000,
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertSame('Acme Corporation', $updated['name'] ?? null);
+        $this->assertSame('billing@acme.test', $updated['email'] ?? null);
+        $this->assertSame('EUR', $updated['currency'] ?? null);
+        $this->assertSame(15000, $updated['defaultRateAmount'] ?? null);
+    }
+
     public function testRecurringInvoiceSpawnsAFreshDraft(): void
     {
         $admin = $this->createUser('admin@example.com');
