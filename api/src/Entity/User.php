@@ -52,7 +52,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
     #[ORM\CustomIdGenerator(class: 'doctrine.uuid_generator')]
-    #[Groups(['user:read', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?Uuid $id = null;
 
     // Settable on signup (`user:create`), but not on PATCH — changes
@@ -60,7 +60,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 180, unique: true)]
     #[Assert\NotBlank]
     #[Assert\Email]
-    #[Groups(['user:read', 'user:create', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'user:create', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $email = '';
 
     #[ORM\Column]
@@ -134,18 +134,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Given name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $givenName = '';
 
     #[ORM\Column(length: 100)]
     #[Assert\NotBlank(message: 'Family name is required.')]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $familyName = '';
 
     #[ORM\Column(length: 100, nullable: true)]
     #[Assert\Length(max: 100)]
-    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'user:write', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?string $nickname = null;
 
     /**
@@ -159,7 +159,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         choices: AvatarColorService::PALETTE,
         message: 'Pick a color from the available palette.',
     )]
-    #[Groups(['user:read', 'user:write', 'user:create', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
+    #[Groups(['user:read', 'user:write', 'user:create', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private string $personalizedColor = AvatarColorService::PALETTE[0];
 
     /**
@@ -296,7 +296,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         'tasks',
         'boards',
         'pages',
-        'discussions',
         'comments',
         'notifications',
         'files',
@@ -310,14 +309,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      * (an override for a specific id wins over its category default). Each
      * maps to one of IMPERSONATION_CATEGORIES.
      */
-    public const IMPERSONATION_ITEM_TYPES = ['board', 'page', 'task', 'discussion'];
+    public const IMPERSONATION_ITEM_TYPES = ['board', 'page', 'task'];
 
     /** @var array<string, string> item type → owning category */
     private const IMPERSONATION_ITEM_CATEGORY = [
         'board' => 'boards',
         'page' => 'pages',
         'task' => 'tasks',
-        'discussion' => 'discussions',
     ];
 
     /** The category an item-override type rolls up to, or null if unknown. */
@@ -370,7 +368,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
             'tasks' => 'none',
             'boards' => 'none',
             'pages' => 'none',
-            'discussions' => 'none',
             'comments' => 'none',
             'notifications' => 'none',
             'files' => 'none',
@@ -384,7 +381,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
             'board' => [],
             'page' => [],
             'task' => [],
-            'discussion' => [],
         ],
     ];
 
@@ -586,7 +582,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
      *
      * @return array<string, string>|null
      */
-    #[Groups(['user:read', 'board:read', 'group:read', 'task:read', 'comment:read', 'discussion:read', 'feedback:read', 'space:read', 'page:read', 'notification:read'])]
+    #[Groups(['user:read', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read'])]
     public function getAvatarUrls(): ?array
     {
         return $this->avatar?->getVariantUrls();

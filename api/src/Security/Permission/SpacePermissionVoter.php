@@ -9,7 +9,6 @@ use App\Entity\Project;
 use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
-use App\Entity\Discussion;
 use App\Entity\Estimate;
 use App\Entity\Expense;
 use App\Entity\ExpenseCategory;
@@ -88,7 +87,6 @@ final class SpacePermissionVoter extends Voter
             $subject instanceof Board => $subject->getSpace(),
             $subject instanceof Task => $subject->getBoard()?->getSpace(),
             $subject instanceof Page => $subject->getSpace(),
-            $subject instanceof Discussion => $subject->getSpace(),
             $subject instanceof CustomFieldDefinition => $subject->getSpace(),
             $subject instanceof Tag => $subject->getSpace(),
             $subject instanceof UserGroup => $subject->getSpace(),
@@ -116,10 +114,6 @@ final class SpacePermissionVoter extends Voter
         $page = $comment->getPage();
         if (null !== $page) {
             return $page->getSpace();
-        }
-        $discussion = $comment->getDiscussion();
-        if (null !== $discussion) {
-            return $discussion->getSpace();
         }
 
         return null;

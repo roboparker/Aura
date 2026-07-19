@@ -25,9 +25,9 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  * Unified comment thread (#228). Replaces the per-parent
  * `TaskComment` / `PageComment` split: every comment now lives in one
  * `comment` table with a polymorphic parent — `commentable_type`
- * discriminates between `'task'`, `'page'`, and `'discussion'`, and
- * exactly one of `task` / `page` / `discussion` is set to match. All
- * three are real FKs (rather than a single bare `commentable_id`) so
+ * discriminates between `'task'`, `'page'`, and `'feedback'`, and
+ * exactly one of `task` / `page` / `feedback` is set to match. All
+ * are real FKs (rather than a single bare `commentable_id`) so
  * we keep cascade-on-delete from the parent.
  *
  * Comments are flat (no reply tree) and ordered chronologically. The
@@ -36,19 +36,18 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  *
  * Access is parent-aware:
  *   - read: anyone who can read the parent (task accessibility OR
- *     page / discussion space membership).
- *   - post: same set as read. A locked discussion additionally
- *     refuses *new* comments (existing ones stay editable/deletable).
+ *     page space membership).
+ *   - post: same set as read.
  *   - edit: author only.
  *   - delete: author, OR an admin escalation suited to the parent —
  *     the task's owner can delete on tasks; the space-admin can
- *     delete on pages and discussions.
+ *     delete on pages.
  *
  * `@mention` tokens in `body` are scanned by
  * {@see App\Service\CommentMentionService} after persist and create
  * one `mention` Notification per resolved recipient. The recipient
- * set is derived from the parent (task: owner + board space; page /
- * discussion: the parent's space).
+ * set is derived from the parent (task: owner + board space; page:
+ * the parent's space).
  */
 #[ApiResource(
     shortName: 'Comment',
@@ -79,13 +78,12 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     denormalizationContext: ['groups' => ['comment:write']],
     order: ['createdAt' => 'ASC'],
 )]
-#[ApiFilter(SearchFilter::class, properties: ['task' => 'exact', 'page' => 'exact', 'discussion' => 'exact', 'feedback' => 'exact', 'commentableType' => 'exact'])]
+#[ApiFilter(SearchFilter::class, properties: ['task' => 'exact', 'page' => 'exact', 'feedback' => 'exact', 'commentableType' => 'exact'])]
 #[ApiFilter(OrderFilter::class, properties: ['createdAt'], arguments: ['orderParameterName' => 'order'])]
 #[ORM\Entity(repositoryClass: CommentRepository::class)]
 #[ORM\Table(name: 'comment')]
 #[ORM\Index(columns: ['task_id', 'created_at'], name: 'idx_comment_task_created')]
 #[ORM\Index(columns: ['page_id', 'created_at'], name: 'idx_comment_page_created')]
-#[ORM\Index(columns: ['discussion_id', 'created_at'], name: 'idx_comment_discussion_created')]
 #[ORM\Index(columns: ['feedback_id', 'created_at'], name: 'idx_comment_feedback_created')]
 #[ORM\Index(columns: ['search_vector'], name: 'idx_comment_search_vector', flags: ['gin'])]
 #[ORM\HasLifecycleCallbacks]
@@ -95,13 +93,11 @@ class Comment
 
     public const TYPE_TASK = 'task';
     public const TYPE_PAGE = 'page';
-    public const TYPE_DISCUSSION = 'discussion';
     public const TYPE_FEEDBACK = 'feedback';
 
     public const ALLOWED_TYPES = [
         self::TYPE_TASK,
         self::TYPE_PAGE,
-        self::TYPE_DISCUSSION,
         self::TYPE_FEEDBACK,
     ];
 
@@ -113,14 +109,14 @@ class Comment
     private ?Uuid $id = null;
 
     /**
-     * `'task'`, `'page'`, or `'discussion'` — discriminator for the
+     * `'task'`, `'page'`, or `'feedback'` — discriminator for the
      * polymorphic parent FK. Stamped server-side from whichever of
-     * `task` / `page` / `discussion` the client supplied; never
+     * `task` / `page` / `feedback` the client supplied; never
      * accepted directly on the wire so clients can't desync it from
-     * the FK trio.
+     * the FK set.
      */
     #[ORM\Column(name: 'commentable_type', length: 16)]
-    #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Parent type must be task, page, discussion, or feedback.')]
+    #[Assert\Choice(choices: self::ALLOWED_TYPES, message: 'Parent type must be task, page, or feedback.')]
     #[Groups(['comment:read'])]
     private string $commentableType = self::TYPE_TASK;
 
@@ -133,11 +129,6 @@ class Comment
     #[ORM\JoinColumn(name: 'page_id', nullable: true, onDelete: 'CASCADE')]
     #[Groups(['comment:read', 'comment:write'])]
     private ?Page $page = null;
-
-    #[ORM\ManyToOne(targetEntity: Discussion::class)]
-    #[ORM\JoinColumn(name: 'discussion_id', nullable: true, onDelete: 'CASCADE')]
-    #[Groups(['comment:read', 'comment:write'])]
-    private ?Discussion $discussion = null;
 
     #[ORM\ManyToOne(targetEntity: Feedback::class)]
     #[ORM\JoinColumn(name: 'feedback_id', nullable: true, onDelete: 'CASCADE')]
@@ -209,8 +200,6 @@ class Comment
             $this->commentableType = self::TYPE_TASK;
         } elseif (null !== $this->page) {
             $this->commentableType = self::TYPE_PAGE;
-        } elseif (null !== $this->discussion) {
-            $this->commentableType = self::TYPE_DISCUSSION;
         } elseif (null !== $this->feedback) {
             $this->commentableType = self::TYPE_FEEDBACK;
         }
@@ -237,7 +226,6 @@ class Comment
         if (null !== $task) {
             $this->commentableType = self::TYPE_TASK;
             $this->page = null;
-            $this->discussion = null;
             $this->feedback = null;
         }
         return $this;
@@ -254,24 +242,6 @@ class Comment
         if (null !== $page) {
             $this->commentableType = self::TYPE_PAGE;
             $this->task = null;
-            $this->discussion = null;
-            $this->feedback = null;
-        }
-        return $this;
-    }
-
-    public function getDiscussion(): ?Discussion
-    {
-        return $this->discussion;
-    }
-
-    public function setDiscussion(?Discussion $discussion): static
-    {
-        $this->discussion = $discussion;
-        if (null !== $discussion) {
-            $this->commentableType = self::TYPE_DISCUSSION;
-            $this->task = null;
-            $this->page = null;
             $this->feedback = null;
         }
         return $this;
@@ -289,20 +259,19 @@ class Comment
             $this->commentableType = self::TYPE_FEEDBACK;
             $this->task = null;
             $this->page = null;
-            $this->discussion = null;
         }
         return $this;
     }
 
     /**
-     * Returns the parent entity (Task, Page, Discussion, or Feedback)
-     * the comment is attached to, or null if none is set yet (during
+     * Returns the parent entity (Task, Page, or Feedback) the comment
+     * is attached to, or null if none is set yet (during
      * denormalization). Lets callers reach the parent without
      * branching on `commentableType`.
      */
-    public function getCommentable(): Task|Page|Discussion|Feedback|null
+    public function getCommentable(): Task|Page|Feedback|null
     {
-        return $this->task ?? $this->page ?? $this->discussion ?? $this->feedback;
+        return $this->task ?? $this->page ?? $this->feedback;
     }
 
     public function getAuthor(): ?User
@@ -340,7 +309,7 @@ class Comment
     /**
      * Whether `$user` can read this comment. Delegates to the parent
      * entity's own accessibility rule — task uses owner-or-space-
-     * member; page and discussion use space-member.
+     * member; page uses space-member.
      */
     public function isAccessibleBy(User $user): bool
     {
@@ -349,10 +318,6 @@ class Comment
         }
         if (null !== $this->page) {
             $space = $this->page->getSpace();
-            return null !== $space && $space->hasMember($user);
-        }
-        if (null !== $this->discussion) {
-            $space = $this->discussion->getSpace();
             return null !== $space && $space->hasMember($user);
         }
         // Feedback is an instance-level board: any authenticated user can
@@ -365,8 +330,8 @@ class Comment
 
     /**
      * Whether `$user` qualifies for the per-parent delete-escalation
-     * path: task owner on a task comment, space admin on a page or
-     * discussion comment. Feedback comments have no extra escalation —
+     * path: task owner on a task comment, space admin on a page
+     * comment. Feedback comments have no extra escalation —
      * author-self and platform admin (the security expression) are the
      * only deleters. Author-self deletion is handled by the security
      * expression separately.
@@ -384,25 +349,19 @@ class Comment
             $space = $this->page->getSpace();
             return null !== $space && $space->isAdmin($user);
         }
-        if (null !== $this->discussion) {
-            $space = $this->discussion->getSpace();
-            return null !== $space && $space->isAdmin($user);
-        }
         return false;
     }
 
     /**
-     * Exactly one of `task` / `page` / `discussion` must be set on
-     * save. Anything else (more than one, none) is rejected — the FK
-     * trio is the canonical parent reference and the discriminator
-     * follows.
+     * Exactly one of `task` / `page` / `feedback` must be set on save.
+     * Anything else (more than one, none) is rejected — the FK set is
+     * the canonical parent reference and the discriminator follows.
      */
     #[Assert\Callback]
     public function validateParent(ExecutionContextInterface $context): void
     {
         $set = (null !== $this->task ? 1 : 0)
             + (null !== $this->page ? 1 : 0)
-            + (null !== $this->discussion ? 1 : 0)
             + (null !== $this->feedback ? 1 : 0);
 
         if ($set > 1) {
@@ -412,28 +371,8 @@ class Comment
             return;
         }
         if (0 === $set) {
-            $context->buildViolation('A comment must reference a task, a page, a discussion, or a feedback ticket.')
+            $context->buildViolation('A comment must reference a task, a page, or a feedback ticket.')
                 ->atPath('task')
-                ->addViolation();
-        }
-    }
-
-    /**
-     * A locked discussion refuses *new* comments. The guard fires on
-     * insert only (`null === id`) so existing comments on a thread
-     * that was later locked stay editable and deletable; only fresh
-     * replies are turned away. Matches the PWA, which hides the
-     * composer behind the locked banner.
-     */
-    #[Assert\Callback]
-    public function validateNotLocked(ExecutionContextInterface $context): void
-    {
-        if (null !== $this->id) {
-            return;
-        }
-        if (null !== $this->discussion && $this->discussion->isLocked()) {
-            $context->buildViolation('This discussion is locked.')
-                ->atPath('discussion')
                 ->addViolation();
         }
     }

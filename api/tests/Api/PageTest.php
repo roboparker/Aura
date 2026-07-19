@@ -85,8 +85,7 @@ class PageTest extends ApiTestCase
         ]);
         // SpaceAccessExtension hides Alice's space from the stranger
         // during IRI resolution — denormalisation 400s before the
-        // securityPostDenormalize check fires. Same shape as the
-        // DiscussionTest non-member case.
+        // securityPostDenormalize check fires.
         $this->assertResponseStatusCodeSame(400);
     }
 

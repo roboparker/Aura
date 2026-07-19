@@ -33,9 +33,9 @@ use Symfony\Component\Validator\Constraints as Assert;
  * `createdBy` field is audit-only.
  *
  * PR 1 ships only the Space entity, its memberships, and a backfill
- * that links existing boards/discussions/custom-field-definitions to
+ * that links existing boards/custom-field-definitions to
  * their creator's personal space. The access-extension rewrite that
- * actually swaps Board/Discussion/CFD permissions over to space
+ * actually swaps Board/CFD permissions over to space
  * membership lands in PR 2 (#185).
  */
 #[ApiResource(

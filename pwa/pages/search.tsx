@@ -6,7 +6,6 @@ import {
   ChevronRight,
   Globe,
   Loader2,
-  MessageSquare,
   Plus,
   Search as SearchIcon,
   X,
@@ -18,12 +17,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { highlightMatches } from "@/lib/highlightMatches";
 import { parseQuery } from "@/lib/searchQuery";
 import { addRecentSearch } from "@/lib/recentSearches";
-import { formatRelative } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
-import CategoryBadge, {
-  type DiscussionCategory,
-} from "@/components/discussions/CategoryBadge";
-import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +26,7 @@ import { cn } from "@/lib/utils";
 // ---- Types ----
 type Status = "" | "open" | "completed";
 type Sort = "relevance" | "recent";
-type Kind = "tasks" | "boards" | "discussions";
+type Kind = "tasks" | "boards";
 
 interface SearchMatch {
   source: string;
@@ -61,18 +55,6 @@ interface BoardHit {
   id: string;
   title: string;
   description: string | null;
-}
-interface DiscussionHit {
-  "@id": string;
-  id: string;
-  title: string;
-  body: string;
-  category: DiscussionCategory;
-  isPinned: boolean;
-  isLocked: boolean;
-  createdAt: string;
-  commentCount?: number;
-  author: AvatarUser & { "@id": string; id: string };
 }
 interface AssignableUser {
   "@id": string;
@@ -104,11 +86,10 @@ interface FilterState {
 }
 
 const PAGE_SIZE = 20;
-const KINDS: Kind[] = ["tasks", "boards", "discussions"];
+const KINDS: Kind[] = ["tasks", "boards"];
 const KIND_LABEL: Record<Kind, string> = {
   tasks: "Tasks",
   boards: "Boards",
-  discussions: "Discussions",
 };
 
 const collectionMembers = <T,>(data: {
@@ -137,7 +118,7 @@ const readFilters = (q: Record<string, unknown>): FilterState => {
       : [];
   return {
     q: asString(q.q),
-    kind: (["tasks", "boards", "discussions"] as readonly string[]).includes(kindRaw)
+    kind: (["tasks", "boards"] as readonly string[]).includes(kindRaw)
       ? (kindRaw as Kind)
       : "tasks",
     status: (["open", "completed"] as readonly string[]).includes(asString(q.status))
@@ -177,8 +158,8 @@ const writeFilters = (f: FilterState): Record<string, string | string[]> => {
  * The space IRI to scope a given kind to, or null for global. Tasks are
  * owner-scoped and frequently standalone (no board → no space), so the
  * personal space never scopes tasks — that would hide every personal
- * task. Shared spaces scope tasks through `board.space`. Boards and
- * discussions are space-owned, so they scope to any active space.
+ * task. Shared spaces scope tasks through `board.space`. Boards are
+ * space-owned, so they scope to any active space.
  */
 const spaceFor = (kind: Kind, f: FilterState, activeSpace: Space | null): string | null => {
   if (f.scope !== "active" || !activeSpace) return null;
@@ -360,14 +341,6 @@ const SearchPage = () => {
           {filters.kind === "boards" && (
             <BoardResults filters={filters} activeSpace={activeSpace} onPage={(page) => replaceFilters({ page })} />
           )}
-          {filters.kind === "discussions" && (
-            <DiscussionResults
-              filters={filters}
-              activeSpace={activeSpace}
-              currentUserIri={`/users/${user.id}`}
-              onPage={(page) => replaceFilters({ page })}
-            />
-          )}
         </div>
       </main>
     </>
@@ -463,7 +436,6 @@ const KindTabs = ({
   const [counts, setCounts] = useState<Record<Kind, number | null>>({
     tasks: null,
     boards: null,
-    discussions: null,
   });
 
   useEffect(() => {
@@ -849,55 +821,6 @@ const BoardResults = ({
             {p.description && (
               <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{highlightMatches(snippet(p.description), filters.q)}</p>
             )}
-          </Link>
-        </li>
-      ))}
-    </ResultShell>
-  );
-};
-
-// ---- Discussion results ----
-const DiscussionResults = ({
-  filters,
-  activeSpace,
-  currentUserIri,
-  onPage,
-}: {
-  filters: FilterState;
-  activeSpace: Space | null;
-  currentUserIri: string;
-  onPage: (p: number) => void;
-}) => {
-  const url = buildUrl("discussions", filters, activeSpace, filters.page, PAGE_SIZE);
-  const { items, total, loading } = useResults<DiscussionHit>(url, true);
-  return (
-    <ResultShell loading={loading} count={items.length} total={total} page={filters.page} onPage={onPage} empty={<SimpleEmpty q={filters.q} />}>
-      {items.map((d) => (
-        <li key={d["@id"]} data-testid="search-result-row">
-          <Link href={`/discussions/${d.id}`} className="block px-4 py-3 no-underline transition-colors hover:bg-muted/40">
-            <div className="flex items-start gap-3">
-              <UserAvatar user={d.author} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm font-medium text-foreground">{highlightMatches(d.title, filters.q)}</span>
-                  <CategoryBadge category={d.category} />
-                </div>
-                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{highlightMatches(snippet(d.body), filters.q)}</p>
-                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{displayName(d.author)}</span>
-                  <span aria-hidden>·</span>
-                  <span className="inline-flex items-center gap-1">
-                    <MessageSquare className="h-3 w-3" />
-                    {d.commentCount ?? 0}
-                  </span>
-                  <span aria-hidden>·</span>
-                  <span>{formatRelative(d.createdAt)}</span>
-                  {currentUserIri === d.author["@id"] && (
-                    <span className="rounded bg-muted px-1 text-xs uppercase">you</span>
-                  )}
-                </div>
-              </div>
-            </div>
           </Link>
         </li>
       ))}

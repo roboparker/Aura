@@ -2420,8 +2420,8 @@ const BoardTaskRow = ({
         );
       case "assignees":
         return (
-          // Stacked, name-less avatars + a picker (matches the board, calendar,
-          // and the discussions participant stack).
+          // Stacked, name-less avatars + a picker (matches the board and
+          // calendar).
           <div className="flex h-full min-h-11 items-center px-2">
             <AssignMenu
               assignees={task.assignees}

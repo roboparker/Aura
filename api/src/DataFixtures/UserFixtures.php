@@ -54,7 +54,6 @@ class UserFixtures extends Fixture
             'tasks' => 'edit',
             'boards' => 'edit',
             'pages' => 'edit',
-            'discussions' => 'edit',
             'comments' => 'edit',
             'notifications' => 'edit',
             'files' => 'edit',

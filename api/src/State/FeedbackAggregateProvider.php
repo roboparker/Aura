@@ -18,7 +18,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * the net {@see Feedback::getScore() score} and the caller's own
  * {@see Feedback::getMyVote() vote} — without an N+1.
  *
- * Mirrors {@see DiscussionAggregateProvider}: delegate to the stock
+ * Delegates to the stock
  * Doctrine providers (so access scoping, pagination, filters, and item
  * 404s behave exactly as before), then run one grouped SUM over the page
  * of tickets for the score and one query for this user's votes on that

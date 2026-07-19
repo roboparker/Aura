@@ -10,8 +10,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Stamps the creator on a new {@see Page} (#183). Mirrors the
- * task-side {@see TaskOwnerProcessor} and discussion-side
- * {@see DiscussionAuthorProcessor} pattern — the field is read-only
+ * task-side {@see TaskOwnerProcessor} pattern — the field is read-only
  * on the wire, so the only authority for it is here.
  *
  * @implements ProcessorInterface<Page, Page>

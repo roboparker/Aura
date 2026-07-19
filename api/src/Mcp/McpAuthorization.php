@@ -2,7 +2,6 @@
 
 namespace App\Mcp;
 
-use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Task;
@@ -96,15 +95,5 @@ final class McpAuthorization
         }
         return true === $page->getSpace()?->hasMember($user)
             && $this->permissions->can($user, $page->getSpace(), SpacePermission::PAGES, SpacePermission::UPDATE);
-    }
-
-    /**
-     * Discussions read like the rest of their space: any space member
-     * can browse (#91/#185), now role-gated.
-     */
-    public function canReadDiscussion(Discussion $discussion, User $user): bool
-    {
-        return true === $discussion->getSpace()?->hasMember($user)
-            && $this->permissions->can($user, $discussion->getSpace(), SpacePermission::DISCUSSIONS, SpacePermission::READ);
     }
 }

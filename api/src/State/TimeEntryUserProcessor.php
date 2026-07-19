@@ -14,7 +14,7 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * Stamps the current user as the time entry's tracker on create, mirroring the
- * trust model of DiscussionAuthorProcessor / TaskOwnerProcessor — the owner is
+ * trust model of TaskOwnerProcessor — the owner is
  * set server-side, never from the payload. On update the existing owner is
  * preserved (the processor also runs on Patch), so a member can't reassign a
  * time entry to someone else.

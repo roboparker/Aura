@@ -11,7 +11,7 @@ interface Props {
 
 const PAGE_TITLE = "Blog — Madori";
 const PAGE_DESCRIPTION =
-  "Tips, tricks, and progress updates from the team building Madori — the API-first workspace for tasks, docs, and discussions.";
+  "Tips, tricks, and progress updates from the team building Madori — the API-first workspace for tasks, docs, and boards.";
 
 const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
   const canonical = `${origin}/blog`;

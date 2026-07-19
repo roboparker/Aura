@@ -384,7 +384,7 @@ const SpaceSettings = () => {
               <div className="min-w-0">
                 <p className="font-medium">Download everything in this space</p>
                 <p className="text-sm text-muted-foreground">
-                  Boards, tasks, pages, discussions, comments, and
+                  Boards, tasks, pages, comments, and
                   attachments, bundled as a zip. We&apos;ll email you a
                   download link when it&apos;s ready — links expire after 7
                   days.

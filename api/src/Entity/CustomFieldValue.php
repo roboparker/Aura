@@ -79,7 +79,7 @@ class CustomFieldValue
      * can hold any kind/subtype the strategy registry supports — string
      * for text/url/dropdown, int|float for numeric, ISO date string for
      * date, bool for boolean, `{amount, currency}` for money,
-     * `{user|task|page|discussion: "/iri/..."}` for references, and the
+     * `{user|task|page: "/iri/..."}` for references, and the
      * list-of-any-of-the-above shape when `config.multi=true`. Null is
      * a deliberate "no value" for a nullable field. Shape validation
      * lives in {@see App\Validator\ValidCustomFieldValues}.

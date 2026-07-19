@@ -26,7 +26,7 @@ use Symfony\Component\Uid\Uuid;
  * derived through `task.board.space`, so updating the board is
  * enough. Custom fields are space-owned now (#custom-fields-space) and
  * shared across a space's boards, so the board just picks up the
- * target space's fields. Discussions and pages are space-owned too and
+ * target space's fields. Pages are space-owned too and
  * aren't touched by this move.
  *
  * Audit history is preserved automatically: Board is `Loggable`,
@@ -96,7 +96,7 @@ class BoardMoveController extends AbstractController
         // Custom fields are space-owned now (#custom-fields-space) and
         // per-board shown: the board's selected fields belong to the SOURCE
         // space, so detach them on move — the target space's own fields can be
-        // opted into afterwards. Discussions/pages are space-owned, not moved.
+        // opted into afterwards. Pages are space-owned, not moved.
         $board->getCustomFieldDefinitions()->clear();
 
         $this->em->flush();

@@ -20,7 +20,7 @@ use Symfony\Component\Uid\Uuid;
  * `comment` (comment activity, via App\Service\NotificationDispatcher),
  * and `assigned` / `status` (task activity). Most carry an `actor` (the
  * user who triggered it) and resolve a deep-link `target` from whichever
- * of task / comment / discussion / page is set.
+ * of task / comment / page is set.
  *
  * Read access is per-user — App\Doctrine\NotificationRecipientExtension
  * scopes listings to the current recipient. The only client-writable
@@ -163,15 +163,6 @@ class Notification
     #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
     #[Groups(['notification:read'])]
     private ?Comment $comment = null;
-
-    /**
-     * Discussion this notification points at, when it isn't comment- or
-     * task-derived. Internal — the deep-link is exposed via the computed
-     * `targetUrl` getter rather than a raw IRI.
-     */
-    #[ORM\ManyToOne(targetEntity: Discussion::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
-    private ?Discussion $discussion = null;
 
     /**
      * Page this notification points at, when it isn't comment- or
@@ -357,17 +348,6 @@ class Notification
         return $this;
     }
 
-    public function getDiscussion(): ?Discussion
-    {
-        return $this->discussion;
-    }
-
-    public function setDiscussion(?Discussion $discussion): static
-    {
-        $this->discussion = $discussion;
-        return $this;
-    }
-
     public function getPage(): ?Page
     {
         return $this->page;
@@ -401,7 +381,7 @@ class Notification
         return $this->resolveTarget()['url'];
     }
 
-    /** Title of the linked entity (task / discussion / page title). */
+    /** Title of the linked entity (task / page title). */
     #[Groups(['notification:read'])]
     public function getTargetLabel(): ?string
     {
@@ -427,15 +407,10 @@ class Notification
                 $task = $comment->getTask();
             } elseif (null !== $comment->getPage()) {
                 return $this->pageTarget($comment->getPage());
-            } elseif (null !== $comment->getDiscussion()) {
-                return $this->discussionTarget($comment->getDiscussion());
             }
         }
         if (null !== $task) {
             return $this->taskTarget($task);
-        }
-        if (null !== $this->discussion) {
-            return $this->discussionTarget($this->discussion);
         }
         if (null !== $this->page) {
             return $this->pageTarget($this->page);
@@ -467,20 +442,6 @@ class Notification
             'url' => '/tasks',
             'label' => $task->getTitle(),
             'context' => null === $board ? 'Tasks' : $board->getTitle(),
-        ];
-    }
-
-    /**
-     * @return array{url: ?string, label: ?string, context: ?string}
-     */
-    private function discussionTarget(Discussion $discussion): array
-    {
-        $id = $discussion->getId();
-
-        return [
-            'url' => null === $id ? null : '/discussions/' . $id,
-            'label' => $discussion->getTitle(),
-            'context' => $discussion->getSpace()?->getName(),
         ];
     }
 

@@ -19,9 +19,6 @@ import {
   KeyRound,
   Link2,
   ListTodo,
-  MessageSquare,
-  MessagesSquare,
-  Pin,
   Plus,
   Receipt,
   Repeat,
@@ -453,16 +450,6 @@ const SpaceShowcaseMock = () => (
             House style
           </TileLine>
         </SpaceTile>
-        <SpaceTile icon={MessagesSquare} label="Discussions" count={3}>
-          <TileLine>
-            <Pin className="h-2.5 w-2.5 text-primary" />
-            Spring palette approval
-          </TileLine>
-          <TileLine dim>
-            <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
-            Earnest vs. playful?
-          </TileLine>
-        </SpaceTile>
       </div>
     </div>
   </Frame>
@@ -611,11 +598,6 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
     desc: "Long-form docs with a nested page tree and rich markdown — your handbook, retros, and specs.",
   },
   {
-    icon: MessagesSquare,
-    title: "Discussions",
-    desc: "Lightweight forum threads per space, with categories, pins, and live replies.",
-  },
-  {
     icon: Receipt,
     title: "Time & invoicing",
     desc: "Track time and expenses against clients, then turn them into branded invoices, estimates, and retainers — with reports and approvals.",
@@ -623,7 +605,7 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
   {
     icon: Search,
     title: "Search & ⌘K",
-    desc: "Full-text search across tasks, docs, and discussions — reachable from a command palette anywhere.",
+    desc: "Full-text search across tasks, docs, and boards — reachable from a command palette anywhere.",
   },
   {
     icon: Bell,
@@ -648,7 +630,7 @@ const STRIP: { icon: LucideIcon; label: string }[] = [
 const SPACE_BULLETS = [
   {
     b: "One Space, four surfaces.",
-    t: "Boards, tasks, pages, and discussions all live together — not scattered across five disconnected tools.",
+    t: "Boards, tasks, and pages all live together — not scattered across five disconnected tools.",
   },
   {
     b: "Invite once, see everything.",
@@ -684,7 +666,7 @@ const STEPS = [
   {
     n: "02",
     title: "Invite your team to a Space",
-    desc: "Add people or a group once — they see every board, page, and discussion inside.",
+    desc: "Add people or a group once — they see every board and page inside.",
   },
   {
     n: "03",
@@ -712,7 +694,7 @@ const Home = () => {
         <title>Madori — one calm place for your team&apos;s work</title>
         <meta
           name="description"
-          content="Madori brings tasks, boards, a calendar, long-form docs, and discussions — plus time tracking and invoicing — into shared Spaces. A calm, collaborative workspace for small teams."
+          content="Madori brings tasks, boards, a calendar, and long-form docs — plus time tracking and invoicing — into shared Spaces. A calm, collaborative workspace for small teams."
         />
       </Head>
 
@@ -755,7 +737,7 @@ const Home = () => {
                 <span className="text-primary">calm</span> place.
               </h1>
               <p className="mt-5 max-w-md text-base leading-relaxed text-muted-foreground">
-                Tasks, boards, a calendar, long-form docs, and discussions —
+                Tasks, boards, a calendar, and long-form docs —
                 organized into shared Spaces. No bloat, no busywork. Just the
                 work, and the people doing it.
               </p>
@@ -835,7 +817,7 @@ const Home = () => {
                 </h2>
                 <p className="mt-3 max-w-sm text-[15px] leading-relaxed text-muted-foreground">
                   A Space is a shared home for a team or an effort. It holds the
-                  boards, tasks, pages, and discussions that belong together.
+                  boards, tasks, and pages that belong together.
                 </p>
                 <div className="mt-6 flex flex-col gap-3.5">
                   {SPACE_BULLETS.map((x) => (

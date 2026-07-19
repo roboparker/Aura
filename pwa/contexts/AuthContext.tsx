@@ -79,7 +79,6 @@ export type ImpersonationCategory =
   | "tasks"
   | "boards"
   | "pages"
-  | "discussions"
   | "comments"
   | "notifications"
   | "files";
@@ -87,8 +86,7 @@ export type ImpersonationCategory =
 export type ImpersonationItemType =
   | "board"
   | "page"
-  | "task"
-  | "discussion";
+  | "task";
 
 export interface TwoFactorStatus {
   enabled: boolean;

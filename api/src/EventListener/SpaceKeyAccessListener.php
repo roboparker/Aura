@@ -32,7 +32,6 @@ final class SpaceKeyAccessListener
         'boards' => SpacePermission::BOARDS,
         'tasks' => SpacePermission::TASKS,
         'pages' => SpacePermission::PAGES,
-        'discussions' => SpacePermission::DISCUSSIONS,
         'comments' => SpacePermission::COMMENTS,
         'custom_field_definitions' => SpacePermission::CUSTOM_FIELDS,
         'custom_field_values' => SpacePermission::CUSTOM_FIELDS,

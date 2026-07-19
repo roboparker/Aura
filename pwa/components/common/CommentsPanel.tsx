@@ -41,10 +41,9 @@ interface CommentsPanelProps {
    *  escalation right (task owner / page space admin). */
   canModerate: boolean;
   /**
-   * Whether the composer is shown. Defaults to true. Discussions pass
-   * false on a locked thread so existing comments stay visible while
-   * new replies are turned away (mirrored by the server-side lock
-   * guard); `composerNotice` renders in the composer's place.
+   * Whether the composer is shown. Defaults to true. A caller can pass
+   * false to keep existing comments visible while new replies are turned
+   * away; `composerNotice` renders in the composer's place.
    */
   canCompose?: boolean;
   /** Rendered instead of the composer when `canCompose` is false. */
@@ -120,7 +119,7 @@ const CommentsPanel = ({
         <p className="text-xs text-muted-foreground">Loading comments…</p>
       ) : comments.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
-          No comments yet — start the discussion.
+          No comments yet — start the conversation.
         </p>
       ) : (
         <ul className="divide-y divide-border">

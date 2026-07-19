@@ -22,7 +22,7 @@ Building can take anywhere from a few seconds to a few minutes depending on how 
 
 A zip file containing:
 
-- **`account.json`** — your profile and preferences, plus the tasks, projects, pages, discussions, comments, tags, and API tokens you created.
+- **`account.json`** — your profile and preferences, plus the tasks, boards, pages, comments, tags, and API tokens you created.
 - **`attachments/`** — the files you uploaded, including your avatar.
 
 The export only contains **your own** data. Other people's content is referenced by an internal id where it overlaps with yours (for example, who else was assigned to one of your tasks), never their personal details.

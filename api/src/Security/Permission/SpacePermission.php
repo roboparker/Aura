@@ -27,7 +27,6 @@ final class SpacePermission
     public const BOARDS = 'boards';
     public const TASKS = 'tasks';
     public const PAGES = 'pages';
-    public const DISCUSSIONS = 'discussions';
     public const COMMENTS = 'comments';
     public const CUSTOM_FIELDS = 'custom_fields';
     public const TAGS = 'tags';
@@ -43,7 +42,6 @@ final class SpacePermission
         self::BOARDS,
         self::TASKS,
         self::PAGES,
-        self::DISCUSSIONS,
         self::COMMENTS,
         self::CUSTOM_FIELDS,
         self::TAGS,

@@ -13,8 +13,8 @@ use App\Repository\CommentRepository;
  * handled:
  *
  *  - `reply`   → everyone who previously commented in the same thread.
- *  - `comment` → the thread's owner (task owner / discussion author /
- *                page creator) when they aren't already a participant.
+ *  - `comment` → the thread's owner (task owner / page creator) when
+ *                they aren't already a participant.
  *
  * Runs *after* mentions so the dispatcher's one-row-per-comment dedup
  * enforces the precedence mention > reply > comment: a prior commenter
@@ -72,9 +72,6 @@ final class CommentActivityNotifier
         if (null !== $comment->getTask()) {
             return $comment->getTask()->getOwner();
         }
-        if (null !== $comment->getDiscussion()) {
-            return $comment->getDiscussion()->getAuthor();
-        }
         if (null !== $comment->getPage()) {
             return $comment->getPage()->getCreatedBy();
         }
@@ -89,9 +86,6 @@ final class CommentActivityNotifier
     {
         if (null !== $comment->getTask()) {
             return $comment->getTask()->getTitle();
-        }
-        if (null !== $comment->getDiscussion()) {
-            return $comment->getDiscussion()->getTitle();
         }
         if (null !== $comment->getPage()) {
             return $comment->getPage()->getTitle();

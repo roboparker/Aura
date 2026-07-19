@@ -159,7 +159,6 @@ class ImpersonationAccessTest extends ApiTestCase
             'tasks' => 'edit',
             'boards' => 'edit',
             'pages' => 'edit',
-            'discussions' => 'edit',
             'comments' => 'edit',
             'notifications' => 'edit',
             'files' => 'edit',

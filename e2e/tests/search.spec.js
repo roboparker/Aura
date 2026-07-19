@@ -125,9 +125,7 @@ test.describe("Search page + autocomplete", () => {
     await expect(page.getByTestId("search-result-count")).toContainText("2 results");
   });
 
-  test("kind tabs switch between tasks, boards, and discussions", async ({
-    page,
-  }) => {
+  test("kind tabs switch between tasks and boards", async ({ page }) => {
     const email = uniqueEmail("search-kinds");
     await registerAndSignIn(page, email);
 
@@ -135,7 +133,6 @@ test.describe("Search page + autocomplete", () => {
     const stamp = Date.now();
     const boardTitle = `Pinwheel board ${stamp}`;
     const taskTitle = `Pinwheel task ${stamp}`;
-    const discussionTitle = `Pinwheel discussion ${stamp}`;
 
     const boardRes = await page.request.post(`${BASE_URL}/boards`, {
       headers: ldHeaders,
@@ -149,25 +146,6 @@ test.describe("Search page + autocomplete", () => {
     });
     expect(taskRes.ok()).toBeTruthy();
 
-    const spacesRes = await page.request.get(`${BASE_URL}/spaces`, {
-      headers: { Accept: "application/ld+json" },
-    });
-    const spacesData = await spacesRes.json();
-    const personalSpace = (spacesData.member ?? spacesData["hydra:member"] ?? [])
-      .find((s) => s.isPersonal);
-    expect(personalSpace).toBeDefined();
-
-    const discussionRes = await page.request.post(`${BASE_URL}/discussions`, {
-      headers: ldHeaders,
-      data: {
-        space: personalSpace["@id"],
-        title: discussionTitle,
-        body: "Round and round it goes.",
-        category: "general",
-      },
-    });
-    expect(discussionRes.ok()).toBeTruthy();
-
     await page.goto(`${BASE_URL}/search?q=Pinwheel`);
     // Default tab is Tasks.
     await expect(page.getByTestId("search-results")).toContainText(taskTitle);
@@ -180,12 +158,6 @@ test.describe("Search page + autocomplete", () => {
     await expect(page.getByTestId("search-results")).toContainText(boardTitle);
     await expect(page.getByTestId("search-results")).not.toContainText(
       taskTitle,
-    );
-
-    await page.getByTestId("search-kind-discussions").click();
-    await expect(page).toHaveURL(/kind=discussions/);
-    await expect(page.getByTestId("search-results")).toContainText(
-      discussionTitle,
     );
 
     // Switching back to the Tasks tab drops the kind param from the URL

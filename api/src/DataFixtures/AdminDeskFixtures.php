@@ -8,7 +8,6 @@ use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
-use App\Entity\Discussion;
 use App\Entity\Project;
 use App\Entity\Service;
 use App\Entity\Estimate;
@@ -43,8 +42,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *  - **everything** — a fully-populated shared space with at least one of
  *    every content type: a board (with task sections, tasks — one recurring
  *    with a reminder, a custom field & value, a task relationship, and task
- *    comments), a page with a sub-page and a page comment, a discussion +
- *    comment, tags, groups, and the **full billing chain**: client (with a
+ *    comments), a page with a sub-page and a page comment, tags, groups,
+ *    and the **full billing chain**: client (with a
  *    portal link + address) → project (with a fees budget) with a
  *    category/rate → tracked time → a draft invoice, plus every
  *    Harvest-parity surface — invoice branding (logo/terms/number series),
@@ -246,20 +245,6 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
             (new Comment())->setPage($runbook)->setAuthor($emma)
                 ->setBody('Added the S3 lifecycle note under Backups.'),
         );
-
-        // Discussion + a reply.
-        $discussion = (new Discussion())
-            ->setSpace($desk)->setAuthor($ada)
-            ->setTitle('Welcome to the admin desk')
-            ->setBody('Use this space for housekeeping — ping me with questions.')
-            ->setCategory(Discussion::CATEGORY_ANNOUNCEMENTS)
-            ->setIsPinned(true);
-        $manager->persist($discussion);
-
-        $comment = (new Comment())
-            ->setDiscussion($discussion)->setAuthor($noah)
-            ->setBody('Thanks Ada — added the backup rotation step to the runbook.');
-        $manager->persist($comment);
 
         // Groups owned by this space (#groups-space).
         $ops = (new UserGroup())->setSpace($desk)->setTitle('Ops crew')->setSlug('ops')->setColor('#0d9488');

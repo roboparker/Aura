@@ -9,7 +9,6 @@ export type RegistryEntry = {
     | "Editor"
     | "User"
     | "Layout"
-    | "Discussions"
     | "Custom fields"
     | "Groups"
     | "Notifications"
@@ -53,7 +52,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "code-fence", name: "CodeFence", category: "Editor", description: "Syntax-highlighted code block with copy button and per-page theme switcher." },
   { slug: "code-theme-switcher", name: "CodeThemeSwitcher", category: "Editor", description: "Dropdown to pick the Prism palette for code fences; persisted to localStorage." },
   { slug: "user-avatar", name: "UserAvatar", category: "User", description: "Avatar with image fallback to personalized initials." },
-  { slug: "avatar-stack", name: "AvatarStack", category: "User", description: "Overlapping avatar cluster with a +N overflow chip." },
   { slug: "assignee-placeholder", name: "AssigneePlaceholder", category: "User", description: "Anonymous 'no one assigned' placeholder avatar (dashed square + UserPlus) for empty assignee affordances." },
   { slug: "page-header", name: "PageHeader", category: "Layout", description: "Shared top-of-page header: optional icon + title + count badge, subtitle, right-aligned actions, a search/filter toolbar slot, and a divider." },
   { slug: "impersonation-banner", name: "ImpersonationBanner", category: "Layout", description: "Amber bar shown while an admin impersonates another user; one-click stop. Renders nothing otherwise." },
@@ -68,8 +66,6 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "search-bar", name: "SearchBar", category: "Layout", description: "Navbar task search with debounced autocomplete; ⌘K opens the SearchOverlay palette." },
   { slug: "search-overlay", name: "SearchOverlay", category: "Layout", description: "⌘K command palette: suggestion chips, recent searches, keyboard nav." },
   { slug: "space-switcher", name: "SpaceSwitcher", category: "Layout", description: "Active-space dropdown that persists the choice via ActiveSpaceContext." },
-  { slug: "discussions-panel", name: "DiscussionsPanel", category: "Discussions", description: "Space discussion board: search, category filters, pinned/all table, participant stacks, reply counts, inline pin/lock/delete." },
-  { slug: "category-badge", name: "CategoryBadge", category: "Discussions", description: "Colored-dot pill naming a discussion's category." },
   { slug: "custom-fields-manager", name: "CustomFieldsManager", category: "Custom fields", description: "Owner-managed list + composer for per-board custom field definitions." },
   { slug: "group-tile", name: "GroupTile", category: "Groups", description: "Square colored tile with a grid glyph for a UserGroup avatar." },
   { slug: "notification-row", name: "NotificationRow", category: "Notifications", description: "Inbox row with unread/read/selected states and hover quick-actions." },

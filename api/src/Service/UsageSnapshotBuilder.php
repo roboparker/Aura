@@ -38,7 +38,6 @@ final class UsageSnapshotBuilder
         ['table' => 'board', 'owner' => 'owner_id', 'text' => ['title', 'description']],
         ['table' => 'page', 'owner' => 'created_by_id', 'text' => ['title', 'body']],
         ['table' => 'comment', 'owner' => 'author_id', 'text' => ['body']],
-        ['table' => 'discussion', 'owner' => 'author_id', 'text' => ['title', 'body']],
     ];
 
     public function __construct(

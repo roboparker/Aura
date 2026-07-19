@@ -22,8 +22,6 @@ const AUTHED_PATHS = [
   "/tasks",
   "/boards",
   `/boards/${PLACEHOLDER_UUID}`,
-  "/discussions",
-  `/discussions/${PLACEHOLDER_UUID}`,
   "/pages",
   `/pages/${PLACEHOLDER_UUID}`,
   "/spaces",

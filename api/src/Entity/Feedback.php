@@ -165,7 +165,7 @@ class Feedback
 
     /**
      * The user who filed the ticket — stamped server-side on POST, never
-     * trusted from the payload (same as Discussion.author). Reassigned to
+     * trusted from the payload (same as Page.createdBy). Reassigned to
      * the "Former member" sentinel on account deletion rather than
      * cascade-deleted, so the ticket survives.
      */

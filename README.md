@@ -7,9 +7,9 @@ Madori is an API-first task and project management app. The backend is a Symfony
 - **Spaces** — top-level containers for content, shared with users and groups; every account gets a non-deletable personal "Private" space.
 - **Projects** with markdown descriptions, per-project **custom fields** (typed columns with footer aggregations), and a detail view.
 - **Tasks** — inline-editable in a table grouped into **sections**, plus a **Kanban board view**; drag-to-reorder, due dates with recurrence + reminders, assignees, tags, **relationships** (parent / required / related / duplicate), a deep-linkable detail drawer, and a personal *My Tasks* view.
-- **Pages** (Notion-style docs) and **Discussions** (space forum threads), with unified **comments** and `@mentions`.
+- **Pages** (Notion-style docs) with unified **comments** and `@mentions`.
 - **Notifications** — an in-app inbox plus email (real-time or digest) and **web push**.
-- **Search** — Postgres full-text search across tasks, projects, and discussions, with a ⌘K command palette.
+- **Search** — Postgres full-text search across tasks and boards, with a ⌘K command palette.
 - **Groups** — reusable, owner-managed sets of users with email-based invitations. Invitees get a signup link and are auto-joined on registration.
 - **Accounts** — unified sign up / sign in, verified email-change, password reset, 2FA (TOTP + recovery codes), profile pictures, personalized avatar colors, API tokens, and a GDPR data export.
 - **MCP server** — a `POST /mcp` Model Context Protocol endpoint (Bearer-auth API tokens) so agents can drive the app.

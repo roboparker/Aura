@@ -4,7 +4,6 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\Comment;
-use App\Entity\Discussion;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\MediaObject;
@@ -45,7 +44,6 @@ class SpaceExportTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Page')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\Discussion')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\SpaceExport')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\MediaObject')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
@@ -68,7 +66,6 @@ class SpaceExportTest extends ApiTestCase
         $board = $this->createProject($alice, 'Launch plan', $space);
         $task = $this->createTask($alice, $board, 'Book the venue');
         $this->createComment($alice, $task, 'Deposit paid.');
-        $this->createDiscussion($alice, $space, 'Kickoff thread');
         $this->createPage($alice, $space, 'Runbook');
 
         // A space attachment exercises the streamed addFile() path.
@@ -111,7 +108,6 @@ class SpaceExportTest extends ApiTestCase
         $this->assertZipContains($path, 'boards.json', 'Launch plan');
         $this->assertZipContains($path, 'tasks.json', 'Book the venue');
         $this->assertZipContains($path, 'tasks.json', 'Deposit paid.');
-        $this->assertZipContains($path, 'discussions.json', 'Kickoff thread');
         $this->assertZipContains($path, 'pages.json', 'Runbook');
         $this->assertZipContains(
             $path,
@@ -415,18 +411,6 @@ class SpaceExportTest extends ApiTestCase
         $this->entityManager->persist($comment);
         $this->entityManager->flush();
         return $comment;
-    }
-
-    private function createDiscussion(User $author, Space $space, string $title): Discussion
-    {
-        $discussion = (new Discussion())
-            ->setAuthor($author)
-            ->setSpace($space)
-            ->setTitle($title)
-            ->setBody('Discussion body.');
-        $this->entityManager->persist($discussion);
-        $this->entityManager->flush();
-        return $discussion;
     }
 
     private function createPage(User $author, Space $space, string $title): Page

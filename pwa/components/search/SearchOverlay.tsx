@@ -4,7 +4,6 @@ import {
   AtSign,
   Clock,
   CornerDownLeft,
-  Megaphone,
   Search as SearchIcon,
   Sparkles,
   Trash2,
@@ -73,11 +72,6 @@ const SearchOverlay = () => {
   const suggestions = useMemo(() => {
     const items: { label: string; icon: typeof Clock; href: string }[] = [
       { label: "Overdue tasks", icon: Clock, href: "/search?kind=tasks&overdue=true" },
-      {
-        label: "Announcements this week",
-        icon: Megaphone,
-        href: "/search?kind=discussions&category=announcements",
-      },
     ];
     if (user) {
       items.push({

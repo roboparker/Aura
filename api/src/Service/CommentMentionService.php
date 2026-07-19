@@ -13,7 +13,6 @@ use App\Entity\User;
  *
  *  - task comments: task owner + board space members.
  *  - page comments: page's space members.
- *  - discussion comments: discussion's space members.
  *
  * Unknown handles are ignored silently — the spec treats them as
  * plain text rather than 4xx-ing so users can write `@TODO` or
@@ -150,17 +149,6 @@ final class CommentMentionService
             return $bag;
         }
 
-        $discussion = $comment->getDiscussion();
-        if (null !== $discussion) {
-            $space = $discussion->getSpace();
-            if (null !== $space) {
-                foreach ($space->getEffectiveUsers() as $member) {
-                    $bag[$this->localPart($member)] = $member;
-                }
-            }
-            return $bag;
-        }
-
         // Feedback is instance-level with no bounded membership, so the
         // mentionable set is just the ticket owner — enough to let a
         // commenter @-ping the person who filed it.
@@ -199,10 +187,6 @@ final class CommentMentionService
         $page = $comment->getPage();
         if (null !== $page) {
             return sprintf('%s mentioned you on "%s"', $name, $page->getTitle());
-        }
-        $discussion = $comment->getDiscussion();
-        if (null !== $discussion) {
-            return sprintf('%s mentioned you on "%s"', $name, $discussion->getTitle());
         }
         $feedback = $comment->getFeedback();
         if (null !== $feedback) {
