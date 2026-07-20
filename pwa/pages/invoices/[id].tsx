@@ -53,6 +53,9 @@ const InvoiceDetailPage = () => {
   const [freq, setFreq] = useState("");
   const [interval, setInterval] = useState("1");
   const [nextIssue, setNextIssue] = useState("");
+  const [endMode, setEndMode] = useState<"" | "date" | "count">("");
+  const [endDate, setEndDate] = useState("");
+  const [endCount, setEndCount] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -99,6 +102,19 @@ const InvoiceDetailPage = () => {
     setFreq(invoice.recurrenceFrequency ?? "");
     setInterval(String(invoice.recurrenceInterval ?? 1));
     setNextIssue(invoice.nextIssueDate ?? "");
+    if (invoice.recurrenceEndDate) {
+      setEndMode("date");
+      setEndDate(invoice.recurrenceEndDate);
+      setEndCount("");
+    } else if (invoice.recurrenceCount !== null) {
+      setEndMode("count");
+      setEndCount(String(invoice.recurrenceCount));
+      setEndDate("");
+    } else {
+      setEndMode("");
+      setEndDate("");
+      setEndCount("");
+    }
   }, [invoice]);
 
   const preview = useMemo(() => {
@@ -166,6 +182,9 @@ const InvoiceDetailPage = () => {
           recurrenceFrequency: recurring ? freq : null,
           recurrenceInterval: recurring ? parseInt(interval, 10) || 1 : null,
           nextIssueDate: recurring ? nextIssue || null : null,
+          recurrenceEndDate: recurring && endMode === "date" ? endDate || null : null,
+          recurrenceCount:
+            recurring && endMode === "count" ? parseInt(endCount, 10) || null : null,
         },
       });
       setNotice("Saved.");
@@ -593,6 +612,49 @@ const InvoiceDetailPage = () => {
                         </>
                       )}
                     </div>
+                    {freq !== "" && (
+                      <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="inv-end-mode">Ends</Label>
+                          <select
+                            id="inv-end-mode"
+                            value={endMode}
+                            onChange={(e) =>
+                              setEndMode(e.target.value as "" | "date" | "count")
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                          >
+                            <option value="">Never</option>
+                            <option value="date">On date</option>
+                            <option value="count">After N invoices</option>
+                          </select>
+                        </div>
+                        {endMode === "date" && (
+                          <div className="space-y-1.5">
+                            <Label htmlFor="inv-end-date">End date</Label>
+                            <Input
+                              id="inv-end-date"
+                              type="date"
+                              value={endDate}
+                              min={nextIssue || undefined}
+                              onChange={(e) => setEndDate(e.target.value)}
+                            />
+                          </div>
+                        )}
+                        {endMode === "count" && (
+                          <div className="space-y-1.5">
+                            <Label htmlFor="inv-end-count">Invoices</Label>
+                            <Input
+                              id="inv-end-count"
+                              type="number"
+                              min="1"
+                              value={endCount}
+                              onChange={(e) => setEndCount(e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <Button onClick={() => void save()} disabled={saving}>
                       {saving ? "Saving…" : "Save"}
                     </Button>

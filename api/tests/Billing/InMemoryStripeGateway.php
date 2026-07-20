@@ -18,15 +18,24 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
     public const CHECKOUT_URL = 'https://checkout.stripe.test/session';
     public const PAYMENT_URL = 'https://checkout.stripe.test/pay';
     public const PORTAL_URL = 'https://billing.stripe.test/portal';
+    public const ONBOARD_URL = 'https://connect.stripe.test/onboard';
 
     /** @var list<array{priceId: string, quantity: int, customerId: ?string, customerEmail: ?string, metadata: array<string, string>}> */
     public array $checkoutSessions = [];
 
-    /** @var list<array{amount: int, currency: string, description: string, metadata: array<string, string>}> */
+    /** @var list<array{amount: int, currency: string, description: string, metadata: array<string, string>, destination: ?string, fee: ?int}> */
     public array $paymentSessions = [];
 
     /** @var list<array{customerId: string, returnUrl: string}> */
     public array $portalSessions = [];
+
+    /** @var array<string, array{chargesEnabled: bool, detailsSubmitted: bool, payoutsEnabled: bool}> */
+    public array $connectAccounts = [];
+
+    /** @var list<array{account: string, refreshUrl: string, returnUrl: string}> */
+    public array $accountLinks = [];
+
+    private int $connectCounter = 0;
 
     /** @var list<string> Stripe subscription ids asked to cancel at period end. */
     public array $canceledSubscriptions = [];
@@ -69,15 +78,59 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         string $cancelUrl,
         ?string $customerEmail,
         array $metadata,
+        ?string $destinationAccountId = null,
+        ?int $applicationFeeAmount = null,
     ): string {
         $this->paymentSessions[] = [
             'amount' => $amount,
             'currency' => $currency,
             'description' => $description,
             'metadata' => $metadata,
+            'destination' => $destinationAccountId,
+            'fee' => $applicationFeeAmount,
         ];
 
         return self::PAYMENT_URL;
+    }
+
+    public function createConnectAccount(?string $email, ?string $country): string
+    {
+        $id = 'acct_test_' . (++$this->connectCounter);
+        // A fresh account starts un-onboarded; a test flips it ready via
+        // {@see markConnectReady()} (or the account.updated webhook).
+        $this->connectAccounts[$id] = [
+            'chargesEnabled' => false,
+            'detailsSubmitted' => false,
+            'payoutsEnabled' => false,
+        ];
+
+        return $id;
+    }
+
+    public function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): string
+    {
+        $this->accountLinks[] = ['account' => $accountId, 'refreshUrl' => $refreshUrl, 'returnUrl' => $returnUrl];
+
+        return self::ONBOARD_URL;
+    }
+
+    public function retrieveConnectAccount(string $accountId): array
+    {
+        return $this->connectAccounts[$accountId] ?? [
+            'chargesEnabled' => false,
+            'detailsSubmitted' => false,
+            'payoutsEnabled' => false,
+        ];
+    }
+
+    /** Test helper: mark a connected account fully onboarded. */
+    public function markConnectReady(string $accountId): void
+    {
+        $this->connectAccounts[$accountId] = [
+            'chargesEnabled' => true,
+            'detailsSubmitted' => true,
+            'payoutsEnabled' => true,
+        ];
     }
 
     public function createBillingPortalSession(string $customerId, string $returnUrl): string
@@ -123,6 +176,9 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         $this->portalSessions = [];
         $this->canceledSubscriptions = [];
         $this->immediatelyCanceledSubscriptions = [];
+        $this->connectAccounts = [];
+        $this->accountLinks = [];
+        $this->connectCounter = 0;
         $this->configured = true;
     }
 }

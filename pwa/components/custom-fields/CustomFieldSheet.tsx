@@ -413,7 +413,7 @@ const CustomFieldSheet = ({
         side="right"
         className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
         data-testid="custom-field-sheet"
-        onInteractOutside={(e) => {
+        onInteractOutside={(e: CustomEvent) => {
           const target = e.detail.originalEvent.target as HTMLElement | null;
           if (
             target?.closest(

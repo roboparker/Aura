@@ -590,6 +590,47 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertCount(2, $aEntity->getRemindersSentAt());
     }
 
+    public function testClientCanBeEdited(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $row = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+
+        $updated = $client->request('PATCH', $this->iri($row), [
+            'json' => [
+                'name' => 'Acme Corporation',
+                'email' => 'billing@acme.test',
+                'address' => "1 Loop\nCupertino",
+                'currency' => 'EUR',
+                'defaultRateAmount' => 15000,
+            ],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertSame('Acme Corporation', $updated['name'] ?? null);
+        $this->assertSame('billing@acme.test', $updated['email'] ?? null);
+        $this->assertSame('EUR', $updated['currency'] ?? null);
+        $this->assertSame(15000, $updated['defaultRateAmount'] ?? null);
+    }
+
+    /** Marks a space's Stripe Connect account ready via the live container EM. */
+    private function makeSpaceConnectReady(Space $space): void
+    {
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $fresh = $em->getRepository(Space::class)->find($space->getId());
+        assert($fresh instanceof Space);
+        $fresh->setStripeConnectAccountId('acct_test_ready')->setStripeConnectChargesEnabled(true);
+        $em->flush();
+    }
+
     public function testRecurringInvoiceSpawnsAFreshDraft(): void
     {
         $admin = $this->createUser('admin@example.com');
@@ -625,6 +666,120 @@ class ClientInvoiceTest extends ApiTestCase
         // Now two invoices: the template + the fresh draft clone.
         $list = $client->request('GET', '/invoices?space=' . $spaceIri)->toArray();
         $this->assertSame(2, $list['totalItems'] ?? null);
+    }
+
+    public function testRecurringInvoiceStopsAfterCount(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceCount' => 1,
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $invoiceIri = $this->iri($invoice);
+
+        $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
+        // First run spawns the one allowed occurrence and ends the recurrence.
+        $this->assertSame(1, $spawner->spawnDue(new \DateTimeImmutable('today')));
+        // Second run finds nothing — the template is no longer recurring.
+        $this->assertSame(0, $spawner->spawnDue(new \DateTimeImmutable('today')));
+
+        // Recurrence ended: the now-null fields are skipped from the read payload.
+        $template = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertArrayNotHasKey('recurrenceFrequency', $template);
+        $this->assertArrayNotHasKey('recurrenceCount', $template);
+        $this->assertArrayNotHasKey('nextIssueDate', $template);
+
+        // Exactly one clone was produced (template + one draft).
+        $list = $client->request('GET', '/invoices?space=' . $spaceIri)->toArray();
+        $this->assertSame(2, $list['totalItems'] ?? null);
+    }
+
+    public function testRecurringInvoiceStopsAtEndDate(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        // Next issue 2020-01-01, ends 2020-01-15: after one monthly step the next
+        // occurrence (2020-02-01) falls past the end date, so recurrence stops.
+        $invoice = $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceEndDate' => '2020-01-15',
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $this->assertResponseStatusCodeSame(201);
+        $invoiceIri = $this->iri($invoice);
+
+        $spawner = static::getContainer()->get(\App\Service\RecurringInvoiceSpawner::class);
+        $this->assertSame(1, $spawner->spawnDue(new \DateTimeImmutable('today')));
+        $this->assertSame(0, $spawner->spawnDue(new \DateTimeImmutable('today')));
+
+        // Recurrence ended: the now-null fields are skipped from the read payload.
+        $template = $client->request('GET', $invoiceIri)->toArray();
+        $this->assertArrayNotHasKey('recurrenceFrequency', $template);
+        $this->assertArrayNotHasKey('recurrenceEndDate', $template);
+    }
+
+    public function testRecurringInvoiceRejectsTwoEndConditions(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSharedSpace($admin);
+        $spaceIri = '/spaces/' . $space->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $clientRow = $client->request('POST', '/clients', [
+            'json' => ['space' => $spaceIri, 'name' => 'Acme Co', 'currency' => 'USD'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $client->request('POST', '/invoices', [
+            'json' => [
+                'space' => $spaceIri,
+                'client' => $clientRow['@id'],
+                'currency' => 'USD',
+                'recurrenceFrequency' => 'monthly',
+                'recurrenceInterval' => 1,
+                'nextIssueDate' => '2020-01-01',
+                'recurrenceEndDate' => '2020-06-01',
+                'recurrenceCount' => 3,
+                'lineItems' => [['description' => 'Retainer', 'quantity' => 1, 'unitAmount' => 20000]],
+            ],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
     }
 
     public function testInvoicePdfRenders(): void
@@ -687,6 +842,9 @@ class ClientInvoiceTest extends ApiTestCase
         ])->toArray();
         $token = $sent['token'];
         $this->assertIsString($token);
+
+        // Online pay requires the space to have completed Stripe Connect (#connect).
+        $this->makeSpaceConnectReady($space);
 
         // The public pay endpoint starts a Stripe checkout (in-memory in tests).
         $pay = $client->request('POST', '/public/invoices/' . $token . '/pay', [

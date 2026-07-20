@@ -13,6 +13,11 @@ use Doctrine\ORM\EntityManagerInterface;
  * or its lines' time-entry links) — then advances the template's next issue date
  * by one interval. One clone + one advance per template per run; a template
  * still due after that is picked up on the next daily run.
+ *
+ * A template with an end condition (#598) stops after this spawn when its
+ * remaining count hits zero or the advanced next issue date would pass its end
+ * date — {@see Invoice::endRecurrence()} clears the recurrence so it drops out
+ * of the sweep.
  */
 final class RecurringInvoiceSpawner
 {
@@ -57,10 +62,7 @@ final class RecurringInvoiceSpawner
             $clone->setSubtotal($subtotal)->setTaxAmount($tax)->setTotal($subtotal + $tax);
             $this->em->persist($clone);
 
-            $next = $template->getNextIssueDate();
-            if (null !== $next) {
-                $template->setNextIssueDate($next->modify($step));
-            }
+            $this->advanceOrEnd($template, $step);
             ++$spawned;
         }
 
@@ -69,5 +71,41 @@ final class RecurringInvoiceSpawner
         }
 
         return $spawned;
+    }
+
+    /**
+     * Advances the template to its next issue date, or ends the recurrence when
+     * an end condition (#598) is now satisfied. The clone for the current run
+     * has already been produced by the caller, so this only decides whether the
+     * template keeps recurring.
+     */
+    private function advanceOrEnd(Invoice $template, string $step): void
+    {
+        $next = $template->getNextIssueDate();
+        $advanced = null === $next ? null : $next->modify($step);
+
+        // "After N invoices": this run consumed one occurrence.
+        $count = $template->getRecurrenceCount();
+        if (null !== $count) {
+            $remaining = $count - 1;
+            if ($remaining < 1) {
+                $template->endRecurrence();
+
+                return;
+            }
+            $template->setRecurrenceCount($remaining)->setNextIssueDate($advanced);
+
+            return;
+        }
+
+        // "Until" date: stop once the next occurrence would fall past it.
+        $end = $template->getRecurrenceEndDate();
+        if (null !== $end && null !== $advanced && $advanced > $end) {
+            $template->endRecurrence();
+
+            return;
+        }
+
+        $template->setNextIssueDate($advanced);
     }
 }

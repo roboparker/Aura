@@ -108,7 +108,7 @@ export const ExportDataDialog = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
+    <Dialog open={open} onOpenChange={(o: boolean) => (o ? onOpenChange(true) : close())}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Export your data</DialogTitle>

@@ -458,11 +458,11 @@ const ProjectsPage = () => {
         )}
       </main>
 
-      <Sheet open={sheetFor !== null} onOpenChange={(o) => !o && closeSheet()} modal={false}>
+      <Sheet open={sheetFor !== null} onOpenChange={(o: boolean) => !o && closeSheet()} modal={false}>
         <SheetContent
           side="right"
           className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
-          onInteractOutside={(e) => {
+          onInteractOutside={(e: CustomEvent) => {
             const target = e.detail.originalEvent.target as HTMLElement | null;
             if (
               target?.closest(

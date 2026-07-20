@@ -294,6 +294,8 @@ class BillingController extends AbstractController
             $this->markInvoicePaid($object);
         } elseif ('invoice.payment_succeeded' === $type) {
             $this->sendSubscriptionReceipt($object);
+        } elseif ('account.updated' === $type) {
+            $this->syncConnectAccount($object);
         }
         // Any other event type is acknowledged and ignored.
 
@@ -395,6 +397,29 @@ class BillingController extends AbstractController
             $invoice->setStatus(Invoice::STATUS_PAID);
             $invoice->setPaidAt(new \DateTimeImmutable());
         }
+        $this->em->flush();
+    }
+
+    /**
+     * Mirror a connected account's onboarding state onto its space (#connect)
+     * off `account.updated`. Best-effort instant sync — the status endpoint's
+     * on-demand refresh is the reliable path, so an unresolved account here is
+     * just ignored.
+     *
+     * @param array<mixed, mixed> $account
+     */
+    private function syncConnectAccount(array $account): void
+    {
+        $accountId = $this->stringAt($account, ['id']);
+        if (null === $accountId) {
+            return;
+        }
+        $space = $this->em->getRepository(Space::class)->findOneBy(['stripeConnectAccountId' => $accountId]);
+        if (!$space instanceof Space) {
+            return;
+        }
+        $space->setStripeConnectChargesEnabled(true === $this->dig($account, ['charges_enabled']));
+        $space->setStripeConnectDetailsSubmitted(true === $this->dig($account, ['details_submitted']));
         $this->em->flush();
     }
 
