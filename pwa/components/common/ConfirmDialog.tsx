@@ -70,7 +70,7 @@ const ConfirmDialog = ({
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+      onOpenChange={(next: boolean) => (next ? onOpenChange(true) : close())}
     >
       <DialogContent className="sm:max-w-md" data-testid="confirm-dialog">
         <DialogHeader>

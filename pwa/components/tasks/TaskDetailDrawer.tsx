@@ -387,7 +387,7 @@ const TaskDetailDrawer = ({
         dim
         className="flex w-full flex-col gap-0 p-0 sm:max-w-xl"
         data-testid="task-detail-drawer"
-        onInteractOutside={(e) => {
+        onInteractOutside={(e: CustomEvent) => {
           const target = e.detail.originalEvent.target as HTMLElement | null;
           if (
             target?.closest(

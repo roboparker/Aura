@@ -93,8 +93,8 @@ const TwoFactorRecoveryInterstitial = () => {
     <Dialog open onOpenChange={() => undefined}>
       <DialogContent
         className="sm:max-w-md"
-        onInteractOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
+        onInteractOutside={(e: CustomEvent) => e.preventDefault()}
+        onEscapeKeyDown={(e: KeyboardEvent) => e.preventDefault()}
         showCloseButton={false}
         data-testid="2fa-recovery-interstitial"
       >

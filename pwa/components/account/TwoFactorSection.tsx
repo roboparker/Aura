@@ -350,7 +350,7 @@ const RegenerateConfirmDialog = ({ open, onOpenChange, onSuccess }: RegeneratePr
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
+      onOpenChange={(next: boolean) => {
         if (!next) setCodes(null);
         onOpenChange(next);
       }}

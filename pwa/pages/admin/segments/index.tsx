@@ -305,7 +305,7 @@ const AdminSegments: NextPage = () => {
 
       <Dialog
         open={createOpen}
-        onOpenChange={(o) => {
+        onOpenChange={(o: boolean) => {
           setCreateOpen(o);
           if (!o) resetDraft();
         }}
