@@ -234,7 +234,7 @@ const AdminUsers: NextPage = () => {
         </div>
       </div>
 
-      <Dialog open={target !== null} onOpenChange={(o) => !o && setTarget(null)}>
+      <Dialog open={target !== null} onOpenChange={(o: boolean) => !o && setTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Impersonate this user?</DialogTitle>

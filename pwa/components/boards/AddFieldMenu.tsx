@@ -61,7 +61,7 @@ const AddFieldMenu = ({ hiddenFields, onEnable, onCreate }: AddFieldMenuProps) =
   return (
     <Popover
       open={open}
-      onOpenChange={(o) => {
+      onOpenChange={(o: boolean) => {
         setOpen(o);
         if (!o) setQuery("");
       }}

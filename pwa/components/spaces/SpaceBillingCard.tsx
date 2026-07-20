@@ -306,7 +306,7 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
         )}
       </CardContent>
 
-      <Dialog open={cancelOpen} onOpenChange={(o) => (o ? setCancelOpen(true) : closeCancel())}>
+      <Dialog open={cancelOpen} onOpenChange={(o: boolean) => (o ? setCancelOpen(true) : closeCancel())}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancel Team subscription</DialogTitle>

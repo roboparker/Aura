@@ -294,7 +294,7 @@ const AccountBillingCard = ({ endpointBase, upgradeLabel, upgradeBlurb, enterpri
         )}
       </CardContent>
 
-      <Dialog open={cancelOpen} onOpenChange={(o) => (o ? setCancelOpen(true) : closeCancel())}>
+      <Dialog open={cancelOpen} onOpenChange={(o: boolean) => (o ? setCancelOpen(true) : closeCancel())}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancel subscription</DialogTitle>

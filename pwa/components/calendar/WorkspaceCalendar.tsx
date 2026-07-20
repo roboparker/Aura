@@ -383,7 +383,7 @@ const WorkspaceCalendar = ({
       </DndContext>
 
       {/* Recurring drag → this occurrence vs the whole series. */}
-      <Dialog open={pendingDrag !== null} onOpenChange={(open) => !open && setPendingDrag(null)}>
+      <Dialog open={pendingDrag !== null} onOpenChange={(open: boolean) => !open && setPendingDrag(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Move recurring task</DialogTitle>

@@ -95,7 +95,7 @@ const CreateApiTokenDialog = ({
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => (next ? onOpenChange(true) : close())}
+      onOpenChange={(next: boolean) => (next ? onOpenChange(true) : close())}
     >
       <DialogContent>
         {created ? (
