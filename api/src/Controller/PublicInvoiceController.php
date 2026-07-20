@@ -117,6 +117,12 @@ class PublicInvoiceController extends AbstractController
         if (null === $gateway || !$gateway->isConfigured()) {
             return $this->json(['error' => 'Online payment is not available.'], 503);
         }
+        // The invoice's business must have completed Stripe Connect onboarding,
+        // so the payment settles to them rather than the platform (#connect).
+        $space = $invoice->getSpace();
+        if (null === $space || !$space->canAcceptClientPayments()) {
+            return $this->json(['error' => 'This business has not set up online payments yet.'], 503);
+        }
 
         $base = rtrim($this->frontendUrl, '/') . '/i/' . $token;
         try {

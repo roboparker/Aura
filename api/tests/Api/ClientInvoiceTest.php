@@ -620,6 +620,17 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame(15000, $updated['defaultRateAmount'] ?? null);
     }
 
+    /** Marks a space's Stripe Connect account ready via the live container EM. */
+    private function makeSpaceConnectReady(Space $space): void
+    {
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+        $fresh = $em->getRepository(Space::class)->find($space->getId());
+        assert($fresh instanceof Space);
+        $fresh->setStripeConnectAccountId('acct_test_ready')->setStripeConnectChargesEnabled(true);
+        $em->flush();
+    }
+
     public function testRecurringInvoiceSpawnsAFreshDraft(): void
     {
         $admin = $this->createUser('admin@example.com');
@@ -831,6 +842,9 @@ class ClientInvoiceTest extends ApiTestCase
         ])->toArray();
         $token = $sent['token'];
         $this->assertIsString($token);
+
+        // Online pay requires the space to have completed Stripe Connect (#connect).
+        $this->makeSpaceConnectReady($space);
 
         // The public pay endpoint starts a Stripe checkout (in-memory in tests).
         $pay = $client->request('POST', '/public/invoices/' . $token . '/pay', [

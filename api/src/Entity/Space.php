@@ -306,6 +306,24 @@ class Space
     private ?int $invoiceNumberNext = null;
 
     /**
+     * The space's Stripe Connect (Express) account id — where client invoice
+     * payments settle (#connect). Written server-side only by the onboarding
+     * controller + the `account.updated` webhook; never on the wire (a raw
+     * `acct_…` leaking to every member is pointless), so readiness is surfaced
+     * through `GET /spaces/{id}/connect/status` instead of a read group.
+     */
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $stripeConnectAccountId = null;
+
+    /** Stripe says the connected account can accept charges (onboarding done). */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $stripeConnectChargesEnabled = false;
+
+    /** The account has submitted its onboarding details (may still be pending review). */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $stripeConnectDetailsSubmitted = false;
+
+    /**
      * Transient list of email addresses to invite at creation time —
      * consumed by {@see SpaceCreateProcessor}, never persisted. Validated
      * inline so a single bad address fails the whole create with 422
@@ -418,6 +436,51 @@ class Space
         $this->invoiceTerms = $invoiceTerms;
 
         return $this;
+    }
+
+    public function getStripeConnectAccountId(): ?string
+    {
+        return $this->stripeConnectAccountId;
+    }
+
+    public function setStripeConnectAccountId(?string $stripeConnectAccountId): static
+    {
+        $this->stripeConnectAccountId = $stripeConnectAccountId;
+
+        return $this;
+    }
+
+    public function isStripeConnectChargesEnabled(): bool
+    {
+        return $this->stripeConnectChargesEnabled;
+    }
+
+    public function setStripeConnectChargesEnabled(bool $enabled): static
+    {
+        $this->stripeConnectChargesEnabled = $enabled;
+
+        return $this;
+    }
+
+    public function isStripeConnectDetailsSubmitted(): bool
+    {
+        return $this->stripeConnectDetailsSubmitted;
+    }
+
+    public function setStripeConnectDetailsSubmitted(bool $submitted): static
+    {
+        $this->stripeConnectDetailsSubmitted = $submitted;
+
+        return $this;
+    }
+
+    /**
+     * Whether client invoice payments can be collected online for this space:
+     * a connected account exists and Stripe has enabled charges on it.
+     */
+    public function canAcceptClientPayments(): bool
+    {
+        return null !== $this->stripeConnectAccountId && $this->stripeConnectChargesEnabled;
     }
 
     public function getInvoiceNumberPrefix(): ?string

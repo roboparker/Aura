@@ -17,6 +17,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import SpaceBillingCard from "@/components/spaces/SpaceBillingCard";
+import SpaceConnectCard from "@/components/spaces/SpaceConnectCard";
 import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
 import ExpenseCategoriesCard from "@/components/spaces/ExpenseCategoriesCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
@@ -369,6 +370,10 @@ const SpaceSettings = () => {
         {BILLING_ENABLED && !space.isPersonal && (
           <SpaceBillingCard spaceId={space.id} />
         )}
+
+        {/* Payments — collect client invoice payments via Stripe Connect
+            (#connect). Personal spaces don't invoice clients. */}
+        {!space.isPersonal && <SpaceConnectCard spaceId={space.id} />}
 
         {/* Invoice branding (#669): logo, terms, numbering. */}
         <InvoiceBrandingCard space={space} onSaved={load} />
