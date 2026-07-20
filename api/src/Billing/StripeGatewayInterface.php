@@ -47,6 +47,12 @@ interface StripeGatewayInterface
      * subscription checkout above. $metadata rides onto the session + payment
      * intent so the webhook can resolve our invoice.
      *
+     * When $destinationAccountId is set the charge is created on the platform
+     * but funds settle to that Stripe Connect account (a destination charge),
+     * with an optional $applicationFeeAmount (minor units) kept by the platform.
+     * Because the charge stays on the platform, the completion webhook fires on
+     * the platform account like every other payment.
+     *
      * @param int                   $amount   in minor units of $currency
      * @param array<string, string> $metadata
      */
@@ -58,7 +64,31 @@ interface StripeGatewayInterface
         string $cancelUrl,
         ?string $customerEmail,
         array $metadata,
+        ?string $destinationAccountId = null,
+        ?int $applicationFeeAmount = null,
     ): string;
+
+    /**
+     * Create a Stripe Connect **Express** account and return its `acct_…` id.
+     * The space owner completes onboarding through the hosted Account Link
+     * ({@see createAccountLink}); Stripe collects their identity + payout
+     * details, so we never touch bank data.
+     */
+    public function createConnectAccount(?string $email, ?string $country): string;
+
+    /**
+     * Create a single-use hosted onboarding (Account Link) URL for a connected
+     * account. `$refreshUrl` is where Stripe sends the user if the link expires
+     * before they finish; `$returnUrl` is where it sends them when they're done.
+     */
+    public function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): string;
+
+    /**
+     * Read a connected account's onboarding state.
+     *
+     * @return array{chargesEnabled: bool, detailsSubmitted: bool, payoutsEnabled: bool}
+     */
+    public function retrieveConnectAccount(string $accountId): array;
 
     /**
      * Create a Billing Portal session for an existing customer and return its

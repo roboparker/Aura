@@ -95,6 +95,12 @@ parameters:
     app.free_space_member_limit: 5
     app.billing_enforcement_enabled: false
 
+    # Platform fee kept on each client invoice paid through a space's Stripe
+    # Connect account, in basis points (100 = 1%). 0 = the platform takes no
+    # cut. Env-overridable so the business rate is a deploy knob, not a release.
+    app.stripe_connect_application_fee_bps: '%env(int:default:app.stripe_connect_application_fee_bps_default:STRIPE_CONNECT_FEE_BPS)%'
+    app.stripe_connect_application_fee_bps_default: 0
+
 services:
     # default configuration for services in *this* file
     _defaults:

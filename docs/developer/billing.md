@@ -171,3 +171,41 @@ an API resource). The PWA mirrors the reason list in
   are always honored; only *new* adds/invites are blocked at the cap.
 - **Individual Pro ($8/mo)** plan is deferred; the Team product covers launch.
 - **Group attach** to a Space isn't cap-checked yet.
+
+## Client payments via Stripe Connect (#connect)
+
+The billing above is Madori charging **users**. A separate flow lets users
+charge **their own clients** and have the money settle to them, not the
+platform — Stripe **Connect** with **Express** connected accounts, one per
+`Space` (the billable unit invoices already belong to).
+
+- **Model**: `Space.stripeConnectAccountId` + `stripeConnectChargesEnabled` +
+  `stripeConnectDetailsSubmitted` (server-written only; never serialized —
+  readiness is exposed through the status endpoint). `Space::canAcceptClient
+  Payments()` = has an account AND charges are enabled.
+- **Onboarding** (`App\Controller\ConnectController`, space-admin): `POST
+  /spaces/{id}/connect/onboard` creates the Express account (once) and returns a
+  hosted **Account Link** URL — Stripe collects identity + bank details, we
+  never touch them. `GET /spaces/{id}/connect/status` (any member) reports
+  `none | incomplete | pending | ready`, refreshing from Stripe on each call.
+- **Payment routing**: `StripePaymentGateway::createInvoicePayment` routes the
+  public-pay checkout to the space's connected account as a **destination
+  charge** (`payment_intent_data.transfer_data.destination`), so funds settle to
+  the space owner while the completion webhook still fires on the *platform*
+  (`checkout.session.completed` → `markInvoicePaid`, unchanged). An optional
+  platform cut rides via `application_fee_amount`, sized by
+  `app.stripe_connect_application_fee_bps` (env `STRIPE_CONNECT_FEE_BPS`, basis
+  points, default `0` = no fee).
+- **Gate**: `PublicInvoiceController::pay` 503s ("this business has not set up
+  online payments yet") unless the space is Connect-ready — so a client payment
+  can never silently land in the platform account. Sending/emailing an invoice
+  and recording payments manually (mark-paid) are unaffected.
+- **Webhook**: `account.updated` mirrors `charges_enabled` / `details_submitted`
+  onto the space (best-effort; the status endpoint's refresh is the reliable
+  path).
+- **PWA**: `SpaceConnectCard` on `/spaces/{id}/settings` — a "Payments" card with
+  a Not-set-up / Pending / Active badge and a "Set up payments" button that hands
+  off to Stripe onboarding (`?connect=return|refresh` banners on the way back).
+- **Going live**: enable Connect + Express in the Stripe dashboard; the same
+  `STRIPE_SECRET_KEY` is used. Tests swap `App\Tests\Billing\InMemoryStripe
+  Gateway`. Tests: `App\Tests\Api\ConnectTest`.

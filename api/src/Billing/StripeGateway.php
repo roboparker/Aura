@@ -88,7 +88,19 @@ final class StripeGateway implements StripeGatewayInterface
         string $cancelUrl,
         ?string $customerEmail,
         array $metadata,
+        ?string $destinationAccountId = null,
+        ?int $applicationFeeAmount = null,
     ): string {
+        $paymentIntentData = ['metadata' => $metadata];
+        if (null !== $destinationAccountId) {
+            // Destination charge: created on the platform, funds transferred to
+            // the connected account. Keeps the completion webhook on the platform.
+            $paymentIntentData['transfer_data'] = ['destination' => $destinationAccountId];
+            if (null !== $applicationFeeAmount && $applicationFeeAmount > 0) {
+                $paymentIntentData['application_fee_amount'] = min($applicationFeeAmount, max(0, $amount));
+            }
+        }
+
         $body = [
             'mode' => 'payment',
             'line_items' => [
@@ -106,7 +118,7 @@ final class StripeGateway implements StripeGatewayInterface
             // Stamp our invoice id on both the session and the payment intent so
             // the checkout.session.completed webhook resolves it without a retrieve.
             'metadata' => $metadata,
-            'payment_intent_data' => ['metadata' => $metadata],
+            'payment_intent_data' => $paymentIntentData,
         ];
         if (null !== $customerEmail) {
             $body['customer_email'] = $customerEmail;
@@ -119,6 +131,58 @@ final class StripeGateway implements StripeGatewayInterface
         }
 
         return $url;
+    }
+
+    public function createConnectAccount(?string $email, ?string $country): string
+    {
+        $body = [
+            'type' => 'express',
+            'capabilities' => [
+                'card_payments' => ['requested' => 'true'],
+                'transfers' => ['requested' => 'true'],
+            ],
+        ];
+        if (null !== $email && '' !== $email) {
+            $body['email'] = $email;
+        }
+        if (null !== $country && '' !== $country) {
+            $body['country'] = strtoupper($country);
+        }
+
+        $data = $this->request('POST', '/accounts', $body);
+        $id = $data['id'] ?? null;
+        if (!is_string($id) || '' === $id) {
+            throw new BillingException('Stripe did not return a connected account id.');
+        }
+
+        return $id;
+    }
+
+    public function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): string
+    {
+        $data = $this->request('POST', '/account_links', [
+            'account' => $accountId,
+            'refresh_url' => $refreshUrl,
+            'return_url' => $returnUrl,
+            'type' => 'account_onboarding',
+        ]);
+        $url = $data['url'] ?? null;
+        if (!is_string($url) || '' === $url) {
+            throw new BillingException('Stripe did not return an onboarding URL.');
+        }
+
+        return $url;
+    }
+
+    public function retrieveConnectAccount(string $accountId): array
+    {
+        $data = $this->request('GET', '/accounts/' . rawurlencode($accountId), []);
+
+        return [
+            'chargesEnabled' => true === ($data['charges_enabled'] ?? false),
+            'detailsSubmitted' => true === ($data['details_submitted'] ?? false),
+            'payoutsEnabled' => true === ($data['payouts_enabled'] ?? false),
+        ];
     }
 
     public function createBillingPortalSession(string $customerId, string $returnUrl): string
