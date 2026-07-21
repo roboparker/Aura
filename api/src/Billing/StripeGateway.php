@@ -25,7 +25,15 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final class StripeGateway implements StripeGatewayInterface
 {
     private const API_BASE = 'https://api.stripe.com/v1';
+    private const API_BASE_V2 = 'https://api.stripe.com/v2';
     private const WEBHOOK_TOLERANCE_SECONDS = 300;
+
+    /**
+     * Stripe-Version pinned for the Accounts v2 calls (Connect). v2 endpoints
+     * require an explicit version header; kept in sync with the account's
+     * dashboard/webhook API version.
+     */
+    private const CONNECT_API_VERSION = '2026-06-24.dahlia';
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -135,21 +143,43 @@ final class StripeGateway implements StripeGatewayInterface
 
     public function createConnectAccount(?string $email, ?string $country): string
     {
+        // Accounts v2 (POST /v2/core/accounts): a "recipient"-configured account
+        // that receives destination-charge transfers into its Stripe balance and
+        // onboards through the Stripe-hosted flow. The legacy v1 `type: express`
+        // create is deprecated and rejected for new Connect platforms. See
+        // https://docs.stripe.com/connect/accounts-v2.
         $body = [
-            'type' => 'express',
-            'capabilities' => [
-                'card_payments' => ['requested' => 'true'],
-                'transfers' => ['requested' => 'true'],
+            'dashboard' => 'express',
+            'configuration' => [
+                'recipient' => [
+                    'capabilities' => [
+                        'stripe_balance' => [
+                            'stripe_transfers' => ['requested' => true],
+                        ],
+                    ],
+                ],
             ],
+            // For a recipient-only account the platform (application) is the
+            // merchant of record on destination charges, so it collects fees +
+            // covers losses — Stripe rejects any other value for this config.
+            'defaults' => [
+                'responsibilities' => [
+                    'fees_collector' => 'application',
+                    'losses_collector' => 'application',
+                ],
+            ],
+            'include' => ['configuration.recipient'],
         ];
         if (null !== $email && '' !== $email) {
-            $body['email'] = $email;
+            $body['contact_email'] = $email;
         }
-        if (null !== $country && '' !== $country) {
-            $body['country'] = strtoupper($country);
-        }
+        // v2 requires identity.country before the recipient config can be set
+        // (v1 collected it during onboarding). Default to US when the caller
+        // doesn't supply one; the hosted flow still collects the rest.
+        $countryCode = null !== $country && '' !== $country ? $country : 'US';
+        $body['identity'] = ['country' => strtolower($countryCode)];
 
-        $data = $this->request('POST', '/accounts', $body);
+        $data = $this->requestV2('POST', '/core/accounts', $body);
         $id = $data['id'] ?? null;
         if (!is_string($id) || '' === $id) {
             throw new BillingException('Stripe did not return a connected account id.');
@@ -160,6 +190,8 @@ final class StripeGateway implements StripeGatewayInterface
 
     public function createAccountLink(string $accountId, string $refreshUrl, string $returnUrl): string
     {
+        // The v1 Account Links resource is the documented hosted-onboarding tool
+        // for v2 accounts too — the `account` value just comes from a v2 create.
         $data = $this->request('POST', '/account_links', [
             'account' => $accountId,
             'refresh_url' => $refreshUrl,
@@ -176,12 +208,30 @@ final class StripeGateway implements StripeGatewayInterface
 
     public function retrieveConnectAccount(string $accountId): array
     {
-        $data = $this->request('GET', '/accounts/' . rawurlencode($accountId), []);
+        // Accounts v2 exposes readiness through the recipient configuration's
+        // stripe_transfers capability rather than v1's charges_enabled flags.
+        $data = $this->requestV2(
+            'GET',
+            '/core/accounts/' . rawurlencode($accountId) . '?include=configuration.recipient',
+            [],
+        );
 
+        // Safely dig configuration.recipient.capabilities.stripe_balance.stripe_transfers.status
+        $config = $data['configuration'] ?? null;
+        $recipient = is_array($config) ? ($config['recipient'] ?? null) : null;
+        $capabilities = is_array($recipient) ? ($recipient['capabilities'] ?? null) : null;
+        $balance = is_array($capabilities) ? ($capabilities['stripe_balance'] ?? null) : null;
+        $transfers = is_array($balance) ? ($balance['stripe_transfers'] ?? null) : null;
+        $status = is_array($transfers) && isset($transfers['status']) && is_string($transfers['status'])
+            ? $transfers['status']
+            : '';
+
+        // `active` = can receive transfers (settle destination charges); `pending`
+        // = submitted, under review. Anything else = not yet usable.
         return [
-            'chargesEnabled' => true === ($data['charges_enabled'] ?? false),
-            'detailsSubmitted' => true === ($data['details_submitted'] ?? false),
-            'payoutsEnabled' => true === ($data['payouts_enabled'] ?? false),
+            'chargesEnabled' => 'active' === $status,
+            'detailsSubmitted' => in_array($status, ['active', 'pending'], true),
+            'payoutsEnabled' => 'active' === $status,
         ];
     }
 
@@ -301,6 +351,53 @@ final class StripeGateway implements StripeGatewayInterface
             $error = $data['error'] ?? null;
             if (is_array($error) && isset($error['message']) && is_string($error['message'])) {
                 $message = $error['message'];
+            }
+            throw new BillingException('Stripe error: ' . $message);
+        }
+
+        /** @var array<string, mixed> $data */
+        return $data;
+    }
+
+    /**
+     * Like {@see request()} but for the Accounts v2 surface: JSON request bodies
+     * (not form-encoded) and the pinned `Stripe-Version` header. GET carries no
+     * body; query params (e.g. `?include=…`) ride on `$path`.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return array<string, mixed>
+     */
+    private function requestV2(string $method, string $path, array $body): array
+    {
+        if (!$this->isConfigured()) {
+            throw new BillingException('Stripe is not configured.');
+        }
+
+        try {
+            $options = [
+                'auth_bearer' => $this->secretKey,
+                'headers' => ['Stripe-Version' => self::CONNECT_API_VERSION],
+            ];
+            if ('GET' !== $method) {
+                $options['json'] = $body;
+            }
+            $response = $this->httpClient->request($method, self::API_BASE_V2 . $path, $options);
+            $status = $response->getStatusCode();
+            $data = $response->toArray(false);
+        } catch (\Throwable $e) {
+            throw new BillingException('Stripe request failed: ' . $e->getMessage(), 0, $e);
+        }
+
+        if ($status >= 400) {
+            $message = 'HTTP ' . $status;
+            $error = $data['error'] ?? null;
+            if (is_array($error) && isset($error['message']) && is_string($error['message'])) {
+                $message = $error['message'];
+            }
+            // v2 errors may put the message at the top level instead of under `error`.
+            if ('HTTP ' . $status === $message && isset($data['message']) && is_string($data['message'])) {
+                $message = $data['message'];
             }
             throw new BillingException('Stripe error: ' . $message);
         }
