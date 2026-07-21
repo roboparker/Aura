@@ -101,31 +101,108 @@ flattened to Stripe's bracket notation by HttpClient automatically.
 # api/config/services.yaml
 app.free_mcp_daily_limit: 100
 app.free_space_member_limit: 5
-app.billing_enforcement_enabled: false   # flip on once Stripe is live
+# Enforcement is env-driven (default off) — flip it at go-live with the
+# BILLING_ENFORCEMENT_ENABLED env, no code deploy.
+app.billing_enforcement_enabled: '%env(bool:default:app.billing_enforcement_enabled_default:BILLING_ENFORCEMENT_ENABLED)%'
 ```
 
 ```dotenv
-# api/.env (blank = billing disabled; the gateway no-ops and endpoints 503)
-STRIPE_SECRET_KEY=          # sk_test_... / sk_live_...
-STRIPE_WEBHOOK_SECRET=      # whsec_... from the dashboard webhook endpoint
-STRIPE_PRICE_TEAM_MONTHLY=  # price_... (Team product, monthly)
-STRIPE_PRICE_TEAM_YEARLY=   # price_... (Team product, yearly)
+# api/.env (blank = billing disabled; the gateway no-ops and endpoints 503).
+# Override in .env.local (dev) or the server env (compose.yaml env blocks) for
+# staging/prod — NOT the tracked api/.env.
+STRIPE_SECRET_KEY=              # sk_test_... / sk_live_...
+STRIPE_WEBHOOK_SECRET=          # whsec_... from the dashboard webhook endpoint
+STRIPE_PRICE_PRO_MONTHLY=       # price_... (Pro plan, monthly) — + _YEARLY
+STRIPE_PRICE_BUSINESS_MONTHLY=  # price_... (Business per-seat) — + _YEARLY
+STRIPE_CONNECT_FEE_BPS=         # platform fee on client-invoice Connect payments, bps (blank/0 = none)
+BILLING_ENFORCEMENT_ENABLED=    # blank/false = caps dark; `true` at go-live
 ```
 
-## Going live (one-time Stripe setup)
+Connect (client invoice payments) reuses `STRIPE_SECRET_KEY` — no separate key.
+See the **Client payments via Stripe Connect** section below for the full model.
 
-1. Create a Stripe account; in **test mode** first.
-2. Create a **Product "Team"** with a monthly recurring **Price** (and an
-   optional yearly one). Copy the `price_...` ids.
-3. Add a **webhook endpoint** → `https://<host>/billing/webhook`, subscribed to
-   `customer.subscription.created`, `customer.subscription.updated`,
-   `customer.subscription.deleted`, and `invoice.payment_succeeded` (the last
-   drives the receipt email — `SubscriptionReceiptMailer`; without it billing
-   still works, users just don't get an emailed receipt). Copy the signing
-   secret (`whsec_...`).
-4. Set the four `STRIPE_*` env vars on the server (and the price ids).
-5. Flip `app.billing_enforcement_enabled` to `true` and deploy.
-6. Smoke-test with a Stripe test card, then switch the keys to live mode.
+## The webhook events
+
+`POST /billing/webhook` dispatches on six event types. Subscribe your endpoint
+to all of them:
+
+| Event | Drives |
+| --- | --- |
+| `customer.subscription.created` / `.updated` / `.deleted` | subscription state sync (`Subscription` rows) |
+| `invoice.payment_succeeded` | subscription receipt email (`SubscriptionReceiptMailer`) |
+| `checkout.session.completed` | **marks a client invoice paid** after Checkout (`markInvoicePaid`) — required for online invoice pay |
+| `account.updated` | **Connect** onboarding readiness sync onto the `Space` |
+
+The last two are easy to forget; without `checkout.session.completed` an online
+invoice payment succeeds at Stripe but never flips the invoice to paid.
+
+## Stripe Sandboxes ⚠️ (Connect gotcha)
+
+Stripe's Connect onboarding wizard funnels you into a **separate sandbox account**
+(its own `acct_…` + its own API keys), *not* your main account's test mode. Connect
+enabled in that sandbox does **not** reach a key issued by the main account, and
+the main account only gains Connect once the platform is **activated** (go-live /
+"Verify your account"). So there are two clean setups — pick per environment:
+
+### Local — test memberships **and** invoicing/Connect together
+
+Point local at the **sandbox** that has Connect set up (one account covers both
+flows).
+
+1. **Keys go in the repo-root `./.env`** (gitignored) — *not* `api/.env.local`.
+   Compose substitutes `${STRIPE_*}` from root `./.env` into the `php`/`worker`
+   containers, and that real container env **overrides** Symfony's `api/.env*`
+   dotenv files — so a key in `api/.env.local` gets shadowed by compose's empty
+   value. Set on the sandbox's values (Developers → API keys, **inside the
+   sandbox** account picker):
+   ```dotenv
+   STRIPE_SECRET_KEY=sk_test_…          # the sandbox's secret key
+   STRIPE_PRICE_PRO_MONTHLY=price_…     # prices you create IN THE SANDBOX
+   STRIPE_PRICE_PRO_YEARLY=price_…      #   (price ids are per-account — main-
+   STRIPE_PRICE_BUSINESS_MONTHLY=price_…#    account price ids 404 with the
+   STRIPE_PRICE_BUSINESS_YEARLY=price_… #    sandbox key → "No such price")
+   STRIPE_WEBHOOK_SECRET=whsec_…        # from `stripe listen`, step 3
+   ```
+   Invoicing/Connect needs only `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`;
+   the `STRIPE_PRICE_*` are only for **membership** checkout.
+2. Recreate the containers so they pick up the new env:
+   ```bash
+   docker compose up -d
+   # verify (no secret shown): docker compose exec php sh -lc 'echo ${STRIPE_SECRET_KEY:0:8}'  → sk_test_
+   ```
+3. Forward Stripe webhooks to the local app with the **Stripe CLI** — leave it
+   **running** in its own terminal for the whole test session (close it and
+   `checkout.session.completed` never arrives, so paid invoices don't flip):
+   ```bash
+   stripe listen --api-key sk_test_YOUR_SANDBOX_KEY \
+     --forward-to https://localhost/billing/webhook --skip-verify
+   ```
+   - `--api-key` targets the **sandbox** directly (no `stripe login` account
+     juggling); `--skip-verify` accepts the self-signed `localhost` cert.
+   - It prints `Ready! Your webhook signing secret is whsec_…` — that value is
+     stable per account; put it in `STRIPE_WEBHOOK_SECRET` and `up -d` again.
+4. `APP_FRONTEND_URL=https://localhost` (already the default) so Connect Account
+   Link return/refresh URLs point back at the local app.
+
+Then exercise both: subscribe to a plan (memberships), and on a space you admin
+`/spaces/{id}/settings → Set up payments` → Express onboarding → pay an invoice
+with test card `4242 4242 4242 4242` (any future expiry / CVC / ZIP). Watch the
+`stripe listen` window log the event and the invoice flip to **paid**.
+
+### Production — go live
+
+1. **Activate** your Stripe platform (Verify your account → Go live: business /
+   KYC + agreements). This also activates **Connect** on the live account, so
+   client-invoice payments settle to connected accounts.
+2. Create **live** products/prices → copy the live `price_…` ids.
+3. Add a **live** webhook → `https://<host>/billing/webhook` with all six events
+   above → copy the live `whsec_…`.
+4. Set `STRIPE_SECRET_KEY` (`sk_live_…`), `STRIPE_WEBHOOK_SECRET`, and the price
+   ids in **`compose.yaml`'s `php` + `worker` `environment:` blocks** — not just
+   `/opt/aura/.env` (the recurring gotcha; env there alone doesn't reach the
+   containers).
+5. Set `BILLING_ENFORCEMENT_ENABLED=true` (same env blocks) if you want the free
+   caps to bite. Redeploy.
 
 ## Testing
 

@@ -87,13 +87,14 @@ parameters:
     # plan is per-seat, billed to a Space; a free shared space is capped on
     # both members and MCP throughput for its members, and an entitling
     # subscription lifts both. `billing_enforcement_enabled` ships OFF so the
-    # gate can land + deploy dark before Stripe is live — flip it on (here or
-    # via a future env binding) once checkout works. dev + test keep it off so
-    # local work and the suite aren't gated; the limiter is unit-tested by
-    # constructing it directly with enforcement on.
+    # gate can land + deploy dark before Stripe is live — flip it on at go-live
+    # with the `BILLING_ENFORCEMENT_ENABLED` env (a prod-env knob, no code
+    # deploy). Unset/blank keeps it off, so dev + test aren't gated; the limiter
+    # is unit-tested by constructing it directly with enforcement on.
     app.free_mcp_daily_limit: 100
     app.free_space_member_limit: 5
-    app.billing_enforcement_enabled: false
+    app.billing_enforcement_enabled: '%env(bool:default:app.billing_enforcement_enabled_default:BILLING_ENFORCEMENT_ENABLED)%'
+    app.billing_enforcement_enabled_default: false
 
     # Platform fee kept on each client invoice paid through a space's Stripe
     # Connect account, in basis points (100 = 1%). 0 = the platform takes no

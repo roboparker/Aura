@@ -69,8 +69,9 @@ interface StripeGatewayInterface
     ): string;
 
     /**
-     * Create a Stripe Connect **Express** account and return its `acct_…` id.
-     * The space owner completes onboarding through the hosted Account Link
+     * Create a Stripe Connect (Accounts v2, recipient-configured) account and
+     * return its `acct_…` id. It receives destination-charge transfers; the
+     * space owner completes onboarding through the hosted Account Link
      * ({@see createAccountLink}); Stripe collects their identity + payout
      * details, so we never touch bank data.
      */

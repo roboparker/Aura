@@ -136,6 +136,109 @@ class StripeGatewayTest extends TestCase
         $gateway->createBillingPortalSession('cus_1', 'https://back');
     }
 
+    public function testCreatePaymentCheckoutWithConnectDestinationReturnsUrl(): void
+    {
+        $response = new MockResponse((string) json_encode(['url' => 'https://checkout.stripe.test/pay1']));
+        $gateway = new StripeGateway(new MockHttpClient([$response]), 'sk_test', self::SECRET);
+
+        $url = $gateway->createPaymentCheckout(
+            5000,
+            'usd',
+            'Invoice INV-1',
+            'https://ok',
+            'https://no',
+            'client@x.test',
+            ['invoice_id' => 'inv1'],
+            'acct_dest',
+            150,
+        );
+
+        $this->assertSame('https://checkout.stripe.test/pay1', $url);
+        $this->assertStringContainsString('/checkout/sessions', $response->getRequestUrl());
+    }
+
+    public function testCreateConnectAccountReturnsIdViaV2(): void
+    {
+        $response = new MockResponse((string) json_encode(['id' => 'acct_v2_1', 'object' => 'v2.core.account']));
+        $gateway = new StripeGateway(new MockHttpClient([$response]), 'sk_test', self::SECRET);
+
+        $id = $gateway->createConnectAccount('owner@studio.test', null);
+
+        $this->assertSame('acct_v2_1', $id);
+        $this->assertSame('POST', $response->getRequestMethod());
+        $this->assertStringContainsString('/v2/core/accounts', $response->getRequestUrl());
+    }
+
+    public function testCreateConnectAccountMissingIdThrows(): void
+    {
+        $response = new MockResponse((string) json_encode(['object' => 'v2.core.account']));
+        $gateway = new StripeGateway(new MockHttpClient([$response]), 'sk_test', self::SECRET);
+
+        $this->expectException(BillingException::class);
+        $gateway->createConnectAccount(null, 'GB');
+    }
+
+    public function testCreateAccountLinkReturnsUrl(): void
+    {
+        $response = new MockResponse((string) json_encode(['url' => 'https://connect.stripe.test/setup/x']));
+        $gateway = new StripeGateway(new MockHttpClient([$response]), 'sk_test', self::SECRET);
+
+        $url = $gateway->createAccountLink('acct_1', 'https://r', 'https://ret');
+
+        $this->assertSame('https://connect.stripe.test/setup/x', $url);
+        $this->assertStringContainsString('/account_links', $response->getRequestUrl());
+    }
+
+    public function testRetrieveConnectAccountMapsActiveTransfers(): void
+    {
+        $body = json_encode(['configuration' => ['recipient' => ['capabilities' => [
+            'stripe_balance' => ['stripe_transfers' => ['status' => 'active']],
+        ]]]]);
+        $gateway = new StripeGateway(new MockHttpClient([new MockResponse((string) $body)]), 'sk_test', self::SECRET);
+
+        $result = $gateway->retrieveConnectAccount('acct_1');
+
+        $this->assertTrue($result['chargesEnabled']);
+        $this->assertTrue($result['detailsSubmitted']);
+        $this->assertTrue($result['payoutsEnabled']);
+    }
+
+    public function testRetrieveConnectAccountPendingIsSubmittedButNotChargeable(): void
+    {
+        $body = json_encode(['configuration' => ['recipient' => ['capabilities' => [
+            'stripe_balance' => ['stripe_transfers' => ['status' => 'pending']],
+        ]]]]);
+        $gateway = new StripeGateway(new MockHttpClient([new MockResponse((string) $body)]), 'sk_test', self::SECRET);
+
+        $result = $gateway->retrieveConnectAccount('acct_1');
+
+        $this->assertFalse($result['chargesEnabled']);
+        $this->assertTrue($result['detailsSubmitted']);
+    }
+
+    public function testRetrieveConnectAccountUnknownStatusIsAllFalse(): void
+    {
+        $gateway = new StripeGateway(new MockHttpClient([new MockResponse('{}')]), 'sk_test', self::SECRET);
+
+        $result = $gateway->retrieveConnectAccount('acct_1');
+
+        $this->assertFalse($result['chargesEnabled']);
+        $this->assertFalse($result['detailsSubmitted']);
+        $this->assertFalse($result['payoutsEnabled']);
+    }
+
+    public function testV2ApiErrorSurfacesMessage(): void
+    {
+        $response = new MockResponse(
+            (string) json_encode(['error' => ['message' => 'identity.country is required']]),
+            ['http_code' => 400],
+        );
+        $gateway = new StripeGateway(new MockHttpClient([$response]), 'sk_test', self::SECRET);
+
+        $this->expectExceptionMessage('identity.country is required');
+        $gateway->createConnectAccount('a@b.test', null);
+    }
+
     private function gateway(): StripeGateway
     {
         return new StripeGateway(new MockHttpClient(), 'sk_test', self::SECRET);
