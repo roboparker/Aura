@@ -147,23 +147,47 @@ the main account only gains Connect once the platform is **activated** (go-live 
 ### Local — test memberships **and** invoicing/Connect together
 
 Point local at the **sandbox** that has Connect set up (one account covers both
-flows). In `api/.env.local` (never the tracked `api/.env`):
+flows).
 
-1. `STRIPE_SECRET_KEY` = the **sandbox's** test secret key (Developers → API keys
-   while inside that sandbox).
-2. Create the Pro / Business (/ Team) test **prices in the sandbox**; set the
-   `STRIPE_PRICE_*` ids.
-3. Forward webhooks to localhost with the Stripe CLI — it prints the signing
-   secret to drop into `STRIPE_WEBHOOK_SECRET`:
-   ```bash
-   stripe listen --forward-to https://localhost/billing/webhook
+1. **Keys go in the repo-root `./.env`** (gitignored) — *not* `api/.env.local`.
+   Compose substitutes `${STRIPE_*}` from root `./.env` into the `php`/`worker`
+   containers, and that real container env **overrides** Symfony's `api/.env*`
+   dotenv files — so a key in `api/.env.local` gets shadowed by compose's empty
+   value. Set on the sandbox's values (Developers → API keys, **inside the
+   sandbox** account picker):
+   ```dotenv
+   STRIPE_SECRET_KEY=sk_test_…          # the sandbox's secret key
+   STRIPE_PRICE_PRO_MONTHLY=price_…     # prices you create IN THE SANDBOX
+   STRIPE_PRICE_PRO_YEARLY=price_…      #   (price ids are per-account — main-
+   STRIPE_PRICE_BUSINESS_MONTHLY=price_…#    account price ids 404 with the
+   STRIPE_PRICE_BUSINESS_YEARLY=price_… #    sandbox key → "No such price")
+   STRIPE_WEBHOOK_SECRET=whsec_…        # from `stripe listen`, step 3
    ```
+   Invoicing/Connect needs only `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET`;
+   the `STRIPE_PRICE_*` are only for **membership** checkout.
+2. Recreate the containers so they pick up the new env:
+   ```bash
+   docker compose up -d
+   # verify (no secret shown): docker compose exec php sh -lc 'echo ${STRIPE_SECRET_KEY:0:8}'  → sk_test_
+   ```
+3. Forward Stripe webhooks to the local app with the **Stripe CLI** — leave it
+   **running** in its own terminal for the whole test session (close it and
+   `checkout.session.completed` never arrives, so paid invoices don't flip):
+   ```bash
+   stripe listen --api-key sk_test_YOUR_SANDBOX_KEY \
+     --forward-to https://localhost/billing/webhook --skip-verify
+   ```
+   - `--api-key` targets the **sandbox** directly (no `stripe login` account
+     juggling); `--skip-verify` accepts the self-signed `localhost` cert.
+   - It prints `Ready! Your webhook signing secret is whsec_…` — that value is
+     stable per account; put it in `STRIPE_WEBHOOK_SECRET` and `up -d` again.
 4. `APP_FRONTEND_URL=https://localhost` (already the default) so Connect Account
    Link return/refresh URLs point back at the local app.
 
-Then exercise both: subscribe to a plan (memberships), and on a shared space
+Then exercise both: subscribe to a plan (memberships), and on a space you admin
 `/spaces/{id}/settings → Set up payments` → Express onboarding → pay an invoice
-with test card `4242 4242 4242 4242`.
+with test card `4242 4242 4242 4242` (any future expiry / CVC / ZIP). Watch the
+`stripe listen` window log the event and the invoice flip to **paid**.
 
 ### Production — go live
 
