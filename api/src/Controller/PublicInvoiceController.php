@@ -25,7 +25,10 @@ class PublicInvoiceController extends AbstractController
         private InvoiceRepository $invoices,
         private InvoicePdfRenderer $renderer,
         private PaymentGatewayRegistry $gateways,
-        #[Autowire('%env(default::APP_FRONTEND_URL)%')]
+        // `string:` guards the non-nullable param: `default::` resolves an unset
+        // *or empty* env var to null, which would fatal on construction rather
+        // than degrade (same trap as the Stripe keys).
+        #[Autowire('%env(string:default::APP_FRONTEND_URL)%')]
         private string $frontendUrl,
     ) {
     }
