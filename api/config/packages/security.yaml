@@ -129,6 +129,9 @@ security:
         - { path: ^/account-exports/, roles: IS_AUTHENTICATED_FULLY }
         # Waitlist mode toggle — platform admins only.
         - { path: ^/admin/waitlist, roles: ROLE_ADMIN }
+        # Admin account provisioning (#admin-user-create) — creates a sign-in-ready
+        # account, so it's an account-creation vector: platform admins only.
+        - { path: ^/admin/users, roles: ROLE_ADMIN }
         # Sentry verification triggers (error/worker) — platform admins only.
         - { path: ^/admin/sentry-test, roles: ROLE_ADMIN }
         # SSO admin config (enable toggle, allowed domains, button label).
