@@ -37,9 +37,14 @@ final class StripeGateway implements StripeGatewayInterface
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        #[Autowire('%env(default::STRIPE_SECRET_KEY)%')]
+        // `default::` resolves an unset *or empty* env var to null, which a
+        // non-nullable string param rejects at instantiation — so a Stripe-less
+        // instance used to fatal the moment anything touched the gateway
+        // instead of degrading through isConfigured(). The `string:` cast
+        // restores the '' this class is written against.
+        #[Autowire('%env(string:default::STRIPE_SECRET_KEY)%')]
         private readonly string $secretKey,
-        #[Autowire('%env(default::STRIPE_WEBHOOK_SECRET)%')]
+        #[Autowire('%env(string:default::STRIPE_WEBHOOK_SECRET)%')]
         private readonly string $webhookSecret,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
