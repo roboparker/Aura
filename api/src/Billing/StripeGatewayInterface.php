@@ -25,6 +25,16 @@ interface StripeGatewayInterface
     public function isConfigured(): bool;
 
     /**
+     * Whether the configured key is a **test/sandbox** key (`sk_test_…`) rather
+     * than live. The key *is* Stripe's mode switch, so this is derived from it
+     * rather than a separate setting that could drift out of sync.
+     *
+     * Surfaced in the UI so nobody mistakes a sandbox payment for a real one —
+     * an unconfigured instance reports true (nothing real can be charged).
+     */
+    public function isTestMode(): bool;
+
+    /**
      * Create a subscription-mode Checkout Session and return its hosted URL.
      *
      * @param array<string, string> $metadata copied onto both the session and

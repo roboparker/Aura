@@ -4,6 +4,7 @@ import { CheckCircle2, CreditCard, Loader2, Sparkles } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { cn } from "@/lib/utils";
 import CancellationSurvey from "@/components/feedback/CancellationSurvey";
+import TestModeBadge from "@/components/billing/TestModeBadge";
 import { cancellationFeedbackBody } from "@/lib/cancellationReasons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +25,8 @@ interface AccountBillingStatus {
   status: string | null;
   active: boolean;
   billingAvailable: boolean;
+  /** Stripe sandbox vs live, derived server-side from the key prefix. */
+  testMode: boolean;
   seats?: number | null;
   seatCount?: number | null;
   billingInterval: string | null;
@@ -157,12 +160,15 @@ const AccountBillingCard = ({ endpointBase, upgradeLabel, upgradeBlurb, enterpri
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Plan &amp; billing</h2>
-          <Badge
-            variant={isPaid ? "secondary" : "outline"}
-            className={cn(isPaid && "bg-violet-100 text-violet-700 hover:bg-violet-100")}
-          >
-            {status.planLabel}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <TestModeBadge testMode={status.testMode} />
+            <Badge
+              variant={isPaid ? "secondary" : "outline"}
+              className={cn(isPaid && "bg-violet-100 text-violet-700 hover:bg-violet-100")}
+            >
+              {status.planLabel}
+            </Badge>
+          </div>
         </div>
 
         {checkoutOutcome === "success" && (

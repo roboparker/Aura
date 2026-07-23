@@ -43,6 +43,11 @@ final class StripePaymentGateway implements PaymentGatewayInterface
         return $this->stripe->isConfigured();
     }
 
+    public function isTestMode(): bool
+    {
+        return $this->stripe->isTestMode();
+    }
+
     public function createInvoicePayment(Invoice $invoice, string $successUrl, string $cancelUrl): string
     {
         $label = $invoice->getNumber();

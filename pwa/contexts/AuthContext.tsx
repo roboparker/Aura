@@ -151,6 +151,12 @@ export interface User {
    * the normal case.
    */
   impersonator?: { id: string; email: string; name: string } | null;
+  /**
+   * Platform-wide operational flags, sent only to ROLE_ADMIN accounts (null
+   * otherwise). Rides on /api/me so the admin chrome can badge a sandbox
+   * instance without a dedicated fetch.
+   */
+  platform?: { stripeTestMode: boolean } | null;
 }
 
 /**

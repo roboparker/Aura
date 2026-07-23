@@ -4,6 +4,7 @@ import { CheckCircle2, CreditCard, Loader2, Sparkles, Users } from "lucide-react
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { cn } from "@/lib/utils";
 import CancellationSurvey from "@/components/feedback/CancellationSurvey";
+import TestModeBadge from "@/components/billing/TestModeBadge";
 import { cancellationFeedbackBody } from "@/lib/cancellationReasons";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,8 @@ interface BillingStatus {
   status: string | null;
   active: boolean;
   billingAvailable: boolean;
+  /** Stripe sandbox vs live, derived server-side from the key prefix. */
+  testMode: boolean;
   seats: number | null;
   billingInterval: string | null;
   currentPeriodEnd: string | null;
@@ -163,15 +166,18 @@ const SpaceBillingCard = ({ spaceId }: { spaceId: string }) => {
       <CardContent className="pt-6 space-y-4">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Plan &amp; billing</h2>
-          <Badge
-            variant={isTeam ? "secondary" : "outline"}
-            className={cn(
-              "capitalize",
-              isTeam && "bg-violet-100 text-violet-700 hover:bg-violet-100",
-            )}
-          >
-            {isTeam ? "Team" : "Free"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <TestModeBadge testMode={status.testMode} />
+            <Badge
+              variant={isTeam ? "secondary" : "outline"}
+              className={cn(
+                "capitalize",
+                isTeam && "bg-violet-100 text-violet-700 hover:bg-violet-100",
+              )}
+            >
+              {isTeam ? "Team" : "Free"}
+            </Badge>
+          </div>
         </div>
 
         {checkoutOutcome === "success" && (
