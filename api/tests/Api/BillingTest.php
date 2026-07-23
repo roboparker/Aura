@@ -264,6 +264,49 @@ class BillingTest extends ApiTestCase
         $this->assertJsonContains(['plan' => 'free', 'active' => false]);
     }
 
+    /**
+     * #stripe-mode: the sandbox-vs-live flag is derived from the key prefix and
+     * ridden along on every billing status payload, so the UI can badge a test
+     * instance without a second round-trip.
+     */
+    public function testStatusReportsStripeMode(): void
+    {
+        $alice = $this->createUser('alice-mode@example.com');
+        $space = $this->createSpace($alice, 'Shared');
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+        $client->request('GET', '/spaces/' . $space->getId() . '/billing');
+        $this->assertResponseStatusCodeSame(200);
+        // The suite's fake gateway runs in test mode, like a sandbox instance.
+        // The prefix-derivation itself is unit-tested against the real gateway
+        // in {@see \App\Tests\Billing\StripeGatewayTest}.
+        $this->assertJsonContains(['testMode' => true]);
+    }
+
+    /**
+     * The same flag reaches the admin chrome via /api/me, so a sandbox
+     * instance can be badged without a dedicated fetch. Admin-only: it's
+     * instance configuration, not something to hand every session.
+     */
+    public function testApiMeExposesStripeModeToAdminsOnly(): void
+    {
+        $admin = $this->createUser('admin-mode@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
+        $plain = $this->createUser('plain-mode@example.com');
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $body = $client->request('GET', '/api/me')->toArray();
+        $platform = $body['platform'] ?? null;
+        $this->assertIsArray($platform);
+        $this->assertTrue($platform['stripeTestMode'] ?? false);
+
+        $client->loginUser($plain);
+        $body = $client->request('GET', '/api/me')->toArray();
+        $this->assertArrayHasKey('platform', $body);
+        $this->assertNull($body['platform']);
+    }
+
     public function testStatusWithGroupInTheSpace(): void
     {
         // Repro for the prod billing 500: getEffectiveUsers() walks the space's
@@ -557,13 +600,16 @@ class BillingTest extends ApiTestCase
         return $space;
     }
 
-    private function createUser(string $email): User
+    /**
+     * @param list<string> $roles
+     */
+    private function createUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 
         $user = new User();
         $user->setEmail($email);
-        $user->setRoles(['ROLE_USER']);
+        $user->setRoles($roles);
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');

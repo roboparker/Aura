@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Billing\StripeGatewayInterface;
 use App\Entity\User;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\SwitchUserToken;
@@ -25,6 +26,7 @@ final class UserPayloadSerializer
         private TwoFactorRecoveryState $recoveryState,
         private SegmentEvaluator $segmentEvaluator,
         private Security $security,
+        private StripeGatewayInterface $stripe,
     ) {
     }
 
@@ -87,6 +89,26 @@ final class UserPayloadSerializer
             // operator is so the PWA can show the impersonation banner +
             // "Stop impersonation" control. Null in the normal case.
             'impersonator' => $this->impersonator(),
+            // Platform-wide operational flags, admin-only. Null for everyone
+            // else — this is instance configuration, not user state, and there
+            // is no reason to broadcast it to every session.
+            'platform' => $this->platform(),
+        ];
+    }
+
+    /**
+     * @return array{stripeTestMode: bool}|null
+     */
+    private function platform(): ?array
+    {
+        if (!$this->security->isGranted('ROLE_ADMIN')) {
+            return null;
+        }
+
+        return [
+            // Rides along on /api/me so the admin chrome can badge a sandbox
+            // instance without a dedicated fetch on every page (#stripe-mode).
+            'stripeTestMode' => $this->stripe->isConfigured() && $this->stripe->isTestMode(),
         ];
     }
 

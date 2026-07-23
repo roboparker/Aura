@@ -50,6 +50,13 @@ final class StripeGateway implements StripeGatewayInterface
         return '' !== $this->secretKey;
     }
 
+    public function isTestMode(): bool
+    {
+        // Only an explicit live key counts as live: an unset or unrecognised
+        // key can't charge anything real, so it reports test (fail-safe).
+        return !str_starts_with($this->secretKey, 'sk_live_');
+    }
+
     public function createCheckoutSession(
         string $priceId,
         int $quantity,

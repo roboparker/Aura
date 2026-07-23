@@ -82,6 +82,9 @@ class PublicInvoiceController extends AbstractController
             // /media/ route, so exposing the URL leaks nothing sensitive.
             'logoUrl' => $logoUrls['profile'] ?? array_values($logoUrls)[0] ?? null,
             'terms' => $invoice->getSpace()?->getInvoiceTerms(),
+            // #stripe-mode: tell the client when this is a sandbox invoice, so a
+            // test-card payment can never be mistaken for a real one.
+            'testMode' => $this->gateways->default()?->isTestMode() ?? true,
         ]);
     }
 

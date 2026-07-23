@@ -136,6 +136,33 @@ to all of them:
 The last two are easy to forget; without `checkout.session.completed` an online
 invoice payment succeeds at Stripe but never flips the invoice to paid.
 
+## Test mode vs live mode (#stripe-mode)
+
+The Stripe secret key **is** the mode switch, so we derive the mode from it
+rather than keeping a second setting that could drift:
+`StripeGatewayInterface::isTestMode()` returns `!str_starts_with($key,
+'sk_live_')`. Anything that isn't an explicit live key — a sandbox key, a typo,
+an unset key — reports **test**, which is the fail-safe direction: the worst
+outcome of over-reporting test mode is a badge on a live instance; the worst
+outcome of the opposite is a client entering a real card into a sandbox.
+
+A prod instance running a test key is the one misconfiguration that can't
+announce itself — Checkout opens, webhooks fire, invoices flip to paid, and
+nobody is charged. So the mode is surfaced everywhere it matters:
+
+| Surface | How it shows |
+| --- | --- |
+| `GET /spaces/{id}/billing`, `/me/billing`, `/organizations/{id}/billing` | `testMode` in the payload → amber **TEST MODE** badge on the plan card |
+| `GET /public/invoices/{token}` | `testMode` → banner above the invoice: *"paying it charges nothing… don't enter a real card"* |
+| `GET /api/me` | admin-only `platform.stripeTestMode` → a **Stripe test mode** chip in the sidebar's Admin section |
+| Logs / Sentry | `App\EventListener\StripeModeWarningListener` logs one `critical` per process when `APP_ENV=prod` **and** the key is a test key |
+
+The startup warning is deliberately **not** a hard failure — booting a prod
+container against a sandbox is a legitimate rehearsal setup, and refusing to
+boot would turn a misconfiguration into an outage. It fires on both the HTTP and
+console paths (a worker can be misconfigured just as easily), once per process
+so long-lived workers don't flood the log.
+
 ## Stripe Sandboxes ⚠️ (Connect gotcha)
 
 Stripe's Connect onboarding wizard funnels you into a **separate sandbox account**
@@ -203,6 +230,10 @@ with test card `4242 4242 4242 4242` (any future expiry / CVC / ZIP). Watch the
    containers).
 5. Set `BILLING_ENFORCEMENT_ENABLED=true` (same env blocks) if you want the free
    caps to bite. Redeploy.
+6. **Confirm the mode flipped**: the TEST MODE badges disappear from the billing
+   cards + the Admin sidebar, and the prod logs stop carrying the
+   `Stripe is in TEST mode on a production instance` critical. If they don't,
+   the container is still on the sandbox key (see step 4's gotcha).
 
 ## Testing
 

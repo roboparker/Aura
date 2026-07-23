@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronDown,
   CreditCard,
+  FlaskConical,
   Plus,
   Settings,
   ShieldCheck,
@@ -287,6 +288,8 @@ interface AdminLink {
  */
 const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) => {
   const router = useRouter();
+  const { user } = useAuth();
+  const stripeTestMode = user?.platform?.stripeTestMode === true;
 
   const storageKey = "madori.navCollapsed.admin";
   const [collapsed, setCollapsed] = useState(false);
@@ -338,6 +341,21 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
           )}
         />
       </button>
+
+      {/*
+        Shown even while the section is collapsed: it's a standing warning
+        about the instance, not a link you go looking for (#stripe-mode).
+      */}
+      {stripeTestMode && (
+        <div
+          data-testid="admin-stripe-test-mode"
+          title="Stripe is running against a sandbox — no real payments are processed."
+          className="mx-3 mb-1 flex items-center gap-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-medium uppercase tracking-wide text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300"
+        >
+          <FlaskConical className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">Stripe test mode</span>
+        </div>
+      )}
 
       {!collapsed &&
         links.map((link) => {
