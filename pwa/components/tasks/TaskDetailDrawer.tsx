@@ -22,6 +22,7 @@ import DueDateCell from "@/components/tasks/DueDateCell";
 import RecurrenceEditor from "@/components/tasks/RecurrenceEditor";
 import RemindersEditor from "@/components/tasks/RemindersEditor";
 import TaskRelationshipsPanel from "@/components/tasks/TaskRelationshipsPanel";
+import SubtasksPanel from "@/components/tasks/SubtasksPanel";
 import CommentsPanel from "@/components/common/CommentsPanel";
 import ActivityPanel from "@/components/activity/ActivityPanel";
 import CustomFieldValueList, {
@@ -538,6 +539,8 @@ const TaskDetailDrawer = ({
                   users={assignableUsers}
                 />
               )}
+
+              <SubtasksPanel taskIri={task["@id"]} boardIri={task.board} />
 
               <TaskRelationshipsPanel taskIri={task["@id"]} />
 

@@ -16,6 +16,8 @@ final class ValidTaskRelationship extends Constraint
 {
     public string $messageSelf = 'A task cannot relate to itself.';
     public string $messageDuplicate = 'These tasks already have this relationship.';
+    public string $messageAlreadyHasParent = 'This task is already a subtask of another task.';
+    public string $messageCycle = 'A task cannot be made a subtask of its own subtask.';
 
     public function getTargets(): string
     {

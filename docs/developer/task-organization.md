@@ -30,6 +30,33 @@ Three features structure tasks beyond a flat list: **sections** group a board's 
 - **API**: the resource exposes only `Post` / `Get` / `Delete` (security gates on `source` / `target` `isAccessibleBy` — you must be able to reach both tasks to create a link, either to delete one). Reads come through a dedicated endpoint, **`GET /tasks/{id}/relationships`** (`TaskRelationshipController`), which returns every link touching the task from that task's viewpoint — each with the resolved directional label and the other task's summary.
 - **PWA**: a **Relationships** section in the task detail drawer (`pwa/components/tasks/TaskRelationshipsPanel.tsx`) — a list grouped by label, an add form (directional type picker + task search), and a per-row remove.
 
+## Subtasks
+
+Subtasks are built **on the `parent` relationship** rather than a separate
+model — a subtask is a task that's the `target` of a `parent` link, so the
+whole feature reuses `TaskRelationship` with no schema change.
+
+- **Two extra invariants** (in `ValidTaskRelationshipValidator`, `parent` links only):
+  - **Single-parent** — a task is the `target` of at most one `parent` link, so
+    "the parent" is never ambiguous. Backed by
+    `TaskRelationshipRepository::findParentLinkOf()`.
+  - **No cycles** — a task can't become a subtask of its own descendant. A BFS
+    down the child tree (`findChildLinksOf()`) catches the multi-hop loops that
+    the direct-pair reverse-duplicate check can't see.
+- **Read**: `GET /tasks/{id}/subtasks` (`TaskRelationshipController::subtasks`)
+  returns the ordered children, a `{total, completed}` completion rollup, and
+  the task's own `parent` link (so the drawer can show "part of *X*" without a
+  second request).
+- **Completion never cascades.** A parent is neither auto-completed nor blocked
+  by open children — the rollup is informational. (Product decision; the other
+  options were considered and rejected.)
+- **PWA**: `pwa/components/tasks/SubtasksPanel.tsx` mounts in the task drawer
+  above Relationships — a progress bar + `N/M`, a per-child complete checkbox
+  (PATCH the child) and unlink control (DELETE the relationship; the child task
+  itself survives), and an inline "add subtask" that creates a task on the
+  parent's board then links it. A freshly-created task has no parent and no
+  descendants, so that link can never trip either invariant.
+
 ## Tests
 
 - `App\Tests\Api\TaskSectionTest`, `App\Tests\Api\TaskRelationshipTest` (entity access + validation).

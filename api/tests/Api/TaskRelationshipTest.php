@@ -112,6 +112,76 @@ class TaskRelationshipTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(422);
     }
 
+    public function testSubtaskInvariantsAndProgressRollup(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $parent = $this->createTask($client, $board, 'Parent');
+        $childA = $this->createTask($client, $board, 'Child A');
+        $childB = $this->createTask($client, $board, 'Child B');
+        $other = $this->createTask($client, $board, 'Other parent');
+
+        $this->linkParent($client, $parent, $childA);
+        $this->linkParent($client, $parent, $childB);
+
+        // A child has exactly one parent — a second parent link is rejected.
+        $client->request('POST', '/task_relationships', [
+            'json' => ['source' => $other, 'target' => $childA, 'type' => 'parent'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // No cycles: the child can't become the parent of its own parent.
+        $client->request('POST', '/task_relationships', [
+            'json' => ['source' => $childA, 'target' => $parent, 'type' => 'parent'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+
+        // The subtasks endpoint reports both children, none done yet.
+        $before = $client->request('GET', $parent . '/subtasks')->toArray();
+        $this->assertSame(2, $before['total']);
+        $this->assertSame(0, $before['completed']);
+        $subtasks = $before['subtasks'];
+        $this->assertIsArray($subtasks);
+        $this->assertCount(2, $subtasks);
+
+        // Completing a child bumps the rollup but never touches the parent.
+        $client->request('PATCH', $childA, [
+            'json' => ['completedOn' => (new \DateTimeImmutable())->format(\DATE_ATOM)],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $after = $client->request('GET', $parent . '/subtasks')->toArray();
+        $this->assertSame(2, $after['total']);
+        $this->assertSame(1, $after['completed']);
+
+        // The parent is untouched by its children's completion (issue answer:
+        // nothing automatic).
+        $parentRow = $client->request('GET', $parent)->toArray();
+        $this->assertArrayNotHasKey('completedOn', $parentRow);
+
+        // From the child's side, the endpoint surfaces its parent link.
+        $childView = $client->request('GET', $childA . '/subtasks')->toArray();
+        $this->assertSame(0, $childView['total']);
+        $parentInfo = $childView['parent'];
+        $this->assertIsArray($parentInfo);
+        $this->assertSame('Parent', $parentInfo['title']);
+    }
+
+    private function linkParent(Client $client, string $parent, string $child): void
+    {
+        $client->request('POST', '/task_relationships', [
+            'json' => ['source' => $parent, 'target' => $child, 'type' => 'parent'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(201);
+    }
+
     private function createTask(Client $client, Board $board, string $title): string
     {
         $task = $client->request('POST', '/tasks', [
