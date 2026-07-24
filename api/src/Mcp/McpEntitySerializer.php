@@ -2,15 +2,19 @@
 
 namespace App\Mcp;
 
+use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
+use App\Entity\Invoice;
 use App\Entity\MediaObject;
 use App\Entity\Page;
 use App\Entity\Board;
+use App\Entity\Project;
 use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
+use App\Entity\TimeEntry;
 use App\Entity\User;
 
 /**
@@ -222,5 +226,149 @@ final class McpEntitySerializer
             'id' => (string) $board->getId(),
             'title' => $board->getTitle(),
         ];
+    }
+
+    /**
+     * Money is emitted as minor units plus an explicit currency, never a
+     * pre-formatted string — a model that has to parse "$1,234.50" back into a
+     * number will eventually parse it wrong.
+     *
+     * @return array<string, mixed>
+     */
+    public function timeEntry(TimeEntry $entry): array
+    {
+        $endedAt = $entry->getEndedAt();
+
+        return [
+            'id' => (string) $entry->getId(),
+            'description' => $entry->getDescription(),
+            'startedAt' => $entry->getStartedAt()?->format(\DateTimeInterface::ATOM),
+            'endedAt' => $endedAt?->format(\DateTimeInterface::ATOM),
+            // The one field a model actually reasons about: is this the timer
+            // that's still ticking?
+            'running' => null === $endedAt,
+            'durationSeconds' => $entry->getDurationSeconds(),
+            'billable' => $entry->isBillable(),
+            'rateAmount' => $entry->getRateAmount(),
+            'rateCurrency' => $entry->getRateCurrency(),
+            // Non-null means the entry is on an invoice and is now frozen.
+            'billedAt' => $entry->getBilledAt()?->format(\DateTimeInterface::ATOM),
+            'project' => $this->projectSummary($entry->getProject()),
+            'category' => null === $entry->getCategory() ? null : [
+                'id' => (string) $entry->getCategory()->getId(),
+                'name' => $entry->getCategory()->getName(),
+            ],
+            'user' => null === $entry->getUser() ? null : $this->userSummary($entry->getUser()),
+            'spaceId' => (string) $entry->getSpace()?->getId(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function projectSummary(?Project $project): ?array
+    {
+        if (null === $project) {
+            return null;
+        }
+
+        return [
+            'id' => (string) $project->getId(),
+            'name' => $project->getName(),
+            'clientName' => $project->getClient()?->getName(),
+        ];
+    }
+
+    /**
+     * A client project with the categories that set the billing rate — the
+     * model needs both ids to log time, so they ride along rather than
+     * forcing a second call.
+     *
+     * @return array<string, mixed>
+     */
+    public function project(Project $project): array
+    {
+        $categories = [];
+        foreach ($project->getCategories() as $service) {
+            $categories[] = [
+                'id' => (string) $service->getId(),
+                'name' => $service->getName(),
+                'billingRate' => $service->getBillingRate(),
+                'billable' => $service->isBillable(),
+            ];
+        }
+
+        return [
+            'id' => (string) $project->getId(),
+            'name' => $project->getName(),
+            'currency' => $project->getCurrency(),
+            'client' => null === $project->getClient() ? null : [
+                'id' => (string) $project->getClient()->getId(),
+                'name' => $project->getClient()->getName(),
+            ],
+            'categories' => $categories,
+            'spaceId' => (string) $project->getSpace()?->getId(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function client(Client $client): array
+    {
+        return [
+            'id' => (string) $client->getId(),
+            'name' => $client->getName(),
+            'email' => $client->getEmail(),
+            'currency' => $client->getCurrency(),
+            'defaultRateAmount' => $client->getDefaultRateAmount(),
+            'spaceId' => (string) $client->getSpace()?->getId(),
+        ];
+    }
+
+    /**
+     * @param bool $withLineItems whether to expand the line items — the list
+     *                            tool omits them to keep a page of invoices
+     *                            inside a sane context budget
+     *
+     * @return array<string, mixed>
+     */
+    public function invoice(Invoice $invoice, bool $withLineItems = false): array
+    {
+        $data = [
+            'id' => (string) $invoice->getId(),
+            'number' => $invoice->getNumber(),
+            'status' => $invoice->getStatus(),
+            'currency' => $invoice->getCurrency(),
+            'issueDate' => $invoice->getIssueDate()?->format('Y-m-d'),
+            'dueDate' => $invoice->getDueDate()?->format('Y-m-d'),
+            'client' => null === $invoice->getClient() ? null : [
+                'id' => (string) $invoice->getClient()->getId(),
+                'name' => $invoice->getClient()->getName(),
+            ],
+            'subtotal' => $invoice->getSubtotal(),
+            'discountAmount' => $invoice->getDiscountAmount(),
+            'taxAmount' => $invoice->getTaxAmount(),
+            'total' => $invoice->getTotal(),
+            'amountPaid' => $invoice->getAmountPaid(),
+            'balanceDue' => $invoice->getBalanceDue(),
+            'spaceId' => (string) $invoice->getSpace()?->getId(),
+        ];
+
+        if ($withLineItems) {
+            $lines = [];
+            foreach ($invoice->getLineItems() as $line) {
+                $lines[] = [
+                    'description' => $line->getDescription(),
+                    'quantity' => $line->getQuantity(),
+                    'unitAmount' => $line->getUnitAmount(),
+                    'amount' => $line->getAmount(),
+                    'taxRate' => $line->getEffectiveTaxRate(),
+                ];
+            }
+            $data['lineItems'] = $lines;
+        }
+
+        return $data;
     }
 }

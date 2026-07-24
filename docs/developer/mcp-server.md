@@ -70,12 +70,45 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Tag         | `list_tags`, `create_tag`                                                       |
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
+| Time        | `list_projects`, `list_time_entries`, `log_time`, `start_timer`, `stop_timer`  |
+| Invoicing   | `list_clients`, `list_invoices`, `get_invoice`                                 |
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
+
+> **"Project" means two things in this product.** `list_boards` returns task
+> boards; `list_projects` returns *client* projects — the billing unit that time
+> is tracked against and invoiced from. They're unrelated, and the tool
+> descriptions say so, because a model that conflates them will log time against
+> the wrong thing.
 
 Create tools that target a space (`create_board`, `create_page`) accept an optional `spaceId` — call `list_spaces` to discover the ids, or omit it to default to the caller's personal space.
 
 > **Custom field values** — `get_custom_fields` returns a board's defined fields (`CustomFieldDefinition`). Per-task values (`CustomFieldValue`, #227) are written through `update_task`'s `customFieldValues` array (`[{definitionId, value}]`), which replaces the task's whole value set and is validated by `ValidCustomFieldValues` just like the REST path.
+
+### Time and invoicing
+
+The billing tools ride two space-role categories with deliberately different
+defaults, inherited from `SpacePermissionResolver` rather than restated:
+
+- **`time_entries`** is on for a plain space member — everyone tracks their own
+  time. `list_time_entries` defaults to the caller's own entries; pass
+  `mine: false` for the whole space.
+- **`invoices`** is in `SpacePermission::ADMIN_RESERVED`, so a plain member sees
+  **nothing** until a space admin grants a role. `McpBillingAuthorization` routes
+  reserved categories through `canByExplicitGrant()` exactly like
+  `SpacePermissionVoter` does — MCP must never be more permissive than REST.
+
+Rates are never accepted from the caller. `log_time` and `start_timer` take a
+`categoryId`, and the entity derives the rate, currency and billability from it
+on save, so an agent can't invent a billing rate. The write rules that matter —
+tracker stamping, the one-running-timer invariant, the billed-entry freeze, and
+the submitted-week lock — live in `App\Service\TimeEntryGuard`, shared with the
+REST processor so the two surfaces can't drift.
+
+Invoice *creation* is deliberately absent: generating one is a period-selection
+and entry-selection flow with real financial consequences, and it stays in the
+web UI for now. The tools cover reading invoices and the daily time-tracking
+loop.
 
 ## Errors
 
