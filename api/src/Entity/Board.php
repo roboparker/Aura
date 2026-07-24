@@ -10,9 +10,11 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\CustomField\CustomFieldKind;
 use App\Filter\BoardSearchFilter;
 use App\Repository\BoardRepository;
 use App\State\BoardOwnerProcessor;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\Criteria;
@@ -184,6 +186,32 @@ class Board
     #[Groups(['board:read', 'board:write'])]
     private Collection $globalCustomFieldDefinitions;
 
+    /**
+     * Timeline (#timeline) opt-in: the date custom field whose value is the
+     * **start** of each task's bar in the board's Timeline view. The bar's
+     * **end** is always the task's native `dueDate` — the deadline the rest of
+     * the app already uses — so this is the single field a board configures to
+     * turn Gantt on. Null (both siblings null) = Timeline not configured; the
+     * tab renders an empty state.
+     *
+     * Polymorphic pair mirroring {@see CustomFieldValue}: the start field is
+     * either a space-owned {@see CustomFieldDefinition} on this board OR an
+     * instance-wide {@see GlobalCustomFieldDefinition} the board opts into.
+     * At most one is set (validated in {@see validateTimeline}); both are
+     * `SET NULL` so retiring a field just switches Timeline back off.
+     */
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: CustomFieldDefinition::class)]
+    #[ORM\JoinColumn(name: 'timeline_start_field_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['board:read', 'board:write'])]
+    private ?CustomFieldDefinition $timelineStartField = null;
+
+    #[ApiProperty(readableLink: false)]
+    #[ORM\ManyToOne(targetEntity: GlobalCustomFieldDefinition::class)]
+    #[ORM\JoinColumn(name: 'timeline_start_global_field_id', nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['board:read', 'board:write'])]
+    private ?GlobalCustomFieldDefinition $timelineStartGlobalField = null;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
@@ -307,6 +335,83 @@ class Board
     {
         $this->globalCustomFieldDefinitions->removeElement($definition);
         return $this;
+    }
+
+    public function getTimelineStartField(): ?CustomFieldDefinition
+    {
+        return $this->timelineStartField;
+    }
+
+    public function setTimelineStartField(?CustomFieldDefinition $field): static
+    {
+        $this->timelineStartField = $field;
+        return $this;
+    }
+
+    public function getTimelineStartGlobalField(): ?GlobalCustomFieldDefinition
+    {
+        return $this->timelineStartGlobalField;
+    }
+
+    public function setTimelineStartGlobalField(?GlobalCustomFieldDefinition $field): static
+    {
+        $this->timelineStartGlobalField = $field;
+        return $this;
+    }
+
+    /** Whether the Timeline view has a start field configured. */
+    public function hasTimeline(): bool
+    {
+        return null !== $this->timelineStartField || null !== $this->timelineStartGlobalField;
+    }
+
+    /**
+     * The configured start field as a common-interface reference, or null when
+     * Timeline isn't set up. Lets callers read `getKind()` / `getId()` without
+     * caring which of the polymorphic siblings holds it.
+     */
+    public function getTimelineStartDefinition(): ?CustomFieldDefinitionInterface
+    {
+        return $this->timelineStartField ?? $this->timelineStartGlobalField;
+    }
+
+    /**
+     * The start-field config must name at most one field, that field must be a
+     * date kind (its value is the bar's start date), and a space-owned field
+     * must belong to this board — enforced here rather than trusting the client.
+     */
+    #[Assert\Callback]
+    public function validateTimeline(ExecutionContextInterface $context): void
+    {
+        if (null !== $this->timelineStartField && null !== $this->timelineStartGlobalField) {
+            $context->buildViolation('Set a board field or a global field as the timeline start, not both.')
+                ->atPath('timelineStartField')
+                ->addViolation();
+
+            return;
+        }
+
+        $field = $this->getTimelineStartDefinition();
+        if (null === $field) {
+            return;
+        }
+
+        if (CustomFieldKind::DATE->value !== $field->getKind()) {
+            $context->buildViolation('The timeline start field must be a date field.')
+                ->atPath('timelineStartField')
+                ->addViolation();
+        }
+
+        // A space-owned start field has to be one of this board's own fields;
+        // global fields are instance-wide and need no board check.
+        if (
+            null !== $this->timelineStartField
+            && !$this->customFieldDefinitions->contains($this->timelineStartField)
+        ) {
+            $context->buildViolation('That field does not belong to this board.')
+                ->atPath('timelineStartField')
+                ->addViolation();
+        }
     }
 
     /**
