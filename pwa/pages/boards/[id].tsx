@@ -66,6 +66,7 @@ import AssigneesCombobox, {
   type AssigneeOption,
 } from "@/components/tasks/AssigneesCombobox";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
+import BoardTimeline from "@/components/boards/BoardTimeline";
 import type {
   CustomFieldDefinition,
   CustomFieldKind,
@@ -125,6 +126,9 @@ interface Board {
   owner: Member;
   members: Member[];
   space: string | SpaceRef;
+  /** Timeline (#timeline): the date field IRI driving the bar start, or null. */
+  timelineStartField?: string | null;
+  timelineStartGlobalField?: string | null;
 }
 
 interface BoardTask {
@@ -892,6 +896,35 @@ const BoardDetail = () => {
     }
   };
 
+  // Timeline (#timeline): set (or clear) which date field drives the bar start.
+  // Local vs global fields live in separate FK columns, so key the write by the
+  // definition's source — same split as the custom-field visibility toggle.
+  const handleSetTimelineField = useCallback(
+    async (fieldIri: string | null) => {
+      if (!board) return;
+      const body =
+        fieldIri === null
+          ? { timelineStartField: null, timelineStartGlobalField: null }
+          : isGlobalDefinition(fieldIri)
+            ? { timelineStartField: null, timelineStartGlobalField: fieldIri }
+            : { timelineStartField: fieldIri, timelineStartGlobalField: null };
+      try {
+        const res = await fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/merge-patch+json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error("Failed to update the timeline field.");
+        const data = await res.json();
+        setBoard((prev) => (prev ? { ...prev, ...data } : prev));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update the timeline field.");
+      }
+    },
+    [board],
+  );
+
   const handleMove = async () => {
     if (!board || !moveTargetIri) return;
     setIsMoving(true);
@@ -1261,6 +1294,9 @@ const BoardDetail = () => {
                     <TabsTrigger value="list">List</TabsTrigger>
                     <TabsTrigger value="board">Board</TabsTrigger>
                     <TabsTrigger value="calendar">Calendar</TabsTrigger>
+                    <TabsTrigger value="timeline" data-testid="board-timeline-tab">
+                      Timeline
+                    </TabsTrigger>
                     <TabsTrigger value="fields" data-testid="board-fields-tab">
                       Custom fields
                     </TabsTrigger>
@@ -1335,6 +1371,53 @@ const BoardDetail = () => {
                             >
                               {detailsMessage.text}
                             </span>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Timeline (#timeline): pick the date field driving bar starts. */}
+                    <Card>
+                      <CardContent className="space-y-3 pt-6">
+                        <div>
+                          <h3 className="text-sm font-medium">Timeline</h3>
+                          <p className="text-xs text-muted-foreground">
+                            Choose a date field to use as each task&apos;s start on
+                            the Timeline view. Bars run from that date to the
+                            task&apos;s due date; tasks with only a due date show as
+                            milestones.
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="timeline-start-field">Start date field</Label>
+                          <select
+                            id="timeline-start-field"
+                            data-testid="timeline-start-field"
+                            value={
+                              board.timelineStartField ??
+                              board.timelineStartGlobalField ??
+                              ""
+                            }
+                            onChange={(e) =>
+                              void handleSetTimelineField(e.target.value || null)
+                            }
+                            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                          >
+                            <option value="">None — Timeline off</option>
+                            {definitions
+                              .filter((d) => d.kind === "date")
+                              .map((d) => (
+                                <option key={d["@id"]} value={d["@id"]}>
+                                  {d.name}
+                                  {isGlobalDefinition(d["@id"]) ? " (global)" : ""}
+                                </option>
+                              ))}
+                          </select>
+                          {definitions.filter((d) => d.kind === "date").length === 0 && (
+                            <p className="text-xs text-muted-foreground">
+                              This board has no date custom fields yet — add one
+                              under Custom fields first.
+                            </p>
                           )}
                         </div>
                       </CardContent>
@@ -1686,6 +1769,26 @@ const BoardDetail = () => {
                     onTasksChanged={() => void load()}
                     refreshSignal={calendarRefresh}
                     assignableUsers={boardAssignableUsers}
+                  />
+                </TabsContent>
+
+                <TabsContent value="timeline" className="mt-4">
+                  <BoardTimeline
+                    boardId={board.id}
+                    tasks={tasks}
+                    sections={sections}
+                    startFieldIri={
+                      board.timelineStartField ?? board.timelineStartGlobalField ?? null
+                    }
+                    onOpenTask={(t) => openTaskDetail(t)}
+                    onMoveDue={(t, iso) => void patchTask(t, { dueDate: iso })}
+                    onMoveStart={(t, dateStr) =>
+                      handleCustomFieldChange(
+                        t,
+                        board.timelineStartField ?? board.timelineStartGlobalField ?? "",
+                        dateStr,
+                      )
+                    }
                   />
                 </TabsContent>
 
