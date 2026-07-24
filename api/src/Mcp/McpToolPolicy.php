@@ -59,6 +59,19 @@ final class McpToolPolicy
         // so they ride the tasks scope.
         'list_tags' => ['category' => 'tasks', 'write' => false],
         'create_tag' => ['category' => 'tasks', 'write' => true],
+        // time tracking. `list_projects` returns *client* projects (the thing
+        // time is tracked against), so it rides time_entries rather than
+        // boards — a token scoped to tasks has no business reading rate cards.
+        'list_projects' => ['category' => 'time_entries', 'write' => false],
+        'list_time_entries' => ['category' => 'time_entries', 'write' => false],
+        'log_time' => ['category' => 'time_entries', 'write' => true],
+        'start_timer' => ['category' => 'time_entries', 'write' => true],
+        'stop_timer' => ['category' => 'time_entries', 'write' => true],
+        // invoicing. Clients are only addressable as billing counterparties,
+        // so they ride the invoices scope.
+        'list_clients' => ['category' => 'invoices', 'write' => false],
+        'list_invoices' => ['category' => 'invoices', 'write' => false],
+        'get_invoice' => ['category' => 'invoices', 'write' => false],
     ];
 
     /** @return array{category: string, write: bool}|null */
