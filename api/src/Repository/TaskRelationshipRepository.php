@@ -74,6 +74,35 @@ class TaskRelationshipRepository extends ServiceEntityRepository
     }
 
     /**
+     * `required` edges where **both** tasks belong to the given board — the
+     * dependency arrows the Timeline view draws. Returned source→target
+     * (source required *for* target, i.e. source is the predecessor). Edges
+     * that cross out of the board are omitted, since the other end has no bar
+     * to point at here.
+     *
+     * @return list<array{source: string, target: string}>
+     */
+    public function findRequiredEdgesInBoard(\App\Entity\Board $board): array
+    {
+        /** @var list<array{source: string, target: string}> $rows */
+        $rows = $this->createQueryBuilder('r')
+            ->select('IDENTITY(r.source) AS source', 'IDENTITY(r.target) AS target')
+            ->join('r.source', 's')
+            ->join('r.target', 't')
+            ->where('r.type = :required')
+            ->andWhere('s.board = :board')
+            ->andWhere('t.board = :board')
+            ->setParameter('required', TaskRelationship::TYPE_REQUIRED)
+            ->setParameter('board', $board)
+            ->getQuery()
+            ->getResult();
+
+        // IDENTITY() already yields the id string; the aliased shape is exactly
+        // the return contract, so no re-mapping is needed.
+        return $rows;
+    }
+
+    /**
      * The relationship between two tasks of a given type, in either direction
      * (used to reject duplicates/reverses before insert).
      */

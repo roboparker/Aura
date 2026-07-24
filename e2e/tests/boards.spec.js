@@ -210,6 +210,28 @@ test.describe("Boards", () => {
     await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
   });
 
+  test("timeline tab renders its empty state until a start field is set", async ({ page }) => {
+    const email = uniqueEmail();
+    await registerAndSignIn(page, email);
+
+    // Create a board and land on its detail page.
+    await page.goto(`${BASE_URL}/boards`);
+    const title = `Timeline board ${Date.now()}`;
+    await page.getByTestId("new-board-button").click();
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+
+    // The Timeline tab mounts the Gantt view (#timeline). With no start field
+    // configured, it must render the opt-in empty state rather than throw.
+    await page.getByTestId("board-timeline-tab").click();
+    await expect(page.locator("text=Timeline isn't set up yet")).toBeVisible();
+
+    // The picker for turning it on lives under Settings.
+    await page.getByTestId("board-settings-tab").click();
+    await expect(page.getByTestId("timeline-start-field")).toBeVisible();
+  });
+
   // Removed "account menu shows Boards link" — Boards is no
   // longer a top-level sidebar link after the sidebar redesign
   // (#nav-refresh). The /boards page is still reachable directly

@@ -57,7 +57,39 @@ whole feature reuses `TaskRelationship` with no schema change.
   parent's board then links it. A freshly-created task has no parent and no
   descendants, so that link can never trip either invariant.
 
+## Timeline / Gantt view (#timeline)
+
+A board-level Gantt, **opt-in per board**. We followed Notion's model — the
+view maps onto existing date fields rather than adding a blanket `Task.startDate`
+that every task in every board would carry (Asana/ClickUp/Monday's approach).
+
+- **Bar span**: **start** = a board-configured date custom field; **end** = the
+  task's native `dueDate`. Reusing `dueDate` means there's one field to pick and
+  no second deadline that could disagree with the real one. A task with a due
+  date but no start is a **milestone diamond**; a task with neither is listed as
+  *unscheduled* below the chart rather than dropped.
+- **Config on `Board`**: a polymorphic pair `timelineStartField` (→
+  `CustomFieldDefinition`) / `timelineStartGlobalField` (→
+  `GlobalCustomFieldDefinition`), both nullable + `SET NULL`, mirroring
+  `CustomFieldValue`. `Board::validateTimeline` (class-level `Assert\Callback`)
+  enforces at-most-one, date-kind, and — for a local field — board ownership.
+  Read via `getTimelineStartDefinition()` / `hasTimeline()`.
+- **Dependencies**: `GET /boards/{id}/dependencies`
+  (`BoardTimelineController`) returns the `required` edges among the board's own
+  tasks (source→target = predecessor→dependent) for the finish-to-start arrows.
+  Edges crossing out of the board are dropped — the other end has no bar.
+- **No bar endpoint**: the board page already loads tasks with their custom-field
+  values, so start (the mapped field's value) and end (`dueDate`) resolve
+  client-side; only the cross-task edges need a query.
+- **PWA**: `pwa/components/boards/BoardTimeline.tsx` (generic over the task type)
+  — section-grouped rows, day/week/month zoom, a today line, SVG dependency
+  arrows, and pointer-drag to move a bar (shifts both dates) or resize an edge
+  (start via the custom-field value, end via `dueDate`). Mounts as a **Timeline**
+  tab on `pwa/pages/boards/[id].tsx` next to List/Board/Calendar, empty until
+  configured; the start-field picker lives under **Settings → Timeline**.
+
 ## Tests
 
 - `App\Tests\Api\TaskSectionTest`, `App\Tests\Api\TaskRelationshipTest` (entity access + validation).
-- `e2e/tests/*` exercise the board UI.
+- `App\Tests\Api\BoardTimelineTest` (start-field config validation + dependency-edge scoping).
+- `e2e/tests/*` exercise the board UI, including the Timeline tab mount.
