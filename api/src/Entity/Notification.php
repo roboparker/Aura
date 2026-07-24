@@ -96,6 +96,27 @@ class Notification
     /** An project crossed a budget threshold (→ space admins) (#651/#667). */
     public const TYPE_BUDGET_ALERT = 'budget_alert';
 
+    /**
+     * Every notification type, for callers that need to offer or validate the
+     * set (the MCP `list_notifications` filter, for one). Keep in sync with the
+     * TYPE_* constants above — a type missing here is simply unfilterable, not
+     * broken, so the cost of drift is silent rather than loud.
+     *
+     * @var list<string>
+     */
+    public const TYPES = [
+        self::TYPE_TASK_REMINDER,
+        self::TYPE_MENTION,
+        self::TYPE_REPLY,
+        self::TYPE_COMMENT,
+        self::TYPE_ASSIGNED,
+        self::TYPE_STATUS,
+        self::TYPE_TIMESHEET_SUBMITTED,
+        self::TYPE_TIMESHEET_DECIDED,
+        self::TYPE_TIMESHEET_NUDGE,
+        self::TYPE_BUDGET_ALERT,
+    ];
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]

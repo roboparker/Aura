@@ -8,7 +8,7 @@ use App\Entity\Space;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
-use App\Service\RecurrenceCalculator;
+use App\Service\CalendarOccurrenceResolver;
 use App\Service\SpaceIriResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,11 +40,11 @@ use Symfony\Component\Uid\Uuid;
 final class CalendarController extends AbstractController
 {
     /** Widest window we'll project (a 6-week month grid is 42 days). */
-    private const MAX_RANGE_DAYS = 62;
+    private const MAX_RANGE_DAYS = CalendarOccurrenceResolver::MAX_RANGE_DAYS;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly RecurrenceCalculator $recurrence,
+        private readonly CalendarOccurrenceResolver $occurrences,
     ) {
     }
 
@@ -91,89 +91,12 @@ final class CalendarController extends AbstractController
             $boardId = $segment;
         }
 
-        $tasks = $this->fetchTasks($space, $user, $rangeStart, $rangeEnd, $boardId);
-
         $entries = [];
-        foreach ($tasks as $task) {
-            $due = $task->getDueDate();
-            if (null === $due) {
-                continue;
-            }
-            $rule = $task->getRecurrenceRule();
-            $isLiveSeries = null !== $rule && null === $task->getCompletedOn();
-
-            if (!$isLiveSeries) {
-                if ($due >= $rangeStart && $due <= $rangeEnd) {
-                    $entries[] = $this->entry($task, $due, false);
-                }
-                continue;
-            }
-
-            $occurrences = $this->recurrence->occurrencesInRange(
-                $due,
-                $rule,
-                $rangeStart,
-                $rangeEnd,
-                $task->getRecurrenceExceptions(),
-            );
-            foreach ($occurrences as $occurrence) {
-                $entries[] = $this->entry($task, $occurrence, true);
-            }
+        foreach ($this->occurrences->occurrences($space, $user, $rangeStart, $rangeEnd, $boardId) as $hit) {
+            $entries[] = $this->entry($hit['task'], $hit['occurrence'], $hit['recurring']);
         }
 
         return $this->json(['entries' => $entries]);
-    }
-
-    /**
-     * Due-dated tasks in scope for the window: anything that could contribute
-     * an occurrence — a recurring anchor on/before the end, or a non-recurring
-     * task inside the window.
-     *
-     * @return list<Task>
-     */
-    private function fetchTasks(
-        Space $space,
-        User $user,
-        \DateTimeImmutable $rangeStart,
-        \DateTimeImmutable $rangeEnd,
-        ?string $boardId,
-    ): array {
-        $qb = $this->em->getRepository(Task::class)->createQueryBuilder('t')
-            ->leftJoin('t.board', 'p')
-            ->andWhere('t.dueDate IS NOT NULL')
-            ->andWhere('t.dueDate <= :end')
-            ->andWhere('t.recurrenceRule IS NOT NULL OR t.dueDate >= :start')
-            ->setParameter('start', $rangeStart)
-            ->setParameter('end', $rangeEnd)
-            ->setParameter('space', $space);
-
-        if (null !== $boardId) {
-            // Board-tab calendar: just that board's tasks, still scoped to
-            // the space so a foreign board id resolves to nothing.
-            $qb->andWhere('p.space = :space AND p.id = :boardId')
-                ->setParameter('boardId', $boardId);
-
-            /** @var list<Task> $scoped */
-            $scoped = $qb->getQuery()->getResult();
-
-            return $scoped;
-        }
-
-        // Standalone (board-less) tasks are owner-only and only belong on the
-        // owner's personal-space calendar.
-        $personal = $space->getIsPersonal()
-            && true === $space->getCreatedBy()?->getId()?->equals($user->getId());
-        if ($personal) {
-            $qb->andWhere('p.space = :space OR (t.board IS NULL AND t.owner = :owner)')
-                ->setParameter('owner', $user);
-        } else {
-            $qb->andWhere('p.space = :space');
-        }
-
-        /** @var list<Task> $tasks */
-        $tasks = $qb->getQuery()->getResult();
-
-        return $tasks;
     }
 
     /**

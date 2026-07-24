@@ -6,8 +6,11 @@ use App\Entity\Client;
 use App\Entity\Comment;
 use App\Entity\CustomFieldDefinition;
 use App\Entity\CustomFieldValue;
+use App\Entity\Estimate;
+use App\Entity\Expense;
 use App\Entity\Invoice;
 use App\Entity\MediaObject;
+use App\Entity\Notification;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Project;
@@ -370,5 +373,101 @@ final class McpEntitySerializer
         }
 
         return $data;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function expense(Expense $expense): array
+    {
+        return [
+            'id' => (string) $expense->getId(),
+            'description' => $expense->getDescription(),
+            'amount' => $expense->getAmount(),
+            'currency' => $expense->getCurrency(),
+            'spentOn' => $expense->getSpentOn()?->format('Y-m-d'),
+            'billable' => $expense->isBillable(),
+            // Non-null means it's on an invoice and is now frozen.
+            'billedAt' => $expense->getBilledAt()?->format(\DateTimeInterface::ATOM),
+            'category' => $expense->getCategory(),
+            'hasReceipt' => null !== $expense->getReceipt(),
+            'project' => $this->projectSummary($expense->getProject()),
+            'user' => null === $expense->getUser() ? null : $this->userSummary($expense->getUser()),
+            'spaceId' => (string) $expense->getSpace()?->getId(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function estimate(Estimate $estimate): array
+    {
+        return [
+            'id' => (string) $estimate->getId(),
+            'number' => $estimate->getNumber(),
+            'status' => $estimate->getStatus(),
+            'currency' => $estimate->getCurrency(),
+            'subtotal' => $estimate->getSubtotal(),
+            'taxAmount' => $estimate->getTaxAmount(),
+            'total' => $estimate->getTotal(),
+            'client' => null === $estimate->getClient() ? null : [
+                'id' => (string) $estimate->getClient()->getId(),
+                'name' => $estimate->getClient()->getName(),
+            ],
+            'sentAt' => $estimate->getSentAt()?->format(\DateTimeInterface::ATOM),
+            'decidedAt' => $estimate->getDecidedAt()?->format(\DateTimeInterface::ATOM),
+            // Set once the estimate has been turned into a real invoice.
+            'convertedInvoiceId' => null === $estimate->getConvertedInvoice()
+                ? null
+                : (string) $estimate->getConvertedInvoice()->getId(),
+            'spaceId' => (string) $estimate->getSpace()?->getId(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function notification(Notification $notification): array
+    {
+        return [
+            'id' => (string) $notification->getId(),
+            'type' => $notification->getType(),
+            'title' => $notification->getTitle(),
+            'body' => $notification->getBody(),
+            'read' => $notification->isRead(),
+            'createdAt' => $notification->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            // Where this notification points, so the model can follow up
+            // without reverse-engineering the target from the body text.
+            'targetPath' => $notification->getTargetPath(),
+            'targetLabel' => $notification->getTargetLabel(),
+            'contextLabel' => $notification->getContextLabel(),
+            'actor' => null === $notification->getActor() ? null : $this->userSummary($notification->getActor()),
+        ];
+    }
+
+    /**
+     * One projected calendar occurrence. `occurrenceDate` is the date this
+     * instance falls on, which for a recurring task is *not* the task's own
+     * due date — that distinction is the whole point of the calendar view.
+     *
+     * @return array<string, mixed>
+     */
+    public function calendarOccurrence(Task $task, \DateTimeImmutable $occurrence, bool $recurring): array
+    {
+        $board = $task->getBoard();
+
+        return [
+            'taskId' => (string) $task->getId(),
+            'title' => $task->getTitle(),
+            'occurrenceDate' => $occurrence->format('Y-m-d'),
+            'recurring' => $recurring,
+            'dueDate' => $task->getDueDate()?->format(\DateTimeInterface::ATOM),
+            'completedOn' => $task->getCompletedOn()?->format(\DateTimeInterface::ATOM),
+            'board' => null === $board ? null : $this->boardSummary($board),
+            'assignees' => array_map(
+                fn (User $assignee) => $this->userSummary($assignee),
+                $task->getAssignees()->toArray(),
+            ),
+        ];
     }
 }
