@@ -71,7 +71,10 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | File        | `upload_file`, `list_files`, `download_file`                                   |
 | Custom field| `get_custom_fields`                                                            |
 | Time        | `list_projects`, `list_time_entries`, `log_time`, `start_timer`, `stop_timer`  |
-| Invoicing   | `list_clients`, `list_invoices`, `get_invoice`                                 |
+| Expenses    | `list_expenses`, `log_expense`                                                 |
+| Invoicing   | `list_clients`, `list_invoices`, `get_invoice`, `list_estimates`               |
+| Calendar    | `list_calendar_events`                                                         |
+| Notifications| `list_notifications`, `mark_notifications_read`                               |
 
 Call `tools/list` to inspect each tool's JSON Schema. Tools execute as the user that owns the bearer token; visibility, edit, and delete rules mirror the existing API Platform `security:` expressions on each entity.
 
@@ -107,8 +110,30 @@ REST processor so the two surfaces can't drift.
 
 Invoice *creation* is deliberately absent: generating one is a period-selection
 and entry-selection flow with real financial consequences, and it stays in the
-web UI for now. The tools cover reading invoices and the daily time-tracking
-loop.
+web UI for now. The tools cover reading invoices and estimates plus the daily
+time- and expense-tracking loop.
+
+**Expenses ride `time_entries`, not `invoices`** — recording a cost is a
+tracking concern like logging time (everyone records their own), distinct from
+seeing what the business bills. `list_estimates`, by contrast, rides `invoices`.
+This mirrors the REST `security:` expressions exactly.
+
+### Calendar and notifications
+
+`list_calendar_events` projects a space's due-dated tasks onto a date window,
+**expanding recurring series into one entry per occurrence** — a weekly task
+appears on each of its dates, not once on its anchor. Both this tool and
+`GET /calendar` share `App\Service\CalendarOccurrenceResolver` so the recurrence
+math can't diverge; each owns only its serialization. The window is capped at
+`CalendarOccurrenceResolver::MAX_RANGE_DAYS` (62) so an unbounded range can't
+materialise an unbounded number of occurrences.
+
+`list_notifications` / `mark_notifications_read` operate on the caller's own
+inbox — a notification has exactly one recipient, so scoping is a recipient
+filter with no space permission involved. `mark_notifications_read` requires
+explicit `notificationIds` **or** `all: true`; there is no implicit "clear
+everything", because an inbox the user hasn't read is precisely what an agent
+shouldn't wipe by omission.
 
 ## Errors
 
