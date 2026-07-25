@@ -10,11 +10,14 @@ import { apiGet } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { formatMoney } from "@/lib/invoiceTypes";
 import PageHeader from "@/components/common/PageHeader";
+import AnalyticsDashboard from "@/components/reports/AnalyticsDashboard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+type ReportTab = "dashboard" | "summary" | "uninvoiced";
 
 const GROUP_BYS = [
   { value: "project", label: "Project" },
@@ -92,7 +95,7 @@ const ReportsPage = () => {
   const { activeSpace, can } = useActiveSpace();
   const router = useRouter();
 
-  const [tab, setTab] = useState<"summary" | "uninvoiced">("summary");
+  const [tab, setTab] = useState<ReportTab>("dashboard");
   const [from, setFrom] = useState(monthStart);
   const [to, setTo] = useState(todayInput);
   const [groupBy, setGroupBy] = useState("project");
@@ -172,28 +175,36 @@ const ReportsPage = () => {
         <title>Reports — Madori</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
-        <div className="mx-auto max-w-4xl">
+        {/* The dashboard lays out two chart columns and wants the extra room;
+            the tables read better constrained. */}
+        <div className={tab === "dashboard" ? "mx-auto max-w-6xl" : "mx-auto max-w-4xl"}>
           <PageHeader
             title="Reports"
             icon={<BarChart3 className="size-6 text-violet-600 dark:text-violet-400" />}
           />
 
-          {!canView ? (
-            <Alert>
-              <AlertDescription>
-                Reports are limited to members with invoicing access.
-              </AlertDescription>
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertDescription>{error}</AlertDescription>
             </Alert>
-          ) : (
-            <>
-              {error && (
-                <Alert variant="destructive" className="mb-4">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+          )}
 
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="inline-flex rounded-md border p-0.5" role="tablist">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex rounded-md border p-0.5" role="tablist">
+              <Button
+                variant={tab === "dashboard" ? "secondary" : "ghost"}
+                size="sm"
+                role="tab"
+                aria-selected={tab === "dashboard"}
+                onClick={() => setTab("dashboard")}
+              >
+                Dashboard
+              </Button>
+              {/* The tabular reports are invoicing-only; the dashboard isn't,
+                  because it also carries time metrics and drops the money ones
+                  server-side for anyone who can't read them. */}
+              {canView && (
+                <>
                   <Button
                     variant={tab === "summary" ? "secondary" : "ghost"}
                     size="sm"
@@ -212,12 +223,20 @@ const ReportsPage = () => {
                   >
                     Uninvoiced
                   </Button>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => void downloadCsv()}>
-                  <Download className="h-4 w-4" /> Export CSV
-                </Button>
-              </div>
+                </>
+              )}
+            </div>
+            {tab !== "dashboard" && (
+              <Button variant="outline" size="sm" onClick={() => void downloadCsv()}>
+                <Download className="h-4 w-4" /> Export CSV
+              </Button>
+            )}
+          </div>
 
+          {tab === "dashboard" && <AnalyticsDashboard spaceId={spaceId} />}
+
+          {canView && (
+            <>
               {tab === "summary" && (
                 <>
                   <div className="mb-4 flex flex-wrap items-end gap-3">

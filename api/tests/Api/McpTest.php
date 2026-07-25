@@ -568,6 +568,83 @@ class McpTest extends ApiTestCase
         $this->assertStringContainsString('scope', $content[0]['text']);
     }
 
+    public function testGetAnalyticsReturnsSeriesForASpaceAdmin(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_analytics',
+            'arguments' => ['spaceId' => (string) $space->getId(), 'interval' => 'month'],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+
+        $keys = $this->analyticsMetricKeys($body);
+        $this->assertContains('invoiced', $keys);
+        $this->assertContains('tracked_time', $keys);
+    }
+
+    /**
+     * The gate that only exists on the MCP side: this one tool spans two
+     * permission categories, so a token narrowed to invoices must not pull the
+     * owner's time metrics through it.
+     */
+    public function testGetAnalyticsHonoursTheTokensOwnScopePerMetric(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $space = $this->makeSpace($alice);
+        $plain = $this->mintToken($alice, 'Invoices only', accessPolicy: [
+            'categories' => ['invoices' => 'view'],
+            'items' => [],
+        ]);
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_analytics',
+            'arguments' => ['spaceId' => (string) $space->getId()],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+
+        $keys = $this->analyticsMetricKeys($body);
+        $this->assertContains('invoiced', $keys, 'The token is scoped to invoices.');
+        $this->assertNotContains(
+            'tracked_time',
+            $keys,
+            'A token scoped to invoices must not widen into time metrics.',
+        );
+    }
+
+    public function testGetAnalyticsRejectsForeignSpacesAndBadInput(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $theirs = $this->makeSpace($bob, 'Bob Space');
+        $mine = $this->makeSpace($alice);
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_analytics',
+            'arguments' => ['spaceId' => (string) $theirs->getId()],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_analytics',
+            'arguments' => ['spaceId' => (string) $mine->getId(), 'interval' => 'fortnight'],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_analytics',
+            'arguments' => ['spaceId' => (string) $mine->getId(), 'metrics' => ['profit']],
+        ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
     public function testEveryRegisteredToolHasAPolicyMapping(): void
     {
         // Guards against a new MCP tool silently defaulting to "allowed under
@@ -895,6 +972,38 @@ class McpTest extends ApiTestCase
         $this->entityManager->persist($field);
         $this->entityManager->flush();
         return $field;
+    }
+
+    /**
+     * The metric keys in a `get_analytics` tool result. Tool payloads come back
+     * as JSON inside the text content block, so it has to be decoded first.
+     *
+     * @param array<string, mixed> $body
+     *
+     * @return list<string>
+     */
+    private function analyticsMetricKeys(array $body): array
+    {
+        $result = $body['result'] ?? null;
+        $this->assertIsArray($result);
+        $content = $result['content'] ?? null;
+        $this->assertIsArray($content);
+        $this->assertIsArray($content[0]);
+        $this->assertIsString($content[0]['text']);
+
+        $payload = json_decode($content[0]['text'], true);
+        $this->assertIsArray($payload);
+        $metrics = $payload['metrics'] ?? null;
+        $this->assertIsArray($metrics);
+
+        $keys = [];
+        foreach ($metrics as $metric) {
+            $this->assertIsArray($metric);
+            $this->assertIsString($metric['key']);
+            $keys[] = $metric['key'];
+        }
+
+        return $keys;
     }
 
     private function createUser(string $email): User

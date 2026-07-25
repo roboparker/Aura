@@ -83,6 +83,11 @@ final class McpToolPolicy
         'list_invoices' => ['category' => 'invoices', 'write' => false],
         'get_invoice' => ['category' => 'invoices', 'write' => false],
         'list_estimates' => ['category' => 'invoices', 'write' => false],
+        // Analytics spans invoices AND time_entries. Gated here at the
+        // stricter of the two, then filtered per metric inside the tool
+        // against both the space role and the token's own policy — so a
+        // token scoped to invoices can't pull time metrics through it.
+        'get_analytics' => ['category' => 'invoices', 'write' => false],
         // calendar — a projection of tasks, so it rides the tasks scope.
         'list_calendar_events' => ['category' => 'tasks', 'write' => false],
         // notifications are recipient-scoped rather than space-scoped.
