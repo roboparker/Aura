@@ -76,6 +76,7 @@ import {
   isGlobalDefinition,
   showsOnSurface,
   visibilitySurfaces,
+  TIMELINE_START_SYSTEM_KEY,
 } from "@/components/custom-fields/types";
 import {
   makeValuePair,
@@ -90,6 +91,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import {
   DropdownMenu,
@@ -126,9 +128,11 @@ interface Board {
   owner: Member;
   members: Member[];
   space: string | SpaceRef;
-  /** Timeline (#timeline): the date field IRI driving the bar start, or null. */
-  timelineStartField?: string | null;
-  timelineStartGlobalField?: string | null;
+  /**
+   * Timeline (#timeline): when true, the Gantt tab is active and the canonical
+   * global "Start date" field is attached to this board (the server keeps it so).
+   */
+  timelineEnabled?: boolean;
 }
 
 interface BoardTask {
@@ -599,6 +603,16 @@ const BoardDetail = () => {
     [definitions],
   );
 
+  // Timeline (#timeline): the canonical global "Start date" field drives bar
+  // starts. It's attached to the board (so it's in `definitions`) whenever the
+  // feature is on; resolve its IRI for the Gantt, or null when off.
+  const timelineStartFieldIri = useMemo(() => {
+    if (!board?.timelineEnabled) return null;
+    return (
+      definitions.find((d) => d.systemKey === TIMELINE_START_SYSTEM_KEY)?.["@id"] ?? null
+    );
+  }, [board?.timelineEnabled, definitions]);
+
   // The assignee picker must only offer users who can actually be assigned
   // to this board's tasks — its space members — not the caller's whole
   // assignable universe (which spans every space they're in). On a private
@@ -896,33 +910,30 @@ const BoardDetail = () => {
     }
   };
 
-  // Timeline (#timeline): set (or clear) which date field drives the bar start.
-  // Local vs global fields live in separate FK columns, so key the write by the
-  // definition's source — same split as the custom-field visibility toggle.
-  const handleSetTimelineField = useCallback(
-    async (fieldIri: string | null) => {
+  // Timeline (#timeline): flip the feature on/off. Enabling attaches the
+  // canonical global "Start date" field server-side (BoardTimelineProcessor),
+  // so a reload of the board's field set is needed to pick it up.
+  const handleSetTimelineEnabled = useCallback(
+    async (enabled: boolean) => {
       if (!board) return;
-      const body =
-        fieldIri === null
-          ? { timelineStartField: null, timelineStartGlobalField: null }
-          : isGlobalDefinition(fieldIri)
-            ? { timelineStartField: null, timelineStartGlobalField: fieldIri }
-            : { timelineStartField: fieldIri, timelineStartGlobalField: null };
       try {
         const res = await fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`, {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/merge-patch+json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ timelineEnabled: enabled }),
         });
-        if (!res.ok) throw new Error("Failed to update the timeline field.");
+        if (!res.ok) throw new Error("Failed to update Timeline.");
         const data = await res.json();
         setBoard((prev) => (prev ? { ...prev, ...data } : prev));
+        // The attached global-field set changed — refresh definitions so the
+        // Start date field appears (on enable) for the timeline + task columns.
+        await load();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update the timeline field.");
+        setError(err instanceof Error ? err.message : "Failed to update Timeline.");
       }
     },
-    [board],
+    [board, load],
   );
 
   const handleMove = async () => {
@@ -1376,49 +1387,29 @@ const BoardDetail = () => {
                       </CardContent>
                     </Card>
 
-                    {/* Timeline (#timeline): pick the date field driving bar starts. */}
+                    {/* Timeline (#timeline): a single on/off toggle. Enabling
+                        attaches the shared global "Start date" field. */}
                     <Card>
-                      <CardContent className="space-y-3 pt-6">
-                        <div>
-                          <h3 className="text-sm font-medium">Timeline</h3>
-                          <p className="text-xs text-muted-foreground">
-                            Choose a date field to use as each task&apos;s start on
-                            the Timeline view. Bars run from that date to the
-                            task&apos;s due date; tasks with only a due date show as
-                            milestones.
-                          </p>
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label htmlFor="timeline-start-field">Start date field</Label>
-                          <select
-                            id="timeline-start-field"
-                            data-testid="timeline-start-field"
-                            value={
-                              board.timelineStartField ??
-                              board.timelineStartGlobalField ??
-                              ""
-                            }
-                            onChange={(e) =>
-                              void handleSetTimelineField(e.target.value || null)
-                            }
-                            className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-                          >
-                            <option value="">None — Timeline off</option>
-                            {definitions
-                              .filter((d) => d.kind === "date")
-                              .map((d) => (
-                                <option key={d["@id"]} value={d["@id"]}>
-                                  {d.name}
-                                  {isGlobalDefinition(d["@id"]) ? " (global)" : ""}
-                                </option>
-                              ))}
-                          </select>
-                          {definitions.filter((d) => d.kind === "date").length === 0 && (
-                            <p className="text-xs text-muted-foreground">
-                              This board has no date custom fields yet — add one
-                              under Custom fields first.
+                      <CardContent className="pt-6">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-medium">Timeline</h3>
+                            <p className="max-w-md text-xs text-muted-foreground">
+                              Show a Gantt view of this board. Each task&apos;s bar
+                              runs from the shared <strong>Start date</strong> field
+                              to its due date; tasks with only a due date show as
+                              milestones. Enabling adds the Start date field to this
+                              board — you can&apos;t remove it while Timeline is on.
                             </p>
-                          )}
+                          </div>
+                          <Switch
+                            data-testid="timeline-enabled-switch"
+                            checked={board.timelineEnabled ?? false}
+                            onCheckedChange={(checked) =>
+                              void handleSetTimelineEnabled(checked === true)
+                            }
+                            aria-label="Enable Timeline"
+                          />
                         </div>
                       </CardContent>
                     </Card>
@@ -1777,17 +1768,13 @@ const BoardDetail = () => {
                     boardId={board.id}
                     tasks={tasks}
                     sections={sections}
-                    startFieldIri={
-                      board.timelineStartField ?? board.timelineStartGlobalField ?? null
-                    }
+                    enabled={board.timelineEnabled ?? false}
+                    startFieldIri={timelineStartFieldIri}
                     onOpenTask={(t) => openTaskDetail(t)}
                     onMoveDue={(t, iso) => void patchTask(t, { dueDate: iso })}
                     onMoveStart={(t, dateStr) =>
-                      handleCustomFieldChange(
-                        t,
-                        board.timelineStartField ?? board.timelineStartGlobalField ?? "",
-                        dateStr,
-                      )
+                      timelineStartFieldIri &&
+                      handleCustomFieldChange(t, timelineStartFieldIri, dateStr)
                     }
                   />
                 </TabsContent>

@@ -59,21 +59,31 @@ whole feature reuses `TaskRelationship` with no schema change.
 
 ## Timeline / Gantt view (#timeline)
 
-A board-level Gantt, **opt-in per board**. We followed Notion's model — the
-view maps onto existing date fields rather than adding a blanket `Task.startDate`
-that every task in every board would carry (Asana/ClickUp/Monday's approach).
+A board-level Gantt, **opt-in per board** via a single `Board.timelineEnabled`
+toggle. We followed Notion's model — the view maps onto a date field rather than
+adding a blanket `Task.startDate` that every task in every board would carry
+(Asana/ClickUp/Monday's approach) — but pinned the start to **one canonical
+field** rather than a per-board choice.
 
-- **Bar span**: **start** = a board-configured date custom field; **end** = the
-  task's native `dueDate`. Reusing `dueDate` means there's one field to pick and
-  no second deadline that could disagree with the real one. A task with a due
-  date but no start is a **milestone diamond**; a task with neither is listed as
-  *unscheduled* below the chart rather than dropped.
-- **Config on `Board`**: a polymorphic pair `timelineStartField` (→
-  `CustomFieldDefinition`) / `timelineStartGlobalField` (→
-  `GlobalCustomFieldDefinition`), both nullable + `SET NULL`, mirroring
-  `CustomFieldValue`. `Board::validateTimeline` (class-level `Assert\Callback`)
-  enforces at-most-one, date-kind, and — for a local field — board ownership.
-  Read via `getTimelineStartDefinition()` / `hasTimeline()`.
+- **Bar span**: **start** = the canonical global "Start date" field; **end** =
+  the task's native `dueDate`. Reusing `dueDate` means no second deadline that
+  could disagree with the real one. A task with a due date but no start is a
+  **milestone diamond**; a task with neither is listed as *unscheduled* below
+  the chart rather than dropped.
+- **The start field is a seeded, system-owned global custom field.**
+  `GlobalCustomFieldDefinition` gains a nullable-unique `systemKey`; the
+  canonical row carries `SYSTEM_TIMELINE_START = 'timeline_start'`, seeded in a
+  migration. A non-null `systemKey` blocks Delete and (via `Assert\Callback`)
+  keeps the field's kind = date, so the feature can't be broken instance-wide.
+  Resolve it with `GlobalCustomFieldDefinitionRepository::findTimelineStartField()`.
+- **Presence derived from the toggle**: `App\State\BoardTimelineProcessor` (the
+  board `Patch` processor) attaches the canonical field to
+  `board.globalCustomFieldDefinitions` whenever `timelineEnabled` is true, and
+  re-adds it if a request tries to drop it. Turning Timeline off is the only way
+  to remove it. There is deliberately no validator — the processor is the write
+  step and runs *after* validation, which is why the invariant lives there (the
+  field is legitimately absent at validation time right after the toggle flips).
+  Disabling does not auto-detach, so task start values survive a toggle-off.
 - **Dependencies**: `GET /boards/{id}/dependencies`
   (`BoardTimelineController`) returns the `required` edges among the board's own
   tasks (source→target = predecessor→dependent) for the finish-to-start arrows.

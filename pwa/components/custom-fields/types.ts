@@ -116,7 +116,16 @@ export interface CustomFieldDefinition {
   nullable: boolean;
   position: number;
   visibility: CustomFieldVisibility;
+  /**
+   * Stable handle for a system global field the app provisions (e.g. the
+   * Timeline "Start date" field, `timeline_start`). Null/absent on ordinary
+   * fields; present only on global definitions.
+   */
+  systemKey?: string | null;
 }
+
+/** systemKey of the canonical global field that drives the board Timeline. */
+export const TIMELINE_START_SYSTEM_KEY = "timeline_start";
 
 /**
  * Whether a definition (or bare IRI) is an instance-wide GLOBAL field rather
