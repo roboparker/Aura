@@ -74,6 +74,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Time        | `list_projects`, `list_time_entries`, `log_time`, `start_timer`, `stop_timer`  |
 | Expenses    | `list_expenses`, `log_expense`                                                 |
 | Invoicing   | `list_clients`, `list_invoices`, `get_invoice`, `list_estimates`               |
+| Analytics   | `get_analytics`                                                                 |
 | Calendar    | `list_calendar_events`                                                         |
 | Notifications| `list_notifications`, `mark_notifications_read`                               |
 
@@ -118,6 +119,35 @@ time- and expense-tracking loop.
 tracking concern like logging time (everyone records their own), distinct from
 seeing what the business bills. `list_estimates`, by contrast, rides `invoices`.
 This mirrors the REST `security:` expressions exactly.
+
+### Analytics
+
+`get_analytics` returns the business metrics as time series — see
+[business-analytics.md](business-analytics.md) for the metric definitions. It's
+the one tool that **spans two permission categories**, and that makes its gating
+different from every other tool here.
+
+`McpToolPolicy` maps each tool to a single category, so `get_analytics` is
+mapped at the stricter of the two (`invoices`). That alone would be wrong in the
+other direction, though: a token narrowed to `invoices` would then receive its
+owner's *time* metrics too, quietly widening the scope its owner chose. So the
+tool filters again per metric, checking both gates:
+
+1. the caller's **space role** for the metric's category (money metrics need an
+   explicit grant, being `ADMIN_RESERVED`), and
+2. the calling **token's own `AccessPolicy`** for that same category, via
+   `ActorPolicyResolver`.
+
+Metrics failing either gate are omitted from the response rather than raising an
+error, so a partially-scoped token gets a shorter answer instead of a failure.
+
+Values carry no unit in the numbers themselves, so the response states them
+explicitly: money is **minor currency units** (cents), time is **seconds**. A
+model that assumes dollars reports a 100× error.
+
+`spaceId` is optional only when the caller can read exactly one space. With
+several, the tool refuses and asks for one rather than guessing — picking
+silently would produce a confidently wrong answer the model can't detect.
 
 ### Calendar and notifications
 
