@@ -140,7 +140,7 @@ const ProjectsPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Which project the side panel is showing: null (closed) | NEW (create) |
-  // an project IRI (view/edit that one).
+  // a project IRI (view/edit that one).
   const [sheetFor, setSheetFor] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [clientIri, setClientIri] = useState("");
@@ -358,7 +358,7 @@ const ProjectsPage = () => {
         <PageHeader
           title="Projects"
           icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
-          subtitle="A project has a client and a set of categories, each with an hourly rate. Time is tracked against an project + category."
+          subtitle="A project has a client and a set of categories, each with an hourly rate. Time is tracked against a project + category."
         />
 
         {loadError && (

@@ -335,7 +335,7 @@ const InvoicesPage = () => {
                                   }}
                                   className="h-9 w-64 max-w-full rounded-md border border-input bg-background px-3 text-sm"
                                 >
-                                  <option value="">Select an project…</option>
+                                  <option value="">Select a project…</option>
                                   {projects.map((eng) => (
                                     <option key={eng["@id"]} value={eng["@id"]}>
                                       {eng.name}

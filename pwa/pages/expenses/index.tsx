@@ -48,7 +48,7 @@ const openReceipt = async (receiptIri: string, onError: (m: string) => void) => 
 
 /**
  * Expense tracking (#650): inline-add list like /time — members log their
- * own expenses against an project, optionally attach a receipt, and
+ * own expenses against a project, optionally attach a receipt, and
  * invoice generation pulls the unbilled billable ones (billed = locked).
  */
 const ExpensesPage = () => {
@@ -237,7 +237,7 @@ const ExpensesPage = () => {
           {canCreate && noProjects && (
             <Alert className="mb-4">
               <AlertDescription>
-                You need an project to log expenses.{" "}
+                You need a project to log expenses.{" "}
                 <Link href="/projects" className="underline">
                   Set one up
                 </Link>{" "}

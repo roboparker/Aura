@@ -496,7 +496,7 @@ const TimePage = () => {
                                   title={
                                     canTrack
                                       ? `Start a timer on ${projectName.get(projectIri) ?? "…"} · ${categoryName.get(categoryIri) ?? "…"} (change via Add time)`
-                                      : "Pick an project first"
+                                      : "Pick a project first"
                                   }
                                   className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                                 >
