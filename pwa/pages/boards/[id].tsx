@@ -1768,6 +1768,7 @@ const BoardDetail = () => {
                     boardId={board.id}
                     tasks={tasks}
                     sections={sections}
+                    enabled={board.timelineEnabled ?? false}
                     startFieldIri={timelineStartFieldIri}
                     onOpenTask={(t) => openTaskDetail(t)}
                     onMoveDue={(t, iso) => void patchTask(t, { dueDate: iso })}

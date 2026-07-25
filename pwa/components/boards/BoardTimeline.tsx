@@ -51,7 +51,14 @@ interface BoardTimelineProps<T extends TimelineTask> {
   boardId: string;
   tasks: T[];
   sections: Section[];
-  /** The configured start-date field IRI, or null when Timeline isn't set up. */
+  /** Whether the feature is on. Drives the empty state — independent of the
+   *  field having loaded, so flipping the toggle clears the empty state at once. */
+  enabled: boolean;
+  /**
+   * The canonical Start-date field IRI, or null while it hasn't loaded yet.
+   * When enabled but null, bars fall back to milestones (dueDate only) until
+   * the field arrives.
+   */
   startFieldIri: string | null;
   onOpenTask: (task: T) => void;
   /** Persist a new due date (ISO) or clear it. */
@@ -113,6 +120,7 @@ const BoardTimeline = <T extends TimelineTask>({
   boardId,
   tasks,
   sections,
+  enabled,
   startFieldIri,
   onOpenTask,
   onMoveDue,
@@ -287,7 +295,7 @@ const BoardTimeline = <T extends TimelineTask>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom]);
 
-  if (!startFieldIri) {
+  if (!enabled) {
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed py-16 text-center">
         <CalendarRange className="h-8 w-8 text-muted-foreground" aria-hidden />
