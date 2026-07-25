@@ -632,6 +632,42 @@ class McpTest extends ApiTestCase
         $this->assertSame('parent of', $first['label']);
     }
 
+    public function testGetTaskCarriesTheSubtaskRollup(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $parent = $this->makeTask($alice, 'Parent');
+        $child = $this->makeTask($alice, 'Child');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'link_tasks',
+            'arguments' => [
+                'sourceTaskId' => (string) $parent->getId(),
+                'targetTaskId' => (string) $child->getId(),
+                'type' => 'parent',
+            ],
+        ]);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_task',
+            'arguments' => ['taskId' => (string) $parent->getId()],
+        ]);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame(['total' => 1, 'completed' => 0], $structured['subtasks']);
+
+        // A childless task still reports the zeroed shape rather than omitting
+        // the key, so the model needn't special-case it.
+        $solo = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_task',
+            'arguments' => ['taskId' => (string) $child->getId()],
+        ]);
+        $soloStructured = $solo['result']['structuredContent'] ?? null;
+        $this->assertIsArray($soloStructured);
+        $this->assertSame(['total' => 0, 'completed' => 0], $soloStructured['subtasks']);
+    }
+
     public function testLinkTasksRejectsSelfLink(): void
     {
         $alice = $this->createUser('alice@example.com');

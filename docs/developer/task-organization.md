@@ -56,6 +56,24 @@ whole feature reuses `TaskRelationship` with no schema change.
   itself survives), and an inline "add subtask" that creates a task on the
   parent's board then links it. A freshly-created task has no parent and no
   descendants, so that link can never trip either invariant.
+- **Rollup on task rows** — task *collections* carry a `subtaskProgress`
+  (`{total, completed}`) so a "2/5" badge can render per row without a request
+  each. It's attached by `App\State\TaskSubtaskProgressProvider`, which
+  decorates `TaskSearchProvenanceProvider` (itself decorating the stock
+  collection provider, which keeps access scoping / filters / pagination), and
+  adds exactly **one** batched query per page via
+  `TaskRelationshipRepository::subtaskProgressFor()`. Collection-only on
+  purpose: the drawer — the only place showing the full child list — already
+  calls `GET /tasks/{id}/subtasks`, so a per-item rollup query would buy
+  nothing. Tasks with no children keep the zeroed default, so clients never
+  null-check; the badge (`pwa/components/tasks/SubtaskProgressBadge.tsx`, on
+  board list rows and Kanban cards) hides itself at `total: 0` rather than
+  rendering `0/0` on every childless task.
+- **MCP** — `get_task` returns the same rollup as `subtasks`. The three
+  collection tools (`list_tasks`, `get_my_tasks`, `search_tasks`) go through
+  `McpEntitySerializer::tasks()` (plural), which batches the same repository
+  call; mapping over the singular `task()` instead would reintroduce the N+1,
+  which is why the plural exists.
 
 ## Timeline / Gantt view (#timeline)
 

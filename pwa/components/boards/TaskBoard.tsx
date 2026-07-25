@@ -26,6 +26,9 @@ import { Badge } from "@/components/ui/badge";
 import CustomFieldValueCell from "@/components/custom-fields/CustomFieldValueCell";
 import type { CustomFieldDefinition } from "@/components/custom-fields/types";
 import type { CustomFieldValuePair } from "@/components/tasks/CustomFieldValueList";
+import SubtaskProgressBadge, {
+  type SubtaskProgress,
+} from "@/components/tasks/SubtaskProgressBadge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +59,8 @@ export interface BoardTask {
   tags: { "@id": string; title: string }[];
   assignees: BoardUser[];
   customFieldValues: CustomFieldValuePair[];
+  /** Subtask rollup, batched onto the collection by the API. */
+  subtaskProgress?: SubtaskProgress;
 }
 
 export interface BoardColumn {
@@ -254,6 +259,7 @@ const CardBody = ({
     </p>
     <CardCustomFields task={task} definitions={definitions} />
     <div className="flex flex-wrap items-center gap-1">
+      <SubtaskProgressBadge progress={task.subtaskProgress} />
       {task.dueDate && (
         <Badge variant="secondary" className="px-1.5 py-0 text-xs font-normal">
           {dueLabel(task.dueDate)}
