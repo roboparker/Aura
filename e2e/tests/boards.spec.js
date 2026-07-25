@@ -221,6 +221,9 @@ test.describe("Boards", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
 
+    // The detail URL path is the board's IRI (/boards/{uuid}).
+    const boardIri = new URL(page.url()).pathname;
+
     // Create the parent task via the board's inline add row.
     await page.getByTestId("board-add-task").first().click();
     const titleInput = page.getByTestId("board-new-task-title");
@@ -234,17 +237,30 @@ test.describe("Boards", () => {
     // With no subtasks the badge stays hidden rather than rendering 0/0.
     await expect(row.getByTestId("subtask-progress-badge")).toHaveCount(0);
 
-    // Add a subtask from the task drawer.
-    await row.getByTestId("board-task-open-detail").click();
-    const drawer = page.locator('[data-testid="task-detail-drawer"]');
-    await expect(drawer).toBeVisible();
-    await drawer.getByTestId("subtask-add").click();
-    await drawer.getByTestId("subtask-input").fill("Child task");
-    await drawer.getByTestId("subtask-save").click();
-    await expect(drawer.getByTestId("subtask-item")).toHaveCount(1);
+    // Attach a child through the API (page.request shares the signed-in
+    // session). The drawer's add-subtask flow is covered by its own panel; what
+    // this test pins is that a real `parent` link surfaces as a row badge.
+    const listed = await page.request.get(`${BASE_URL}/tasks?itemsPerPage=50`);
+    const listedBody = await listed.json();
+    const members = listedBody.member ?? listedBody["hydra:member"] ?? [];
+    const parent = members.find((t) => t.title === "Parent task");
+    expect(parent, "parent task should exist").toBeTruthy();
+
+    const childRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title: "Child task", board: boardIri },
+    });
+    expect(childRes.status()).toBe(201);
+    const child = await childRes.json();
+
+    const linkRes = await page.request.post(`${BASE_URL}/task_relationships`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { source: parent["@id"], target: child["@id"], type: "parent" },
+    });
+    expect(linkRes.status()).toBe(201);
 
     // Reload so the row re-reads the collection: the rollup the API batches in
-    // now shows on the row without the drawer being open.
+    // now renders on the row without the drawer being open.
     await page.reload();
     const refreshed = page.locator('[data-testid="board-task-item"]', {
       hasText: "Parent task",
