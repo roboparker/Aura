@@ -29,6 +29,11 @@ final class McpToolPolicy
         'delete_task' => ['category' => 'tasks', 'write' => true],
         'assign_task' => ['category' => 'tasks', 'write' => true],
         'unassign_task' => ['category' => 'tasks', 'write' => true],
+        // task relationships (subtasks / dependencies / links) ride the tasks
+        // category — they're edits to the tasks involved.
+        'list_task_relationships' => ['category' => 'tasks', 'write' => false],
+        'link_tasks' => ['category' => 'tasks', 'write' => true],
+        'unlink_tasks' => ['category' => 'tasks', 'write' => true],
         // comments (task / page comments share one category)
         'list_task_comments' => ['category' => 'comments', 'write' => false],
         'add_task_comment' => ['category' => 'comments', 'write' => true],

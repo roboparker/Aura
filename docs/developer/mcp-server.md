@@ -62,6 +62,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Category    | Tool                                                                           |
 | ----------- | ------------------------------------------------------------------------------ |
 | Task        | `create_task`, `get_task`, `update_task`, `delete_task`, `list_tasks`, `search_tasks` |
+| Relationships| `link_tasks`, `unlink_tasks`, `list_task_relationships` (subtasks / dependencies / links) |
 | Board       | `create_board`, `get_board`, `update_board`, `delete_board`, `list_boards` |
 | Space       | `list_spaces`                                                                   |
 | Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
