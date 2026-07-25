@@ -182,6 +182,59 @@ class TaskRelationshipTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(201);
     }
 
+    /**
+     * The rollup that backs the "2/5" badge on task rows. Attached by
+     * TaskSubtaskProgressProvider in one batched query for the whole page.
+     */
+    public function testCollectionCarriesSubtaskProgress(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createProject($alice, 'Backend');
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $parent = $this->createTask($client, $board, 'Parent');
+        $doneChild = $this->createTask($client, $board, 'Done child');
+        $openChild = $this->createTask($client, $board, 'Open child');
+        $lonely = $this->createTask($client, $board, 'No children');
+
+        foreach ([$doneChild, $openChild] as $child) {
+            $client->request('POST', '/task_relationships', [
+                'json' => ['source' => $parent, 'target' => $child, 'type' => 'parent'],
+                'headers' => ['Content-Type' => 'application/ld+json'],
+            ]);
+            $this->assertResponseStatusCodeSame(201);
+        }
+
+        $client->request('PATCH', $doneChild, [
+            'json' => ['completedOn' => (new \DateTimeImmutable())->format(\DATE_ATOM)],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $body = $client->request('GET', '/tasks?itemsPerPage=50')->toArray();
+        $members = $body['member'] ?? $body['hydra:member'] ?? [];
+        $this->assertIsArray($members);
+
+        $byIri = [];
+        foreach ($members as $row) {
+            $this->assertIsArray($row);
+            $iri = $row['@id'];
+            $this->assertIsString($iri);
+            $byIri[$iri] = $row;
+        }
+
+        $parentRow = $byIri[$parent] ?? null;
+        $this->assertIsArray($parentRow);
+        $this->assertSame(['total' => 2, 'completed' => 1], $parentRow['subtaskProgress']);
+
+        // A task with no children still carries the zeroed shape, so the client
+        // never has to null-check before reading it.
+        $lonelyRow = $byIri[$lonely] ?? null;
+        $this->assertIsArray($lonelyRow);
+        $this->assertSame(['total' => 0, 'completed' => 0], $lonelyRow['subtaskProgress']);
+    }
+
     private function createTask(Client $client, Board $board, string $title): string
     {
         $task = $client->request('POST', '/tasks', [

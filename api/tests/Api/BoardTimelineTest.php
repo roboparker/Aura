@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\CustomField\CustomFieldKind;
 use App\Entity\Board;
 use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Task;
@@ -36,7 +37,35 @@ class BoardTimelineTest extends ApiTestCase
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
-        // Leaves the migration-seeded canonical Start date field in place.
+        $this->ensureCanonicalStartField();
+    }
+
+    /**
+     * Re-seed the canonical Start date field if it's missing.
+     *
+     * The migration seeds it, but a sibling suite
+     * ({@see GlobalCustomFieldDefinitionTest}) truncates the whole table in its
+     * own setUp — and since migrations are already applied, the row never comes
+     * back. That made this suite pass only on a freshly-migrated database (CI)
+     * and fail on any developer's box that had run the other suite first.
+     * Seeding here makes these tests independent of both migration state and
+     * execution order.
+     */
+    private function ensureCanonicalStartField(): void
+    {
+        $repo = static::getContainer()->get(GlobalCustomFieldDefinitionRepository::class);
+        if (null !== $repo->findTimelineStartField()) {
+            return;
+        }
+
+        $field = new GlobalCustomFieldDefinition();
+        $field->setName('Start date')
+            ->setKind(CustomFieldKind::DATE->value)
+            ->setSubtype('date')
+            ->setConfig([])
+            ->setSystemKey(GlobalCustomFieldDefinition::SYSTEM_TIMELINE_START);
+        $this->entityManager->persist($field);
+        $this->entityManager->flush();
     }
 
     public function testEnablingTimelineAttachesTheCanonicalStartField(): void

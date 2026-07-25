@@ -76,7 +76,7 @@ final class SearchTasksTool implements McpToolInterface
         $tasks = $qb->getQuery()->getResult();
         $this->warmer->warm($tasks);
         return [
-            'items' => array_map(fn (Task $task) => $this->serializer->task($task), $tasks),
+            'items' => $this->serializer->tasks($tasks),
             'query' => $query,
         ];
     }

@@ -210,6 +210,48 @@ test.describe("Boards", () => {
     await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
   });
 
+  test("adding a subtask surfaces a progress badge on the board row", async ({ page }) => {
+    const email = uniqueEmail();
+    await registerAndSignIn(page, email);
+
+    await page.goto(`${BASE_URL}/boards`);
+    const title = `Subtask board ${Date.now()}`;
+    await page.getByTestId("new-board-button").click();
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+
+    // Create the parent task via the board's inline add row.
+    await page.getByTestId("board-add-task").first().click();
+    const titleInput = page.getByTestId("board-new-task-title");
+    await titleInput.fill("Parent task");
+    await titleInput.press("Enter");
+
+    const row = page.locator('[data-testid="board-task-item"]', {
+      hasText: "Parent task",
+    });
+    await expect(row).toBeVisible();
+    // With no subtasks the badge stays hidden rather than rendering 0/0.
+    await expect(row.getByTestId("subtask-progress-badge")).toHaveCount(0);
+
+    // Add a subtask from the task drawer.
+    await row.getByTestId("board-task-open-detail").click();
+    const drawer = page.locator('[data-testid="task-detail-drawer"]');
+    await expect(drawer).toBeVisible();
+    await drawer.getByTestId("subtask-add").click();
+    await drawer.getByTestId("subtask-input").fill("Child task");
+    await drawer.getByTestId("subtask-save").click();
+    await expect(drawer.getByTestId("subtask-item")).toHaveCount(1);
+
+    // Reload so the row re-reads the collection: the rollup the API batches in
+    // now shows on the row without the drawer being open.
+    await page.reload();
+    const refreshed = page.locator('[data-testid="board-task-item"]', {
+      hasText: "Parent task",
+    });
+    await expect(refreshed.getByTestId("subtask-progress-badge")).toHaveText(/0\s*\/\s*1/);
+  });
+
   test("timeline tab renders its empty state until the feature is enabled", async ({ page }) => {
     const email = uniqueEmail();
     await registerAndSignIn(page, email);

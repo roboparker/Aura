@@ -19,7 +19,7 @@ use ApiPlatform\Metadata\Post;
 use App\Repository\TaskRepository;
 use App\State\TaskDeleteProcessor;
 use App\State\TaskOwnerProcessor;
-use App\State\TaskSearchProvenanceProvider;
+use App\State\TaskSubtaskProgressProvider;
 use App\State\TaskUpdateProcessor;
 use App\Validator\ValidAssignees;
 use App\Validator\ValidCustomFieldValues;
@@ -43,10 +43,11 @@ use Symfony\Component\Validator\Constraints as Assert;
             // client-controlled pagination the per-page size is fixed at the
             // 30-item default and the savings disappear.
             paginationClientItemsPerPage: true,
-            // Annotates results with comment / custom-field match provenance
-            // when `?search=` is present (no-op otherwise; delegates to the
-            // stock provider for access scoping + pagination).
-            provider: TaskSearchProvenanceProvider::class,
+            // Read-time annotations, chained: subtask rollup (one batched
+            // query for the page) → comment / custom-field search provenance
+            // when `?search=` is present → the stock provider, which owns
+            // access scoping, filters and pagination.
+            provider: TaskSubtaskProgressProvider::class,
         ),
         new Post(
             security: "is_granted('ROLE_USER')",
@@ -607,6 +608,38 @@ class Task
     public function setSearchMatches(array $searchMatches): static
     {
         $this->searchMatches = $searchMatches;
+        return $this;
+    }
+
+    /**
+     * Subtask completion rollup (`{total, completed}`) for the "2/5" badge on
+     * task rows. Batched in at read time by
+     * {@see App\State\TaskSubtaskProgressProvider} on collections; zeroes
+     * otherwise, so a client can always read it without a null check. Never
+     * persisted.
+     *
+     * `total: 0` means "no subtasks" — the badge hides itself rather than
+     * rendering an empty 0/0.
+     *
+     * @var array{total: int, completed: int}
+     */
+    private array $subtaskProgress = ['total' => 0, 'completed' => 0];
+
+    /**
+     * @return array{total: int, completed: int}
+     */
+    #[Groups(['task:read'])]
+    public function getSubtaskProgress(): array
+    {
+        return $this->subtaskProgress;
+    }
+
+    /**
+     * @param array{total: int, completed: int} $progress
+     */
+    public function setSubtaskProgress(array $progress): static
+    {
+        $this->subtaskProgress = $progress;
         return $this;
     }
 }

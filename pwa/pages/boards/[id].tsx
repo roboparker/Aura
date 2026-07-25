@@ -67,6 +67,9 @@ import AssigneesCombobox, {
 } from "@/components/tasks/AssigneesCombobox";
 import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import BoardTimeline from "@/components/boards/BoardTimeline";
+import SubtaskProgressBadge, {
+  type SubtaskProgress,
+} from "@/components/tasks/SubtaskProgressBadge";
 import type {
   CustomFieldDefinition,
   CustomFieldKind,
@@ -151,6 +154,8 @@ interface BoardTask {
   customFieldValues: CustomFieldValuePair[];
   /** Board section IRI, or null = the default "In progress" group. */
   section: string | null;
+  /** Subtask rollup, batched onto the collection by the API. */
+  subtaskProgress?: SubtaskProgress;
 }
 
 interface TaskSection {
@@ -2425,6 +2430,7 @@ const InlineTaskTitle = ({
       >
         {task.title}
       </button>
+      <SubtaskProgressBadge progress={task.subtaskProgress} className="ml-1.5" />
       <button
         type="button"
         onClick={onOpenDetails}

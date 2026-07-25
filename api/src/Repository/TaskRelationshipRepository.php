@@ -103,6 +103,53 @@ class TaskRelationshipRepository extends ServiceEntityRepository
     }
 
     /**
+     * Subtask counts for many parents in **one** query — the rollup behind the
+     * "2/5" badge on task rows and the MCP task payload.
+     *
+     * Batched deliberately: the per-parent alternative
+     * ({@see findChildLinksOf}) is fine for one task in the drawer, but a board
+     * page or an MCP `list_tasks` page would fan it out into an N+1. Parents
+     * with no children are simply absent from the result — callers treat a
+     * missing key as `{total: 0, completed: 0}`.
+     *
+     * @param list<string> $parentIds
+     *
+     * @return array<string, array{total: int, completed: int}>
+     */
+    public function subtaskProgressFor(array $parentIds): array
+    {
+        if ([] === $parentIds) {
+            return [];
+        }
+
+        /** @var list<array{parentId: string, total: int|string, completed: int|string}> $rows */
+        $rows = $this->createQueryBuilder('r')
+            ->select(
+                'IDENTITY(r.source) AS parentId',
+                'COUNT(child.id) AS total',
+                'SUM(CASE WHEN child.completedOn IS NULL THEN 0 ELSE 1 END) AS completed',
+            )
+            ->join('r.target', 'child')
+            ->where('r.type = :parent')
+            ->andWhere('IDENTITY(r.source) IN (:ids)')
+            ->setParameter('parent', TaskRelationship::TYPE_PARENT)
+            ->setParameter('ids', $parentIds)
+            ->groupBy('parentId')
+            ->getQuery()
+            ->getResult();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[$row['parentId']] = [
+                'total' => (int) $row['total'],
+                'completed' => (int) $row['completed'],
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * The relationship between two tasks of a given type, in either direction
      * (used to reject duplicates/reverses before insert).
      */

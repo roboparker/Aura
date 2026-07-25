@@ -19,6 +19,7 @@ use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\TimeEntry;
 use App\Entity\User;
+use App\Repository\TaskRelationshipRepository;
 
 /**
  * Plain-array serialization for the MCP tool responses. We intentionally
@@ -30,14 +31,51 @@ use App\Entity\User;
  */
 final class McpEntitySerializer
 {
+    public function __construct(private TaskRelationshipRepository $relationships)
+    {
+    }
+
     /**
+     * Serialize a whole page of tasks, batching the subtask rollup into one
+     * query. Collection tools must use this rather than mapping over
+     * {@see task()} themselves — that's what keeps `list_tasks`,
+     * `get_my_tasks` and `search_tasks` from becoming an N+1.
+     *
+     * @param list<Task> $tasks
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function tasks(array $tasks): array
+    {
+        $ids = [];
+        foreach ($tasks as $task) {
+            $ids[] = (string) $task->getId();
+        }
+        $progress = $this->relationships->subtaskProgressFor($ids);
+
+        return array_map(
+            fn (Task $task) => $this->task($task, $progress[(string) $task->getId()] ?? null),
+            $tasks,
+        );
+    }
+
+    /**
+     * @param array{total: int, completed: int}|null $subtaskProgress rollup for
+     *        this task, when the caller has one. Passed in rather than queried
+     *        here because `task()` also serializes whole pages — looking it up
+     *        per task would turn those into an N+1. Use {@see tasks()} for
+     *        collections; it batches.
+     *
      * @return array<string, mixed>
      */
-    public function task(Task $task): array
+    public function task(Task $task, ?array $subtaskProgress = null): array
     {
         return [
             'id' => (string) $task->getId(),
             'title' => $task->getTitle(),
+            // Always present so a model needn't special-case its absence;
+            // total 0 means "no subtasks".
+            'subtasks' => $subtaskProgress ?? ['total' => 0, 'completed' => 0],
             'description' => $task->getDescription(),
             'status' => null === $task->getCompletedOn() ? 'open' : 'completed',
             'completedOn' => $task->getCompletedOn()?->format(\DateTimeInterface::ATOM),
