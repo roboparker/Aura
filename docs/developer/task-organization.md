@@ -103,9 +103,14 @@ field** rather than a per-board choice.
   field is legitimately absent at validation time right after the toggle flips).
   Disabling does not auto-detach, so task start values survive a toggle-off.
 - **Dependencies**: `GET /boards/{id}/dependencies`
-  (`BoardTimelineController`) returns the `required` edges among the board's own
-  tasks (source→target = predecessor→dependent) for the finish-to-start arrows.
-  Edges crossing out of the board are dropped — the other end has no bar.
+  (`BoardTimelineController`) returns the `required` **and** `parent` edges among
+  the board's own tasks (source→target = predecessor→dependent, or parent→child)
+  in one query. `required` draws the finish-to-start arrows; `parent` drives row
+  nesting. Edges crossing out of the board are dropped — the other end has no bar.
+- **Cross-board view**: `GET /spaces/{id}/dependencies` is the space-scoped
+  sibling, for the `/timeline` page. It *keeps* links that span two boards,
+  because the space chart has a row for both ends; both ends must still be
+  inside the space, so a link reaching elsewhere never leaks.
 - **No bar endpoint**: the board page already loads tasks with their custom-field
   values, so start (the mapped field's value) and end (`dueDate`) resolve
   client-side; only the cross-task edges need a query.
@@ -115,9 +120,38 @@ field** rather than a per-board choice.
   (start via the custom-field value, end via `dueDate`). Mounts as a **Timeline**
   tab on `pwa/pages/boards/[id].tsx` next to List/Board/Calendar, empty until
   configured; the start-field picker lives under **Settings → Timeline**.
+- **Schedule analysis (read-only)** — `pwa/lib/timelineAnalysis.ts` computes two
+  things from the bars + `required` edges, and **never edits a task**:
+  - **Critical path** — the dependency chain with the longest total calendar
+    span, i.e. the sequence that actually determines the finish date. Longest
+    path over a DAG by memoised DFS, with a `visiting` guard so a cyclic
+    `required` chain terminates instead of hanging the browser (`parent` links
+    are cycle-checked server-side, `required` is not). A lone task isn't
+    highlighted — a "path" needs at least one dependency. Rendered amber *and*
+    ringed, so the signal survives for colour-blind viewers.
+  - **Violated dependencies** — a `required` edge whose dependent starts on or
+    before its prerequisite ends. Drawn as a red arrow with a count in the
+    legend.
+
+  Auto-scheduling was considered and **declined**: dragging one bar could
+  silently rewrite many people's due dates with no obvious undo. Surfacing the
+  problem and leaving the fix to a human is the deliberate trade.
+- **Subtask nesting** — `parent` edges indent child rows under their parent
+  (`nestByParent`, 12px per level, depth-capped). A task whose parent is off the
+  chart is treated as a root, which is what makes this safe on a board-scoped
+  view where the parent may live elsewhere.
+- **Cross-board page** — `pwa/pages/timeline.tsx` (`/timeline`, in the sidebar
+  under Calendar) charts every **timeline-enabled** board in the active space,
+  one group per board (the same component, with `groupBy` swapped from section
+  to board). It's `readOnly`: seeing how work lines up across boards is the
+  point, and the start-field config lives on the owning board, so rescheduling
+  stays on that board's tab.
 
 ## Tests
 
 - `App\Tests\Api\TaskSectionTest`, `App\Tests\Api\TaskRelationshipTest` (entity access + validation).
-- `App\Tests\Api\BoardTimelineTest` (start-field config validation + dependency-edge scoping).
+- `App\Tests\Api\BoardTimelineTest` (start-field config validation, board- and
+  space-scoped dependency edges, non-member 404s).
+- `pwa/lib/timelineAnalysis.test.ts` (critical path, violated dependencies,
+  nesting — including the cycle and off-chart-parent edge cases).
 - `e2e/tests/*` exercise the board UI, including the Timeline tab mount.

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
+  CalendarRange,
   ChevronDown,
   CreditCard,
   FlaskConical,
@@ -691,6 +692,7 @@ const SidebarNav = ({
   if (!isAuthenticated || !user) return null;
 
   const calendarActive = router.pathname === "/calendar";
+  const timelineActive = router.pathname === "/timeline";
 
   return (
     <div className={cn("flex flex-col", scrollable && "h-full")}>
@@ -724,6 +726,27 @@ const SidebarNav = ({
                 <Link href="/calendar">
                   <CalendarDays className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
                   <span className="truncate">Calendar</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  NAV_ITEM_CLASS,
+                  timelineActive && NAV_ITEM_ACTIVE_CLASS,
+                )}
+              >
+                <Link href="/timeline">
+                  <CalendarRange className="size-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+                  <span className="truncate">Timeline</span>
                 </Link>
               </Button>,
             )}

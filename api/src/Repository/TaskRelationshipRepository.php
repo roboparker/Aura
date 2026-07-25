@@ -74,25 +74,68 @@ class TaskRelationshipRepository extends ServiceEntityRepository
     }
 
     /**
-     * `required` edges where **both** tasks belong to the given board — the
-     * dependency arrows the Timeline view draws. Returned source→target
-     * (source required *for* target, i.e. source is the predecessor). Edges
-     * that cross out of the board are omitted, since the other end has no bar
-     * to point at here.
+     * Edges of the given types where **both** tasks sit in the given space —
+     * powering the cross-board `/timeline` view. Unlike the board-scoped
+     * sibling this keeps links that span two boards, because the space chart
+     * has a row for both ends. Both ends must still be inside the space, so a
+     * link reaching into a space the caller can't see never appears.
      *
-     * @return list<array{source: string, target: string}>
+     * @param list<string> $types
+     *
+     * @return list<array{source: string, target: string, type: string}>
      */
-    public function findRequiredEdgesInBoard(\App\Entity\Board $board): array
+    public function findEdgesInSpace(\App\Entity\Space $space, array $types): array
     {
-        /** @var list<array{source: string, target: string}> $rows */
+        if ([] === $types) {
+            return [];
+        }
+
+        /** @var list<array{source: string, target: string, type: string}> $rows */
         $rows = $this->createQueryBuilder('r')
-            ->select('IDENTITY(r.source) AS source', 'IDENTITY(r.target) AS target')
+            ->select('IDENTITY(r.source) AS source', 'IDENTITY(r.target) AS target', 'r.type AS type')
             ->join('r.source', 's')
             ->join('r.target', 't')
-            ->where('r.type = :required')
+            ->join('s.board', 'sb')
+            ->join('t.board', 'tb')
+            ->where('r.type IN (:types)')
+            ->andWhere('sb.space = :space')
+            ->andWhere('tb.space = :space')
+            ->setParameter('types', $types)
+            ->setParameter('space', $space)
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
+    }
+
+    /**
+     * Edges of the given types where **both** tasks belong to the board — what
+     * a board's Timeline tab draws. `required` becomes a dependency arrow;
+     * `parent` lets the chart nest subtask rows under their parent. Edges
+     * crossing out of the board are omitted, since the other end has no row.
+     *
+     * Direction is source→target throughout: for `required` the source is the
+     * predecessor; for `parent` the source is the parent task.
+     *
+     * @param list<string> $types
+     *
+     * @return list<array{source: string, target: string, type: string}>
+     */
+    public function findEdgesInBoard(\App\Entity\Board $board, array $types): array
+    {
+        if ([] === $types) {
+            return [];
+        }
+
+        /** @var list<array{source: string, target: string, type: string}> $rows */
+        $rows = $this->createQueryBuilder('r')
+            ->select('IDENTITY(r.source) AS source', 'IDENTITY(r.target) AS target', 'r.type AS type')
+            ->join('r.source', 's')
+            ->join('r.target', 't')
+            ->where('r.type IN (:types)')
             ->andWhere('s.board = :board')
             ->andWhere('t.board = :board')
-            ->setParameter('required', TaskRelationship::TYPE_REQUIRED)
+            ->setParameter('types', $types)
             ->setParameter('board', $board)
             ->getQuery()
             ->getResult();

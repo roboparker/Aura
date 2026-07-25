@@ -163,9 +163,15 @@ class BoardTimelineTest extends ApiTestCase
         $b = $this->seedTask($board, $alice, 'B');
         $external = $this->seedTask($other, $alice, 'External');
 
+        $c = $this->seedTask($board, $alice, 'C');
+
         $this->seedRelationship($a, $b, TaskRelationship::TYPE_REQUIRED);
+        // Crosses out of the board — no row at the far end, so it's omitted.
         $this->seedRelationship($b, $external, TaskRelationship::TYPE_REQUIRED);
+        // Not a timeline concern: neither an arrow nor nesting.
         $this->seedRelationship($a, $b, TaskRelationship::TYPE_RELATED);
+        // `parent` rides along so the chart can nest subtasks under a parent.
+        $this->seedRelationship($a, $c, TaskRelationship::TYPE_PARENT);
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -173,11 +179,67 @@ class BoardTimelineTest extends ApiTestCase
         $body = $client->request('GET', '/boards/' . $board->getId() . '/dependencies')->toArray();
         $edges = $body['edges'];
         $this->assertIsArray($edges);
+        $this->assertCount(2, $edges);
+
+        $byType = [];
+        foreach ($edges as $edge) {
+            $this->assertIsArray($edge);
+            $type = $edge['type'];
+            $this->assertIsString($type);
+            $byType[$type] = $edge;
+        }
+
+        $this->assertArrayHasKey(TaskRelationship::TYPE_REQUIRED, $byType);
+        $this->assertSame((string) $a->getId(), $byType[TaskRelationship::TYPE_REQUIRED]['source']);
+        $this->assertSame((string) $b->getId(), $byType[TaskRelationship::TYPE_REQUIRED]['target']);
+
+        $this->assertArrayHasKey(TaskRelationship::TYPE_PARENT, $byType);
+        $this->assertSame((string) $c->getId(), $byType[TaskRelationship::TYPE_PARENT]['target']);
+    }
+
+    /**
+     * The cross-board `/timeline` view reads edges for a whole space, so links
+     * spanning two boards in that space must appear (unlike the board-scoped
+     * endpoint, which drops them for lack of a row at the far end).
+     */
+    public function testSpaceDependencyEdgesSpanBoards(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createBoard($alice);
+        $other = $this->createBoard($alice, 'Other board');
+
+        $a = $this->seedTask($board, $alice, 'A');
+        $b = $this->seedTask($other, $alice, 'B');
+        $this->seedRelationship($a, $b, TaskRelationship::TYPE_REQUIRED);
+
+        $space = $board->getSpace();
+        $this->assertNotNull($space);
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/dependencies')->toArray();
+        $edges = $body['edges'];
+        $this->assertIsArray($edges);
         $this->assertCount(1, $edges);
         $edge = $edges[0];
         $this->assertIsArray($edge);
         $this->assertSame((string) $a->getId(), $edge['source']);
         $this->assertSame((string) $b->getId(), $edge['target']);
+    }
+
+    public function testSpaceDependencyEndpointHidesNonMembers(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $board = $this->createBoard($alice);
+        $space = $board->getSpace();
+        $this->assertNotNull($space);
+
+        $client = static::createClient();
+        $client->loginUser($bob);
+        $client->request('GET', '/spaces/' . $space->getId() . '/dependencies');
+        $this->assertResponseStatusCodeSame(404);
     }
 
     public function testDependencyEndpointHidesUnreadableBoards(): void
