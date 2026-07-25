@@ -23,6 +23,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Attribute\Groups;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 /**
  * Instance-wide, admin-managed custom field definition. The sibling of the
@@ -60,7 +61,10 @@ use Symfony\Component\Validator\Constraints as Assert;
             security: "is_granted('ROLE_ADMIN')",
         ),
         new Delete(
-            security: "is_granted('ROLE_ADMIN')",
+            // System fields (e.g. the Timeline start field) back a feature and
+            // must not be deletable, or the feature breaks instance-wide.
+            security: "is_granted('ROLE_ADMIN') and object.getSystemKey() === null",
+            securityMessage: 'This is a system field and cannot be deleted.',
         ),
     ],
     normalizationContext: ['groups' => ['global_custom_field_definition:read']],
@@ -81,6 +85,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
 {
     public const MAX_NAME_LENGTH = 80;
+
+    /** systemKey of the canonical global field driving the board Timeline (#timeline). */
+    public const SYSTEM_TIMELINE_START = 'timeline_start';
 
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
@@ -174,6 +181,19 @@ class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
     private \DateTimeImmutable $createdAt;
 
     /**
+     * Stable identifier for a **system** field the app itself provisions and
+     * depends on — null for ordinary admin-created fields. A non-null key marks
+     * the field undeletable (a feature relies on it) and lets code resolve it by
+     * a fixed handle instead of a name that could be renamed or localized.
+     *
+     * The Timeline feature's canonical "Start date" field carries
+     * {@see self::SYSTEM_TIMELINE_START}; see the seed in the migration.
+     */
+    #[ORM\Column(length: 32, nullable: true, unique: true)]
+    #[Groups(['global_custom_field_definition:read'])]
+    private ?string $systemKey = null;
+
+    /**
      * Boards that have opted this global field into their task view.
      * Inverse side — the join table is owned by
      * {@see Board::$globalCustomFieldDefinitions}. Backs the `?boards=`
@@ -202,6 +222,41 @@ class GlobalCustomFieldDefinition implements CustomFieldDefinitionInterface
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    public function getSystemKey(): ?string
+    {
+        return $this->systemKey;
+    }
+
+    /**
+     * The Timeline start field has to stay a date field or the feature it backs
+     * breaks. `systemKey` is read-only (off the write group), so only the kind
+     * could be edited into something incompatible — reject that.
+     */
+    #[Assert\Callback]
+    public function validateSystemField(ExecutionContextInterface $context): void
+    {
+        if (
+            self::SYSTEM_TIMELINE_START === $this->systemKey
+            && CustomFieldKind::DATE->value !== $this->kind
+        ) {
+            $context->buildViolation('The Start date field must remain a date field.')
+                ->atPath('kind')
+                ->addViolation();
+        }
+    }
+
+    public function setSystemKey(?string $systemKey): static
+    {
+        $this->systemKey = $systemKey;
+        return $this;
+    }
+
+    /** A system field the app provisions and depends on — undeletable. */
+    public function isSystem(): bool
+    {
+        return null !== $this->systemKey;
     }
 
     public function getName(): string

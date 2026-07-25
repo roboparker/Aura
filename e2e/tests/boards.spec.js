@@ -210,7 +210,7 @@ test.describe("Boards", () => {
     await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
   });
 
-  test("timeline tab renders its empty state until a start field is set", async ({ page }) => {
+  test("timeline tab renders its empty state until the feature is enabled", async ({ page }) => {
     const email = uniqueEmail();
     await registerAndSignIn(page, email);
 
@@ -222,14 +222,16 @@ test.describe("Boards", () => {
     await page.click('button[type="submit"]');
     await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
 
-    // The Timeline tab mounts the Gantt view (#timeline). With no start field
-    // configured, it must render the opt-in empty state rather than throw.
+    // The Timeline tab mounts the Gantt view (#timeline). Off by default, it
+    // must render the opt-in empty state rather than throw.
     await page.getByTestId("board-timeline-tab").click();
-    await expect(page.locator("text=Timeline isn't set up yet")).toBeVisible();
+    await expect(page.locator("text=Timeline isn't turned on")).toBeVisible();
 
-    // The picker for turning it on lives under Settings.
+    // The on/off toggle lives under Settings; flipping it clears the empty state.
     await page.getByTestId("board-settings-tab").click();
-    await expect(page.getByTestId("timeline-start-field")).toBeVisible();
+    await page.getByTestId("timeline-enabled-switch").click();
+    await page.getByTestId("board-timeline-tab").click();
+    await expect(page.locator("text=Timeline isn't turned on")).toHaveCount(0);
   });
 
   // Removed "account menu shows Boards link" — Boards is no

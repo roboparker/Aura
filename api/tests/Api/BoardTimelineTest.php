@@ -5,25 +5,23 @@ declare(strict_types=1);
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
-use App\CustomField\CustomFieldKind;
 use App\Entity\Board;
-use App\Entity\CustomFieldDefinition;
+use App\Entity\GlobalCustomFieldDefinition;
 use App\Entity\Task;
 use App\Entity\TaskRelationship;
 use App\Entity\User;
+use App\Repository\GlobalCustomFieldDefinitionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * Board Timeline (#timeline): the opt-in start-field config on the board and
- * the batched dependency-edges endpoint. The bars themselves are computed
- * client-side from data the board page already has, so the backend surface is
- * just "which field is the start" + "which required links to draw".
+ * Board Timeline (#timeline): the `timelineEnabled` toggle wires the board to
+ * the single canonical global "Start date" field — enabling attaches it, and it
+ * can't be detached while enabled. Plus the batched dependency-edges endpoint
+ * for the Gantt arrows.
  */
 class BoardTimelineTest extends ApiTestCase
 {
-    use SpaceMembershipFixture;
-
     private EntityManagerInterface $entityManager;
 
     protected function setUp(): void
@@ -35,63 +33,95 @@ class BoardTimelineTest extends ApiTestCase
 
         $this->entityManager->createQuery('DELETE FROM App\Entity\TaskRelationship')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Task')->execute();
-        $this->entityManager->createQuery('DELETE FROM App\Entity\CustomFieldDefinition')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Board')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\Space')->execute();
         $this->entityManager->createQuery('DELETE FROM App\Entity\User')->execute();
+        // Leaves the migration-seeded canonical Start date field in place.
     }
 
-    public function testConfiguringADateFieldAsTimelineStart(): void
+    public function testEnablingTimelineAttachesTheCanonicalStartField(): void
     {
         $alice = $this->createUser('alice@example.com');
         $board = $this->createBoard($alice);
-        $dateField = $this->seedField($board, 'Start', CustomFieldKind::DATE->value, 'date');
+        $startFieldIri = '/global_custom_field_definitions/' . $this->startField()->getId();
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         $body = $client->request('PATCH', '/boards/' . $board->getId(), [
-            'json' => ['timelineStartField' => '/custom_field_definitions/' . $dateField->getId()],
+            'json' => ['timelineEnabled' => true],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ])->toArray();
         $this->assertResponseIsSuccessful();
-        $configured = $body['timelineStartField'] ?? null;
-        $this->assertIsString($configured);
-        $this->assertStringContainsString((string) $dateField->getId(), $configured);
+
+        $this->assertTrue($body['timelineEnabled'] ?? false);
+        // Enabling is one action — the Start date field is now on the board.
+        $fields = $body['globalCustomFieldDefinitions'] ?? [];
+        $this->assertIsArray($fields);
+        $this->assertContains($startFieldIri, $fields);
     }
 
-    public function testANonDateFieldIsRejectedAsTheStart(): void
+    public function testTheStartFieldStaysAttachedWhileTimelineEnabled(): void
     {
         $alice = $this->createUser('alice@example.com');
         $board = $this->createBoard($alice);
-        $textField = $this->seedField($board, 'Notes', CustomFieldKind::TEXT->value, 'text');
+        $startFieldIri = '/global_custom_field_definitions/' . $this->startField()->getId();
+
+        $client = static::createClient();
+        $client->loginUser($alice);
+
+        // Enable (attaches the field), then try to drop all global fields while
+        // still enabled. The processor re-adds the timeline field, so it can't
+        // be removed without first turning the feature off.
+        $client->request('PATCH', '/boards/' . $board->getId(), [
+            'json' => ['timelineEnabled' => true],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $body = $client->request('PATCH', '/boards/' . $board->getId(), [
+            'json' => ['globalCustomFieldDefinitions' => []],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $fields = $body['globalCustomFieldDefinitions'] ?? [];
+        $this->assertIsArray($fields);
+        $this->assertContains($startFieldIri, $fields);
+    }
+
+    public function testDisablingTimelineThenRemovingTheFieldIsAllowed(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->createBoard($alice);
 
         $client = static::createClient();
         $client->loginUser($alice);
 
         $client->request('PATCH', '/boards/' . $board->getId(), [
-            'json' => ['timelineStartField' => '/custom_field_definitions/' . $textField->getId()],
+            'json' => ['timelineEnabled' => true],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
-        // A text field can't drive a date bar — 422, not a silent accept.
-        $this->assertResponseStatusCodeSame(422);
+        $this->assertResponseIsSuccessful();
+
+        // Turning the feature off first is the sanctioned way to drop the field.
+        $body = $client->request('PATCH', '/boards/' . $board->getId(), [
+            'json' => ['timelineEnabled' => false, 'globalCustomFieldDefinitions' => []],
+            'headers' => ['Content-Type' => 'application/merge-patch+json'],
+        ])->toArray();
+        $this->assertResponseIsSuccessful();
+        $this->assertFalse($body['timelineEnabled'] ?? true);
     }
 
-    public function testAFieldFromAnotherBoardIsRejected(): void
+    public function testTheCanonicalStartFieldCannotBeDeleted(): void
     {
-        $alice = $this->createUser('alice@example.com');
-        $board = $this->createBoard($alice);
-        $other = $this->createBoard($alice, 'Other board');
-        $foreignField = $this->seedField($other, 'Start', CustomFieldKind::DATE->value, 'date');
+        $admin = $this->createUser('admin@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
 
         $client = static::createClient();
-        $client->loginUser($alice);
+        $client->loginUser($admin);
 
-        $client->request('PATCH', '/boards/' . $board->getId(), [
-            'json' => ['timelineStartField' => '/custom_field_definitions/' . $foreignField->getId()],
-            'headers' => ['Content-Type' => 'application/merge-patch+json'],
-        ]);
-        $this->assertResponseStatusCodeSame(422);
+        // Even an admin can't delete a system field — the feature depends on it.
+        $client->request('DELETE', '/global_custom_field_definitions/' . $this->startField()->getId());
+        $this->assertResponseStatusCodeSame(403);
     }
 
     public function testDependencyEdgesAreScopedToTheBoard(): void
@@ -104,11 +134,8 @@ class BoardTimelineTest extends ApiTestCase
         $b = $this->seedTask($board, $alice, 'B');
         $external = $this->seedTask($other, $alice, 'External');
 
-        // A required-for B (both in board) — should appear.
         $this->seedRelationship($a, $b, TaskRelationship::TYPE_REQUIRED);
-        // B required-for a task in another board — must NOT appear (no bar to point at).
         $this->seedRelationship($b, $external, TaskRelationship::TYPE_REQUIRED);
-        // A 'related' link between board tasks is not a dependency — excluded.
         $this->seedRelationship($a, $b, TaskRelationship::TYPE_RELATED);
 
         $client = static::createClient();
@@ -138,6 +165,15 @@ class BoardTimelineTest extends ApiTestCase
 
     // ---- fixtures -------------------------------------------------------
 
+    private function startField(): GlobalCustomFieldDefinition
+    {
+        $repo = static::getContainer()->get(GlobalCustomFieldDefinitionRepository::class);
+        $field = $repo->findTimelineStartField();
+        assert($field instanceof GlobalCustomFieldDefinition);
+
+        return $field;
+    }
+
     private function createBoard(User $owner, string $title = 'Roadmap'): Board
     {
         $board = new Board();
@@ -147,22 +183,6 @@ class BoardTimelineTest extends ApiTestCase
         $this->entityManager->flush();
 
         return $board;
-    }
-
-    private function seedField(Board $board, string $name, string $kind, string $subtype): CustomFieldDefinition
-    {
-        $field = new CustomFieldDefinition();
-        $field->setBoard($board)
-            ->setName($name)
-            ->setKind($kind)
-            ->setSubtype($subtype)
-            ->setConfig([])
-            ->setPosition(0);
-        $board->addCustomFieldDefinition($field);
-        $this->entityManager->persist($field);
-        $this->entityManager->flush();
-
-        return $field;
     }
 
     private function seedTask(Board $board, User $owner, string $title): Task
@@ -185,13 +205,16 @@ class BoardTimelineTest extends ApiTestCase
         $this->entityManager->flush();
     }
 
-    private function createUser(string $email): User
+    /**
+     * @param list<string> $roles
+     */
+    private function createUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
 
         $user = new User();
         $user->setEmail($email);
-        $user->setRoles(['ROLE_USER']);
+        $user->setRoles($roles);
         $user->setGivenName('Test');
         $user->setFamilyName('User');
         $user->setPersonalizedColor('#0369a1');

@@ -291,11 +291,10 @@ const BoardTimeline = <T extends TimelineTask>({
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed py-16 text-center">
         <CalendarRange className="h-8 w-8 text-muted-foreground" aria-hidden />
-        <p className="font-medium">Timeline isn&apos;t set up yet</p>
+        <p className="font-medium">Timeline isn&apos;t turned on</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Pick a date field to use as each task&apos;s start in the board&apos;s
-          Settings → Timeline. Bars then run from that date to the task&apos;s due
-          date.
+          Enable Timeline in the board&apos;s Settings to plan tasks on a Gantt
+          chart. Each bar runs from its Start date to its due date.
         </p>
       </div>
     );
