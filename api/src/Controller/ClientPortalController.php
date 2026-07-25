@@ -47,7 +47,10 @@ class ClientPortalController extends AbstractController
         private PaymentGatewayRegistry $gateways,
         private EstimateMailer $estimateMailer,
         private MailDispatcher $mail,
-        #[Autowire('%env(default::APP_FRONTEND_URL)%')]
+        // `string:` guards the non-nullable param: `default::` resolves an unset
+        // *or empty* env var to null, which would fatal on construction rather
+        // than degrade (same trap as the Stripe keys).
+        #[Autowire('%env(string:default::APP_FRONTEND_URL)%')]
         private string $frontendUrl,
     ) {
     }

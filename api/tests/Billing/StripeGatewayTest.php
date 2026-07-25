@@ -74,6 +74,23 @@ class StripeGatewayTest extends TestCase
         $this->assertFalse((new StripeGateway(new MockHttpClient(), '', self::SECRET))->isConfigured());
     }
 
+    /**
+     * #stripe-mode: the key prefix *is* Stripe's mode switch, so the flag is
+     * derived from it. Anything that isn't an explicit live key reports test
+     * mode — a typo'd or unset key can't charge real money, and defaulting the
+     * other way would hide a sandbox behind a "live" badge.
+     */
+    public function testIsTestModeIsDerivedFromKeyPrefix(): void
+    {
+        $live = new StripeGateway(new MockHttpClient(), 'sk_live_abc123', self::SECRET);
+        $this->assertFalse($live->isTestMode());
+
+        foreach (['sk_test_abc123', '', 'rk_live_abc123', 'nonsense'] as $key) {
+            $gateway = new StripeGateway(new MockHttpClient(), $key, self::SECRET);
+            $this->assertTrue($gateway->isTestMode(), sprintf('Key "%s" should report test mode.', $key));
+        }
+    }
+
     public function testCreateCheckoutSessionReturnsUrl(): void
     {
         $response = new MockResponse((string) json_encode(['url' => 'https://checkout.stripe.test/s1']));

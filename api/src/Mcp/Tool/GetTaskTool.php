@@ -8,6 +8,7 @@ use App\Mcp\McpAuthorization;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpException;
 use App\Mcp\McpInputHelper;
+use App\Repository\TaskRelationshipRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class GetTaskTool implements McpToolInterface
@@ -17,6 +18,7 @@ final class GetTaskTool implements McpToolInterface
         private McpAuthorization $authz,
         private McpEntitySerializer $serializer,
         private McpInputHelper $input,
+        private TaskRelationshipRepository $relationships,
     ) {
     }
 
@@ -27,7 +29,7 @@ final class GetTaskTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Fetch one task by id, including assignees, tags, board, and attachments. Returns 404 when the task is not visible to the caller.';
+        return 'Fetch one task by id, including assignees, tags, board, attachments, and its subtask rollup. Returns 404 when the task is not visible to the caller.';
     }
 
     public function getInputSchema(): array
@@ -49,6 +51,8 @@ final class GetTaskTool implements McpToolInterface
         if (null === $task || !$this->authz->canReadTask($task, $user)) {
             throw McpException::notFound(sprintf('Task %s', $taskId));
         }
-        return $this->serializer->task($task);
+        $progress = $this->relationships->subtaskProgressFor([(string) $task->getId()]);
+
+        return $this->serializer->task($task, $progress[(string) $task->getId()] ?? null);
     }
 }

@@ -30,7 +30,128 @@ Three features structure tasks beyond a flat list: **sections** group a board's 
 - **API**: the resource exposes only `Post` / `Get` / `Delete` (security gates on `source` / `target` `isAccessibleBy` — you must be able to reach both tasks to create a link, either to delete one). Reads come through a dedicated endpoint, **`GET /tasks/{id}/relationships`** (`TaskRelationshipController`), which returns every link touching the task from that task's viewpoint — each with the resolved directional label and the other task's summary.
 - **PWA**: a **Relationships** section in the task detail drawer (`pwa/components/tasks/TaskRelationshipsPanel.tsx`) — a list grouped by label, an add form (directional type picker + task search), and a per-row remove.
 
+## Subtasks
+
+Subtasks are built **on the `parent` relationship** rather than a separate
+model — a subtask is a task that's the `target` of a `parent` link, so the
+whole feature reuses `TaskRelationship` with no schema change.
+
+- **Two extra invariants** (in `ValidTaskRelationshipValidator`, `parent` links only):
+  - **Single-parent** — a task is the `target` of at most one `parent` link, so
+    "the parent" is never ambiguous. Backed by
+    `TaskRelationshipRepository::findParentLinkOf()`.
+  - **No cycles** — a task can't become a subtask of its own descendant. A BFS
+    down the child tree (`findChildLinksOf()`) catches the multi-hop loops that
+    the direct-pair reverse-duplicate check can't see.
+- **Read**: `GET /tasks/{id}/subtasks` (`TaskRelationshipController::subtasks`)
+  returns the ordered children, a `{total, completed}` completion rollup, and
+  the task's own `parent` link (so the drawer can show "part of *X*" without a
+  second request).
+- **Completion never cascades.** A parent is neither auto-completed nor blocked
+  by open children — the rollup is informational. (Product decision; the other
+  options were considered and rejected.)
+- **PWA**: `pwa/components/tasks/SubtasksPanel.tsx` mounts in the task drawer
+  above Relationships — a progress bar + `N/M`, a per-child complete checkbox
+  (PATCH the child) and unlink control (DELETE the relationship; the child task
+  itself survives), and an inline "add subtask" that creates a task on the
+  parent's board then links it. A freshly-created task has no parent and no
+  descendants, so that link can never trip either invariant.
+- **Rollup on task rows** — task *collections* carry a `subtaskProgress`
+  (`{total, completed}`) so a "2/5" badge can render per row without a request
+  each. It's attached by `App\State\TaskSubtaskProgressProvider`, which
+  decorates `TaskSearchProvenanceProvider` (itself decorating the stock
+  collection provider, which keeps access scoping / filters / pagination), and
+  adds exactly **one** batched query per page via
+  `TaskRelationshipRepository::subtaskProgressFor()`. Collection-only on
+  purpose: the drawer — the only place showing the full child list — already
+  calls `GET /tasks/{id}/subtasks`, so a per-item rollup query would buy
+  nothing. Tasks with no children keep the zeroed default, so clients never
+  null-check; the badge (`pwa/components/tasks/SubtaskProgressBadge.tsx`, on
+  board list rows and Kanban cards) hides itself at `total: 0` rather than
+  rendering `0/0` on every childless task.
+- **MCP** — `get_task` returns the same rollup as `subtasks`. The three
+  collection tools (`list_tasks`, `get_my_tasks`, `search_tasks`) go through
+  `McpEntitySerializer::tasks()` (plural), which batches the same repository
+  call; mapping over the singular `task()` instead would reintroduce the N+1,
+  which is why the plural exists.
+
+## Timeline / Gantt view (#timeline)
+
+A board-level Gantt, **opt-in per board** via a single `Board.timelineEnabled`
+toggle. We followed Notion's model — the view maps onto a date field rather than
+adding a blanket `Task.startDate` that every task in every board would carry
+(Asana/ClickUp/Monday's approach) — but pinned the start to **one canonical
+field** rather than a per-board choice.
+
+- **Bar span**: **start** = the canonical global "Start date" field; **end** =
+  the task's native `dueDate`. Reusing `dueDate` means no second deadline that
+  could disagree with the real one. A task with a due date but no start is a
+  **milestone diamond**; a task with neither is listed as *unscheduled* below
+  the chart rather than dropped.
+- **The start field is a seeded, system-owned global custom field.**
+  `GlobalCustomFieldDefinition` gains a nullable-unique `systemKey`; the
+  canonical row carries `SYSTEM_TIMELINE_START = 'timeline_start'`, seeded in a
+  migration. A non-null `systemKey` blocks Delete and (via `Assert\Callback`)
+  keeps the field's kind = date, so the feature can't be broken instance-wide.
+  Resolve it with `GlobalCustomFieldDefinitionRepository::findTimelineStartField()`.
+- **Presence derived from the toggle**: `App\State\BoardTimelineProcessor` (the
+  board `Patch` processor) attaches the canonical field to
+  `board.globalCustomFieldDefinitions` whenever `timelineEnabled` is true, and
+  re-adds it if a request tries to drop it. Turning Timeline off is the only way
+  to remove it. There is deliberately no validator — the processor is the write
+  step and runs *after* validation, which is why the invariant lives there (the
+  field is legitimately absent at validation time right after the toggle flips).
+  Disabling does not auto-detach, so task start values survive a toggle-off.
+- **Dependencies**: `GET /boards/{id}/dependencies`
+  (`BoardTimelineController`) returns the `required` **and** `parent` edges among
+  the board's own tasks (source→target = predecessor→dependent, or parent→child)
+  in one query. `required` draws the finish-to-start arrows; `parent` drives row
+  nesting. Edges crossing out of the board are dropped — the other end has no bar.
+- **Cross-board view**: `GET /spaces/{id}/dependencies` is the space-scoped
+  sibling, for the `/timeline` page. It *keeps* links that span two boards,
+  because the space chart has a row for both ends; both ends must still be
+  inside the space, so a link reaching elsewhere never leaks.
+- **No bar endpoint**: the board page already loads tasks with their custom-field
+  values, so start (the mapped field's value) and end (`dueDate`) resolve
+  client-side; only the cross-task edges need a query.
+- **PWA**: `pwa/components/boards/BoardTimeline.tsx` (generic over the task type)
+  — section-grouped rows, day/week/month zoom, a today line, SVG dependency
+  arrows, and pointer-drag to move a bar (shifts both dates) or resize an edge
+  (start via the custom-field value, end via `dueDate`). Mounts as a **Timeline**
+  tab on `pwa/pages/boards/[id].tsx` next to List/Board/Calendar, empty until
+  configured; the start-field picker lives under **Settings → Timeline**.
+- **Schedule analysis (read-only)** — `pwa/lib/timelineAnalysis.ts` computes two
+  things from the bars + `required` edges, and **never edits a task**:
+  - **Critical path** — the dependency chain with the longest total calendar
+    span, i.e. the sequence that actually determines the finish date. Longest
+    path over a DAG by memoised DFS, with a `visiting` guard so a cyclic
+    `required` chain terminates instead of hanging the browser (`parent` links
+    are cycle-checked server-side, `required` is not). A lone task isn't
+    highlighted — a "path" needs at least one dependency. Rendered amber *and*
+    ringed, so the signal survives for colour-blind viewers.
+  - **Violated dependencies** — a `required` edge whose dependent starts on or
+    before its prerequisite ends. Drawn as a red arrow with a count in the
+    legend.
+
+  Auto-scheduling was considered and **declined**: dragging one bar could
+  silently rewrite many people's due dates with no obvious undo. Surfacing the
+  problem and leaving the fix to a human is the deliberate trade.
+- **Subtask nesting** — `parent` edges indent child rows under their parent
+  (`nestByParent`, 12px per level, depth-capped). A task whose parent is off the
+  chart is treated as a root, which is what makes this safe on a board-scoped
+  view where the parent may live elsewhere.
+- **Cross-board page** — `pwa/pages/timeline.tsx` (`/timeline`, in the sidebar
+  under Calendar) charts every **timeline-enabled** board in the active space,
+  one group per board (the same component, with `groupBy` swapped from section
+  to board). It's `readOnly`: seeing how work lines up across boards is the
+  point, and the start-field config lives on the owning board, so rescheduling
+  stays on that board's tab.
+
 ## Tests
 
 - `App\Tests\Api\TaskSectionTest`, `App\Tests\Api\TaskRelationshipTest` (entity access + validation).
-- `e2e/tests/*` exercise the board UI.
+- `App\Tests\Api\BoardTimelineTest` (start-field config validation, board- and
+  space-scoped dependency edges, non-member 404s).
+- `pwa/lib/timelineAnalysis.test.ts` (critical path, violated dependencies,
+  nesting — including the cycle and off-chart-parent edge cases).
+- `e2e/tests/*` exercise the board UI, including the Timeline tab mount.

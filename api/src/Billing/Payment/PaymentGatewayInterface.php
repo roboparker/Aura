@@ -24,6 +24,14 @@ interface PaymentGatewayInterface
     public function isConfigured(): bool;
 
     /**
+     * Whether the provider is running against its **sandbox** rather than live
+     * money. Surfaced on the public pay page so a client can never mistake a
+     * test-card payment for a real one; an unconfigured provider reports true,
+     * since nothing real can be charged through it.
+     */
+    public function isTestMode(): bool;
+
+    /**
      * Start a payment for the invoice's outstanding total and return the hosted
      * URL the buyer is redirected to. The provider stamps enough metadata
      * (our invoice id) that its webhook can mark the invoice paid.

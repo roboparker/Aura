@@ -79,7 +79,7 @@ final class GetMyTasksTool implements McpToolInterface
         /** @var list<Task> $tasks */
         $tasks = array_values(iterator_to_array($paginator));
         $this->warmer->warm($tasks);
-        $items = array_map(fn (Task $task) => $this->serializer->task($task), $tasks);
+        $items = $this->serializer->tasks($tasks);
 
         return [
             'items' => $items,

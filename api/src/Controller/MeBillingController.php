@@ -61,6 +61,9 @@ class MeBillingController extends AbstractController
             'status' => $subscription?->getStatus(),
             'active' => null !== $subscription,
             'billingAvailable' => $this->stripe->isConfigured(),
+            // Sandbox vs live, derived from the key prefix (#stripe-mode) so
+            // the UI can never misrepresent a test payment as a real one.
+            'testMode' => $this->stripe->isTestMode(),
             'billingInterval' => $subscription?->getBillingInterval(),
             'currentPeriodEnd' => $subscription?->getCurrentPeriodEnd()?->format(\DateTimeInterface::ATOM),
             'cancelAtPeriodEnd' => $subscription?->getCancelAtPeriodEnd() ?? false,

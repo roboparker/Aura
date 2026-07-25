@@ -15,4 +15,15 @@ class GlobalCustomFieldDefinitionRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, GlobalCustomFieldDefinition::class);
     }
+
+    /**
+     * The canonical "Start date" field the board Timeline (#timeline) reads,
+     * resolved by its stable systemKey rather than name. Seeded by migration,
+     * so this is non-null in practice; callers still guard for null in case a
+     * fresh install hasn't run migrations.
+     */
+    public function findTimelineStartField(): ?GlobalCustomFieldDefinition
+    {
+        return $this->findOneBy(['systemKey' => GlobalCustomFieldDefinition::SYSTEM_TIMELINE_START]);
+    }
 }

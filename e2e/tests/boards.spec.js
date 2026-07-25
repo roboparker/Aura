@@ -210,6 +210,88 @@ test.describe("Boards", () => {
     await expect(item.locator('[data-testid="task-tag"]', { hasText: tag.title })).toBeVisible();
   });
 
+  test("adding a subtask surfaces a progress badge on the board row", async ({ page }) => {
+    const email = uniqueEmail();
+    await registerAndSignIn(page, email);
+
+    await page.goto(`${BASE_URL}/boards`);
+    const title = `Subtask board ${Date.now()}`;
+    await page.getByTestId("new-board-button").click();
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+
+    // The detail URL path is the board's IRI (/boards/{uuid}).
+    const boardIri = new URL(page.url()).pathname;
+
+    // Create the parent task via the board's inline add row.
+    await page.getByTestId("board-add-task").first().click();
+    const titleInput = page.getByTestId("board-new-task-title");
+    await titleInput.fill("Parent task");
+    await titleInput.press("Enter");
+
+    const row = page.locator('[data-testid="board-task-item"]', {
+      hasText: "Parent task",
+    });
+    await expect(row).toBeVisible();
+    // With no subtasks the badge stays hidden rather than rendering 0/0.
+    await expect(row.getByTestId("subtask-progress-badge")).toHaveCount(0);
+
+    // Attach a child through the API (page.request shares the signed-in
+    // session). The drawer's add-subtask flow is covered by its own panel; what
+    // this test pins is that a real `parent` link surfaces as a row badge.
+    const listed = await page.request.get(`${BASE_URL}/tasks?itemsPerPage=50`);
+    const listedBody = await listed.json();
+    const members = listedBody.member ?? listedBody["hydra:member"] ?? [];
+    const parent = members.find((t) => t.title === "Parent task");
+    expect(parent, "parent task should exist").toBeTruthy();
+
+    const childRes = await page.request.post(`${BASE_URL}/tasks`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { title: "Child task", board: boardIri },
+    });
+    expect(childRes.status()).toBe(201);
+    const child = await childRes.json();
+
+    const linkRes = await page.request.post(`${BASE_URL}/task_relationships`, {
+      headers: { "Content-Type": "application/ld+json" },
+      data: { source: parent["@id"], target: child["@id"], type: "parent" },
+    });
+    expect(linkRes.status()).toBe(201);
+
+    // Reload so the row re-reads the collection: the rollup the API batches in
+    // now renders on the row without the drawer being open.
+    await page.reload();
+    const refreshed = page.locator('[data-testid="board-task-item"]', {
+      hasText: "Parent task",
+    });
+    await expect(refreshed.getByTestId("subtask-progress-badge")).toHaveText(/0\s*\/\s*1/);
+  });
+
+  test("timeline tab renders its empty state until the feature is enabled", async ({ page }) => {
+    const email = uniqueEmail();
+    await registerAndSignIn(page, email);
+
+    // Create a board and land on its detail page.
+    await page.goto(`${BASE_URL}/boards`);
+    const title = `Timeline board ${Date.now()}`;
+    await page.getByTestId("new-board-button").click();
+    await page.fill("#title", title);
+    await page.click('button[type="submit"]');
+    await expect(page).toHaveURL(/\/boards\/[a-f0-9-]+/);
+
+    // The Timeline tab mounts the Gantt view (#timeline). Off by default, it
+    // must render the opt-in empty state rather than throw.
+    await page.getByTestId("board-timeline-tab").click();
+    await expect(page.locator("text=Timeline isn't turned on")).toBeVisible();
+
+    // The on/off toggle lives under Settings; flipping it clears the empty state.
+    await page.getByTestId("board-settings-tab").click();
+    await page.getByTestId("timeline-enabled-switch").click();
+    await page.getByTestId("board-timeline-tab").click();
+    await expect(page.locator("text=Timeline isn't turned on")).toHaveCount(0);
+  });
+
   // Removed "account menu shows Boards link" — Boards is no
   // longer a top-level sidebar link after the sidebar redesign
   // (#nav-refresh). The /boards page is still reachable directly

@@ -74,6 +74,68 @@ class TaskRelationshipController extends AbstractController
         return new JsonResponse(['relationships' => $items]);
     }
 
+    /**
+     * `GET /tasks/{id}/subtasks` — the task's children (the `parent` links where
+     * it's the source), with a completion rollup. Separate from the general
+     * relationships read because the subtask panel wants an ordered checklist +
+     * progress, not the flattened both-directions view.
+     */
+    #[Route('/tasks/{id}/subtasks', name: 'task_subtasks', methods: ['GET'])]
+    public function subtasks(string $id, #[CurrentUser] ?User $user): Response
+    {
+        if (null === $user) {
+            return new JsonResponse(['error' => 'Not authenticated.'], 401);
+        }
+        if (!Uuid::isValid($id)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $task = $this->em->getRepository(Task::class)->find($id);
+        if (null === $task || !$this->canRead($task, $user)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $items = [];
+        $completed = 0;
+        foreach ($this->relationships->findChildLinksOf($task) as $link) {
+            $child = $link->getTarget();
+            if (null === $child) {
+                continue;
+            }
+            $isDone = null !== $child->getCompletedOn();
+            if ($isDone) {
+                ++$completed;
+            }
+            $items[] = [
+                // The relationship IRI so the panel can unlink without a lookup.
+                'relationshipId' => (string) $link->getId(),
+                'id' => (string) $child->getId(),
+                '@id' => '/tasks/' . $child->getId(),
+                'title' => $child->getTitle(),
+                'completed' => $isDone,
+                'completedOn' => $child->getCompletedOn()?->format(\DATE_ATOM),
+                'dueDate' => $child->getDueDate()?->format(\DATE_ATOM),
+            ];
+        }
+
+        // The parent link (if this task is itself a subtask), so the drawer can
+        // show "part of <parent>" without a second request.
+        $parentLink = $this->relationships->findParentLinkOf($task);
+        $parent = $parentLink?->getSource();
+
+        return new JsonResponse([
+            'subtasks' => $items,
+            'total' => count($items),
+            'completed' => $completed,
+            'parent' => null === $parent ? null : [
+                'id' => (string) $parent->getId(),
+                '@id' => '/tasks/' . $parent->getId(),
+                'title' => $parent->getTitle(),
+                'completed' => null !== $parent->getCompletedOn(),
+            ],
+        ]);
+    }
+
     private function canRead(Task $task, User $user): bool
     {
         if ($this->isGranted('ROLE_ADMIN')) {

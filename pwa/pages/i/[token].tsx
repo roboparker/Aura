@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { Download, Receipt } from "lucide-react";
+import { Download, FlaskConical, Receipt } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { formatMoney, InvoiceStatus, STATUS_META } from "@/lib/invoiceTypes";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,12 @@ interface PublicInvoice {
   payments: { amount: number; paidOn: string; method: string | null }[];
   logoUrl: string | null;
   terms: string | null;
+  /**
+   * Stripe sandbox rather than live, derived server-side from the key prefix.
+   * Shown prominently below so a client can never mistake a test-card payment
+   * for a real one (#stripe-mode).
+   */
+  testMode?: boolean;
 }
 
 const fmtDate = (iso: string | null): string =>
@@ -144,6 +150,20 @@ const PublicInvoicePage = () => {
     const meta = STATUS_META[invoice.status];
     body = (
       <div className="space-y-6">
+        {invoice.testMode && (
+          <div
+            data-testid="invoice-test-mode-notice"
+            className="flex items-start gap-2.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+          >
+            <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <p>
+              <span className="font-semibold">Test mode.</span> This invoice is
+              connected to a payment sandbox — paying it charges nothing and
+              settles no money. Don&apos;t enter a real card.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-4">
           <div>
             {invoice.logoUrl && (

@@ -425,6 +425,10 @@ class ClientInvoiceTest extends ApiTestCase
         $this->assertSame('INV-0001', $public['number'] ?? null);
         $this->assertSame(10000, $public['total'] ?? null);
         $this->assertSame('Acme Co', $public['billTo'] ?? null);
+        // #stripe-mode: the pay page has to say when it's a sandbox, so a real
+        // client can't mistake a test-card payment for a real one. The suite's
+        // fake gateway runs in test mode.
+        $this->assertTrue($public['testMode'] ?? false);
 
         // An unknown token 404s.
         $client->request('GET', '/public/invoices/deadbeef');

@@ -13,6 +13,7 @@ use ApiPlatform\Metadata\Post;
 use App\Filter\BoardSearchFilter;
 use App\Repository\BoardRepository;
 use App\State\BoardOwnerProcessor;
+use App\State\BoardTimelineProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\Common\Collections\Criteria;
@@ -60,6 +61,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         ),
         new Patch(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or (object.isAccessibleBy(user) and is_granted('space.boards.update', object)))",
+            processor: BoardTimelineProcessor::class,
         ),
         new Delete(
             security: "is_granted('ROLE_USER') and (is_granted('ROLE_ADMIN') or object.getOwner() == user or object.isSpaceAdmin(user) or (object.isAccessibleBy(user) and is_granted('space.boards.delete', object)))",
@@ -184,6 +186,19 @@ class Board
     #[Groups(['board:read', 'board:write'])]
     private Collection $globalCustomFieldDefinitions;
 
+    /**
+     * Timeline (#timeline) opt-in. When true, the board shows the Gantt tab and
+     * the canonical global "Start date" field
+     * ({@see GlobalCustomFieldDefinition::SYSTEM_TIMELINE_START}) is attached to
+     * this board's field set — each task's bar runs from that field to its
+     * native `dueDate`. {@see \App\State\BoardTimelineProcessor} keeps the field
+     * attached for as long as this is true (re-adding it if a request tries to
+     * drop it), so turning Timeline off is the only way to remove it.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    #[Groups(['board:read', 'board:write'])]
+    private bool $timelineEnabled = false;
+
     public function __construct()
     {
         $this->createdOn = new \DateTimeImmutable();
@@ -306,6 +321,17 @@ class Board
     public function removeGlobalCustomFieldDefinition(GlobalCustomFieldDefinition $definition): static
     {
         $this->globalCustomFieldDefinitions->removeElement($definition);
+        return $this;
+    }
+
+    public function isTimelineEnabled(): bool
+    {
+        return $this->timelineEnabled;
+    }
+
+    public function setTimelineEnabled(bool $enabled): static
+    {
+        $this->timelineEnabled = $enabled;
         return $this;
     }
 

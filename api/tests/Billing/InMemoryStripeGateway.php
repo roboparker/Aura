@@ -45,9 +45,17 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
 
     public bool $configured = true;
 
+    /** Flip to false in a test to exercise the live-mode rendering. */
+    public bool $testMode = true;
+
     public function isConfigured(): bool
     {
         return $this->configured;
+    }
+
+    public function isTestMode(): bool
+    {
+        return $this->testMode;
     }
 
     public function createCheckoutSession(

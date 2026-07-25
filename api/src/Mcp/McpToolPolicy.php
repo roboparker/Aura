@@ -29,6 +29,11 @@ final class McpToolPolicy
         'delete_task' => ['category' => 'tasks', 'write' => true],
         'assign_task' => ['category' => 'tasks', 'write' => true],
         'unassign_task' => ['category' => 'tasks', 'write' => true],
+        // task relationships (subtasks / dependencies / links) ride the tasks
+        // category — they're edits to the tasks involved.
+        'list_task_relationships' => ['category' => 'tasks', 'write' => false],
+        'link_tasks' => ['category' => 'tasks', 'write' => true],
+        'unlink_tasks' => ['category' => 'tasks', 'write' => true],
         // comments (task / page comments share one category)
         'list_task_comments' => ['category' => 'comments', 'write' => false],
         'add_task_comment' => ['category' => 'comments', 'write' => true],
@@ -59,6 +64,30 @@ final class McpToolPolicy
         // so they ride the tasks scope.
         'list_tags' => ['category' => 'tasks', 'write' => false],
         'create_tag' => ['category' => 'tasks', 'write' => true],
+        // time tracking. `list_projects` returns *client* projects (the thing
+        // time is tracked against), so it rides time_entries rather than
+        // boards — a token scoped to tasks has no business reading rate cards.
+        'list_projects' => ['category' => 'time_entries', 'write' => false],
+        'list_time_entries' => ['category' => 'time_entries', 'write' => false],
+        'log_time' => ['category' => 'time_entries', 'write' => true],
+        'start_timer' => ['category' => 'time_entries', 'write' => true],
+        'stop_timer' => ['category' => 'time_entries', 'write' => true],
+        // expenses ride time_entries, not invoices — mirroring the REST
+        // security expressions, where recording a cost is a tracking concern
+        // like logging time, not visibility into what the business bills.
+        'list_expenses' => ['category' => 'time_entries', 'write' => false],
+        'log_expense' => ['category' => 'time_entries', 'write' => true],
+        // invoicing. Clients and estimates are only addressable as billing
+        // artefacts, so they ride the invoices scope.
+        'list_clients' => ['category' => 'invoices', 'write' => false],
+        'list_invoices' => ['category' => 'invoices', 'write' => false],
+        'get_invoice' => ['category' => 'invoices', 'write' => false],
+        'list_estimates' => ['category' => 'invoices', 'write' => false],
+        // calendar — a projection of tasks, so it rides the tasks scope.
+        'list_calendar_events' => ['category' => 'tasks', 'write' => false],
+        // notifications are recipient-scoped rather than space-scoped.
+        'list_notifications' => ['category' => 'notifications', 'write' => false],
+        'mark_notifications_read' => ['category' => 'notifications', 'write' => true],
     ];
 
     /** @return array{category: string, write: bool}|null */

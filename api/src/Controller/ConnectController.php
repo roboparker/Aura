@@ -34,7 +34,10 @@ class ConnectController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly StripeGatewayInterface $stripe,
-        #[Autowire('%env(default::APP_FRONTEND_URL)%')]
+        // `string:` guards the non-nullable param: `default::` resolves an unset
+        // *or empty* env var to null, which would fatal on construction rather
+        // than degrade (same trap as the Stripe keys).
+        #[Autowire('%env(string:default::APP_FRONTEND_URL)%')]
         private readonly string $frontendUrl,
     ) {
     }
