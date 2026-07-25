@@ -146,6 +146,8 @@ services:
             tags: ['app.custom_field_type']
         App\CustomField\Converter\CustomFieldTypeConverterInterface:
             tags: ['app.custom_field_converter']
+        App\Analytics\AnalyticsMetricInterface:
+            tags: ['app.analytics_metric']
 
     App\Mcp\McpToolRegistry:
         arguments:
