@@ -6,10 +6,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { CalendarRange } from "lucide-react";
+import { CalendarRange, CornerDownRight } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { cn } from "@/lib/utils";
 import { valuePairDefinitionIri } from "@/components/tasks/CustomFieldValueList";
+import { analyseSchedule, edgeKey, nestByParent } from "@/lib/timelineAnalysis";
 
 /**
  * Board Timeline (#timeline) — a Gantt view of the board's tasks.
@@ -45,12 +46,32 @@ interface Section {
 interface Edge {
   source: string;
   target: string;
+  /** 'required' → dependency arrow; 'parent' → row nesting. */
+  type: string;
 }
 
 interface BoardTimelineProps<T extends TimelineTask> {
-  boardId: string;
+  /**
+   * Where dependency edges come from. A board id keeps the chart scoped to one
+   * board; a space id unions every board in the space (the `/timeline` page).
+   */
+  boardId?: string;
+  spaceId?: string;
   tasks: T[];
+  /**
+   * Row groups. Boards pass their sections; the space-level view passes one
+   * group per board. Grouping is just labelled buckets either way, so the same
+   * chart serves both.
+   */
   sections: Section[];
+  /** Which field on a task decides its group. Defaults to `section`. */
+  groupBy?: (task: T) => string | null;
+  /**
+   * Disable rescheduling. The cross-board view is for seeing how work lines up,
+   * and the start-field config lives on the owning board — so drags belong
+   * there, not here.
+   */
+  readOnly?: boolean;
   /** Whether the feature is on. Drives the empty state — independent of the
    *  field having loaded, so flipping the toggle clears the empty state at once. */
   enabled: boolean;
@@ -118,8 +139,11 @@ interface DragState {
 
 const BoardTimeline = <T extends TimelineTask>({
   boardId,
+  spaceId,
   tasks,
   sections,
+  groupBy,
+  readOnly = false,
   enabled,
   startFieldIri,
   onOpenTask,
@@ -133,10 +157,17 @@ const BoardTimeline = <T extends TimelineTask>({
   const scrollRef = useRef<HTMLDivElement>(null);
   const dayWidth = DAY_WIDTH[zoom];
 
-  // Dependency edges for the arrows. Refetched when the board changes.
+  // Dependency + parent edges. Board-scoped, or space-scoped for /timeline.
+  const edgesUrl = spaceId
+    ? `${ENTRYPOINT}/spaces/${encodeURIComponent(spaceId)}/dependencies`
+    : boardId
+      ? `${ENTRYPOINT}/boards/${encodeURIComponent(boardId)}/dependencies`
+      : null;
+
   useEffect(() => {
+    if (!edgesUrl) return;
     let live = true;
-    void fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(boardId)}/dependencies`, {
+    void fetch(edgesUrl, {
       credentials: "include",
       headers: { Accept: "application/json" },
     })
@@ -148,7 +179,7 @@ const BoardTimeline = <T extends TimelineTask>({
     return () => {
       live = false;
     };
-  }, [boardId, tasks]);
+  }, [edgesUrl, tasks]);
 
   // Resolve each task's [start, end] in day-space.
   const rows = useMemo<Row<T>[]>(() => {
@@ -190,35 +221,59 @@ const BoardTimeline = <T extends TimelineTask>({
     [domain.min, dayWidth],
   );
 
-  // Rows grouped by section, keeping the board's section order; scheduled only.
+  // Rows grouped by section (board order), then nested so subtasks sit under
+  // their parent within the section. Scheduled rows only.
   const groups = useMemo(() => {
     const orderedSections = [
       ...sections.map((s) => ({ key: s["@id"], title: s.title })),
       { key: "__none__", title: sections.length > 0 ? "No section" : "Tasks" },
     ];
     return orderedSections
-      .map((g) => ({
-        ...g,
-        rows: scheduled.filter((r) =>
-          g.key === "__none__" ? r.task.section === null : r.task.section === g.key,
-        ),
-      }))
+      .map((g) => {
+        const keyOf = groupBy ?? ((t: T) => t.section);
+        const inSection = scheduled.filter((r) =>
+          g.key === "__none__" ? keyOf(r.task) === null : keyOf(r.task) === g.key,
+        );
+        // nestByParent keys on `id`, so hand it a shim and read the row back.
+        const nested = nestByParent(
+          inSection.map((r) => ({ id: r.task.id, row: r })),
+          edges,
+        );
+        return { ...g, rows: nested.map((n) => ({ row: n.item.row, depth: n.depth })) };
+      })
       .filter((g) => g.rows.length > 0);
-  }, [sections, scheduled]);
+  }, [sections, scheduled, edges, groupBy]);
 
   // Flatten to positioned rows so bar y-coordinates (and arrow geometry) line up.
   const positioned = useMemo(() => {
-    const out: { row: Row<T>; y: number }[] = [];
+    const out: { row: Row<T>; depth: number; y: number }[] = [];
     let y = 0;
     for (const g of groups) {
       y += ROW_H; // section header row
       for (const r of g.rows) {
-        out.push({ row: r, y });
+        out.push({ row: r.row, depth: r.depth, y });
         y += ROW_H;
       }
     }
     return { list: out, height: y };
   }, [groups]);
+
+  // Read-only schedule analysis: which bars are on the critical path, and which
+  // dependency arrows are violated. Never edits anything (see timelineAnalysis).
+  const analysis = useMemo(
+    () =>
+      analyseSchedule(
+        positioned.list
+          .filter(({ row }) => row.endDay !== null)
+          .map(({ row }) => ({
+            id: row.task.id,
+            startDay: row.startDay ?? (row.endDay as number),
+            endDay: row.endDay as number,
+          })),
+        edges,
+      ),
+    [positioned, edges],
+  );
 
   const barGeom = useMemo(() => {
     const map = new Map<string, { x: number; w: number; y: number; milestone: boolean }>();
@@ -239,6 +294,8 @@ const BoardTimeline = <T extends TimelineTask>({
     task: TimelineTask,
     mode: DragState["mode"],
   ) => {
+    // Read-only charts let the click fall through to "open task" instead.
+    if (readOnly) return;
     e.preventDefault();
     e.stopPropagation();
     const next: DragState = { taskId: task.id, mode, originX: e.clientX, deltaDays: 0 };
@@ -319,10 +376,30 @@ const BoardTimeline = <T extends TimelineTask>({
   return (
     <div className="space-y-3" data-testid="board-timeline">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {scheduled.length} scheduled
-          {unscheduled.length > 0 && ` · ${unscheduled.length} unscheduled`}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+          <span>
+            {scheduled.length} scheduled
+            {unscheduled.length > 0 && ` · ${unscheduled.length} unscheduled`}
+          </span>
+          {/* Only explain the analysis colours when they're actually on screen. */}
+          {analysis.criticalTaskIds.size > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs">
+              <span className="size-2 rounded-sm bg-amber-500" aria-hidden />
+              Critical path
+            </span>
+          )}
+          {analysis.violatedEdgeKeys.size > 0 && (
+            <span
+              className="inline-flex items-center gap-1 text-xs text-rose-600 dark:text-rose-400"
+              data-testid="timeline-violation-note"
+            >
+              <span className="size-2 rounded-sm bg-rose-500" aria-hidden />
+              {analysis.violatedEdgeKeys.size === 1
+                ? "1 dependency issue"
+                : `${analysis.violatedEdgeKeys.size} dependency issues`}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1 rounded-md border p-0.5" role="group" aria-label="Zoom">
           {(["day", "week", "month"] as Zoom[]).map((z) => (
             <button
@@ -373,14 +450,25 @@ const BoardTimeline = <T extends TimelineTask>({
                   >
                     <span className="truncate">{g.title}</span>
                   </div>
-                  {g.rows.map((r) => (
+                  {g.rows.map(({ row: r, depth }) => (
                     <button
                       key={r.task.id}
                       type="button"
                       onClick={() => onOpenTask(r.task)}
-                      style={{ height: ROW_H }}
-                      className="flex w-full items-center px-3 text-left text-sm hover:bg-accent/50"
+                      style={{
+                        height: ROW_H,
+                        // Indent subtasks under their parent (12px per level).
+                        paddingLeft: 12 + depth * 12,
+                      }}
+                      className="flex w-full items-center pr-3 text-left text-sm hover:bg-accent/50"
+                      data-testid={depth > 0 ? "timeline-row-nested" : "timeline-row"}
                     >
+                      {depth > 0 && (
+                        <CornerDownRight
+                          className="mr-1 size-3 shrink-0 text-muted-foreground/60"
+                          aria-hidden
+                        />
+                      )}
                       <span
                         className={cn(
                           "truncate",
@@ -416,27 +504,44 @@ const BoardTimeline = <T extends TimelineTask>({
                   <marker id="tl-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
                     <path d="M0,0 L6,3 L0,6 Z" className="fill-muted-foreground" />
                   </marker>
+                  <marker id="tl-arrow-bad" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                    <path d="M0,0 L6,3 L0,6 Z" className="fill-rose-500" />
+                  </marker>
                 </defs>
-                {edges.map((edge, i) => {
-                  const from = barGeom.get(edge.source);
-                  const to = barGeom.get(edge.target);
-                  if (!from || !to) return null;
-                  const x1 = from.x + from.w;
-                  const y1 = from.y + ROW_H / 2;
-                  const x2 = to.x;
-                  const y2 = to.y + ROW_H / 2;
-                  const midX = Math.max(x1 + 8, x2 - 8);
-                  return (
-                    <path
-                      key={i}
-                      d={`M${x1},${y1} H${midX} V${y2} H${x2}`}
-                      className="stroke-muted-foreground/60"
-                      strokeWidth={1.5}
-                      fill="none"
-                      markerEnd="url(#tl-arrow)"
-                    />
-                  );
-                })}
+                {/* Only `required` edges are dependencies; `parent` edges are
+                    expressed by row nesting instead of arrows. */}
+                {edges
+                  .filter((edge) => edge.type === "required")
+                  .map((edge, i) => {
+                    const from = barGeom.get(edge.source);
+                    const to = barGeom.get(edge.target);
+                    if (!from || !to) return null;
+                    const violated = analysis.violatedEdgeKeys.has(edgeKey(edge));
+                    const x1 = from.x + from.w;
+                    const y1 = from.y + ROW_H / 2;
+                    const x2 = to.x;
+                    const y2 = to.y + ROW_H / 2;
+                    const midX = Math.max(x1 + 8, x2 - 8);
+                    return (
+                      <path
+                        key={i}
+                        d={`M${x1},${y1} H${midX} V${y2} H${x2}`}
+                        className={cn(
+                          violated ? "stroke-rose-500" : "stroke-muted-foreground/60",
+                        )}
+                        strokeWidth={violated ? 2 : 1.5}
+                        fill="none"
+                        markerEnd={violated ? "url(#tl-arrow-bad)" : "url(#tl-arrow)"}
+                        data-testid={violated ? "timeline-violated-edge" : "timeline-edge"}
+                      >
+                        <title>
+                          {violated
+                            ? "This task starts before the task it depends on finishes."
+                            : "Depends on the task this arrow comes from."}
+                        </title>
+                      </path>
+                    );
+                  })}
               </svg>
 
               {/* bars */}
@@ -446,6 +551,7 @@ const BoardTimeline = <T extends TimelineTask>({
                 const isDragging = drag?.taskId === row.task.id;
                 const shift = isDragging ? drag.deltaDays * dayWidth : 0;
                 const done = row.task.completedOn !== null;
+                const critical = analysis.criticalTaskIds.has(row.task.id);
 
                 if (geom.milestone) {
                   return (
@@ -475,9 +581,13 @@ const BoardTimeline = <T extends TimelineTask>({
                     key={row.task.id}
                     className={cn(
                       "group absolute z-20 flex items-center rounded-md text-xs text-white shadow-sm",
-                      done ? "bg-emerald-500/80" : "bg-sky-500",
+                      done ? "bg-emerald-500/80" : critical ? "bg-amber-500" : "bg-sky-500",
+                      // Critical-path bars get a ring as well as a hue so the
+                      // signal survives for colour-blind viewers.
+                      critical && !done && "ring-2 ring-amber-300",
                       isDragging && "ring-2 ring-sky-300",
                     )}
+                    data-testid={critical ? "timeline-bar-critical" : "timeline-bar"}
                     style={{
                       left: geom.x,
                       top: y + 6,
@@ -485,8 +595,11 @@ const BoardTimeline = <T extends TimelineTask>({
                       height: ROW_H - 12,
                       transform: `translateX(${shift}px)`,
                     }}
-                    title={row.task.title}
-                    data-testid="timeline-bar"
+                    title={
+                      critical
+                        ? `${row.task.title} — on the critical path`
+                        : row.task.title
+                    }
                   >
                     {/* left resize handle */}
                     <span

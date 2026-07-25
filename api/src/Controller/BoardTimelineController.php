@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\Board;
+use App\Entity\Space;
+use App\Entity\TaskRelationship;
 use App\Entity\User;
 use App\Repository\TaskRelationshipRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,6 +52,42 @@ class BoardTimelineController extends AbstractController
             return new JsonResponse(['error' => 'Not found.'], 404);
         }
 
-        return new JsonResponse(['edges' => $this->relationships->findRequiredEdgesInBoard($board)]);
+        // `required` drives the dependency arrows + critical path; `parent`
+        // lets the chart nest subtask rows under their parent. Both come back
+        // in one query, tagged by type, so the client needn't ask twice.
+        $edges = $this->relationships->findEdgesInBoard($board, [
+            TaskRelationship::TYPE_REQUIRED,
+            TaskRelationship::TYPE_PARENT,
+        ]);
+
+        return new JsonResponse(['edges' => $edges]);
+    }
+
+    /**
+     * `GET /spaces/{id}/dependencies` — the same edges across every board in a
+     * space, for the cross-board `/timeline` view. Members only; a non-member
+     * gets the access extensions' existence-hiding 404.
+     */
+    #[Route('/spaces/{id}/dependencies', name: 'space_dependencies', methods: ['GET'])]
+    public function space(string $id, #[CurrentUser] ?User $user): Response
+    {
+        if (null === $user) {
+            return new JsonResponse(['error' => 'Not authenticated.'], 401);
+        }
+        if (!Uuid::isValid($id)) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $space = $this->em->getRepository(Space::class)->find($id);
+        if (null === $space || (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user))) {
+            return new JsonResponse(['error' => 'Not found.'], 404);
+        }
+
+        $edges = $this->relationships->findEdgesInSpace($space, [
+            TaskRelationship::TYPE_REQUIRED,
+            TaskRelationship::TYPE_PARENT,
+        ]);
+
+        return new JsonResponse(['edges' => $edges]);
     }
 }
