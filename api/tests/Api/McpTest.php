@@ -597,6 +597,130 @@ class McpTest extends ApiTestCase
         $this->assertNotNull($token->getLastUsedAt());
     }
 
+    public function testLinkTasksCreatesASubtaskRelationship(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $parent = $this->makeTask($alice, 'Parent');
+        $child = $this->makeTask($alice, 'Child');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'link_tasks',
+            'arguments' => [
+                'sourceTaskId' => (string) $parent->getId(),
+                'targetTaskId' => (string) $child->getId(),
+                'type' => 'parent',
+            ],
+        ]);
+
+        $this->assertFalse($body['result']['isError'] ?? null);
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $this->assertSame('parent', $structured['type']);
+        $this->assertSame('parent of', $structured['label']);
+
+        // And it's visible from the parent's viewpoint.
+        $list = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_task_relationships',
+            'arguments' => ['taskId' => (string) $parent->getId()],
+        ]);
+        $items = $this->relationshipItems($list);
+        $this->assertCount(1, $items);
+        $first = $items[0];
+        $this->assertIsArray($first);
+        $this->assertSame('parent of', $first['label']);
+    }
+
+    public function testLinkTasksRejectsSelfLink(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $task = $this->makeTask($alice, 'Solo');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'link_tasks',
+            'arguments' => [
+                'sourceTaskId' => (string) $task->getId(),
+                'targetTaskId' => (string) $task->getId(),
+                'type' => 'related',
+            ],
+        ]);
+
+        // ValidTaskRelationship's self-link rule surfaces as a tool error, not
+        // a protocol error, so the model can recover.
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
+    public function testLinkTasksHidesTasksTheCallerCannotEdit(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $mine = $this->makeTask($alice, 'Mine');
+        $bobsTask = $this->makeTask($bob, 'Private');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'link_tasks',
+            'arguments' => [
+                'sourceTaskId' => (string) $mine->getId(),
+                'targetTaskId' => (string) $bobsTask->getId(),
+                'type' => 'related',
+            ],
+        ]);
+
+        // 404-shaped: Alice learns nothing about Bob's task.
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
+    public function testUnlinkTasksRemovesTheRelationship(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $a = $this->makeTask($alice, 'A');
+        $b = $this->makeTask($alice, 'B');
+        $plain = $this->mintToken($alice, 'CLI');
+
+        $client = static::createClient();
+        $args = [
+            'sourceTaskId' => (string) $a->getId(),
+            'targetTaskId' => (string) $b->getId(),
+            'type' => 'required',
+        ];
+        $this->callMcp($client, $plain, 'tools/call', ['name' => 'link_tasks', 'arguments' => $args]);
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'unlink_tasks',
+            'arguments' => $args,
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+
+        $list = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_task_relationships',
+            'arguments' => ['taskId' => (string) $a->getId()],
+        ]);
+        $this->assertCount(0, $this->relationshipItems($list));
+    }
+
+    /**
+     * Narrow the `items` array out of a list_task_relationships tool response.
+     *
+     * @param array<string, mixed> $body
+     * @return array<array-key, mixed>
+     */
+    private function relationshipItems(array $body): array
+    {
+        $result = $body['result'] ?? null;
+        $this->assertIsArray($result);
+        $structured = $result['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'] ?? null;
+        $this->assertIsArray($items);
+
+        return $items;
+    }
+
     /**
      * Returns the JSON-RPC response body. Every site that uses this
      * helper goes through {@see assertResponseIsSuccessful()} and
