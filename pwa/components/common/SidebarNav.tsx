@@ -312,6 +312,7 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
     });
 
   const links: AdminLink[] = [
+    { href: "/admin/growth", label: "Growth", match: "/admin/growth" },
     { href: "/admin/users", label: "Users", match: "/admin/users" },
     { href: "/admin/waitlist", label: "Waitlist", match: "/admin/waitlist" },
     { href: "/admin/segments", label: "Segments", match: "/admin/segments" },

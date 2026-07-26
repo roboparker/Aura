@@ -1,0 +1,16 @@
+{# @var recipient \App\Entity\User #}
+Hi {{ recipient.givenName ?: recipient.email }},
+
+Someone just started paying.
+
+  Account   {{ who }}
+  Plan      {{ plan }}{% if seats > 1 %} x {{ seats }} seats{% endif %}
+
+  Billing   {{ interval }}ly
+  Status    {{ status }}
+{% if status == 'trialing' %}
+This one is on a trial — it converts to a charge when the trial ends.
+{% endif %}
+Growth dashboard: {{ dashboardUrl }}
+
+— Madori
