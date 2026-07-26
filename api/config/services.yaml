@@ -18,6 +18,10 @@ parameters:
     # dashboard (#763). Stripe remains the source of truth for actual revenue —
     # these ignore coupons, proration, and tax. Kept in step with
     # pwa/pages/pricing.tsx, which is what customers are actually quoted.
+    # How long automation run rows are kept (#764). A debugging aid, not an
+    # audit trail — every task edit on an automated board writes one.
+    app.automation_run_retention_days: 30
+
     app.plan_price_pro_monthly_cents: 1000
     app.plan_price_business_monthly_cents: 1500
 

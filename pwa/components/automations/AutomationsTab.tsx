@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import AutomationRunLog from "./AutomationRunLog";
 import StepConfigPanel, { type PickerOption } from "./StepConfigPanel";
 
 // React Flow is heavy and only this tab needs it.
@@ -51,6 +52,7 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
   const [draft, setDraft] = useState<AutomationGraph | null>(null);
   const [draftName, setDraftName] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [view, setView] = useState<"build" | "history">("build");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -83,6 +85,9 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
       setDraft(selectedRule.graph);
       setDraftName(selectedRule.name);
       setSelectedNodeId(null);
+      // Back to Build on rule change — carrying History over means clicking a
+      // rule to edit it lands you on a log instead.
+      setView("build");
     }
   }, [selectedRule?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -318,12 +323,37 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
               </div>
             </div>
 
-            {problem && (
+            {/* Build vs History. The log is a first-class view rather than a
+                buried panel — it's what a member opens to find out why their
+                task changed, and they can't edit anything anyway. */}
+            <div className="inline-flex rounded-md border p-0.5">
+              <Button
+                size="sm"
+                variant={view === "build" ? "secondary" : "ghost"}
+                onClick={() => setView("build")}
+              >
+                Build
+              </Button>
+              <Button
+                size="sm"
+                variant={view === "history" ? "secondary" : "ghost"}
+                onClick={() => setView("history")}
+                data-testid="rule-history-tab"
+              >
+                History
+              </Button>
+            </div>
+
+            {view === "build" && problem && (
               <Alert>
                 <AlertDescription>{problem}</AlertDescription>
               </Alert>
             )}
 
+            {view === "history" ? (
+              <AutomationRunLog automationId={selectedRule.id} />
+            ) : (
+              <>
             {/* Palette — built from the server catalog, never hardcoded. */}
             {canEdit && (
               <div className="hidden flex-wrap gap-1.5 lg:flex">
@@ -392,6 +422,8 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
                 )}
               </Card>
             </div>
+              </>
+            )}
           </div>
         )}
       </div>

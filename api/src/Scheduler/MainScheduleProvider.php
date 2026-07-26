@@ -9,6 +9,7 @@ use App\Message\DispatchTaskReminders;
 use App\Message\MarkOverdueInvoices;
 use App\Message\SpawnRecurringInvoices;
 use App\Message\PruneAccountExports;
+use App\Message\PruneAutomationRuns;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
 use App\Message\RunBackup;
@@ -89,6 +90,9 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // from a request — a date passing is not a user action — so the
                 // sweep is the only way the trigger ever fires.
                 RecurringMessage::cron('5 * * * *', new SweepDueTasks(), $utc),
+                // Automation run-log retention. 04:00 keeps it clear of the
+                // backup and the export prunes.
+                RecurringMessage::cron('0 4 * * *', new PruneAutomationRuns(), $utc),
                 // Space-export retention: delete export zips + rows past
                 // the app.space_export_retention_days window (default 7 —
                 // App\Service\SpaceExportPruner). 03:30 keeps it clear of
