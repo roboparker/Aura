@@ -64,7 +64,9 @@ class DashboardController extends AbstractController
                 $items[] = $this->serialize($widget, null);
                 continue;
             }
-            if (!$this->access->canRead($definition, $space, $user)) {
+            // Config-aware: what this instance was set to show decides who may
+            // see it, not just its type.
+            if (!$this->access->canRead($definition, $space, $user, $widget->getConfig())) {
                 continue;
             }
 
@@ -130,16 +132,17 @@ class DashboardController extends AbstractController
             return $this->json(['error' => sprintf('Unknown widget type "%s".', $type)], 422);
         }
 
-        // Adding a widget you can't read would put a permanently blank box on
-        // everyone's dashboard, so the catalog gate applies to writes too.
-        if (!$this->access->canRead($definition, $space, $user)) {
-            return $this->json(['error' => 'You do not have access to that widget.'], 403);
-        }
-
         $config = $this->configFrom($payload);
         $message = $definition->validateConfig($config);
         if (null !== $message) {
             return $this->json(['error' => $message], 422);
+        }
+
+        // Adding a widget you can't read would put a permanently blank box on
+        // everyone's dashboard, so the read gate applies to writes too. Checked
+        // against the submitted config, since that can decide the category.
+        if (!$this->access->canRead($definition, $space, $user, $config)) {
+            return $this->json(['error' => 'You do not have access to that widget.'], 403);
         }
 
         $size = $definition->defaultSize();
@@ -284,7 +287,7 @@ class DashboardController extends AbstractController
 
         $space = $widget->getSpace();
         assert($space instanceof Space);
-        if (!$this->access->canRead($definition, $space, $user)) {
+        if (!$this->access->canRead($definition, $space, $user, $widget->getConfig())) {
             return $this->json(['error' => 'Widget not found.'], 404);
         }
 

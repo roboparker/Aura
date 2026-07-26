@@ -51,10 +51,22 @@ interface WidgetDefinitionInterface
      * The `SpacePermission::*` category a viewer must be able to read, or null
      * when the widget shows nothing space-scoped (a notes widget, say).
      *
+     * **Takes the config**, because for some widgets the answer genuinely
+     * depends on it: a "metric chart" showing tracked hours and one showing
+     * revenue are the same widget type with very different audiences. Pinning
+     * such a type to a single category would either leak the money or hide the
+     * hours.
+     *
+     * Called with an empty config to probe the catalog, where no instance
+     * exists yet. A config naming something unreadable or unknown should fail
+     * closed — return the stricter category rather than null.
+     *
      * Admin-reserved categories are resolved through `canByExplicitGrant()`
      * upstream — see {@see \App\Dashboard\WidgetAccess}.
+     *
+     * @param array<string, mixed> $config
      */
-    public function permissionCategory(): ?string;
+    public function permissionCategory(array $config = []): ?string;
 
     /**
      * Starting size in grid units: width 1-4 columns, height in rows.

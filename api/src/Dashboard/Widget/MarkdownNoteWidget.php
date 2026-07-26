@@ -42,7 +42,7 @@ final class MarkdownNoteWidget implements WidgetDefinitionInterface
         return 'General';
     }
 
-    public function permissionCategory(): ?string
+    public function permissionCategory(array $config = []): ?string
     {
         // Shows nothing space-scoped: the text is written by an admin on the
         // dashboard itself, so any member who can see the dashboard can see it.

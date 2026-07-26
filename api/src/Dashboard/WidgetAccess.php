@@ -32,13 +32,24 @@ final class WidgetAccess
     }
 
     /**
-     * Whether `$user` may see `$widget` in `$space`.
+     * Whether `$user` may see `$widget`, as configured, in `$space`.
+     *
+     * `$config` matters because a widget's required category can depend on what
+     * it was set to show — a metric chart of hours and one of revenue are the
+     * same type. Pass the instance's config on an instance path; leave it empty
+     * to probe the catalog.
      *
      * A widget declaring no category is visible to any member — that's a claim
      * the widget makes about showing nothing space-scoped, not a fallback.
+     *
+     * @param array<string, mixed> $config
      */
-    public function canRead(WidgetDefinitionInterface $widget, Space $space, User $user): bool
-    {
+    public function canRead(
+        WidgetDefinitionInterface $widget,
+        Space $space,
+        User $user,
+        array $config = [],
+    ): bool {
         if (!$space->hasMember($user)) {
             return false;
         }
@@ -46,7 +57,7 @@ final class WidgetAccess
             return true;
         }
 
-        $category = $widget->permissionCategory();
+        $category = $widget->permissionCategory($config);
         if (null === $category) {
             return true;
         }

@@ -75,6 +75,89 @@ class DashboardWidgetTest extends ApiTestCase
         }
     }
 
+    /**
+     * The load-bearing one. `invoices` is ADMIN_RESERVED, so a plain member —
+     * who has no assigned roles and would be "unrestricted" under plain can() —
+     * must not see the revenue widget, while still getting the work ones.
+     */
+    public function testPlainMemberIsDeniedMoneyWidgetsButKeepsWorkOnes(): void
+    {
+        $admin = $this->makeUser('admin@example.com');
+        $member = $this->makeUser('member@example.com');
+        $space = $this->makeSpace($admin, $member);
+
+        $money = $this->makeWidget($space, 'engagements.table');
+        $this->makeWidget($space, 'boards.list');
+
+        $client = static::createClient();
+        $client->loginUser($member);
+
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/dashboard')->toArray();
+        $types = $this->typesOf($body);
+
+        $this->assertNotContains('engagements.table', $types, 'A plain member must not see budgets and rates.');
+        $this->assertContains('boards.list', $types);
+
+        // And the instance route is gated too — it's directly addressable, so
+        // it can't lean on having been filtered out of the listing.
+        $client->request('GET', '/dashboard-widgets/' . $money->getId() . '/data');
+        $this->assertResponseStatusCodeSame(404);
+
+        // The admin does see it — otherwise the assertions above would pass
+        // for the wrong reason (a widget hidden from everyone proves nothing).
+        $client->loginUser($admin);
+        $adminBody = $client->request('GET', '/spaces/' . $space->getId() . '/dashboard')->toArray();
+        $this->assertContains('engagements.table', $this->typesOf($adminBody));
+
+        $client->request('GET', '/dashboard-widgets/' . $money->getId() . '/data');
+        $this->assertResponseIsSuccessful();
+    }
+
+    /**
+     * A metric widget's category depends on which metric it shows, so the same
+     * widget type must be visible or hidden per instance.
+     */
+    public function testMetricWidgetPermissionFollowsTheMetricItShows(): void
+    {
+        $admin = $this->makeUser('admin@example.com');
+        $member = $this->makeUser('member@example.com');
+        $space = $this->makeSpace($admin, $member);
+
+        $this->makeWidget($space, 'analytics.metric', ['metric' => 'invoiced', 'interval' => 'month', 'months' => 12]);
+        $this->makeWidget($space, 'analytics.metric', ['metric' => 'tracked_time', 'interval' => 'month', 'months' => 12]);
+
+        $client = static::createClient();
+        $client->loginUser($member);
+
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/dashboard')->toArray();
+        $metrics = [];
+        foreach ($this->arrayField($body, 'widgets') as $widget) {
+            $this->assertIsArray($widget);
+            $config = $widget['config'];
+            $this->assertIsArray($config);
+            $metrics[] = $config['metric'] ?? null;
+        }
+
+        // Same widget type, opposite outcomes — which is the whole point.
+        $this->assertNotContains('invoiced', $metrics, 'Revenue must not leak through a generic metric widget.');
+        $this->assertContains('tracked_time', $metrics);
+    }
+
+    /** A metric that no longer exists must fail closed, not fall through. */
+    public function testAMetricWidgetNamingAnUnknownMetricIsHiddenFromPlainMembers(): void
+    {
+        $admin = $this->makeUser('admin@example.com');
+        $member = $this->makeUser('member@example.com');
+        $space = $this->makeSpace($admin, $member);
+        $this->makeWidget($space, 'analytics.metric', ['metric' => 'metric_that_was_removed']);
+
+        $client = static::createClient();
+        $client->loginUser($member);
+
+        $body = $client->request('GET', '/spaces/' . $space->getId() . '/dashboard')->toArray();
+        $this->assertCount(0, $this->arrayField($body, 'widgets'));
+    }
+
     public function testAdminAddsAWidgetAndMemberSeesIt(): void
     {
         $admin = $this->makeUser('admin@example.com');
@@ -301,12 +384,29 @@ class DashboardWidgetTest extends ApiTestCase
         $this->assertArrayHasKey('data', $body);
     }
 
-    private function makeWidget(Space $space, string $type): DashboardWidget
+    /**
+     * @param array<int|string, mixed> $body
+     *
+     * @return list<string>
+     */
+    private function typesOf(array $body): array
+    {
+        $types = [];
+        foreach ($this->arrayField($body, 'widgets') as $widget) {
+            $this->assertIsArray($widget);
+            $types[] = $this->stringField($widget, 'type');
+        }
+
+        return $types;
+    }
+
+    /** @param array<string, mixed> $config */
+    private function makeWidget(Space $space, string $type, array $config = []): DashboardWidget
     {
         $widget = (new DashboardWidget())
             ->setSpace($space)
             ->setType($type)
-            ->setConfig([]);
+            ->setConfig($config);
         $this->entityManager->persist($widget);
         $this->entityManager->flush();
 
