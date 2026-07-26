@@ -17,6 +17,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { randomPaletteColor } from "@/lib/avatarPalette";
 import ActivityPanel from "@/components/activity/ActivityPanel";
+import AutomationsTab from "@/components/automations/AutomationsTab";
 import TaskBoard from "@/components/boards/TaskBoard";
 import CalendarView from "@/components/calendar/CalendarView";
 import FilterMultiSelect from "@/components/common/FilterMultiSelect";
@@ -1316,6 +1317,9 @@ const BoardDetail = () => {
                     <TabsTrigger value="fields" data-testid="board-fields-tab">
                       Custom fields
                     </TabsTrigger>
+                    <TabsTrigger value="automations" data-testid="board-automations-tab">
+                      Automations
+                    </TabsTrigger>
                     <TabsTrigger value="activity">Activity</TabsTrigger>
                     <TabsTrigger value="settings" data-testid="board-settings-tab">
                       Settings
@@ -1782,6 +1786,21 @@ const BoardDetail = () => {
                       handleCustomFieldChange(t, timelineStartFieldIri, dateStr)
                     }
                   />
+                </TabsContent>
+
+                <TabsContent value="automations" className="mt-4">
+                  {/* Mounted only when the tab is open, so React Flow isn't
+                      fetched for the far more common list/board views. */}
+                  {activeTab === "automations" && boardId && (
+                    <AutomationsTab
+                      boardId={boardId}
+                      sections={sections.map((s) => ({ value: s.id, label: s.title }))}
+                      members={assignableUsers.map((u) => ({
+                        value: u.id,
+                        label: u.email,
+                      }))}
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4">
