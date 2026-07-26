@@ -18,6 +18,10 @@ parameters:
     # dashboard (#763). Stripe remains the source of truth for actual revenue —
     # these ignore coupons, proration, and tax. Kept in step with
     # pwa/pages/pricing.tsx, which is what customers are actually quoted.
+    # How long automation run rows are kept (#764). A debugging aid, not an
+    # audit trail — every task edit on an automated board writes one.
+    app.automation_run_retention_days: 30
+
     app.plan_price_pro_monthly_cents: 1000
     app.plan_price_business_monthly_cents: 1500
 
@@ -157,6 +161,12 @@ services:
             tags: ['app.analytics_metric']
         App\Dashboard\WidgetDefinitionInterface:
             tags: ['app.dashboard_widget']
+        App\Automation\TriggerDefinitionInterface:
+            tags: ['app.automation_trigger']
+        App\Automation\ConditionDefinitionInterface:
+            tags: ['app.automation_condition']
+        App\Automation\ActionDefinitionInterface:
+            tags: ['app.automation_action']
 
     App\Growth\GrowthMetrics:
         arguments:
@@ -287,6 +297,25 @@ when@test:
         app.stripe_price_business_monthly: 'price_test_biz_monthly'
         app.stripe_price_business_yearly: 'price_test_biz_yearly'
     services:
+        # The automation runner has one consumer in prod (the message handler),
+        # so the container inlines it and the test container can't fetch it.
+        # Public here lets AutomationRunnerTest drive the executor directly,
+        # which is the only way to assert per-step outcomes.
+        # Scheduler handlers have no consumer other than the bus, so the
+        # container inlines them and the test container can't fetch them.
+        App\MessageHandler\SweepDueTasksHandler:
+            public: true
+            autowire: true
+        App\MessageHandler\PruneAutomationRunsHandler:
+            public: true
+            autowire: true
+
+        App\Automation\AutomationRunner:
+            public: true
+            # This block has no _defaults, so autowiring has to be restated —
+            # without it the definition is bare and the constructor gets nothing.
+            autowire: true
+
         App\Tests\Push\InMemoryPushSender:
             public: true
         App\Push\PushSenderInterface: '@App\Tests\Push\InMemoryPushSender'
