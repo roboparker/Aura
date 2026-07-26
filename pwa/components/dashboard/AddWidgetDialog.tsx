@@ -67,6 +67,7 @@ const AddWidgetDialog = ({ open, spaceId, adding, onAdd, onOpenChange }: Props) 
                       <button
                         key={entry.type}
                         type="button"
+                        data-testid={`add-widget-${entry.type}`}
                         disabled={adding !== null}
                         onClick={() => onAdd(entry)}
                         className="flex w-full items-start gap-3 rounded-md border p-3 text-left transition-colors hover:bg-accent disabled:opacity-60"

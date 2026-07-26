@@ -92,6 +92,7 @@ const WidgetFrame = ({ widget, canEdit, onConfigure, onRemove }: Props) => {
     <div
       ref={setNodeRef}
       style={style}
+      data-testid={`widget-${widget.type}`}
       className={`${WIDTH_CLASS[widget.width] ?? WIDTH_CLASS[2]} ${
         isDragging ? "z-10 opacity-70" : ""
       }`}
