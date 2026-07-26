@@ -55,6 +55,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     #[Groups(['user:read', 'board:read', 'group:read', 'task:read', 'comment:read', 'feedback:read', 'space:read', 'page:read', 'notification:read', 'segment:read'])]
     private ?Uuid $id = null;
 
+    /**
+     * Signup time. Added late (#763) — before this, nothing recorded when an
+     * account was created, which made the whole acquisition funnel
+     * unmeasurable. Backfilled from each user's personal space, which is
+     * created in the same flush as the user, so historical rows are accurate
+     * rather than stamped with the migration date.
+     */
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $createdAt;
+
     // Settable on signup (`user:create`), but not on PATCH — changes
     // run through EmailChangeController so the new address is verified.
     #[ORM\Column(length: 180, unique: true)]
@@ -489,6 +499,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     public function __construct()
     {
         $this->ssoIdentities = new ArrayCollection();
+        // Stamped here rather than in a signup processor so every creation path
+        // gets it — email signup, SSO, invite acceptance, fixtures, CLI.
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    /** When the account was created. Drives the growth funnel (#763). */
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
     }
 
     /**

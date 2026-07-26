@@ -4,6 +4,9 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Automation\AutomationDispatcher;
+use App\Automation\AutomationEvents;
+use App\Automation\TaskSnapshot;
 use App\Entity\CalendarEventLink;
 use App\Entity\Task;
 use App\Entity\User;
@@ -43,6 +46,7 @@ final class TaskUpdateProcessor implements ProcessorInterface
         private TaskActivityNotifier $activity,
         private RecurrenceCalculator $recurrence,
         private MessageBusInterface $bus,
+        private AutomationDispatcher $automations,
     ) {
     }
 
@@ -114,6 +118,24 @@ final class TaskUpdateProcessor implements ProcessorInterface
                 }
             }
         }
+
+        // Board rules (#764). Enqueued, never run inline — a rule can do real
+        // work and none of it belongs on the latency path of a checkbox.
+        //
+        // The completion transition gets its own event so a "when completed"
+        // rule can't also fire on every later edit of an already-done task;
+        // everything else is a generic update, narrowed by the trigger.
+        $before = $previous instanceof Task ? TaskSnapshot::of($previous) : [];
+        $after = TaskSnapshot::of($result);
+        $this->automations->dispatch(
+            $result,
+            $wasIncomplete && $isNowComplete
+                ? AutomationEvents::TASK_COMPLETED
+                : AutomationEvents::TASK_UPDATED,
+            $before,
+            $after,
+            $actor instanceof User ? $actor : null,
+        );
 
         return $result;
     }

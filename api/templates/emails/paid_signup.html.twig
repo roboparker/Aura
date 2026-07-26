@@ -1,0 +1,31 @@
+{# @var recipient \App\Entity\User #}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p><strong>Someone just started paying.</strong></p>
+
+<table cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
+    <tr>
+        <td style="color: #6b7280;">Account</td>
+        <td><strong>{{ who }}</strong></td>
+    </tr>
+    <tr>
+        <td style="color: #6b7280;">Plan</td>
+        <td><strong>{{ plan }}</strong>{% if seats > 1 %} × {{ seats }} seats{% endif %}</td>
+    </tr>
+    <tr>
+        <td style="color: #6b7280;">Billing</td>
+        <td>{{ interval }}ly</td>
+    </tr>
+    <tr>
+        <td style="color: #6b7280;">Status</td>
+        <td>{{ status }}</td>
+    </tr>
+</table>
+
+{% if status == 'trialing' %}
+    <p style="font-size: 14px;">
+        This one is on a trial — it converts to a charge when the trial ends.
+    </p>
+{% endif %}
+
+<p><a href="{{ dashboardUrl }}">Open the growth dashboard</a></p>

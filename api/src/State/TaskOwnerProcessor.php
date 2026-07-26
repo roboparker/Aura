@@ -4,6 +4,9 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Automation\AutomationDispatcher;
+use App\Automation\AutomationEvents;
+use App\Automation\TaskSnapshot;
 use App\Entity\Task;
 use App\Message\SyncTaskToCalendar;
 use App\Repository\TaskRepository;
@@ -32,6 +35,7 @@ final class TaskOwnerProcessor implements ProcessorInterface
         private TaskRepository $tasks,
         private TaskActivityNotifier $activity,
         private MessageBusInterface $bus,
+        private AutomationDispatcher $automations,
     ) {
     }
 
@@ -67,6 +71,17 @@ final class TaskOwnerProcessor implements ProcessorInterface
         if (null !== $result->getDueDate() && null !== $id) {
             $this->bus->dispatch(SyncTaskToCalendar::upsert((string) $id, (string) $user->getId()));
         }
+
+        // Board rules (#764). No `before` — nothing existed a moment ago, so a
+        // "did X change" trigger has nothing to compare and correctly won't
+        // match on create.
+        $this->automations->dispatch(
+            $result,
+            AutomationEvents::TASK_CREATED,
+            [],
+            TaskSnapshot::of($result),
+            $user,
+        );
 
         return $result;
     }
