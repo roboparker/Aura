@@ -62,6 +62,9 @@ final class AutomationRunner
             return null;
         }
 
+        // Bind the change to this rule, so actions can attribute themselves.
+        $context = $context->forAutomation($automation);
+
         $triggerNode = $graph->trigger();
         $trigger = $this->registry->trigger($triggerNode['type']);
         if (null === $trigger || $trigger->event() !== $context->event) {

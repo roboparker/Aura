@@ -293,6 +293,16 @@ when@test:
         app.stripe_price_business_monthly: 'price_test_biz_monthly'
         app.stripe_price_business_yearly: 'price_test_biz_yearly'
     services:
+        # The automation runner has one consumer in prod (the message handler),
+        # so the container inlines it and the test container can't fetch it.
+        # Public here lets AutomationRunnerTest drive the executor directly,
+        # which is the only way to assert per-step outcomes.
+        App\Automation\AutomationRunner:
+            public: true
+            # This block has no _defaults, so autowiring has to be restated —
+            # without it the definition is bare and the constructor gets nothing.
+            autowire: true
+
         App\Tests\Push\InMemoryPushSender:
             public: true
         App\Push\PushSenderInterface: '@App\Tests\Push\InMemoryPushSender'
