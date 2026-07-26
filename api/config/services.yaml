@@ -157,6 +157,12 @@ services:
             tags: ['app.analytics_metric']
         App\Dashboard\WidgetDefinitionInterface:
             tags: ['app.dashboard_widget']
+        App\Automation\TriggerDefinitionInterface:
+            tags: ['app.automation_trigger']
+        App\Automation\ConditionDefinitionInterface:
+            tags: ['app.automation_condition']
+        App\Automation\ActionDefinitionInterface:
+            tags: ['app.automation_action']
 
     App\Growth\GrowthMetrics:
         arguments:
