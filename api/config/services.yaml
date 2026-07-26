@@ -148,6 +148,8 @@ services:
             tags: ['app.custom_field_converter']
         App\Analytics\AnalyticsMetricInterface:
             tags: ['app.analytics_metric']
+        App\Dashboard\WidgetDefinitionInterface:
+            tags: ['app.dashboard_widget']
 
     App\Mcp\McpToolRegistry:
         arguments:
