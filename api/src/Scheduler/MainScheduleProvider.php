@@ -14,6 +14,7 @@ use App\Message\PullCalendarChanges;
 use App\Message\RunBackup;
 use App\Message\SendGrowthDigest;
 use App\Message\SendTimesheetNudges;
+use App\Message\SweepDueTasks;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -83,6 +84,11 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // Monday 09:00 UTC so the week's numbers land at the start of
                 // the working week rather than over the weekend.
                 RecurringMessage::cron('0 9 * * 1', new SendGrowthDigest(), $utc),
+                // Board automations (#764): fire "due date passed" for tasks
+                // that went overdue in the last few hours. Nothing raises this
+                // from a request — a date passing is not a user action — so the
+                // sweep is the only way the trigger ever fires.
+                RecurringMessage::cron('5 * * * *', new SweepDueTasks(), $utc),
                 // Space-export retention: delete export zips + rows past
                 // the app.space_export_retention_days window (default 7 —
                 // App\Service\SpaceExportPruner). 03:30 keeps it clear of
