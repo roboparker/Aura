@@ -134,6 +134,7 @@ security:
         - { path: ^/admin/users, roles: ROLE_ADMIN }
         # Sentry verification triggers (error/worker) — platform admins only.
         - { path: ^/admin/sentry-test, roles: ROLE_ADMIN }
+        - { path: ^/admin/growth, roles: ROLE_ADMIN }
         # SSO admin config (enable toggle, allowed domains, button label).
         # Linking / unlinking a social account to the signed-in user (#267).
         - { path: ^/me/sso, roles: ROLE_USER }

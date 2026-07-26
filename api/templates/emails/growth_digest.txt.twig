@@ -1,0 +1,33 @@
+{# @var recipient \App\Entity\User #}
+{%- macro delta(n) -%}
+{% if n > 0 %}(+{{ n }} vs prior week){% elseif n < 0 %}({{ n }} vs prior week){% else %}(flat vs prior week){% endif %}
+{%- endmacro -%}
+{% import _self as fmt %}
+Hi {{ recipient.givenName ?: recipient.email }},
+
+Madori for the week of {{ from|date('F j') }} – {{ to|date('F j, Y') }}.
+
+THIS WEEK
+  Signups      {{ totals.signups }} {{ fmt.delta(deltas.signups) }}
+  Activated    {{ totals.activations }} {{ fmt.delta(deltas.activations) }}
+  Upgraded     {{ totals.upgrades }} {{ fmt.delta(deltas.upgrades) }}
+  Churned      {{ totals.churn }} {{ fmt.delta(deltas.churn) }}
+
+Activated means the person created their first task.
+
+WHERE THINGS STAND
+  Users                {{ snapshot.users }}{% if snapshot.waitlisted > 0 %} ({{ snapshot.waitlisted }} still on the waitlist){% endif %}
+
+  Activated            {{ snapshot.activated }}
+  Paid subscriptions   {{ snapshot.paidSubscriptions }} across {{ snapshot.paidSeats }} seats
+  Estimated MRR        ${{ (snapshot.mrrCents / 100)|number_format(2) }}
+
+MRR is estimated from list prices and seat counts. Stripe is the source of
+truth for what was actually billed.
+{% if snapshot.waitlisted > 0 %}
+Signups are still gated behind the waitlist, so conversion will stay near
+zero until you open them.
+{% endif %}
+Full dashboard: {{ dashboardUrl }}
+
+— Madori

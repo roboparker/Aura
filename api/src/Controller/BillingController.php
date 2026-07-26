@@ -17,6 +17,7 @@ use App\Entity\Subscription;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Service\CancellationFeedbackRecorder;
+use App\Service\GrowthDigestMailer;
 use App\Service\SubscriptionReceiptMailer;
 use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -55,6 +56,7 @@ class BillingController extends AbstractController
         private CancellationFeedbackRecorder $feedback,
         private PlanGate $planGate,
         private SubscriptionReceiptMailer $receiptMailer,
+        private GrowthDigestMailer $growthMailer,
         private LoggerInterface $logger,
         #[Autowire('%env(string:default:app.stripe_price_pro_monthly:STRIPE_PRICE_PRO_MONTHLY)%')]
         private string $proMonthly,
@@ -478,8 +480,24 @@ class BillingController extends AbstractController
             $this->em->persist($row);
         }
 
+        // Capture before the write so we can tell a genuine conversion from
+        // Stripe re-sending an event for a subscription that was already paying
+        // (#763). A new row starts `incomplete`, so a first successful checkout
+        // reads as a transition and alerts exactly once.
+        $wasEntitling = in_array($row->getStatus(), Subscription::ENTITLING_STATUSES, true);
+
         $status = $deleted ? Subscription::STATUS_CANCELED : ($this->stringAt($sub, ['status']) ?? Subscription::STATUS_INCOMPLETE);
         $row->setStatus($status);
+
+        if (!$wasEntitling && in_array($status, Subscription::ENTITLING_STATUSES, true)) {
+            // Best-effort: a failed alert must never fail the webhook, or
+            // Stripe retries a payment event we already recorded.
+            try {
+                $this->growthMailer->sendPaidSignupAlert($row);
+            } catch (\Throwable $e) {
+                $this->logger->warning('Paid-signup alert failed.', ['error' => $e->getMessage()]);
+            }
+        }
 
         // The tier bought, carried on the subscription metadata from checkout.
         $planMeta = $this->stringAt($sub, ['metadata', 'plan']);

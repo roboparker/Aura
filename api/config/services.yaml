@@ -14,6 +14,13 @@ parameters:
     # configured" until the real ids are set. Pinned in when@test below so the
     # billing suite is deterministic regardless of env-resolution order (see
     # RateLimitTest, which mutates $_ENV and reboots kernels).
+    # List prices in minor units, used only to estimate MRR on the growth
+    # dashboard (#763). Stripe remains the source of truth for actual revenue —
+    # these ignore coupons, proration, and tax. Kept in step with
+    # pwa/pages/pricing.tsx, which is what customers are actually quoted.
+    app.plan_price_pro_monthly_cents: 1000
+    app.plan_price_business_monthly_cents: 1500
+
     app.stripe_price_pro_monthly: ''
     app.stripe_price_pro_yearly: ''
     app.stripe_price_business_monthly: ''
@@ -150,6 +157,11 @@ services:
             tags: ['app.analytics_metric']
         App\Dashboard\WidgetDefinitionInterface:
             tags: ['app.dashboard_widget']
+
+    App\Growth\GrowthMetrics:
+        arguments:
+            $proMonthlyCents: '%app.plan_price_pro_monthly_cents%'
+            $businessMonthlyCents: '%app.plan_price_business_monthly_cents%'
 
     App\Mcp\McpToolRegistry:
         arguments:

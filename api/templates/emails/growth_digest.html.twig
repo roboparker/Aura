@@ -1,0 +1,63 @@
+{# @var recipient \App\Entity\User #}
+{%- macro delta(n) -%}
+    {% if n > 0 %}<span style="color: #059669;">+{{ n }}</span>
+    {%- elseif n < 0 %}<span style="color: #dc2626;">{{ n }}</span>
+    {%- else %}<span style="color: #9ca3af;">flat</span>{% endif %}
+{%- endmacro -%}
+{% import _self as fmt %}
+<p>Hi {{ recipient.givenName ?: recipient.email }},</p>
+
+<p>Madori for the week of <strong>{{ from|date('F j') }} – {{ to|date('F j, Y') }}</strong>.</p>
+
+<table cellpadding="6" cellspacing="0" style="border-collapse: collapse; font-size: 14px;">
+    <tr>
+        <th align="left" style="border-bottom: 1px solid #e5e7eb;">This week</th>
+        <th align="right" style="border-bottom: 1px solid #e5e7eb;">Count</th>
+        <th align="right" style="border-bottom: 1px solid #e5e7eb;">vs prior</th>
+    </tr>
+    <tr>
+        <td>Signups</td>
+        <td align="right"><strong>{{ totals.signups }}</strong></td>
+        <td align="right">{{ fmt.delta(deltas.signups) }}</td>
+    </tr>
+    <tr>
+        <td>Activated <span style="color: #9ca3af;">(created a first task)</span></td>
+        <td align="right"><strong>{{ totals.activations }}</strong></td>
+        <td align="right">{{ fmt.delta(deltas.activations) }}</td>
+    </tr>
+    <tr>
+        <td>Upgraded to paid</td>
+        <td align="right"><strong>{{ totals.upgrades }}</strong></td>
+        <td align="right">{{ fmt.delta(deltas.upgrades) }}</td>
+    </tr>
+    <tr>
+        <td>Churned</td>
+        <td align="right"><strong>{{ totals.churn }}</strong></td>
+        <td align="right">{{ fmt.delta(deltas.churn) }}</td>
+    </tr>
+</table>
+
+<p style="margin-top: 20px;"><strong>Where things stand</strong></p>
+<ul style="font-size: 14px;">
+    <li>
+        {{ snapshot.users }} users{% if snapshot.waitlisted > 0 %},
+        {{ snapshot.waitlisted }} still on the waitlist{% endif %}
+    </li>
+    <li>{{ snapshot.activated }} have created something</li>
+    <li>{{ snapshot.paidSubscriptions }} paid subscriptions across {{ snapshot.paidSeats }} seats</li>
+    <li>Estimated MRR ${{ (snapshot.mrrCents / 100)|number_format(2) }}</li>
+</ul>
+
+{% if snapshot.waitlisted > 0 %}
+    <p style="font-size: 14px;">
+        Signups are still gated behind the waitlist, so conversion will stay
+        near zero until you open them.
+    </p>
+{% endif %}
+
+<p><a href="{{ dashboardUrl }}">Open the growth dashboard</a></p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    MRR is estimated from list prices and seat counts. Stripe is the source of
+    truth for what was actually billed.
+</p>

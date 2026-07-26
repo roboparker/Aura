@@ -12,6 +12,7 @@ use App\Message\PruneAccountExports;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
 use App\Message\RunBackup;
+use App\Message\SendGrowthDigest;
 use App\Message\SendTimesheetNudges;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
@@ -77,6 +78,11 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // means a run missed during downtime is caught up on the
                 // next worker boot instead of silently skipped.
                 RecurringMessage::cron('0 2 * * *', new RunBackup(), $utc),
+                // Weekly growth digest: last week's signup -> paid funnel,
+                // emailed to every admin (App\Service\GrowthDigestMailer).
+                // Monday 09:00 UTC so the week's numbers land at the start of
+                // the working week rather than over the weekend.
+                RecurringMessage::cron('0 9 * * 1', new SendGrowthDigest(), $utc),
                 // Space-export retention: delete export zips + rows past
                 // the app.space_export_retention_days window (default 7 —
                 // App\Service\SpaceExportPruner). 03:30 keeps it clear of
