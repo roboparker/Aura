@@ -301,6 +301,15 @@ when@test:
         # so the container inlines it and the test container can't fetch it.
         # Public here lets AutomationRunnerTest drive the executor directly,
         # which is the only way to assert per-step outcomes.
+        # Scheduler handlers have no consumer other than the bus, so the
+        # container inlines them and the test container can't fetch them.
+        App\MessageHandler\SweepDueTasksHandler:
+            public: true
+            autowire: true
+        App\MessageHandler\PruneAutomationRunsHandler:
+            public: true
+            autowire: true
+
         App\Automation\AutomationRunner:
             public: true
             # This block has no _defaults, so autowiring has to be restated —
