@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CalendarDays,
   CalendarRange,
+  LayoutDashboard,
   ChevronDown,
   CreditCard,
   FlaskConical,
@@ -691,6 +692,7 @@ const SidebarNav = ({
 
   if (!isAuthenticated || !user) return null;
 
+  const dashboardActive = router.pathname === "/dashboard";
   const calendarActive = router.pathname === "/calendar";
   const timelineActive = router.pathname === "/timeline";
 
@@ -711,6 +713,27 @@ const SidebarNav = ({
           scrollable && "flex-1 overflow-y-auto",
         )}
       >
+        {activeSpace && (
+          <span>
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  NAV_ITEM_CLASS,
+                  dashboardActive && NAV_ITEM_ACTIVE_CLASS,
+                )}
+              >
+                <Link href="/dashboard">
+                  <LayoutDashboard className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />
+                  <span className="truncate">Dashboard</span>
+                </Link>
+              </Button>,
+            )}
+          </span>
+        )}
+
         {activeSpace && (
           <span>
             {wrap(
