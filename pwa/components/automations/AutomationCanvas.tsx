@@ -157,7 +157,11 @@ const AutomationCanvas = ({
   );
 
   return (
-    <div className="h-[520px] w-full rounded-md border">
+    /* Fills the viewport rather than sitting in a fixed 520px letterbox — a
+       rule with a few branches needs room, and the canvas is the whole point
+       of the tab. The floor keeps it usable on a short window; the offset
+       leaves space for the page chrome above it. */
+    <div className="h-[calc(100vh-20rem)] min-h-[520px] w-full rounded-md border">
       <ReactFlow
         nodes={nodes}
         edges={edges}

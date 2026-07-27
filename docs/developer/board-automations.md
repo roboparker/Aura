@@ -40,7 +40,19 @@ The **before/after snapshot travels with the message** (`TaskSnapshot`). By the 
 
 **Failure is per-step.** One action throwing records an error against that node and the walk continues with its siblings. A rule that assigns *and* comments shouldn't lose the assignment because someone deleted a tag.
 
-Events (`AutomationEvents`): `task.created`, `task.updated`, `task.completed`, `task.due`. Completion raises its own event rather than a generic update, so a "when completed" rule can't re-fire on every later edit of a finished task.
+Events (`AutomationEvents`): `task.created`, `task.updated`, `task.completed`, `task.due`, `task.deleted`. Completion raises its own event rather than a generic update, so a "when completed" rule can't re-fire on every later edit of a finished task.
+
+### `task.deleted` is the odd one
+
+By the time rules run, the row is gone. That breaks the usual model, so it's handled explicitly rather than left to fail confusingly:
+
+- The message carries the **board id and the task's title**, because the board can't be resolved from a task that no longer exists.
+- The handler rebuilds a **detached shell** from that snapshot so conditions can still read what the task *was*.
+- Actions must be marked `SurvivesTaskDeletion` to run. Everything else is **skipped with an explanation in the run log** — letting `add_tag` mutate a detached object would look like success while doing nothing.
+- The run is logged with `task = null` and the title kept in `taskTitle`. Linking the FK would make Doctrine try to persist the deleted task back.
+- Deletions never chain: there's nothing left to change.
+
+In practice this means `task.deleted` pairs with **Notify someone**, which is why that action exists.
 
 ## Adding a trigger, condition, or action
 

@@ -116,6 +116,61 @@ class AutomationWiringTest extends ApiTestCase
         $this->assertCount(0, $reloaded->getTags());
     }
 
+    /**
+     * Deleting a task fires its rule, and a mutating action is refused rather
+     * than silently editing a row that no longer exists.
+     */
+    public function testDeletingATaskRunsARuleButRefusesMutatingActions(): void
+    {
+        [$user, $board] = $this->scaffold();
+        // add_tag has nothing left to tag once the task is gone.
+        $this->makeRule($board, $user, AutomationEvents::TASK_DELETED, 'task.deleted', 'ghost-tag');
+        $task = $this->makeTask($user, $board, 'Doomed');
+        $taskId = (string) $task->getId();
+
+        $client = static::createClient();
+        $client->loginUser($user);
+        $client->request('DELETE', '/tasks/' . $taskId);
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+
+        // The rule ran and was logged — that's the point of the event.
+        $runs = $this->entityManager->getRepository(AutomationRun::class)->findAll();
+        $this->assertCount(1, $runs);
+        $this->assertSame('Doomed', $runs[0]->getTaskTitle());
+
+        // …but the action was skipped with an explanation, not silently
+        // "applied" against a detached object nobody saves.
+        $actionStep = null;
+        foreach ($runs[0]->getSteps() as $step) {
+            if ('action' === $step['kind']) {
+                $actionStep = $step;
+            }
+        }
+        $this->assertNotNull($actionStep, 'The action should appear in the log even when skipped.');
+        $this->assertSame('skipped', $actionStep['outcome']);
+        $this->assertStringContainsString('deleted', $actionStep['detail']);
+
+        // And the task really is gone.
+        $this->assertNull($this->entityManager->getRepository(Task::class)->find($taskId));
+    }
+
+    /** A board with no deletion rule must not enqueue anything. */
+    public function testDeletingATaskWithNoRuleLogsNothing(): void
+    {
+        [$user, $board] = $this->scaffold();
+        $task = $this->makeTask($user, $board, 'Unwatched');
+
+        $client = static::createClient();
+        $client->loginUser($user);
+        $client->request('DELETE', '/tasks/' . $task->getId());
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $this->assertCount(0, $this->entityManager->getRepository(AutomationRun::class)->findAll());
+    }
+
     /** A disabled rule must not run. */
     public function testADisabledRuleIsSkipped(): void
     {

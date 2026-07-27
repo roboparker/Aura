@@ -7,6 +7,7 @@ use App\Automation\AutomationEvents;
 use App\Automation\AutomationRunner;
 use App\Automation\TaskSnapshot;
 use App\Entity\AutomationRun;
+use App\Entity\Board;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Message\RunAutomations;
@@ -44,16 +45,34 @@ final class RunAutomationsHandler
 
     public function __invoke(RunAutomations $message): void
     {
-        $task = $this->em->getRepository(Task::class)->find($message->taskId);
-        // Deleted between the edit and the worker picking this up. Nothing to
-        // do, and not an error worth retrying.
-        if (!$task instanceof Task) {
-            return;
-        }
+        $deleted = AutomationEvents::TASK_DELETED === $message->event;
 
-        $board = $task->getBoard();
-        if (null === $board) {
-            return;
+        if ($deleted) {
+            // The row is gone on purpose. Rebuild a detached shell from what
+            // travelled with the message so conditions can still read what the
+            // task *was* — the runner refuses to let anything write to it.
+            $board = null === $message->boardId
+                ? null
+                : $this->em->getRepository(Board::class)->find($message->boardId);
+            if (!$board instanceof Board) {
+                return;
+            }
+
+            $task = new Task();
+            $task->setTitle($message->taskTitle ?? 'Deleted task');
+            $task->setBoard($board);
+        } else {
+            $task = $this->em->getRepository(Task::class)->find($message->taskId);
+            // Deleted between the edit and the worker picking this up. Nothing
+            // to do, and not an error worth retrying.
+            if (!$task instanceof Task) {
+                return;
+            }
+
+            $board = $task->getBoard();
+            if (null === $board) {
+                return;
+            }
         }
 
         $rules = $this->automations->enabledFor($board, $message->event);
@@ -72,6 +91,7 @@ final class RunAutomationsHandler
             after: $message->after,
             actor: $actor instanceof User ? $actor : null,
             depth: $message->depth,
+            taskDeleted: $deleted,
         );
 
         // Snapshot before the rules touch anything, so the follow-up event can
@@ -99,7 +119,9 @@ final class RunAutomationsHandler
 
         $this->em->flush();
 
-        if (!$applied) {
+        // A deletion can't chain: nothing was changed, and there's no task left
+        // for a follow-up rule to look at.
+        if (!$applied || $deleted) {
             return;
         }
 

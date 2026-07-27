@@ -28,12 +28,23 @@ final class AutomationEvents
      */
     public const TASK_DUE = 'task.due';
 
+    /**
+     * A task was deleted from a board.
+     *
+     * The odd one out: by the time rules run, the row is gone. Conditions read
+     * a snapshot taken before deletion, and only actions marked
+     * {@see SurvivesTaskDeletion} can run — everything else has nothing left to
+     * edit. See {@see AutomationRunner} for how that's enforced.
+     */
+    public const TASK_DELETED = 'task.deleted';
+
     /** @var list<string> */
     public const ALL = [
         self::TASK_CREATED,
         self::TASK_UPDATED,
         self::TASK_COMPLETED,
         self::TASK_DUE,
+        self::TASK_DELETED,
     ];
 
     public static function isValid(string $event): bool
