@@ -8,6 +8,7 @@ use App\Entity\SpaceMembership;
 use App\Entity\Tag;
 use App\Entity\Task;
 use App\Entity\User;
+use App\Service\AvatarColorService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -54,7 +55,7 @@ class TagTest extends ApiTestCase
             'json' => [
                 'title' => 'Urgent',
                 'description' => 'Needs doing today',
-                'color' => '#ef4444',
+                'color' => '#b91c1c',
                 'space' => '/spaces/' . $space->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -65,7 +66,7 @@ class TagTest extends ApiTestCase
             '@type' => 'Tag',
             'title' => 'Urgent',
             'description' => 'Needs doing today',
-            'color' => '#ef4444',
+            'color' => '#b91c1c',
         ]);
 
         $tag = $this->reloadTagByTitle('Urgent');
@@ -85,7 +86,7 @@ class TagTest extends ApiTestCase
         $client->request('POST', '/tags', [
             'json' => [
                 'title' => 'Sneaky',
-                'color' => '#22c55e',
+                'color' => '#15803d',
                 'space' => '/spaces/' . $space->getId(),
                 'owner' => '/users/' . $bob->getId(),
             ],
@@ -108,7 +109,7 @@ class TagTest extends ApiTestCase
         $client->request('POST', '/tags', [
             'json' => [
                 'title' => 'Trespass',
-                'color' => '#22c55e',
+                'color' => '#15803d',
                 'space' => '/spaces/' . $bobsSpace->getId(),
             ],
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -125,7 +126,7 @@ class TagTest extends ApiTestCase
         $client->loginUser($user);
 
         $client->request('POST', '/tags', [
-            'json' => ['title' => 'No space', 'color' => '#22c55e'],
+            'json' => ['title' => 'No space', 'color' => '#15803d'],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         // securityPostDenormalize rejects a tag with no (accessible) space.
@@ -140,7 +141,7 @@ class TagTest extends ApiTestCase
         $client->loginUser($user);
 
         $client->request('POST', '/tags', [
-            'json' => ['title' => '', 'color' => '#22c55e', 'space' => '/spaces/' . $space->getId()],
+            'json' => ['title' => '', 'color' => '#15803d', 'space' => '/spaces/' . $space->getId()],
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
@@ -158,6 +159,47 @@ class TagTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/ld+json'],
         ]);
         $this->assertResponseStatusCodeSame(422);
+    }
+
+    /**
+     * A well-formed hex outside the WCAG-AA palette is rejected. Tag chips
+     * render their label over this colour, and an unconstrained hex let
+     * seeded tags reach 2.15:1 against white — well under the 4.5:1 floor.
+     */
+    public function testCreateTagRejectsColorOutsideThePalette(): void
+    {
+        $user = $this->createUser('alice@example.com');
+        $space = $this->createSpace($user, 'Alice space');
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        $client->request('POST', '/tags', [
+            // amber-500: valid hex, 2.15:1 against white.
+            'json' => ['title' => 'Low contrast', 'color' => '#f59e0b', 'space' => '/spaces/' . $space->getId()],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ]);
+        $this->assertResponseStatusCodeSame(422);
+    }
+
+    /** Every palette entry is accepted, so the constraint can't drift from the list. */
+    public function testCreateTagAcceptsEveryPaletteColor(): void
+    {
+        $user = $this->createUser('alice@example.com');
+        $space = $this->createSpace($user, 'Alice space');
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        foreach (AvatarColorService::PALETTE as $index => $color) {
+            $client->request('POST', '/tags', [
+                'json' => [
+                    'title' => 'Palette ' . $index,
+                    'color' => $color,
+                    'space' => '/spaces/' . $space->getId(),
+                ],
+                'headers' => ['Content-Type' => 'application/ld+json'],
+            ]);
+            $this->assertResponseStatusCodeSame(201, sprintf('palette colour %s should be accepted', $color));
+        }
     }
 
     public function testListTagsOnlyShowsTagsInSpacesYouBelongTo(): void
@@ -218,13 +260,13 @@ class TagTest extends ApiTestCase
         $client = static::createClient();
         $client->loginUser($member);
         $client->request('PATCH', '/tags/' . $tag->getId(), [
-            'json' => ['title' => 'After', 'color' => '#3b82f6'],
+            'json' => ['title' => 'After', 'color' => '#1d4ed8'],
             'headers' => ['Content-Type' => 'application/merge-patch+json'],
         ]);
 
         $this->assertResponseIsSuccessful();
         $reloaded = $this->reloadTagByTitle('After');
-        $this->assertSame('#3b82f6', $reloaded->getColor());
+        $this->assertSame('#1d4ed8', $reloaded->getColor());
     }
 
     public function testDeleteTagInOwnSpace(): void
@@ -244,7 +286,7 @@ class TagTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Write docs');
-        $tag = $this->createTag($alice, $space, 'Writing', '#3b82f6');
+        $tag = $this->createTag($alice, $space, 'Writing', '#1d4ed8');
 
         $client = static::createClient();
         $client->loginUser($alice);
@@ -269,8 +311,8 @@ class TagTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Write docs');
-        $keep = $this->createTag($alice, $space, 'Keep', '#22c55e');
-        $drop = $this->createTag($alice, $space, 'Drop', '#ef4444');
+        $keep = $this->createTag($alice, $space, 'Keep', '#15803d');
+        $drop = $this->createTag($alice, $space, 'Drop', '#b91c1c');
         $task->addTag($keep);
         $task->addTag($drop);
         $this->entityManager->flush();
@@ -348,7 +390,7 @@ class TagTest extends ApiTestCase
         $alice = $this->createUser('alice@example.com');
         $space = $this->createSpace($alice, 'Alice space');
         $task = $this->createTask($alice, 'Has a tag');
-        $tag = $this->createTag($alice, $space, 'Temp', '#ef4444');
+        $tag = $this->createTag($alice, $space, 'Temp', '#b91c1c');
         $task->addTag($tag);
         $this->entityManager->flush();
 

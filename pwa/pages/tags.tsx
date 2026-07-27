@@ -16,6 +16,7 @@ import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import PageHeader from "@/components/common/PageHeader";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
+import { readableForeground } from "@/lib/contrast";
 import { ENTRYPOINT } from "@/config/entrypoint";
 
 interface Tag {
@@ -296,8 +297,11 @@ const Tags = () => {
                       >
                         <td className="px-4 py-2 align-middle">
                           <span
-                            className="inline-block rounded px-2 py-1 text-sm font-semibold whitespace-nowrap text-white"
-                            style={{ backgroundColor: tag.color }}
+                            className="inline-block rounded px-2 py-1 text-sm font-semibold whitespace-nowrap"
+                            style={{
+                              backgroundColor: tag.color,
+                              color: readableForeground(tag.color),
+                            }}
                           >
                             {tag.title}
                           </span>

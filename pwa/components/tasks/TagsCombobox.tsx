@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { readableForeground } from "@/lib/contrast";
 import { cn } from "@/lib/utils";
 import {
   Combobox,
@@ -105,8 +106,11 @@ const TagsCombobox = ({
               <ComboboxChip
                 key={tag["@id"]}
                 aria-label={tag.title}
-                className="px-2 text-white [&_[data-slot=combobox-chip-remove]]:hover:!bg-transparent"
-                style={{ backgroundColor: tag.color }}
+                className="px-2 [&_[data-slot=combobox-chip-remove]]:hover:!bg-transparent"
+                style={{
+                  backgroundColor: tag.color,
+                  color: readableForeground(tag.color),
+                }}
                 showRemove={elevation !== 0}
                 data-testid="task-tag"
               >
