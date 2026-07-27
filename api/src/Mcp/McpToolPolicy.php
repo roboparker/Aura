@@ -50,6 +50,11 @@ final class McpToolPolicy
         'create_board' => ['category' => 'boards', 'write' => true],
         'update_board' => ['category' => 'boards', 'write' => true],
         'delete_board' => ['category' => 'boards', 'write' => true],
+        // Automations are board configuration, so they ride the boards scope.
+        // Read-only by design — see ListAutomationsTool on why there is no
+        // create_automation.
+        'list_automations' => ['category' => 'boards', 'write' => false],
+        'get_automation_runs' => ['category' => 'boards', 'write' => false],
         // spaces — no dedicated AccessPolicy category; spaces are the
         // container for boards, so listing them rides the boards
         // read scope (it's read-only metadata either way).

@@ -274,6 +274,8 @@ User docs:
 - `docs/user/two-factor-auth.md` - End-user guide for enabling, using, and recovering 2FA
 - `docs/user/password-reset.md` - End-user guide for resetting a forgotten password
 - `docs/user/data-export.md` - End-user guide for exporting your account data (GDPR)
+- `docs/user/automations.md` - End-user guide for board rules: reading a graph, building one, the run history, why a rule didn't fire
+- `docs/user/dashboards-and-reports.md` - End-user guide for the space dashboard widgets and the Reports charts
 
 ### GitHub Community Files (`.github/`)
 - `.github/CONTRIBUTING.md` - Contribution guidelines
