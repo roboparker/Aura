@@ -197,13 +197,14 @@ interface NewTaskDraft {
 
 const BoardDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { spaces } = useActiveSpace();
+  const { spaces, activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const boardId = typeof id === "string" ? id : null;
   const currentUserIri = user ? `/users/${user.id}` : null;
 
   const [board, setBoard] = useState<Board | null>(null);
+  const [enablingTimeline, setEnablingTimeline] = useState(false);
   const [tasks, setTasks] = useState<BoardTask[]>([]);
   // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
   const [calendarRefresh, setCalendarRefresh] = useState(0);
@@ -919,9 +920,26 @@ const BoardDetail = () => {
   // Timeline (#timeline): flip the feature on/off. Enabling attaches the
   // canonical global "Start date" field server-side (BoardTimelineProcessor),
   // so a reload of the board's field set is needed to pick it up.
+  /**
+   * Whether to offer "Turn on Timeline" in the Timeline tab's empty state.
+   *
+   * Mirrors the server's `space.boards.update` check. `can()` answers for the
+   * **active** space, so it's only trustworthy when that's the space this board
+   * actually lives in — otherwise we'd be reading someone's permissions in the
+   * wrong space. When they differ we withhold the button rather than guess:
+   * Settings still has the switch, and a button that 403s is worse than one
+   * that isn't there.
+   */
+  const canEnableTimeline = useMemo(() => {
+    if (!board || !activeSpace) return false;
+    if (boardSpaceIri(board) !== activeSpace["@id"]) return false;
+    return can("boards", "update");
+  }, [board, activeSpace, can]);
+
   const handleSetTimelineEnabled = useCallback(
     async (enabled: boolean) => {
       if (!board) return;
+      setEnablingTimeline(true);
       try {
         const res = await fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`, {
           method: "PATCH",
@@ -937,6 +955,8 @@ const BoardDetail = () => {
         await load();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to update Timeline.");
+      } finally {
+        setEnablingTimeline(false);
       }
     },
     [board, load],
@@ -1779,6 +1799,9 @@ const BoardDetail = () => {
                     sections={sections}
                     enabled={board.timelineEnabled ?? false}
                     startFieldIri={timelineStartFieldIri}
+                    canEnable={canEnableTimeline}
+                    enabling={enablingTimeline}
+                    onEnable={() => handleSetTimelineEnabled(true)}
                     onOpenTask={(t) => openTaskDetail(t)}
                     onMoveDue={(t, iso) => void patchTask(t, { dueDate: iso })}
                     onMoveStart={(t, dateStr) =>
