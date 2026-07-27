@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, Workflow } from "lucide-react";
 import { apiGet, apiSend } from "@/lib/apiClient";
 import {
-  KIND_LABEL,
+  KIND_HINT,
+  KIND_PALETTE_LABEL,
   defaultConfigFor,
   definitionFor,
   describeProblem,
@@ -27,7 +28,10 @@ import StepConfigPanel, { type PickerOption } from "./StepConfigPanel";
 // React Flow is heavy and only this tab needs it.
 const AutomationCanvas = dynamic(() => import("./AutomationCanvas"), {
   ssr: false,
-  loading: () => <div className="h-[520px] animate-pulse rounded-md bg-muted/40" />,
+  // Matches the canvas's own height so the tab doesn't jump when it loads.
+  loading: () => (
+    <div className="h-[calc(100vh-20rem)] min-h-[520px] animate-pulse rounded-md bg-muted/40" />
+  ),
 });
 
 interface Props {
@@ -354,13 +358,22 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
               <AutomationRunLog automationId={selectedRule.id} />
             ) : (
               <>
-            {/* Palette — built from the server catalog, never hardcoded. */}
+            {/* Palette — built from the server catalog, never hardcoded.
+                Grouped by category with a one-line explanation, so the three
+                kinds of step read as a model (listen → gate → do) rather than
+                as three undifferentiated rows of buttons. */}
             {canEdit && (
-              <div className="hidden flex-wrap gap-1.5 lg:flex">
+              <div className="hidden flex-col gap-2 lg:flex">
                 {palette.map(([kind, steps]) => (
                   <div key={kind} className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">
-                      {KIND_LABEL[kind]}:
+                    <span
+                      className="w-16 shrink-0 text-xs font-medium"
+                      title={KIND_HINT[kind]}
+                    >
+                      {KIND_PALETTE_LABEL[kind]}
+                    </span>
+                    <span className="mr-1 hidden text-xs text-muted-foreground 2xl:inline">
+                      {KIND_HINT[kind]}
                     </span>
                     {steps.map((step) => (
                       <Button
@@ -395,7 +408,9 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
                 onReject={setError}
               />
 
-              <Card className="p-3">
+              {/* Scrolls inside itself rather than stretching the row, so a
+                  step with many fields can't push the canvas off-screen. */}
+              <Card className="max-h-[calc(100vh-20rem)] min-h-[520px] overflow-y-auto p-3">
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   {selectedNode ? "Step settings" : "Nothing selected"}
                 </p>

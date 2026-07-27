@@ -104,6 +104,18 @@ class AutomationRun
     }
 
     /** Also snapshots the title, so the run survives the task's deletion. */
+    /**
+     * Records the title even when there's no task to link to — a `task.deleted`
+     * run has no row to point at, and "which task was that?" is the first thing
+     * anyone reading the log needs.
+     */
+    public function setTaskTitle(string $title): self
+    {
+        $this->taskTitle = mb_substr($title, 0, 255);
+
+        return $this;
+    }
+
     public function setTask(?Task $task): self
     {
         $this->task = $task;

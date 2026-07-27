@@ -76,7 +76,12 @@ final class AutomationRunner
 
         $run = (new AutomationRun())
             ->setAutomation($automation)
-            ->setTask($context->task)
+            // No FK for a deleted task: the entity here is a detached shell, and
+            // linking it would make Doctrine try to cascade-persist a task that
+            // was just removed. The snapshotted title below is precisely why
+            // that column exists — the log outlives the row either way.
+            ->setTask($context->taskDeleted ? null : $context->task)
+            ->setTaskTitle($context->task->getTitle())
             ->setDepth($context->depth);
 
         $steps = [];
@@ -138,6 +143,19 @@ final class AutomationRunner
             $action = $this->registry->action($node['type']);
             if (null === $action) {
                 $steps[] = $this->step($node, 'error', 'This action is not available on this server.');
+
+                return;
+            }
+
+            // On task.deleted there is no row left to edit. Refusing here — and
+            // saying so in the log — beats letting an action mutate a detached
+            // object that will never be saved, which would read as success.
+            if ($context->taskDeleted && !$action instanceof SurvivesTaskDeletion) {
+                $steps[] = $this->step(
+                    $node,
+                    'skipped',
+                    'Skipped — the task was deleted, so there is nothing left to change. Use "Notify someone" here instead.',
+                );
 
                 return;
             }

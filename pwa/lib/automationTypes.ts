@@ -88,10 +88,32 @@ export interface AutomationRun {
   ranAt: string;
 }
 
+/**
+ * How a step reads *inside a rule* — the sentence form, so a graph scans as
+ * "When a task is completed, only if it's urgent, then notify the lead".
+ */
 export const KIND_LABEL: Record<NodeKind, string> = {
   trigger: "When",
   condition: "Only if",
   action: "Then",
+};
+
+/**
+ * How a step reads *in the palette* — the category you're picking from, which
+ * is a different question from how it reads in a sentence. "When:" as a
+ * column heading says nothing about what the list contains.
+ */
+export const KIND_PALETTE_LABEL: Record<NodeKind, string> = {
+  trigger: "Events",
+  condition: "Gates",
+  action: "Actions",
+};
+
+/** One-line explanation of each category, for the palette. */
+export const KIND_HINT: Record<NodeKind, string> = {
+  trigger: "What we listen for. Every rule starts with exactly one.",
+  condition: "Checks the event's data. Steps below only run if it passes.",
+  action: "What happens. Can use the event's data.",
 };
 
 /** An empty rule still needs its trigger — a graph without one can never run. */
