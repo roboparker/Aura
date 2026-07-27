@@ -418,13 +418,13 @@ class McpTest extends ApiTestCase
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'create_tag',
-            'arguments' => ['title' => 'urgent', 'color' => '#ef4444'],
+            'arguments' => ['title' => 'urgent', 'color' => '#b91c1c'],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
         $this->assertIsArray($structured);
         $this->assertSame('urgent', $structured['title']);
-        $this->assertSame('#ef4444', $structured['color']);
+        $this->assertSame('#b91c1c', $structured['color']);
 
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'list_tags',

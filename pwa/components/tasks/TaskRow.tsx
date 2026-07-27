@@ -353,24 +353,30 @@ const TaskRow = ({
           />
         </TableCell>
         <TableCell className="align-top text-right whitespace-nowrap">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenDetail(task)}
-            aria-label={`Open details for "${task.title}"`}
-            data-testid="task-open-detail"
-          >
-            <PanelRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(task)}
-            aria-label={`Delete "${task.title}"`}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {/* The benign action and the destructive one are deliberately not
+              adjacent: a divider plus a gap separates them so a slipped click
+              on "Open details" can't land on Delete. */}
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenDetail(task)}
+              aria-label={`Open details for "${task.title}"`}
+              data-testid="task-open-detail"
+            >
+              <PanelRight className="h-4 w-4" />
+            </Button>
+            <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(task)}
+              aria-label={`Delete "${task.title}"`}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
       <TableRow

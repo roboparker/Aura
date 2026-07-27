@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Mcp\McpEntitySerializer;
 use App\Mcp\McpInputHelper;
 use App\Mcp\McpSpaceResolver;
+use App\Service\AvatarColorService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -31,7 +32,7 @@ final class CreateTagTool implements McpToolInterface
 
     public function getDescription(): string
     {
-        return 'Create a tag in a space. Pass a spaceId (from list_spaces) for a shared space, or omit it for your personal space. Color is a #RRGGBB hex (defaults to grey).';
+        return 'Create a tag in a space. Pass a spaceId (from list_spaces) for a shared space, or omit it for your personal space. Color must be one of the supported palette values (defaults to slate).';
     }
 
     public function getInputSchema(): array
@@ -41,7 +42,15 @@ final class CreateTagTool implements McpToolInterface
             'properties' => [
                 'title' => ['type' => 'string', 'description' => 'Tag label (required).'],
                 'spaceId' => ['type' => 'string', 'description' => 'UUID of a space the user belongs to. Omit for the personal space.'],
-                'color' => ['type' => 'string', 'description' => 'Hex color like #22c55e. Defaults to #6b7280.'],
+                // Enumerated rather than free-form: the entity constrains this
+                // to the WCAG-AA palette, so advertising an arbitrary hex would
+                // just produce validation errors the model has to guess its
+                // way out of.
+                'color' => [
+                    'type' => 'string',
+                    'enum' => AvatarColorService::PALETTE,
+                    'description' => 'Tag color. Must be one of the listed palette values. Defaults to #334155 (slate).',
+                ],
                 'description' => ['type' => 'string', 'description' => 'Optional note.'],
             ],
             'required' => ['title'],

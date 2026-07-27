@@ -1,14 +1,16 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePreferencePersist } from "@/lib/usePreferencePersist";
 import { useSettingsSection } from "@/lib/useSettingsSection";
-import { enablePush } from "@/lib/push";
-import { DEFAULT_NOTIFICATION_MATRIX } from "@/lib/notificationPrefs";
+import { enablePush, pushPermission } from "@/lib/push";
+import { DEFAULT_NOTIFICATION_MATRIX, PUSH_PERMISSION_COPY } from "@/lib/notificationPrefs";
 import SettingsShell from "@/components/settings/SettingsShell";
 import SaveIndicator from "@/components/settings/SaveIndicator";
 import SectionSaveBar from "@/components/settings/SectionSaveBar";
 import NotificationMatrix from "@/components/settings/NotificationMatrix";
 import EmailDigestControl from "@/components/settings/EmailDigestControl";
 import QuietHoursControl from "@/components/settings/QuietHoursControl";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -19,10 +21,11 @@ const NotificationsPage = () => {
   const prefs = user?.preferences;
   const disabled = !user;
 
-  const pushPermission =
-    typeof window !== "undefined" && "Notification" in window
-      ? Notification.permission
-      : "default";
+  // Read in an effect, not during render: the server has no Notification API
+  // and would always emit "default", so deriving it inline mismatches on
+  // hydration for anyone who has already granted or blocked push.
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported" | null>(null);
+  useEffect(() => setPermission(pushPermission()), []);
 
   const matrix = prefs?.notificationMatrix ?? DEFAULT_NOTIFICATION_MATRIX;
   const digest = prefs?.emailDigest ?? { mode: "realtime", hour: 8 };
@@ -144,13 +147,37 @@ const NotificationsPage = () => {
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Browser permission:{" "}
-            <span className="font-medium" data-testid="push-permission">
-              {pushPermission}
-            </span>
-            .
-          </p>
+          {/* The browser's own permission vocabulary is misleading here:
+              "default" is a spec term meaning *not yet asked*, but reads as
+              "this is the normal setting, nothing to do" — so the one state
+              that needs action looked like the one that didn't. Each state is
+              stated as intent, and the actionable one carries its control. */}
+          {permission !== null && (
+            <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+              <span data-testid="push-permission" data-permission={permission}>
+                {PUSH_PERMISSION_COPY[permission]}
+              </span>
+              {permission === "default" && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs"
+                  disabled={disabled}
+                  onClick={() => {
+                    void enablePush().then((result) => {
+                      setPermission(pushPermission());
+                      if (result.ok) {
+                        void push.persist({ pushNotificationsEnabled: true });
+                      }
+                    });
+                  }}
+                  data-testid="push-enable"
+                >
+                  Enable
+                </Button>
+              )}
+            </p>
+          )}
         </CardContent>
       </Card>
     </SettingsShell>

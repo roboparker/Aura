@@ -3,6 +3,7 @@ import {
   allOnMatrix,
   DEFAULT_NOTIFICATION_MATRIX,
   NOTIFICATION_ROWS,
+  PUSH_PERMISSION_COPY,
 } from "./notificationPrefs";
 
 describe("notification preference defaults", () => {
@@ -30,5 +31,25 @@ describe("allOnMatrix", () => {
     for (const channel of Object.values(matrix)) {
       expect(channel).toEqual({ inApp: true, email: true });
     }
+  });
+});
+
+describe("PUSH_PERMISSION_COPY", () => {
+  it("covers every state the push helper can report", () => {
+    for (const state of ["default", "granted", "denied", "unsupported"] as const) {
+      expect(PUSH_PERMISSION_COPY[state]).toBeTruthy();
+    }
+  });
+
+  it("never leaks the raw spec vocabulary to the user", () => {
+    // "default" in particular reads as "nothing to do" when it means the
+    // opposite, which is the whole reason this map exists.
+    for (const copy of Object.values(PUSH_PERMISSION_COPY)) {
+      expect(copy).not.toMatch(/\b(default|granted|denied)\b/);
+    }
+  });
+
+  it("tells the user what to do when push is blocked", () => {
+    expect(PUSH_PERMISSION_COPY.denied).toMatch(/site settings/i);
   });
 });

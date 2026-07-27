@@ -180,7 +180,7 @@ test.describe("Boards", () => {
     // Seed a tag so the tags combobox has something to pick.
     const tagRes = await page.request.post(`${BASE_URL}/tags`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { title: `urgent-${Date.now()}`, color: "#ef4444", space: spaceIri },
+      data: { title: `urgent-${Date.now()}`, color: "#b91c1c", space: spaceIri },
     });
     expect(tagRes.ok()).toBeTruthy();
     const tag = await tagRes.json();
