@@ -710,7 +710,7 @@ const Home = () => {
         />
       </Head>
 
-      <main className="relative overflow-hidden">
+      <div className="relative overflow-hidden">
         {/* atmospheric glows */}
         <div
           aria-hidden
@@ -975,7 +975,7 @@ const Home = () => {
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </>
   );
 };

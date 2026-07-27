@@ -291,7 +291,7 @@ const GroupDetail = () => {
 
   if (notFound) {
     return (
-      <main className="px-4 py-12 max-w-5xl mx-auto">
+      <div className="px-4 py-12 max-w-5xl mx-auto">
         <Card>
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Group not found</h1>
@@ -303,7 +303,7 @@ const GroupDetail = () => {
             </Link>
           </CardContent>
         </Card>
-      </main>
+      </div>
     );
   }
 
@@ -312,7 +312,7 @@ const GroupDetail = () => {
       <Head>
         <title>{group ? `${group.title} - Madori` : "Group - Madori"}</title>
       </Head>
-      <main className="px-6 py-8 max-w-6xl mx-auto">
+      <div className="px-6 py-8 max-w-6xl mx-auto">
         {isLoading || !group ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : (
@@ -725,7 +725,7 @@ const GroupDetail = () => {
             />
           </>
         )}
-      </main>
+      </div>
     </>
   );
 };

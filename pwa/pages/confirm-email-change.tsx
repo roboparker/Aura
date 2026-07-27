@@ -75,7 +75,7 @@ const ConfirmEmailChange = () => {
       <Head>
         <title>Confirm Email Change - Madori</title>
       </Head>
-      <main className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
+      <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl text-center">Confirm Email Change</CardTitle>
@@ -114,7 +114,7 @@ const ConfirmEmailChange = () => {
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
     </>
   );
 };

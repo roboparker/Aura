@@ -18,7 +18,7 @@ const GuidesIndex = ({ sections }: Props) => (
         content="User and developer documentation for Madori."
       />
     </Head>
-    <main className="bg-background">
+    <div className="bg-background">
       <div className="mx-auto max-w-5xl px-6 py-10 md:py-16">
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
@@ -65,7 +65,7 @@ const GuidesIndex = ({ sections }: Props) => (
           ))
         )}
       </div>
-    </main>
+    </div>
   </>
 );
 

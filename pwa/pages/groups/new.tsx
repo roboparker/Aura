@@ -161,7 +161,7 @@ const NewGroupPage = () => {
         <title>Create a group — Madori</title>
       </Head>
 
-      <main className="px-4 py-10 max-w-5xl mx-auto">
+      <div className="px-4 py-10 max-w-5xl mx-auto">
         <Card>
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-start gap-3">
@@ -273,7 +273,7 @@ const NewGroupPage = () => {
             </form>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </>
   );
 };

@@ -286,7 +286,7 @@ const SearchPage = () => {
       <Head>
         <title>{filters.q ? `Search: ${filters.q}` : "Search"} - Madori</title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">
           <SearchHeader
             filters={filters}
@@ -342,7 +342,7 @@ const SearchPage = () => {
             <BoardResults filters={filters} activeSpace={activeSpace} onPage={(page) => replaceFilters({ page })} />
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };
@@ -367,7 +367,7 @@ const SearchHeader = ({
     <header className="space-y-3">
       <div className="flex items-center gap-1 text-sm text-muted-foreground">
         <SearchIcon className="h-3.5 w-3.5" />
-        <span>Search</span>
+        <h1>Search</h1>
         {filters.q && (
           <>
             <ChevronRight className="h-3.5 w-3.5" />
@@ -867,9 +867,9 @@ const EmptyState = ({
       <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted">
         <SearchIcon className="h-5 w-5 text-muted-foreground" />
       </span>
-      <h3 className="mt-4 text-lg font-semibold">
+      <h2 className="mt-4 text-lg font-semibold">
         {filters.q ? `No results for “${filters.q}”` : "No tasks match these filters"}
-      </h3>
+      </h2>
 
       {activeFilters.length > 0 && (
         <div className="mx-auto mt-5 max-w-sm text-left">

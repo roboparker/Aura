@@ -111,7 +111,7 @@ const OrganizationsIndex = () => {
         <title>Organizations - Madori</title>
       </Head>
 
-      <main className="px-6 py-8 max-w-5xl mx-auto">
+      <div className="px-6 py-8 max-w-5xl mx-auto">
         <PageHeader
           title="Organizations"
           icon={<Building2 className="h-6 w-6 text-cyan-600" />}
@@ -176,7 +176,7 @@ const OrganizationsIndex = () => {
             })}
           </ul>
         )}
-      </main>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
