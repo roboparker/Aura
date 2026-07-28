@@ -43,6 +43,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "popover", name: "Popover", category: "Overlay", description: "Floating content anchored to a trigger." },
   { slug: "separator", name: "Separator", category: "Primitive", description: "Horizontal or vertical divider." },
   { slug: "sheet", name: "Sheet", category: "Overlay", description: "Side-anchored drawer." },
+  { slug: "skeleton", name: "Skeleton", category: "Feedback", description: "Pulsing placeholders for loading content, plus SkeletonList for rows." },
   { slug: "sonner", name: "Toaster (sonner)", category: "Feedback", description: "App-wide transient toasts, including undoable actions. Mounted once in _app.tsx." },
   { slug: "switch", name: "Switch", category: "Form", description: "On/off toggle built on @base-ui/react." },
   { slug: "table", name: "Table", category: "Data", description: "Styled HTML table primitives." },

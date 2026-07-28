@@ -6,6 +6,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownView from "@/components/editor/MarkdownView";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -116,7 +117,7 @@ const CommentsPanel = ({
       )}
 
       {isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading comments…</p>
+        <SkeletonList rows={3} label="Loading comments" itemClassName="h-16" />
       ) : comments.length === 0 ? (
         <p className="text-xs text-muted-foreground italic">
           No comments yet — start the conversation.

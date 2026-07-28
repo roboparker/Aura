@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/invoiceTypes";
 import type { WidgetProps } from "./registry";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface EngagementRow {
   id: string;
@@ -32,7 +33,7 @@ const barTone = (percent: number): string =>
 
 const EngagementsWidget = ({ data, isLoading }: WidgetProps) => {
   if (isLoading) {
-    return <div className="h-full animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-full rounded-md bg-muted/40" />;
   }
 
   const rows = ((data ?? {}) as { rows?: EngagementRow[] }).rows ?? [];

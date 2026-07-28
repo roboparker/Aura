@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/card";
 import { CalloutBadge } from "@/components/ui/callout-badge";
 import { FormikField } from "@/components/ui/formik-field";
+import { Skeleton } from "@/components/ui/skeleton";
 import PasswordStrengthMeter from "./PasswordStrengthMeter";
 import TermsConsentField from "./TermsConsentField";
 
@@ -255,7 +256,7 @@ const LoadingCard = () => (
       <CardTitle className="text-3xl font-bold">Checking your invite…</CardTitle>
     </CardHeader>
     <CardContent className="p-8 pt-2">
-      <div className="h-24 animate-pulse rounded-md bg-muted" />
+      <Skeleton className="h-24 rounded-md bg-muted" />
     </CardContent>
   </>
 );

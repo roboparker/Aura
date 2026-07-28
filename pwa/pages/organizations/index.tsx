@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SkeletonList } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -133,7 +134,12 @@ const OrganizationsIndex = () => {
         />
 
         {loading && orgs.length === 0 ? (
-          <p className="text-muted-foreground">Loading organizations…</p>
+          <SkeletonList
+            rows={2}
+            label="Loading organizations"
+            className="grid gap-3 space-y-0 sm:grid-cols-1 lg:grid-cols-2"
+            itemClassName="h-[5.5rem]"
+          />
         ) : sorted.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
             You don&apos;t belong to any organizations yet. Create one to invite

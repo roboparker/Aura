@@ -95,6 +95,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import {
@@ -1274,7 +1275,21 @@ const BoardDetail = () => {
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="w-full">
           {isLoading || !board ? (
-            <p className="text-muted-foreground">Loading board...</p>
+            // The board swaps in title, tab bar and table at once, so the
+            // placeholder stands in for all three. One region announces the
+            // whole thing — nesting SkeletonList here would announce twice.
+            <div role="status" aria-busy="true" className="space-y-4 pt-2">
+              <span className="sr-only">Loading board</span>
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-9 w-96 max-w-full" />
+              <Card>
+                <CardContent className="space-y-2 p-4">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-14" />
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <>
               <Tabs value={activeTab} onValueChange={setActiveTab}>

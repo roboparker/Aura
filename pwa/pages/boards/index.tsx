@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SkeletonList } from "@/components/ui/skeleton";
 
 interface Member {
   "@id": string;
@@ -260,7 +261,9 @@ const Boards = () => {
           )}
 
           {boardsQuery.isLoading ? (
-            <p className="text-muted-foreground">Loading boards...</p>
+            // Sized to a real board card (~72px) so the placeholder is a
+            // picture of what's coming, not a sentence about it.
+            <SkeletonList rows={3} label="Loading boards" itemClassName="h-[4.5rem]" />
           ) : boards.length === 0 ? (
             // The empty state is the first thing a new user sees and the
             // moment with the clearest intent, so it carries the action itself

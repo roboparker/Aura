@@ -18,11 +18,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Recharts is heavy and only this tab needs it.
 const MetricChart = dynamic(() => import("./MetricChart"), {
   ssr: false,
-  loading: () => <div className="h-[220px] animate-pulse rounded-md bg-muted/50" />,
+  loading: () => <Skeleton className="h-[220px] rounded-md bg-muted/50" />,
 });
 
 /** Months back from today, as a date-input value. */
@@ -146,7 +147,7 @@ const AnalyticsDashboard = ({ spaceId }: { spaceId: string | null }) => {
       {query.isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2">
           {[0, 1, 2, 3].map((i) => (
-            <Card key={i} className="h-[320px] animate-pulse bg-muted/40" />
+            <Skeleton key={i} className="h-[320px] rounded-xl border bg-muted/40" />
           ))}
         </div>
       ) : metrics.length === 0 ? (
