@@ -42,10 +42,26 @@ test.describe("Authentication", () => {
     await page.goto(`${BASE_URL}/signup`);
 
     // Submit empty form → top-of-form summary + inline messages.
+    // Each message appears twice by design (once in the summary, once beside
+    // its field), so assert against each location specifically rather than a
+    // bare text match.
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByTestId("signup-error-summary")).toBeVisible();
-    await expect(page.locator("text=Email is required")).toBeVisible();
-    await expect(page.locator("text=Password is required")).toBeVisible();
+
+    const summary = page.getByTestId("signup-error-summary");
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText("Email is required");
+    await expect(summary).toContainText("Password is required");
+
+    // Inline messages, associated with their input via aria-describedby.
+    await expect(page.locator("#email-error")).toBeVisible();
+    await expect(page.locator("#password-error")).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toHaveAttribute(
+      "aria-describedby",
+      "email-error",
+    );
+
+    // A failed submit must move focus to the summary, not leave it on <body>.
+    await expect(summary).toBeFocused();
   });
 
   test("sign in with valid credentials", async ({ page }) => {

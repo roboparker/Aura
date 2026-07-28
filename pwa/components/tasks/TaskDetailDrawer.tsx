@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Repeat, Trash2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -399,6 +399,22 @@ const TaskDetailDrawer = ({
           }
         }}
       >
+        {/* The dialog's accessible name. Visually hidden because the visible
+            title is an editable <input> and can't double as the heading; without
+            this the drawer announced only "dialog", so in a list of similar rows
+            there was no way to confirm the right task had opened. Rendering it
+            through SheetTitle (Radix's Dialog.Title) is what wires
+            aria-labelledby, and it gives the dialog its one heading.
+
+            Deliberately NOT aria-modal: this Sheet is modal={false} so its
+            comboboxes and popovers portal outside the dialog subtree and stay
+            interactive (see the onInteractOutside guard above). Claiming
+            modality would tell assistive tech that everything outside the
+            drawer is unavailable — hiding exactly those controls. Focus is
+            already trapped, which is the part that matters functionally. */}
+        <SheetTitle className="sr-only">
+          {task ? `Task details: ${task.title}` : "Task details"}
+        </SheetTitle>
         {loading && (
           <p className="p-6 text-sm text-muted-foreground">Loading…</p>
         )}

@@ -31,6 +31,18 @@ export function FormikField({
   const fieldId = id ?? name;
   const [, meta] = useField(name);
   const isInvalid = meta.touched && Boolean(meta.error);
+
+  // The error and description are only useful to a screen reader if the input
+  // points at them. Without this the field announces "invalid" with no reason
+  // given, and the user has to hunt the form to find out which rule they broke.
+  // Only reference ids that are actually rendered.
+  const errorId = `${fieldId}-error`;
+  const descriptionId = `${fieldId}-description`;
+  const describedBy =
+    [description ? descriptionId : null, isInvalid ? errorId : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
     <div className={cn("space-y-1.5", containerClassName)}>
       {labelAddon ? (
@@ -46,13 +58,22 @@ export function FormikField({
         id={fieldId}
         name={name}
         aria-invalid={isInvalid || undefined}
+        aria-describedby={describedBy}
         className={inputClassName}
         {...inputProps}
       />
       {description && (
-        <p className="text-xs text-muted-foreground">{description}</p>
+        <p id={descriptionId} className="text-xs text-muted-foreground">
+          {description}
+        </p>
       )}
-      <ErrorMessage name={name} component="p" className="text-sm text-destructive" />
+      <ErrorMessage name={name}>
+        {(message) => (
+          <p id={errorId} className="text-sm text-destructive">
+            {message}
+          </p>
+        )}
+      </ErrorMessage>
     </div>
   );
 }

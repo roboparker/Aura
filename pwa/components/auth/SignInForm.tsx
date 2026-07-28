@@ -11,6 +11,7 @@ import { landingPathFor, readLanding } from "@/lib/landingDestination";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormikField } from "@/components/ui/formik-field";
+import { FormikFocusError } from "@/components/ui/formik-focus-error";
 import SsoButtons from "@/components/auth/SsoButtons";
 
 interface SignInValues {
@@ -112,6 +113,9 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
       >
         {({ isSubmitting, status }) => (
           <Form className="space-y-5" noValidate>
+            {/* Two fields and no summary, so this focuses the first invalid
+                input directly. */}
+            <FormikFocusError />
             {status && (() => {
               const isCreds = /invalid credentials/i.test(status);
               const title = isCreds ? "Invalid email or password" : status;
@@ -139,6 +143,7 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
             })()}
 
             <FormikField
+              required
               name="email"
               type="email"
               label="Email"
@@ -148,6 +153,7 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
             />
 
             <FormikField
+              required
               name="password"
               type="password"
               label="Password"
