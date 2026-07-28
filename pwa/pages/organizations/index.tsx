@@ -119,7 +119,7 @@ const OrganizationsIndex = () => {
           actions={
             <Button
               size="sm"
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="gap-1.5"
               onClick={() => {
                 setError(null);
                 setName("");

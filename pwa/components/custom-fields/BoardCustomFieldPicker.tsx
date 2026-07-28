@@ -248,7 +248,7 @@ const BoardCustomFieldPicker = ({
           Toggle where each field shows on this board — the task list, the
           board, and/or the calendar (all off = not on this board). Space
           fields are defined in{" "}
-          <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+          <Link href="/custom-fields" className="text-primary hover:underline">
             space settings
           </Link>
           ; global fields are managed by admins.
@@ -268,7 +268,7 @@ const BoardCustomFieldPicker = ({
             {spaceFields.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 This space has no custom fields yet. Define them in{" "}
-                <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+                <Link href="/custom-fields" className="text-primary hover:underline">
                   space settings
                 </Link>
                 .

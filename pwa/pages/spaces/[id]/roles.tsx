@@ -241,7 +241,7 @@ const SpaceRoles = () => {
           Assign roles to members on the{" "}
           <Link
             href={`/spaces/${space.id}/users`}
-            className="text-cyan-700 hover:underline dark:text-cyan-400"
+            className="text-primary hover:underline"
           >
             Users
           </Link>{" "}

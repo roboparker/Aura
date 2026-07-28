@@ -323,7 +323,6 @@ const NewSpacePage = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !name.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
                   {isSubmitting ? "Creating…" : "Create space"}
                 </Button>
