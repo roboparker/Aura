@@ -1,11 +1,12 @@
 import dynamic from "next/dynamic";
 import type { AnalyticsInterval, AnalyticsMetric } from "@/lib/analyticsTypes";
 import type { WidgetProps } from "./registry";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Recharts is heavy; only a dashboard carrying a chart should pay for it.
 const MetricChart = dynamic(() => import("@/components/reports/MetricChart"), {
   ssr: false,
-  loading: () => <div className="h-full animate-pulse rounded-md bg-muted/50" />,
+  loading: () => <Skeleton className="h-full rounded-md bg-muted/50" />,
 });
 
 interface MetricPayload {
@@ -23,7 +24,7 @@ interface MetricPayload {
  */
 const AnalyticsMetricWidget = ({ data, isLoading }: WidgetProps) => {
   if (isLoading) {
-    return <div className="h-full animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-full rounded-md bg-muted/40" />;
   }
 
   const payload = (data ?? {}) as MetricPayload;

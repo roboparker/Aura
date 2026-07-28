@@ -12,6 +12,7 @@ import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SkeletonList } from "@/components/ui/skeleton";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import PageHeader from "@/components/common/PageHeader";
@@ -221,7 +222,11 @@ const Tags = () => {
           )}
 
           {tagsQuery.isLoading ? (
-            <p className="text-muted-foreground">Loading tags...</p>
+            // Keeps the bordered card the table lives in, so only the rows
+            // inside it swap — the surface itself doesn't appear late.
+            <div className="overflow-hidden rounded-lg border bg-card p-4">
+              <SkeletonList rows={4} label="Loading tags" itemClassName="h-11" />
+            </div>
           ) : (
             <div className="overflow-hidden rounded-lg border bg-card" data-testid="tag-list">
               <table className="w-full text-sm">

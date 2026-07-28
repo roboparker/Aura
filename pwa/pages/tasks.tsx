@@ -54,6 +54,7 @@ import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SkeletonList } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -1243,7 +1244,13 @@ const Tasks = () => {
           )}
 
           {isLoading ? (
-            <p className="text-muted-foreground">Loading tasks...</p>
+            // Same Card the table lands in, so the surface is already there
+            // when the rows arrive. Row height measured off the real list.
+            <Card>
+              <CardContent className="p-4">
+                <SkeletonList rows={6} label="Loading tasks" itemClassName="h-14" />
+              </CardContent>
+            </Card>
           ) : view === "calendar" ? (
             activeSpace ? (
               <CalendarView

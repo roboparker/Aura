@@ -35,6 +35,7 @@ import WidgetFrame from "@/components/dashboard/WidgetFrame";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * The configurable space dashboard (#759).
@@ -209,7 +210,10 @@ const DashboardPage = () => {
           {query.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-4">
               {[0, 1, 2].map((i) => (
-                <Card key={i} className="h-[288px] animate-pulse bg-muted/40 sm:col-span-2" />
+                <Skeleton
+                  key={i}
+                  className="h-[288px] rounded-xl border bg-muted/40 sm:col-span-2"
+                />
               ))}
             </div>
           ) : widgets.length === 0 ? (

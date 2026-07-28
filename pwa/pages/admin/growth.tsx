@@ -22,10 +22,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const FunnelChart = dynamic(() => import("@/components/admin/FunnelChart"), {
   ssr: false,
-  loading: () => <div className="h-[260px] animate-pulse rounded-md bg-muted/50" />,
+  loading: () => <Skeleton className="h-[260px] rounded-md bg-muted/50" />,
 });
 
 const INTERVALS = [
@@ -208,7 +209,7 @@ const GrowthPage = () => {
 
           <Card className="mb-6 p-4">
             {query.isLoading ? (
-              <div className="h-[260px] animate-pulse rounded-md bg-muted/40" />
+              <Skeleton className="h-[260px] rounded-md bg-muted/40" />
             ) : (
               <FunnelChart funnel={funnel ?? {}} />
             )}

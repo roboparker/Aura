@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { WidgetProps } from "./registry";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TaskRow {
   id: string;
@@ -17,7 +18,7 @@ const dueLabel = (iso: string): string => {
 
 const MyTasksWidget = ({ data, isLoading }: WidgetProps) => {
   if (isLoading) {
-    return <div className="h-full animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-full rounded-md bg-muted/40" />;
   }
 
   const rows = ((data ?? {}) as { rows?: TaskRow[] }).rows ?? [];

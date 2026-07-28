@@ -4,6 +4,7 @@ import { apiGet } from "@/lib/apiClient";
 import { KIND_LABEL, type AutomationRun, type AutomationRunStep } from "@/lib/automationTypes";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Props {
   automationId: string;
@@ -60,7 +61,7 @@ const AutomationRunLog = ({ automationId }: Props) => {
   });
 
   if (query.isLoading) {
-    return <div className="h-32 animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-32 rounded-md bg-muted/40" />;
   }
 
   const runs = query.data?.runs ?? [];

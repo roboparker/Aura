@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import AutomationRunLog from "./AutomationRunLog";
 import StepConfigPanel, { type PickerOption } from "./StepConfigPanel";
 
@@ -30,7 +31,7 @@ const AutomationCanvas = dynamic(() => import("./AutomationCanvas"), {
   ssr: false,
   // Matches the canvas's own height so the tab doesn't jump when it loads.
   loading: () => (
-    <div className="h-[calc(100vh-20rem)] min-h-[520px] animate-pulse rounded-md bg-muted/40" />
+    <Skeleton className="h-[calc(100vh-20rem)] min-h-[520px] rounded-md bg-muted/40" />
   ),
 });
 
@@ -207,7 +208,7 @@ const AutomationsTab = ({ boardId, sections, members }: Props) => {
   );
 
   if (rulesQuery.isLoading) {
-    return <div className="h-64 animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-64 rounded-md bg-muted/40" />;
   }
 
   return (

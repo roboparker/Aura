@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Switch } from "@/components/ui/switch";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   isGlobalDefinition,
@@ -258,7 +259,7 @@ const BoardCustomFieldPicker = ({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading fields…</p>
+        <SkeletonList rows={4} label="Loading fields" itemClassName="h-10" />
       ) : (
         <div className="space-y-4">
           <section className="space-y-1.5">
