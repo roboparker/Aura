@@ -64,6 +64,35 @@ test.describe("Authentication", () => {
     await expect(summary).toBeFocused();
   });
 
+  test("tabbing through empty fields does not flag them as errors", async ({
+    page,
+  }) => {
+    await page.goto(`${BASE_URL}/signup`);
+
+    // Walk the form the way someone orienting on it does: focus the first
+    // field and tab onward without typing. Formik marks each field touched on
+    // blur, so the naive `touched && error` render told the user off for
+    // fields they hadn't reached a decision on yet.
+    await page.focus("#givenName");
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Tab");
+
+    await expect(page.locator("#givenName-error")).toHaveCount(0);
+    await expect(page.locator("#email-error")).toHaveCount(0);
+    await expect(page.locator("#password-error")).toHaveCount(0);
+    await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+
+    // But typing something genuinely wrong and leaving SHOULD complain — this
+    // is "reward early, punish late", not "never validate before submit".
+    await page.fill("#email", "not-an-email");
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#email-error")).toBeVisible();
+    await expect(page.locator("#email-error")).toContainText("Invalid email");
+
+    // ...and only for that field. The still-empty password is untouched by
+    // the user's mistake and must stay quiet.
+    await expect(page.locator("#password-error")).toHaveCount(0);
+  });
+
   test("sign in with valid credentials", async ({ page }) => {
     // Register first via API
     const email = uniqueEmail();
