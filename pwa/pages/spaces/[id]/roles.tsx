@@ -198,14 +198,14 @@ const SpaceRoles = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <Button asChild variant="outline">
             <Link href="/spaces">Back to spaces</Link>
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -224,7 +224,7 @@ const SpaceRoles = () => {
       <Head>
         <title>Roles · {space.name}</title>
       </Head>
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader
           title="Roles"
           icon={<ShieldCheck className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
@@ -313,7 +313,7 @@ const SpaceRoles = () => {
             <Plus className="h-3.5 w-3.5" aria-hidden /> New role
           </button>
         </div>
-      </main>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">

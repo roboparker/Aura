@@ -24,7 +24,7 @@ const ComponentDoc = ({ name, description, importPath, examples }: ComponentDocP
     <Head>
       <title>{`${name} · Dev Components`}</title>
     </Head>
-    <main className="mx-auto max-w-4xl px-6 py-10">
+    <div className="mx-auto max-w-4xl px-6 py-10">
       <Link
         href="/dev/components"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -54,7 +54,7 @@ const ComponentDoc = ({ name, description, importPath, examples }: ComponentDocP
           </section>
         ))}
       </div>
-    </main>
+    </div>
   </>
 );
 

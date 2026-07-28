@@ -22,7 +22,7 @@ const ComponentsIndex = () => (
     <Head>
       <title>Components · Dev</title>
     </Head>
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">
         <h1 className="text-3xl font-semibold tracking-tight">Component library</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
@@ -54,7 +54,7 @@ const ComponentsIndex = () => (
           </section>
         );
       })}
-    </main>
+    </div>
   </>
 );
 

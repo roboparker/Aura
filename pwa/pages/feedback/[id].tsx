@@ -235,7 +235,7 @@ const FeedbackDetailPage = () => {
           {ticket ? `${ticket.title} - Madori` : "Feedback - Madori"}
         </title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
           {notFound ? (
             <Card>
@@ -454,7 +454,7 @@ const FeedbackDetailPage = () => {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };

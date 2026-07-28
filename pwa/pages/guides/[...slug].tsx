@@ -47,7 +47,7 @@ const GuidePage = ({ doc, sectionLabel }: Props) => (
         content={`${doc.title} — ${sectionLabel} documentation for Madori.`}
       />
     </Head>
-    <main className="bg-background">
+    <div className="bg-background">
       <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
         <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2 gap-1">
           <Link href="/guides">
@@ -74,7 +74,7 @@ const GuidePage = ({ doc, sectionLabel }: Props) => (
           </ReactMarkdown>
         </article>
       </div>
-    </main>
+    </div>
   </>
 );
 

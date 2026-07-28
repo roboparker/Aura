@@ -47,7 +47,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
         {ogImage ? <meta name="twitter:image" content={ogImage} /> : null}
       </Head>
 
-      <main className="bg-background">
+      <div className="bg-background">
         <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
           <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2 gap-1">
             <Link href="/blog">
@@ -76,7 +76,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.body}</ReactMarkdown>
           </article>
         </div>
-      </main>
+      </div>
     </>
   );
 };

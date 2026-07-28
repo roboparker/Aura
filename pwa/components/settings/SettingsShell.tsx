@@ -48,7 +48,7 @@ const SettingsShell = ({
       <Head>
         <title>{title} · Settings - Madori</title>
       </Head>
-      <main className="min-h-screen bg-muted">
+      <div className="min-h-screen bg-muted">
         <div className="mx-auto max-w-5xl px-4 py-10">
           <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
@@ -74,7 +74,7 @@ const SettingsShell = ({
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 };

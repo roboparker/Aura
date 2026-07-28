@@ -340,7 +340,7 @@ const SpaceDetail = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Space not found</h1>
@@ -352,7 +352,7 @@ const SpaceDetail = () => {
             </Link>
           </CardContent>
         </Card>
-      </main>
+      </div>
     );
   }
 
@@ -361,7 +361,7 @@ const SpaceDetail = () => {
       <Head>
         <title>{space ? `${space.name} - Madori` : "Space - Madori"}</title>
       </Head>
-      <main className="min-h-screen bg-background px-4 py-8">
+      <div className="min-h-screen bg-background px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {isLoading || !space ? (
             <p className="text-muted-foreground">Loading…</p>
@@ -769,7 +769,7 @@ const SpaceDetail = () => {
             </>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };

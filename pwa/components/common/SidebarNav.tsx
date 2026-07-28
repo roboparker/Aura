@@ -709,6 +709,7 @@ const SidebarNav = ({
       )}
 
       <nav
+        aria-label="Primary"
         className={cn(
           "flex flex-col gap-0.5 px-0 pt-2 pb-4",
           scrollable && "flex-1 overflow-y-auto",

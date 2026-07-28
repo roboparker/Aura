@@ -354,7 +354,7 @@ const ProjectsPage = () => {
       <Head>
         <title>Projects — Madori</title>
       </Head>
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-4xl px-6 py-8">
         <PageHeader
           title="Projects"
           icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
@@ -456,7 +456,7 @@ const ProjectsPage = () => {
             </div>
           </Card>
         )}
-      </main>
+      </div>
 
       <Sheet open={sheetFor !== null} onOpenChange={(o: boolean) => !o && closeSheet()} modal={false}>
         <SheetContent

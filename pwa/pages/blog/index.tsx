@@ -31,7 +31,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
         <meta name="twitter:description" content={PAGE_DESCRIPTION} />
       </Head>
 
-      <main className="bg-background">
+      <div className="bg-background">
         <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
           <header className="mb-10 border-b pb-6">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -82,7 +82,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
             </ul>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };
