@@ -52,14 +52,14 @@ test.describe("Tasks", () => {
     // explicit toBeChecked / not.toBeChecked assertions auto-wait until
     // the controlled input matches the expected DOM state, which is
     // the actual sync point we care about.
-    const checkbox = item.locator('input[type="checkbox"]');
+    const checkbox = item.getByTestId("task-done");
     const completeResponse = page.waitForResponse(
       (res) =>
         res.request().method() === "PATCH" &&
         res.url().includes("/tasks/") &&
         res.ok(),
     );
-    await checkbox.check();
+    await checkbox.click();
     await completeResponse;
     await expect(checkbox).toBeChecked();
     // Completed tasks read as muted (no strikethrough).
@@ -72,7 +72,7 @@ test.describe("Tasks", () => {
         res.url().includes("/tasks/") &&
         res.ok(),
     );
-    await checkbox.uncheck();
+    await checkbox.click();
     await uncompleteResponse;
     await expect(checkbox).not.toBeChecked();
     await expect(item.locator(`text=${title}`)).not.toHaveClass(/text-muted-foreground/);
@@ -153,7 +153,7 @@ test.describe("Tasks", () => {
 
     // Complete the task — backend clones the next occurrence; frontend
     // refetches because the toggled task carries a recurrence rule.
-    await item.locator('input[type="checkbox"]').check();
+    await item.getByTestId("task-done").click();
 
     // Two rows now share the title — one completed (the original) and one
     // pending (the next occurrence, due 14 days after the original date).
@@ -163,7 +163,7 @@ test.describe("Tasks", () => {
     // The new row also shows the recurrence icon (rule carries over).
     await expect(
       allRows
-        .filter({ hasNot: page.locator("input[type=checkbox]:checked") })
+        .filter({ hasNot: page.locator('[data-testid="task-done"][data-state="checked"]') })
         .locator('[data-testid="task-due-date-repeat-icon"]'),
     ).toBeVisible();
   });
@@ -230,7 +230,7 @@ test.describe("Tasks", () => {
     // would yank the row out of view and time the check out.
     await filter.click();
     await expect(todayItem).toBeVisible();
-    await overdueItem.locator('input[type="checkbox"]').check();
+    await overdueItem.getByTestId("task-done").click();
     await expect(overdueCell).toHaveAttribute("data-status", "none");
   });
 

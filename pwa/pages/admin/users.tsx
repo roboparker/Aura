@@ -11,6 +11,7 @@ import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -454,10 +455,9 @@ const AdminUsers: NextPage = () => {
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={skipWaitlist}
-                    onChange={(e) => setSkipWaitlist(e.target.checked)}
+                    onCheckedChange={(c) => setSkipWaitlist(c === true)}
                   />
                   Skip the waitlist (account can use the app immediately)
                 </label>

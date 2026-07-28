@@ -16,6 +16,7 @@ import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -397,10 +398,9 @@ const ExpensesPage = () => {
                               </div>
                               <div className="flex flex-wrap items-center gap-4">
                                 <label className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={billable}
-                                    onChange={(e) => setBillable(e.target.checked)}
+                                    onCheckedChange={(c) => setBillable(c === true)}
                                   />
                                   Billable
                                 </label>
@@ -649,10 +649,9 @@ const EditExpenseRow = ({
             />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={eBillable}
-              onChange={(e) => setEBillable(e.target.checked)}
+              onCheckedChange={(c) => setEBillable(c === true)}
             />
             Billable
           </label>

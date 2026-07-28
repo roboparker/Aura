@@ -12,6 +12,7 @@ import AttachmentsPanel, { type Attachment } from "@/components/tasks/Attachment
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -695,12 +696,11 @@ const ProjectsPage = () => {
                     const checked = assigned.includes(p["@id"]);
                     return (
                       <label key={p["@id"]} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
-                          onChange={(e) =>
+                          onCheckedChange={(c) =>
                             setAssigned((prev) =>
-                              e.target.checked ? [...prev, p["@id"]] : prev.filter((x) => x !== p["@id"]),
+                              c === true ? [...prev, p["@id"]] : prev.filter((x) => x !== p["@id"]),
                             )
                           }
                         />

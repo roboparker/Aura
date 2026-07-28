@@ -520,7 +520,7 @@ const AcceptInviteCard = ({
 
               <TermsConsentField />
 
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+              <Button type="submit" loading={isSubmitting} className="w-full">
                 {isSubmitting ? "Creating account…" : "Accept & create account"}
               </Button>
             </Form>

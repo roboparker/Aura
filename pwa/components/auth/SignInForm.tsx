@@ -173,7 +173,7 @@ const SignInForm = ({ next, registered, reset, expired, onTwoFactorRequired }: P
             <div className="space-y-3 pt-2">
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                loading={isSubmitting}
                 className="w-full h-12 text-base font-semibold"
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
