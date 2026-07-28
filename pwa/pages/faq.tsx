@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface QA {
   q: string;
@@ -161,7 +162,7 @@ const SECTIONS: Section[] = [
 const Faq = () => (
   <>
     <Head>
-      <title>FAQ — Madori</title>
+      <title>{pageTitle("FAQ")}</title>
       <meta
         name="description"
         content="Frequently asked questions about Madori — plans and billing, your data, the API, and support."

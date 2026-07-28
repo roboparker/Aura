@@ -8,6 +8,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import PageHeader from "@/components/common/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * Space-level custom-field manager (#custom-fields-space). Defines the field
@@ -38,7 +39,7 @@ const CustomFields = () => {
   return (
     <>
       <Head>
-        <title>Custom fields - Madori</title>
+        <title>{pageTitle("Custom fields")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-4xl">

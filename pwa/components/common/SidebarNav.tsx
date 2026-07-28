@@ -9,6 +9,7 @@ import {
   ChevronDown,
   CreditCard,
   FlaskConical,
+  KeyRound,
   Plus,
   Settings,
   ShieldCheck,
@@ -402,11 +403,20 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
 };
 
 /**
- * Space membership + access management (Users, Roles, API keys) as a
- * collapsible nav group, mirroring {@see AdminSection}. Users + Roles are
- * space-admin only; API keys is gated on the `api_keys` read capability
- * (admins have it by default, a role can grant it to a member too). The
- * "General" space settings live in a standalone link above this group.
+ * Space membership management (Users, Roles) as a collapsible nav group,
+ * mirroring {@see AdminSection}. Space-admin only.
+ *
+ * API keys deliberately does *not* live here, even though it is adjacent
+ * access-management. It is gated on the `api_keys` capability rather than on
+ * admin, so a member granted that one capability used to see the whole "User
+ * management" heading standing over a single "API keys" child — a category
+ * label promising user management and delivering one unrelated item, which
+ * reads as a permissions bug and sends members hunting for controls they will
+ * never have. Hiding the header on a child count would have been the wrong
+ * cure: the mismatch is semantic, not numeric, and a count rule would also
+ * swallow a section that legitimately has one child. So API keys is a
+ * top-level item instead — the shape Tags and Custom fields already use — and
+ * it sits in the same place for every role.
  */
 const UserManagementSection = ({
   wrap,
@@ -414,7 +424,7 @@ const UserManagementSection = ({
   wrap: (children: ReactNode) => ReactNode;
 }) => {
   const router = useRouter();
-  const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
+  const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
 
   const storageKey = "madori.navCollapsed.userManagement";
   const [collapsed, setCollapsed] = useState(false);
@@ -446,15 +456,6 @@ const UserManagementSection = ({
             href: `/spaces/${activeSpace.id}/roles`,
             label: "Roles",
             match: "/spaces/[id]/roles",
-          },
-        ]
-      : []),
-    ...(activeSpace && can("api_keys", "read")
-      ? [
-          {
-            href: `/spaces/${activeSpace.id}/api-keys`,
-            label: "API keys",
-            match: "/spaces/[id]/api-keys",
           },
         ]
       : []),
@@ -802,6 +803,32 @@ const SidebarNav = ({
         {activeSpace && <BillingSection wrap={wrap} canInvoices={canInvoices} />}
 
         <UserManagementSection wrap={wrap} />
+
+        {/* Top-level rather than inside User management: it's gated on the
+            `api_keys` capability, not on admin, so grouping it under that
+            heading left a member with only this one item standing under a
+            "User management" label. Same place for every role now. */}
+        {activeSpace && can("api_keys", "read") && (
+          <div className="mt-3">
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  NAV_ITEM_CLASS,
+                  router.pathname === "/spaces/[id]/api-keys" &&
+                    NAV_ITEM_ACTIVE_CLASS,
+                )}
+              >
+                <Link href={`/spaces/${activeSpace.id}/api-keys`}>
+                  <KeyRound className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="truncate">API keys</span>
+                </Link>
+              </Button>,
+            )}
+          </div>
+        )}
 
         {activeSpace && isActiveSpaceAdmin && (
           <div className="mt-3">

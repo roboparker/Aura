@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface SpaceRef {
   "@id": string;
@@ -132,7 +133,7 @@ const PagesIndex = () => {
   return (
     <>
       <Head>
-        <title>Pages - Madori</title>
+        <title>{pageTitle("Pages")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">

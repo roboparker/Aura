@@ -1,12 +1,13 @@
 import Head from "next/head";
 import Link from "next/link";
+import { pageTitle } from "@/lib/pageTitle";
 
 const LAST_UPDATED = "June 9, 2026";
 
 const Privacy = () => (
   <>
     <Head>
-      <title>Privacy Policy — Madori</title>
+      <title>{pageTitle("Privacy Policy")}</title>
       <meta
         name="description"
         content="How Madori collects, uses, and protects your personal data."

@@ -39,6 +39,7 @@ import {
 } from "@/components/spaces/SpaceContentTabs";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface BoardOwner {
   email: string;
@@ -359,7 +360,7 @@ const SpaceDetail = () => {
   return (
     <>
       <Head>
-        <title>{space ? `${space.name} - Madori` : "Space - Madori"}</title>
+        <title>{pageTitle(space?.name ?? "Space")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="max-w-6xl mx-auto">

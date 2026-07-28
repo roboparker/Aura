@@ -19,6 +19,7 @@ import { SkeletonList } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/common/PageHeader";
 import SpaceCard from "@/components/spaces/SpaceCard";
+import { pageTitle } from "@/lib/pageTitle";
 
 type FilterKey = "all" | "shared" | "personal" | "owned";
 type SortKey = "recent" | "name" | "members";
@@ -126,7 +127,7 @@ const SpacesIndex = () => {
   return (
     <>
       <Head>
-        <title>Spaces - Madori</title>
+        <title>{pageTitle("Spaces")}</title>
       </Head>
 
       <div className="px-6 py-8 max-w-7xl mx-auto">

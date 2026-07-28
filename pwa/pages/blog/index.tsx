@@ -3,13 +3,14 @@ import Head from "next/head";
 import Link from "next/link";
 import { formatBlogDate, type BlogPostSummary } from "@/lib/blogTypes";
 import { getPostSummaries, siteUrl } from "@/lib/blog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Props {
   posts: BlogPostSummary[];
   origin: string;
 }
 
-const PAGE_TITLE = "Blog — Madori";
+const PAGE_TITLE = pageTitle("Blog");
 const PAGE_DESCRIPTION =
   "Tips, tricks, and progress updates from the team building Madori — the API-first workspace for tasks, docs, and boards.";
 

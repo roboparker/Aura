@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface WaitlistUser {
   id: string;
@@ -185,7 +186,7 @@ const AdminWaitlist: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -204,7 +205,7 @@ const AdminWaitlist: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Waitlist - Madori Admin</title>
+        <title>{pageTitle("Waitlist", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">

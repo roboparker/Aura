@@ -15,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 // Admin-only page to verify Sentry captures errors on each surface once the
 // DSNs are configured (see docs/developer/monitoring.md). Nothing here is
@@ -110,7 +111,7 @@ const AdminSentryTest: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -127,7 +128,7 @@ const AdminSentryTest: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Sentry test - Madori Admin</title>
+        <title>{pageTitle("Sentry test", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-3xl mx-auto space-y-6">

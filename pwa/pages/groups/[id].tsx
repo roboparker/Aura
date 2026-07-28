@@ -28,6 +28,7 @@ import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar from "@/components/user/UserAvatar";
+import { pageTitle } from "@/lib/pageTitle";
 
 const formatDate = (iso: string): string => {
   const d = new Date(iso);
@@ -310,7 +311,7 @@ const GroupDetail = () => {
   return (
     <>
       <Head>
-        <title>{group ? `${group.title} - Madori` : "Group - Madori"}</title>
+        <title>{pageTitle(group?.title ?? "Group")}</title>
       </Head>
       <div className="px-6 py-8 max-w-6xl mx-auto">
         {isLoading || !group ? (

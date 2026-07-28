@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, X } from "lucide-react";
+import { pageTitle } from "@/lib/pageTitle";
 
 const AdminSegmentDetail: NextPage = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -248,7 +249,7 @@ const AdminSegmentDetail: NextPage = () => {
   return (
     <>
       <Head>
-        <title>{segment.name} - Madori Segments</title>
+        <title>{pageTitle(segment.name, "Segments", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">

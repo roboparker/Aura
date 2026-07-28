@@ -17,6 +17,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import EmailChipInput from "@/components/common/EmailChipInput";
 import GroupTile from "@/components/groups/GroupTile";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MAX_INVITES = 50;
 
@@ -158,7 +159,7 @@ const NewGroupPage = () => {
   return (
     <>
       <Head>
-        <title>Create a group — Madori</title>
+        <title>{pageTitle("Create a group")}</title>
       </Head>
 
       <div className="px-4 py-10 max-w-5xl mx-auto">

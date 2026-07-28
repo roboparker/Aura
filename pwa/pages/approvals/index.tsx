@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ApprovalRow {
   id: string;
@@ -95,7 +96,7 @@ const ApprovalsPage = () => {
   return (
     <>
       <Head>
-        <title>Approvals — Madori</title>
+        <title>{pageTitle("Approvals")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">

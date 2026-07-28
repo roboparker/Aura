@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 // ---- Types ----
 type Status = "" | "open" | "completed";
@@ -284,7 +285,7 @@ const SearchPage = () => {
   return (
     <>
       <Head>
-        <title>{filters.q ? `Search: ${filters.q}` : "Search"} - Madori</title>
+        <title>{pageTitle(filters.q ? `Search: ${filters.q}` : "Search")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">

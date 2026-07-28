@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/common/PageHeader";
 import GroupTile from "@/components/groups/GroupTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
+import { pageTitle } from "@/lib/pageTitle";
 
 type Role = "admin" | "member";
 
@@ -489,7 +490,7 @@ const SpaceUsers = () => {
   return (
     <>
       <Head>
-        <title>Users · {space.name}</title>
+        <title>{pageTitle("Users", space.name)}</title>
       </Head>
       <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader

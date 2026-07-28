@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 type TypeFilter = FeedbackType | "all";
 type StatusFilter = FeedbackStatus | "all";
@@ -95,7 +96,7 @@ const FeedbackBoardPage = () => {
   return (
     <>
       <Head>
-        <title>Feedback - Madori</title>
+        <title>{pageTitle("Feedback")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">

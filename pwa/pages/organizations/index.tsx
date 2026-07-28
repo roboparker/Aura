@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PageHeader from "@/components/common/PageHeader";
+import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationsIndex = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -109,7 +110,7 @@ const OrganizationsIndex = () => {
   return (
     <>
       <Head>
-        <title>Organizations - Madori</title>
+        <title>{pageTitle("Organizations")}</title>
       </Head>
 
       <div className="px-6 py-8 max-w-5xl mx-auto">

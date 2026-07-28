@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SkeletonList } from "@/components/ui/skeleton";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Member {
   "@id": string;
@@ -195,7 +196,7 @@ const Boards = () => {
   return (
     <>
       <Head>
-        <title>Boards - Madori</title>
+        <title>{pageTitle("Boards")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto">

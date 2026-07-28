@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 type State =
   | { status: "idle" }
@@ -73,7 +74,7 @@ const ConfirmEmailChange = () => {
   return (
     <>
       <Head>
-        <title>Confirm Email Change - Madori</title>
+        <title>{pageTitle("Confirm Email Change")}</title>
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-md">

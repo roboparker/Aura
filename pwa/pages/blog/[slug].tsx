@@ -7,6 +7,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBlogDate, type BlogPost } from "@/lib/blogTypes";
 import { getAllPosts, getPostBySlug, siteUrl } from "@/lib/blog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Props {
   post: BlogPost;
@@ -21,7 +22,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
   return (
     <>
       <Head>
-        <title>{`${post.title} — Madori`}</title>
+        <title>{pageTitle(post.title)}</title>
         <meta name="description" content={description} />
         <link rel="canonical" href={canonical} />
         {post.draft ? <meta name="robots" content="noindex" /> : null}

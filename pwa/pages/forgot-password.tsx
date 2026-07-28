@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { FormikField } from "@/components/ui/formik-field";
 import MadoriWordmark from "@/components/auth/MadoriWordmark";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ForgotPasswordValues {
   email: string;
@@ -81,7 +82,7 @@ const ForgotPassword = () => {
   return (
     <>
       <Head>
-        <title>Reset your password — Madori</title>
+        <title>{pageTitle("Reset your password")}</title>
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
         <MadoriWordmark />

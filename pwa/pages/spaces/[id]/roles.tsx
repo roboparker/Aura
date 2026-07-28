@@ -31,6 +31,7 @@ import PageHeader from "@/components/common/PageHeader";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import RolePermissionMatrix from "@/components/spaces/RolePermissionMatrix";
+import { pageTitle } from "@/lib/pageTitle";
 
 const SpaceRoles = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -222,7 +223,7 @@ const SpaceRoles = () => {
   return (
     <>
       <Head>
-        <title>Roles · {space.name}</title>
+        <title>{pageTitle("Roles", space.name)}</title>
       </Head>
       <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader

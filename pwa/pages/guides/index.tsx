@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDocSections, type DocSection } from "@/lib/docs";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Props {
   sections: DocSection[];
@@ -12,7 +13,7 @@ interface Props {
 const GuidesIndex = ({ sections }: Props) => (
   <>
     <Head>
-      <title>Guides — Madori</title>
+      <title>{pageTitle("Guides")}</title>
       <meta
         name="description"
         content="User and developer documentation for Madori."

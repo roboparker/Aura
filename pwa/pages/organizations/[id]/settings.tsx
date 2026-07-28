@@ -9,6 +9,7 @@ import { apiGet, ApiError } from "@/lib/apiClient";
 import { type Organization } from "@/lib/organizationTypes";
 import { Button } from "@/components/ui/button";
 import AccountBillingCard from "@/components/billing/AccountBillingCard";
+import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationSettings = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -65,7 +66,7 @@ const OrganizationSettings = () => {
   return (
     <>
       <Head>
-        <title>{org ? `${org.name} settings - Madori` : "Organization settings - Madori"}</title>
+        <title>{pageTitle(org ? `${org.name} settings` : "Organization settings")}</title>
       </Head>
 
       <div className="px-6 py-8 max-w-3xl mx-auto">

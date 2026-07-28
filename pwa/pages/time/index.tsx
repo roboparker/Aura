@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MERGE_PATCH = "application/merge-patch+json";
 
@@ -321,7 +322,7 @@ const TimePage = () => {
   return (
     <>
       <Head>
-        <title>Time — Madori</title>
+        <title>{pageTitle("Time")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-5xl">

@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MERGE_PATCH = "application/merge-patch+json";
 
@@ -226,7 +227,7 @@ const ExpensesPage = () => {
   return (
     <>
       <Head>
-        <title>Expenses — Madori</title>
+        <title>{pageTitle("Expenses")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-5xl">

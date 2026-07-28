@@ -1,4 +1,4 @@
-import { AVATAR_PALETTE } from "@/lib/avatarPalette";
+import { AVATAR_PALETTE, colorName } from "@/lib/avatarPalette";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,7 +50,9 @@ const ColorSwatchPicker = ({
             type="button"
             role="radio"
             aria-checked={isSelected}
-            aria-label={color}
+            // Named, not hex: the rest of this picker is wired correctly, so
+            // the label was the only thing making it unusable without sight.
+            aria-label={colorName(color)}
             disabled={disabled}
             onClick={() => onChange(color)}
             className={cn(
