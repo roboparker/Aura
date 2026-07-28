@@ -306,18 +306,34 @@ test.describe("Tasks", () => {
 
     // Grab the grip on the top item (C) and move it down twice to position 3.
     // Use locator.press() to focus+press atomically (more reliable in CI than
-    // focus() + keyboard.press), and wait briefly between keys so dnd-kit's
-    // drag state has time to update between Space/Arrow events.
+    // focus() + keyboard.press).
+    //
+    // Each key is followed by a wait for dnd-kit to *announce* the move rather
+    // than a fixed sleep. dnd-kit names the droppable it moved over in its own
+    // live region, so the announcement changing is proof the key was processed.
+    // A fixed delay is a guess, and on a loaded machine 100ms was sometimes
+    // short enough that the second ArrowDown landed before the first had
+    // settled — the drop then committed one position early, leaving B, C, A
+    // instead of B, A, C. That produced a failure at the very last assertion,
+    // which read as flake but was really "we stopped measuring too soon".
+    // dnd-kit's own region, matched by its generated id. Not `role="status"`
+    // broadly — the toaster and the loading skeletons are live regions too.
+    const dragAnnouncement = page.locator('[id^="DndLiveRegion"]');
+    const pressAndSettle = async (press) => {
+      const before = await dragAnnouncement.textContent();
+      await press();
+      await expect
+        .poll(() => dragAnnouncement.textContent(), { timeout: 5000 })
+        .not.toBe(before);
+    };
+
     const topGrip = page
       .locator('[data-testid="task-item"]')
       .first()
       .getByRole("button", { name: /Drag to reorder/ });
-    await topGrip.press("Space");
-    await page.waitForTimeout(100);
-    await page.keyboard.press("ArrowDown");
-    await page.waitForTimeout(100);
-    await page.keyboard.press("ArrowDown");
-    await page.waitForTimeout(100);
+    await pressAndSettle(() => topGrip.press("Space"));
+    await pressAndSettle(() => page.keyboard.press("ArrowDown"));
+    await pressAndSettle(() => page.keyboard.press("ArrowDown"));
     await page.keyboard.press("Space");
 
     // Now the order should be B, A, C — verify via the top item

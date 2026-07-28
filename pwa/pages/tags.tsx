@@ -12,6 +12,14 @@ import MarkdownView from "@/components/editor/MarkdownView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { SkeletonList } from "@/components/ui/skeleton";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
@@ -230,33 +238,26 @@ const Tags = () => {
             </div>
           ) : (
             <div className="overflow-hidden rounded-lg border bg-card" data-testid="tag-list">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-2 text-left font-medium">Tag</th>
-                    <th className="px-4 py-2 text-left font-medium">Description</th>
-                    <th className="px-4 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Tag</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {tags.length === 0 && !creating && (
-                    <tr data-testid="tag-empty">
-                      <td
-                        colSpan={3}
-                        className="px-4 py-6 text-center text-muted-foreground"
-                      >
+                    <TableRow data-testid="tag-empty">
+                      <TableCell colSpan={3} className="py-6 text-center whitespace-normal text-muted-foreground">
                         No tags yet — add one to start grouping tasks across boards.
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
                   {tags.map((tag) =>
                     editingId === tag["@id"] ? (
-                      <tr
-                        key={tag["@id"]}
-                        data-testid="tag-item"
-                        className="border-b last:border-0"
-                      >
-                        <td colSpan={3} className="px-4 py-3">
+                      <TableRow key={tag["@id"]} data-testid="tag-item">
+                        <TableCell colSpan={3} className="py-3 whitespace-normal">
                           <form
                             onSubmit={(e) => handleUpdate(e, tag)}
                             className="space-y-3"
@@ -293,15 +294,11 @@ const Tags = () => {
                               </Button>
                             </div>
                           </form>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : (
-                      <tr
-                        key={tag["@id"]}
-                        data-testid="tag-item"
-                        className="border-b last:border-0 hover:bg-accent/40"
-                      >
-                        <td className="px-4 py-2 align-middle">
+                      <TableRow key={tag["@id"]} data-testid="tag-item">
+                        <TableCell>
                           <span
                             className="inline-block rounded px-2 py-1 text-sm font-semibold whitespace-nowrap"
                             style={{
@@ -311,15 +308,15 @@ const Tags = () => {
                           >
                             {tag.title}
                           </span>
-                        </td>
-                        <td className="min-w-0 px-4 py-2 align-middle">
+                        </TableCell>
+                        <TableCell className="min-w-0 whitespace-normal">
                           {tag.description ? (
                             <MarkdownView source={tag.description} />
                           ) : (
                             <span className="text-muted-foreground/50">—</span>
                           )}
-                        </td>
-                        <td className="px-4 py-2 text-right align-middle whitespace-nowrap">
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -337,13 +334,13 @@ const Tags = () => {
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ),
                   )}
                   {creating && (
-                    <tr data-testid="tag-create-row" className="border-b last:border-0">
-                      <td colSpan={3} className="px-4 py-3">
+                    <TableRow data-testid="tag-create-row">
+                      <TableCell colSpan={3} className="py-3 whitespace-normal">
                         <form onSubmit={handleCreate} className="space-y-3">
                           <Input
                             type="text"
@@ -386,11 +383,11 @@ const Tags = () => {
                             </Button>
                           </div>
                         </form>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   )}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               {can("tags", "create") && !creating && (
                 <button
                   type="button"
