@@ -16,15 +16,31 @@ import ImpersonationBanner from "./ImpersonationBanner";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
+/** Target of the skip link and id of the app's single <main> landmark. */
+const CONTENT_ID = "content";
+
+/**
+ * Public-facing surfaces that keep the marketing footer.
+ *
+ * Every link in it — Pricing, FAQ, Blog, Guides, the AGPL notice — is an
+ * acquisition link, which is noise inside a tool someone has already signed
+ * into: it sat below every board, task list and settings pane, and took 28% of
+ * total scroll length on `/tasks` at 375px. Signed-in users visiting a
+ * marketing page still get it; the app itself doesn't.
+ */
+const MARKETING_PATHS = new Set(["/", "/pricing", "/faq", "/privacy", "/terms"]);
+const MARKETING_PREFIXES = ["/blog", "/guides", "/dev"];
+
+const isMarketingPath = (pathname: string): boolean =>
+  MARKETING_PATHS.has(pathname) ||
+  MARKETING_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
 /**
  * Standalone auth/entry screens that must NEVER render inside the app chrome
  * (sidebar/navbar) — even if a stale `user` lingers from an expired session
  * mid-redirect. Gating on the route (not just auth state) is what stops the
  * sign-in screen from appearing behind the logged-in sidebar.
  */
-/** Target of the skip link and id of the app's single <main> landmark. */
-const CONTENT_ID = "content";
-
 const CHROME_FREE_PATHS = new Set([
   "/signin",
   "/signup",
@@ -40,7 +56,7 @@ const CHROME_FREE_PATHS = new Set([
  * sidebar/navbar) — it reads as a standalone screen rather than the empty app.
  */
 const AppShell = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
   if (
@@ -92,7 +108,10 @@ const AppShell = ({ children }: { children: ReactNode }) => {
           <main id={CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
             {children}
           </main>
-          <Footer />
+          {/* Marketing chrome, so only on marketing surfaces. An
+              unauthenticated visitor can only reach public pages anyway (app
+              routes bounce to sign-in), so they always keep it. */}
+          {(!isAuthenticated || isMarketingPath(router.pathname)) && <Footer />}
         </div>
       </div>
     </div>
