@@ -246,7 +246,7 @@ const ReenrollPasswordStep = ({ onCancel, onStarted }: ReenrollPasswordStepProps
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting}
+              loading={isSubmitting}
               className="flex-1"
               data-testid="2fa-recovery-password-submit"
             >
@@ -416,7 +416,7 @@ const DisableStep = ({ onCancel, onDone }: DisableStepProps) => (
             <Button
               type="submit"
               variant="destructive"
-              disabled={isSubmitting}
+              loading={isSubmitting}
               className="flex-1"
               data-testid="2fa-recovery-disable-submit"
             >

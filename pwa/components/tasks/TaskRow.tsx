@@ -24,6 +24,7 @@ import AttachmentsPanel, {
 import DueDateCell from "@/components/tasks/DueDateCell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { TableCell, TableRow } from "@/components/ui/table";
 import {
@@ -287,12 +288,12 @@ const TaskRow = ({
               a bigger target is faster for everyone and materially easier with
               a tremor or a touch screen. `before:` grows the *hit area* to
               24x24 without changing how the checkbox looks. */}
-          <input
-            type="checkbox"
+          <Checkbox
             checked={!!task.completedOn}
-            onChange={() => onToggle(task)}
+            onCheckedChange={() => onToggle(task)}
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
-            className="relative mt-1 h-4 w-4 shrink-0 cursor-pointer before:absolute before:-inset-1 before:content-['']"
+            data-testid="task-done"
+            className="relative mt-1 shrink-0 before:absolute before:-inset-1 before:content-['']"
           />
         </TableCell>
         <TableCell className="align-top pl-0">

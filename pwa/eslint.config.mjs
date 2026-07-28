@@ -22,4 +22,24 @@ export default [
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  {
+    // A bare <input type="checkbox"> paints the browser's default blue, which
+    // reads as unfinished next to the app's teal primary, and it can't carry
+    // the shared focus-ring or disabled conventions. Use components/ui/checkbox.
+    // Scoped to app code — the primitive itself is allowed to use the native
+    // element, and the dev-docs pages demonstrate it.
+    files: ["components/**/*.tsx", "pages/**/*.tsx"],
+    ignores: ["components/ui/**", "pages/dev/**"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            'JSXOpeningElement[name.name="input"] > JSXAttribute[name.name="type"][value.value="checkbox"]',
+          message:
+            "Use <Checkbox> from @/components/ui/checkbox instead of a raw <input type=\"checkbox\">.",
+        },
+      ],
+    },
+  },
 ];

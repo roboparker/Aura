@@ -314,7 +314,7 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
 
               <TermsConsentField />
 
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+              <Button type="submit" loading={isSubmitting} className="w-full">
                 {submitLabel}
               </Button>
               <SsoButtons verb="Sign up" />

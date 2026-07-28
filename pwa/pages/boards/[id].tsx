@@ -1500,11 +1500,9 @@ const BoardDetail = () => {
                                   {isCopying ? "Copying…" : "Copy"}
                                 </Button>
                                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={copyIncludeTasks}
-                                    onChange={(e) => setCopyIncludeTasks(e.target.checked)}
-                                    className="h-3.5 w-3.5"
+                                    onCheckedChange={(c) => setCopyIncludeTasks(c === true)}
                                     data-testid="board-copy-include-tasks"
                                   />
                                   include tasks

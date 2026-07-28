@@ -10,6 +10,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -119,10 +120,9 @@ const ApprovalsPage = () => {
 
               <div className="mb-3 flex justify-end">
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showAll}
-                    onChange={(e) => setShowAll(e.target.checked)}
+                    onCheckedChange={(c) => setShowAll(c === true)}
                   />
                   Show decided weeks
                 </label>
