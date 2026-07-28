@@ -405,7 +405,7 @@ const ProjectsPage = () => {
                   {projects.length === 0 ? (
                     <tr>
                       <td colSpan={COL_COUNT} className="px-4 py-10 text-center text-muted-foreground">
-                        No projects yet. Use “Add project” to create one.
+                        No projects yet — add one to start tracking time against a client.
                       </td>
                     </tr>
                   ) : (

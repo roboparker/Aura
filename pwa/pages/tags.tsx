@@ -239,7 +239,7 @@ const Tags = () => {
                         colSpan={3}
                         className="px-4 py-6 text-center text-muted-foreground"
                       >
-                        No tags yet. Use “Add tag” below to create one.
+                        No tags yet — add one to start grouping tasks across boards.
                       </td>
                     </tr>
                   )}

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
 import { trackEvent } from "@/lib/analytics";
@@ -261,11 +262,35 @@ const Boards = () => {
           {boardsQuery.isLoading ? (
             <p className="text-muted-foreground">Loading boards...</p>
           ) : boards.length === 0 ? (
+            // The empty state is the first thing a new user sees and the
+            // moment with the clearest intent, so it carries the action itself
+            // rather than naming a control 470px away in the opposite corner.
             <Card>
-              <CardContent className="pt-6">
-                <p className="text-muted-foreground">
-                  No boards yet. Click &ldquo;New board&rdquo; to start collaborating.
-                </p>
+              <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+                <BoardsIcon
+                  className={cn("size-8 opacity-40", boardsMeta.iconClass)}
+                  aria-hidden="true"
+                />
+                <div className="space-y-1">
+                  <h2 className="text-lg font-semibold">No boards yet</h2>
+                  <p className="mx-auto max-w-sm text-sm text-muted-foreground">
+                    A board holds a set of tasks — with its own sections, custom
+                    fields and members — so a project has one place to live.
+                  </p>
+                </div>
+                {/* Gated on the same permission as the header button, so a
+                    member without create rights gets the explanation without a
+                    control they can't use. */}
+                {can("boards", "create") && (
+                  <Button
+                    className="mt-1 gap-1.5"
+                    onClick={() => setShowComposer(true)}
+                    data-testid="boards-empty-create"
+                  >
+                    <Plus className="size-4" />
+                    New board
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
