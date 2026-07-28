@@ -255,7 +255,7 @@ const SpaceRoles = () => {
           <ul className="divide-y divide-border">
             {orderedRoles.length === 0 && (
               <li className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No roles yet. Create one to start restricting members.
+                No roles yet — members have full access until a role narrows it.
               </li>
             )}
             {orderedRoles.map((role) => (

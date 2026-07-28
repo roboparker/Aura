@@ -353,7 +353,7 @@ const ClientsPage = () => {
                     {clients.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                          No clients yet. Use “Add client” to start invoicing.
+                          No clients yet — add one to start tracking projects and invoicing.
                         </td>
                       </tr>
                     ) : (
