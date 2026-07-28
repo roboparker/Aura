@@ -137,6 +137,10 @@ const AssigneesCombobox = ({
           </ComboboxValue>
           <ComboboxChipsInput
             placeholder={value.length === 0 ? "Assign people…" : ""}
+            // min-h-6: at its natural 20px this input sat 11px from the
+            // adjacent filter control, which fails WCAG 2.2 §2.5.8 — under
+            // 24px and too close for the spacing exception to apply.
+            className="min-h-6"
             aria-label={
               subjectLabel ? `Assignees for "${subjectLabel}"` : "Assignees"
             }

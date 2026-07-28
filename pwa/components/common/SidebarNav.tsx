@@ -36,6 +36,15 @@ const NAV_ITEM_ACTIVE_CLASS =
 // the item rows below it.
 const NAV_HEADING_CLASS = "border-l-2 border-l-transparent";
 
+// Collapsible section header (Admin / User management / Taxonomy / Billing).
+// `min-h-6` is load-bearing: at its natural 20px these rows sat 10px from the
+// nav item below, which fails WCAG 2.2 §2.5.8 — under 24px *and* too close for
+// the spacing exception to apply. 24px clears it without moving the label,
+// since the extra height is absorbed by the existing bottom padding.
+const NAV_SECTION_BUTTON_CLASS =
+  "flex min-h-6 w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold " +
+  "uppercase tracking-wide text-muted-foreground hover:text-foreground";
+
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
 // see UserMenu / Navbar. The sidebar carries the space switcher, the
@@ -333,7 +342,7 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Admin`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <ShieldCheck className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <span className="truncate">Admin</span>
@@ -460,7 +469,7 @@ const UserManagementSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} User management`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <Users className="size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
         <span className="truncate">User management</span>
@@ -541,7 +550,7 @@ const TaxonomySection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Taxonomy`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <Tag className="size-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
         <span className="truncate">Taxonomy</span>
@@ -632,7 +641,7 @@ const BillingSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Billing`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <CreditCard className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
         <span className="truncate">Billing</span>

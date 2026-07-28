@@ -281,12 +281,18 @@ const TaskRow = ({
           </button>
         </TableCell>
         <TableCell className="w-10 align-top">
+          {/* The completion toggle is the most-clicked control in the app, and
+              at 16x16 it is the smallest. It technically conforms to WCAG 2.2
+              §2.5.8 via the spacing exception, but Fitts's Law still applies:
+              a bigger target is faster for everyone and materially easier with
+              a tremor or a touch screen. `before:` grows the *hit area* to
+              24x24 without changing how the checkbox looks. */}
           <input
             type="checkbox"
             checked={!!task.completedOn}
             onChange={() => onToggle(task)}
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
+            className="relative mt-1 h-4 w-4 shrink-0 cursor-pointer before:absolute before:-inset-1 before:content-['']"
           />
         </TableCell>
         <TableCell className="align-top pl-0">
