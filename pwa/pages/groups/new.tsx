@@ -265,7 +265,6 @@ const NewGroupPage = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !title.trim() || !spaceIri}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
                   {isSubmitting ? "Creating…" : "Create group"}
                 </Button>

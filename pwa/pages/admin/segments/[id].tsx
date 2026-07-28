@@ -228,7 +228,7 @@ const AdminSegmentDetail: NextPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted px-4 gap-3">
         <h1 className="text-2xl font-bold">Segment not found</h1>
-        <Link href="/admin/segments" className="text-sm text-cyan-700 hover:underline">
+        <Link href="/admin/segments" className="text-sm text-primary hover:underline">
           Back to segments
         </Link>
       </div>

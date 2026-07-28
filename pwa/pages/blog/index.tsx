@@ -72,7 +72,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
                     ) : null}
                     <Link
                       href={`/blog/${post.slug}`}
-                      className="mt-3 inline-block text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline"
+                      className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
                     >
                       Read more →
                     </Link>

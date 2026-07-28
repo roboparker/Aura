@@ -291,7 +291,7 @@ const SpaceSettings = () => {
             and groups live on the{" "}
             <Link
               href={`/spaces/${space.id}/users`}
-              className="text-cyan-700 hover:underline dark:text-cyan-400"
+              className="text-primary hover:underline"
             >
               Users page
             </Link>
@@ -522,7 +522,7 @@ const SpaceSettings = () => {
             </Button>
             <Button
               size="sm"
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="gap-1.5"
               disabled={!isDirty || !name.trim() || isSaving}
               onClick={handleSave}
             >

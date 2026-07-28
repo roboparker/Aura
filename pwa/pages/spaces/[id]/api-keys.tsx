@@ -236,7 +236,7 @@ const SpaceApiKeys = () => {
           this space&apos;s content. Define what it can do by assigning{" "}
           <Link
             href={`/spaces/${space.id}/roles`}
-            className="text-cyan-700 hover:underline dark:text-cyan-400"
+            className="text-primary hover:underline"
           >
             roles
           </Link>{" "}

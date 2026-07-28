@@ -531,7 +531,7 @@ const GroupDetail = () => {
                       <Button
                         type="submit"
                         size="sm"
-                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                        className="gap-1.5"
                         disabled={isAddingMember || !newMemberEmail.trim()}
                       >
                         <Plus className="h-3.5 w-3.5" aria-hidden />

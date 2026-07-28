@@ -168,7 +168,7 @@ const ChangeVisibilityDialog = ({
           <Button
             type="button"
             variant={toPrivate ? "destructive" : "default"}
-            className={cn("gap-1.5", !toPrivate && "bg-emerald-600 hover:bg-emerald-500 text-white")}
+            className={"gap-1.5"}
             onClick={handleConfirm}
             disabled={isSaving}
           >
