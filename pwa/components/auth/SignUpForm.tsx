@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import SsoButtons from "@/components/auth/SsoButtons";
 import { FormikField } from "@/components/ui/formik-field";
+import { FormikFocusError, findFieldControl } from "@/components/ui/formik-focus-error";
 import {
   MIN_PASSWORD_LENGTH,
   MIN_PASSWORD_STRENGTH,
@@ -213,8 +214,21 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
 
           return (
             <Form className="space-y-4" noValidate>
+              <FormikFocusError />
               {visibleErrors.length > 0 && (
-                <Alert variant="destructive" data-testid="signup-error-summary">
+                // Focus lands here after a failed submit (see FormikFocusError),
+                // so the user hears the whole picture before being dropped into
+                // a single field. tabIndex={-1} makes it programmatically
+                // focusable without adding a tab stop; role="alert" announces it
+                // if it appears while focus is elsewhere.
+                <Alert
+                  variant="destructive"
+                  data-testid="signup-error-summary"
+                  data-error-summary=""
+                  tabIndex={-1}
+                  role="alert"
+                  className="focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <AlertDescription>
                     <p className="font-semibold">Fix the highlighted fields</p>
                     <p className="text-xs mt-1">
@@ -222,18 +236,41 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
                       {visibleErrors.length === 1 ? "" : "s"} to resolve before you can
                       continue.
                     </p>
+                    <ul className="mt-2 space-y-0.5 text-xs">
+                      {visibleErrors.map((key) => (
+                        <li key={key}>
+                          {/* A button, not an anchor: this moves focus, it
+                              doesn't navigate. Resolution is by `name`, not
+                              `id` — id schemes vary per control (the consent
+                              checkbox renders as `consent-acceptTerms`), so an
+                              id-based href would silently be a dead link. */}
+                          <button
+                            type="button"
+                            className="text-left underline underline-offset-2"
+                            onClick={(e) => {
+                              const form = e.currentTarget.closest("form");
+                              if (form) findFieldControl(form, key)?.focus();
+                            }}
+                          >
+                            {errors[key]}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </AlertDescription>
                 </Alert>
               )}
 
               <div className="grid grid-cols-2 gap-3">
                 <FormikField
+                  required
                   name="givenName"
                   type="text"
                   autoComplete="given-name"
                   label="Given name"
                 />
                 <FormikField
+                  required
                   name="familyName"
                   type="text"
                   autoComplete="family-name"
@@ -242,6 +279,7 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
               </div>
 
               <FormikField
+                required
                 name="email"
                 type="email"
                 label="Work email"
@@ -255,6 +293,7 @@ const SignUpForm = ({ inviteToken, onCollected, submitLabel = "Create account" }
               />
 
               <FormikField
+                required
                 name="password"
                 type="password"
                 label="Password"

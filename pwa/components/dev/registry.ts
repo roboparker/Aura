@@ -32,6 +32,7 @@ export const componentRegistry: RegistryEntry[] = [
   { slug: "dialog", name: "Dialog", category: "Overlay", description: "Modal dialog with title, body, and actions." },
   { slug: "dropdown-menu", name: "Dropdown Menu", category: "Overlay", description: "Anchored menu with items, separators, and submenus." },
   { slug: "formik-field", name: "FormikField", category: "Form", description: "Formik-aware label + input + error wrapper." },
+  { slug: "formik-focus-error", name: "FormikFocusError", category: "Form", description: "Moves focus to the error summary or first invalid field after a failed submit." },
   { slug: "input", name: "Input", category: "Form", description: "Single-line text input." },
   { slug: "input-group", name: "InputGroup", category: "Form", description: "Compose an input with leading/trailing addons." },
   { slug: "input-otp", name: "InputOTP", category: "Form", description: "Segmented one-time-code input (slots + separator) built on input-otp." },
