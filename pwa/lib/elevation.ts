@@ -15,18 +15,24 @@ export type Elevation = 0 | 1 | 2 | 3;
 /**
  * Border / background / shadow classes for an `<input>` / `<textarea>`-style
  * control at the given elevation. Focus + hover affordances are baked in.
+ *
+ * Levels 1–3 focus onto the brand ring, matching Button / Switch and
+ * {@link chipsElevationClass}. They previously used a pure-white border,
+ * which was both off-brand and a second focus language competing with the
+ * teal ring used everywhere else. Level 0 keeps its quiet border-only
+ * treatment on purpose — it sits inline in a table cell.
  */
 export const inputElevationClass = (level: Elevation = 1): string => {
   switch (level) {
     case 0:
       return "min-h-11 rounded-none border border-transparent bg-transparent shadow-none hover:border-input focus-visible:border-input";
     case 2:
-      return "border border-input bg-muted shadow-sm focus-visible:border-white";
+      return "border border-input bg-muted shadow-sm focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25";
     case 3:
-      return "border border-input bg-accent shadow-sm focus-visible:border-white";
+      return "border border-input bg-accent shadow-sm focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25";
     case 1:
     default:
-      return "border border-input bg-transparent shadow-sm dark:bg-input/30 focus-visible:border-white";
+      return "border border-input bg-transparent shadow-sm dark:bg-input/30 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/25";
   }
 };
 

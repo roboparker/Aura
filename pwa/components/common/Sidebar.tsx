@@ -20,7 +20,7 @@ const Sidebar = () => {
   if (!isAuthenticated) return null;
   return (
     <aside
-      className="hidden md:flex w-64 shrink-0 border-r bg-background flex-col"
+      className="hidden md:flex w-64 shrink-0 border-r border-border/50 bg-sidebar flex-col"
       data-testid="app-sidebar"
     >
       <SidebarNav includeSpaceSwitcher />
