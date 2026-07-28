@@ -10,7 +10,7 @@ test.describe("Authentication", () => {
     const email = uniqueEmail();
 
     await page.goto(`${BASE_URL}/signup`);
-    await expect(page).toHaveTitle("Sign Up - Madori");
+    await expect(page).toHaveTitle("Sign Up — Madori");
 
     // Step 1 — form. The redesigned signup no longer has a confirm
     // field; the strength meter does the safety work instead.
@@ -104,7 +104,7 @@ test.describe("Authentication", () => {
 
     // Sign in via UI
     await page.goto(`${BASE_URL}/signin`);
-    await expect(page).toHaveTitle("Sign In - Madori");
+    await expect(page).toHaveTitle("Sign In — Madori");
 
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");

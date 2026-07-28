@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { MoreHorizontal } from "lucide-react";
+import { pageTitle } from "@/lib/pageTitle";
 
 const AdminSegments: NextPage = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -190,7 +191,7 @@ const AdminSegments: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -207,7 +208,7 @@ const AdminSegments: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Segments - Madori Admin</title>
+        <title>{pageTitle("Segments", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">

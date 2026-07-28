@@ -22,6 +22,43 @@ export const AVATAR_PALETTE: readonly string[] = [
 ];
 
 /**
+ * Speakable names for the palette, keyed by hex.
+ *
+ * The colours were already named in the comments above; this makes the name
+ * addressable so a swatch can label itself "Teal" instead of handing a screen
+ * reader a hex code to read out as "hash three three four one five five".
+ * Shade suffixes are dropped — "slate-700" is an implementation detail, and
+ * the palette holds one shade per hue, so "Slate" is unambiguous.
+ */
+export const PALETTE_NAMES: Readonly<Record<string, string>> = {
+  "#334155": "Slate",
+  "#b91c1c": "Red",
+  "#c2410c": "Orange",
+  "#b45309": "Amber",
+  "#854d0e": "Yellow",
+  "#4d7c0f": "Lime",
+  "#15803d": "Green",
+  "#047857": "Emerald",
+  "#0f766e": "Teal",
+  "#0e7490": "Cyan",
+  "#0369a1": "Sky",
+  "#1d4ed8": "Blue",
+  "#4338ca": "Indigo",
+  "#6d28d9": "Violet",
+  "#7e22ce": "Purple",
+  "#be185d": "Pink",
+};
+
+/**
+ * Human name for a palette colour, falling back to the hex for anything
+ * off-palette. The fallback is no worse than the previous behaviour, and
+ * every colour the app actually offers is in the map.
+ */
+export function colorName(hex: string): string {
+  return PALETTE_NAMES[hex.trim().toLowerCase()] ?? hex;
+}
+
+/**
  * Deterministic palette pick keyed on a string (name, id — anything
  * stable for the entity in question). Use for surfaces that need a
  * persistent color but don't have a `personalizedColor` column to read

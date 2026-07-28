@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 // Roles an admin can assign from the member row. Owner transfer is a heavier
 // action (kept out of the quick menu until a dedicated flow exists).
@@ -155,7 +156,7 @@ const OrganizationDetail = () => {
   return (
     <>
       <Head>
-        <title>{org ? `${org.name} - Madori` : "Organization - Madori"}</title>
+        <title>{pageTitle(org?.name ?? "Organization")}</title>
       </Head>
 
       <div className="px-6 py-8 max-w-4xl mx-auto">

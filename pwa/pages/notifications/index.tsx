@@ -16,6 +16,7 @@ import NotificationRow from "@/components/notifications/NotificationRow";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 const GROUP_ORDER: TimeGroup[] = ["Today", "This week", "Earlier"];
 
@@ -113,7 +114,7 @@ const NotificationsPage = () => {
   return (
     <>
       <Head>
-        <title>Notifications - Madori</title>
+        <title>{pageTitle("Notifications")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">

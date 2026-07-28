@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { pageTitle } from "@/lib/pageTitle";
 
 const SELECT_CLASS = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
 
@@ -202,7 +203,7 @@ const ClientsPage = () => {
   return (
     <>
       <Head>
-        <title>Clients — Madori</title>
+        <title>{pageTitle("Clients")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">

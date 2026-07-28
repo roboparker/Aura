@@ -18,6 +18,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import EmailChipInput from "@/components/common/EmailChipInput";
 import SpaceTile from "@/components/spaces/SpaceTile";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MAX_INVITES = 50;
 
@@ -169,7 +170,7 @@ const NewSpacePage = () => {
   return (
     <>
       <Head>
-        <title>Create a space — Madori</title>
+        <title>{pageTitle("Create a space")}</title>
       </Head>
 
       <div className="px-4 py-10 max-w-5xl mx-auto">

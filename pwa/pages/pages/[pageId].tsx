@@ -44,6 +44,7 @@ import CommentsPanel, {
   type Comment as PageCommentRow,
 } from "@/components/common/CommentsPanel";
 import { useCommentLiveUpdates } from "@/lib/useCommentLiveUpdates";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ChildPage {
   "@id": string;
@@ -302,7 +303,7 @@ const PageDetailView = () => {
   return (
     <>
       <Head>
-        <title>{page ? `${page.title} - Madori` : "Page - Madori"}</title>
+        <title>{pageTitle(page?.title ?? "Page")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">

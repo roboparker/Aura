@@ -1,12 +1,13 @@
 import Head from "next/head";
 import Link from "next/link";
+import { pageTitle } from "@/lib/pageTitle";
 
 const LAST_UPDATED = "June 9, 2026";
 
 const Terms = () => (
   <>
     <Head>
-      <title>Terms and Conditions — Madori</title>
+      <title>{pageTitle("Terms and Conditions")}</title>
       <meta
         name="description"
         content="The terms and conditions that govern your use of Madori."

@@ -110,6 +110,7 @@ import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Member {
   "@id": string;
@@ -1270,7 +1271,7 @@ const BoardDetail = () => {
   return (
     <>
       <Head>
-        <title>{board ? `${board.title} - Madori` : "Board - Madori"}</title>
+        <title>{pageTitle(board?.title ?? "Board")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="w-full">

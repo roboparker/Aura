@@ -36,6 +36,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * The configurable space dashboard (#759).
@@ -180,7 +181,7 @@ const DashboardPage = () => {
   return (
     <>
       <Head>
-        <title>Dashboard — Madori</title>
+        <title>{pageTitle("Dashboard")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-6xl">

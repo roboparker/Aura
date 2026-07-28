@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { pageTitle } from "@/lib/pageTitle";
 
 type InvoiceAction = "issue" | "send" | "mark-paid" | "void";
 
@@ -284,7 +285,7 @@ const InvoicesPage = () => {
   return (
     <>
       <Head>
-        <title>Invoices — Madori</title>
+        <title>{pageTitle("Invoices")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">

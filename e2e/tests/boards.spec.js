@@ -20,7 +20,7 @@ test.describe("Boards", () => {
     await registerAndSignIn(page, email);
 
     await page.goto(`${BASE_URL}/boards`);
-    await expect(page).toHaveTitle("Boards - Madori");
+    await expect(page).toHaveTitle("Boards — Madori");
     await expect(page.locator("text=No boards yet")).toBeVisible();
 
     // Create — the form lives behind the "New board" toggle now.

@@ -8,6 +8,7 @@ import { ESTIMATE_STATUS_META, EstimateStatus } from "@/lib/estimateTypes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface PortalInvoice {
   id: string;
@@ -325,7 +326,7 @@ const ClientPortalPage = () => {
   return (
     <>
       <Head>
-        <title>Billing portal — Madori</title>
+        <title>{pageTitle("Billing portal")}</title>
       </Head>
       <div className="flex min-h-screen items-start justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-3xl">

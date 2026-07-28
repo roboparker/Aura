@@ -19,6 +19,7 @@ import PageHeader from "@/components/common/PageHeader";
 import { AVATAR_PALETTE } from "@/lib/avatarPalette";
 import { readableForeground } from "@/lib/contrast";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Tag {
   "@id": string;
@@ -200,7 +201,7 @@ const Tags = () => {
   return (
     <>
       <Head>
-        <title>Tags - Madori</title>
+        <title>{pageTitle("Tags")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto">

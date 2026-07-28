@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import PageHeader from "@/components/common/PageHeader";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface SpaceApiKey {
   id: string;
@@ -216,7 +217,7 @@ const SpaceApiKeys = () => {
   return (
     <>
       <Head>
-        <title>API keys · {space.name}</title>
+        <title>{pageTitle("API keys", space.name)}</title>
       </Head>
       <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader

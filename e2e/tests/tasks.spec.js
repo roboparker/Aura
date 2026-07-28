@@ -26,7 +26,7 @@ test.describe("Tasks", () => {
     await registerAndSignIn(page, uniqueEmail());
 
     await page.goto(`${BASE_URL}/tasks`);
-    await expect(page).toHaveTitle("Tasks - Madori");
+    await expect(page).toHaveTitle("Tasks — Madori");
     // Empty state: only the new-task input row, no real task rows.
     await expect(page.locator('[data-testid="task-item"]')).toHaveCount(0);
 

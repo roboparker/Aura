@@ -73,6 +73,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { pageTitle as buildPageTitle } from "@/lib/pageTitle";
 
 interface BoardMembership {
   "@id": string;
@@ -1107,7 +1108,7 @@ const Tasks = () => {
   return (
     <>
       <Head>
-        <title>{pageTitle} - Madori</title>
+        <title>{buildPageTitle(pageTitle)}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-7xl mx-auto">

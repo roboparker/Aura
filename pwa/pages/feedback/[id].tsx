@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 const FeedbackDetailPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -231,9 +232,7 @@ const FeedbackDetailPage = () => {
   return (
     <>
       <Head>
-        <title>
-          {ticket ? `${ticket.title} - Madori` : "Feedback - Madori"}
-        </title>
+        <title>{pageTitle(ticket?.title ?? "Feedback")}</title>
       </Head>
       <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">

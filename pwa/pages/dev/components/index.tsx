@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { componentRegistry } from "@/components/dev/registry";
+import { pageTitle } from "@/lib/pageTitle";
 
 const categories = [
   "Primitive",
@@ -20,7 +21,7 @@ const categories = [
 const ComponentsIndex = () => (
   <>
     <Head>
-      <title>Components · Dev</title>
+      <title>{pageTitle("Components", "Dev")}</title>
     </Head>
     <div className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-8">

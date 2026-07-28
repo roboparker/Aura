@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { pageTitle } from "@/lib/pageTitle";
 
 type ReportTab = "dashboard" | "summary" | "uninvoiced";
 
@@ -172,7 +173,7 @@ const ReportsPage = () => {
   return (
     <>
       <Head>
-        <title>Reports — Madori</title>
+        <title>{pageTitle("Reports")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         {/* The dashboard lays out two chart columns and wants the extra room;

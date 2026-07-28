@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   AVATAR_PALETTE,
+  PALETTE_NAMES,
+  colorName,
   deterministicPaletteColor,
   resolveGroupColor,
   resolveSpaceColor,
@@ -51,5 +53,32 @@ describe("resolveGroupColor", () => {
     expect(resolveGroupColor({ color: null, spaceSummary: { color: null } })).toBe(
       AVATAR_PALETTE[0],
     );
+  });
+});
+
+describe("colorName", () => {
+  // The drift guard: a colour added to the palette without a name would
+  // silently go back to announcing itself as a hex code, which is the exact
+  // defect this map exists to fix.
+  it("names every palette entry", () => {
+    for (const hex of AVATAR_PALETTE) {
+      expect(PALETTE_NAMES[hex], `no name for ${hex}`).toBeTruthy();
+      expect(colorName(hex)).not.toMatch(/^#/);
+    }
+  });
+
+  it("gives each palette entry a distinct name", () => {
+    const names = AVATAR_PALETTE.map(colorName);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("is case- and whitespace-insensitive", () => {
+    expect(colorName("#0F766E")).toBe("Teal");
+    expect(colorName("  #0f766e  ")).toBe("Teal");
+  });
+
+  it("falls back to the hex for an off-palette colour", () => {
+    // No worse than the old behaviour, and the app offers nothing off-palette.
+    expect(colorName("#123456")).toBe("#123456");
   });
 });

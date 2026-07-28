@@ -22,6 +22,7 @@ import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
 import ExpenseCategoriesCard from "@/components/spaces/ExpenseCategoriesCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 // Billing (Stripe) is off until a real payment system is wired up. Flip
 // NEXT_PUBLIC_BILLING_ENABLED=true (and configure the Stripe env) to surface
@@ -281,7 +282,7 @@ const SpaceSettings = () => {
   return (
     <>
       <Head>
-        <title>Space settings · {space.name}</title>
+        <title>{pageTitle("Space settings", space.name)}</title>
       </Head>
       <div className="mx-auto max-w-5xl px-4 py-8 pb-24">
         <div className="mb-6">

@@ -24,6 +24,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { pageTitle } from "@/lib/pageTitle";
 
 const SELECT_CLASS =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -353,7 +354,7 @@ const ProjectsPage = () => {
   return (
     <>
       <Head>
-        <title>Projects — Madori</title>
+        <title>{pageTitle("Projects")}</title>
       </Head>
       <div className="mx-auto max-w-4xl px-6 py-8">
         <PageHeader

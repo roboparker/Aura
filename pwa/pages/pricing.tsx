@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * Public pricing page.
@@ -97,7 +98,7 @@ const Pricing = () => {
   return (
     <>
       <Head>
-        <title>Pricing — Madori</title>
+        <title>{pageTitle("Pricing")}</title>
         <meta
           name="description"
           content="Madori pricing — a free plan for individuals, plus Pro, Business, and Enterprise tiers for teams."

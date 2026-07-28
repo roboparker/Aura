@@ -18,6 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * Landing page for waitlisted accounts. The WaitlistGate (mounted in Layout)
@@ -67,7 +68,7 @@ const Waitlist: NextPage = () => {
   return (
     <>
       <Head>
-        <title>You&apos;re on the waitlist - Madori</title>
+        <title>{pageTitle("You&apos;re on the waitlist")}</title>
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
         <MadoriWordmark />

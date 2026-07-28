@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface AdminUser {
   id: string;
@@ -170,7 +171,7 @@ const AdminUsers: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -196,7 +197,7 @@ const AdminUsers: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Users - Madori Admin</title>
+        <title>{pageTitle("Users", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">

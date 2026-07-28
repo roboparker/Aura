@@ -16,6 +16,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 type ConfirmStatus = "verifying" | "success" | "error";
 type ResendStatus = "idle" | "sending" | "sent" | "error";
@@ -107,7 +108,7 @@ const VerifyEmail: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Confirm your email - Madori</title>
+        <title>{pageTitle("Confirm your email")}</title>
       </Head>
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4 py-10 gap-8">
         <MadoriWordmark />
