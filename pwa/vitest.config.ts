@@ -27,6 +27,7 @@ export default defineConfig({
         "lib/notificationPrefs.ts",
         "lib/notificationTypes.ts",
         "lib/passwordStrength.ts",
+        "lib/planTiers.ts",
         "lib/relativeTime.ts",
         "lib/searchQuery.ts",
         "lib/userDisplay.ts",
