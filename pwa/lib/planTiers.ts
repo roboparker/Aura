@@ -1,150 +1,41 @@
 /**
- * The public plan matrix behind `/pricing`.
+ * The public plans & pricing matrix behind `/pricing`.
  *
- * This MIRRORS `api/src/Billing/PlanCatalog.php`, which stays the source of
- * truth for what a plan actually grants. The copy exists because the pricing
- * page is public and the entitlement API (`GET /spaces/{id}/billing`) is both
- * authenticated and per-space — a visitor who hasn't signed up has no space to
- * read entitlements from. Change the two together: the PHP decides what a
- * customer gets, this decides what we advertise, and they must not disagree.
+ * The *entitlements* — which plan grants which feature, at which limit, for how
+ * much — are not defined here. They're generated from `App\Billing\PlanCatalog`
+ * into `./planEntitlements.generated.ts`, and CI fails if the committed copy is
+ * stale. See that file's header for why the page carries a copy at all.
  *
- * Prices mirror `app.plan_price_*_cents` in `api/config/services.yaml` and must
- * match the configured Stripe Prices (STRIPE_PRICE_{PRO,BUSINESS}_{MONTHLY,YEARLY}).
- * Annual bills at 10x the monthly rate, i.e. two months free.
+ * What lives here is everything the server has no opinion about: plan names,
+ * taglines, card bullets, how a limit is worded, and how the comparison table
+ * is grouped. Marketing copy, in other words — change it freely. To change what
+ * a plan actually *grants*, edit the PHP catalog and re-run the generator.
  */
 
-export const PLAN_KEYS = ["free", "pro", "business", "enterprise"] as const;
-export type PlanKey = (typeof PLAN_KEYS)[number];
+import {
+  PLAN_ENTITLEMENTS,
+  PLAN_FEATURES,
+  PLAN_KEYS,
+  PLAN_LIMITS,
+  PLAN_MONTHLY_CENTS,
+  type PlanFeature,
+  type PlanKey,
+  type PlanLimit,
+} from "./planEntitlements.generated";
 
-/** Feature flags, in `PlanCatalog::FEATURES` order. */
-export const PLAN_FEATURES = [
-  "calendar_sync",
-  "time_tracking",
-  "invoicing",
-  "timeline",
-  "automations",
-  "reporting",
-  "portfolios",
-  "goals",
-  "sso",
-  "webhooks",
-  "scim",
-  "audit_export",
-  "private_spaces",
-  "guests",
-  "priority_support",
-  "ai_assist",
-  "data_residency",
-] as const;
-export type PlanFeature = (typeof PLAN_FEATURES)[number];
-
-/** Numeric limits, in `PlanCatalog::LIMITS` order. */
-export const PLAN_LIMITS = [
-  "space_members",
-  "storage_gb",
-  "history_days",
-  "mcp_calls_per_day",
-  "ai_credits_per_month",
-] as const;
-export type PlanLimit = (typeof PLAN_LIMITS)[number];
-
-export interface PlanEntitlements {
-  features: Record<PlanFeature, boolean>;
-  /** null = unlimited (matching `PlanEntitlements::isUnlimited`). */
-  limits: Record<PlanLimit, number | null>;
-}
-
-/**
- * Build a full feature map from a base of all-false, flipping the named flags
- * on — the same shape as `PlanCatalog::features()`, so each plan below lists
- * only what it adds and a missing flag can't silently read as granted.
- */
-const featureSet = (...granted: PlanFeature[]): Record<PlanFeature, boolean> =>
-  Object.fromEntries(
-    PLAN_FEATURES.map((feature) => [feature, granted.includes(feature)]),
-  ) as Record<PlanFeature, boolean>;
-
-export const PLAN_ENTITLEMENTS: Record<PlanKey, PlanEntitlements> = {
-  free: {
-    features: featureSet("time_tracking"),
-    limits: {
-      space_members: 5,
-      storage_gb: 2,
-      history_days: 30,
-      mcp_calls_per_day: 100,
-      ai_credits_per_month: 0,
-    },
-  },
-  pro: {
-    features: featureSet(
-      "calendar_sync",
-      "time_tracking",
-      "invoicing",
-      "timeline",
-      "guests",
-    ),
-    limits: {
-      space_members: null,
-      storage_gb: 100,
-      history_days: 365,
-      mcp_calls_per_day: 1000,
-      ai_credits_per_month: 0,
-    },
-  },
-  business: {
-    features: featureSet(
-      "calendar_sync",
-      "time_tracking",
-      "invoicing",
-      "timeline",
-      "automations",
-      "reporting",
-      "portfolios",
-      "goals",
-      "sso",
-      "webhooks",
-      "private_spaces",
-      "guests",
-      "priority_support",
-      "ai_assist",
-    ),
-    limits: {
-      space_members: null,
-      storage_gb: null,
-      history_days: null,
-      mcp_calls_per_day: null,
-      ai_credits_per_month: 2000,
-    },
-  },
-  enterprise: {
-    features: featureSet(
-      "calendar_sync",
-      "time_tracking",
-      "invoicing",
-      "timeline",
-      "automations",
-      "reporting",
-      "portfolios",
-      "goals",
-      "sso",
-      "webhooks",
-      "scim",
-      "audit_export",
-      "private_spaces",
-      "guests",
-      "priority_support",
-      "ai_assist",
-      "data_residency",
-    ),
-    limits: {
-      space_members: null,
-      storage_gb: null,
-      history_days: null,
-      mcp_calls_per_day: null,
-      ai_credits_per_month: 10000,
-    },
-  },
+export {
+  PLAN_ENTITLEMENTS,
+  PLAN_FEATURES,
+  PLAN_KEYS,
+  PLAN_LIMITS,
+  PLAN_MONTHLY_CENTS,
 };
+export type {
+  PlanEntitlements,
+  PlanFeature,
+  PlanKey,
+  PlanLimit,
+} from "./planEntitlements.generated";
 
 /* -------------------------------------------------------------------------- */
 /* Pricing                                                                     */
@@ -157,7 +48,11 @@ export interface PlanTier {
   key: PlanKey;
   name: string;
   tagline: string;
-  /** Monthly list price in cents; null = sales-led / custom. */
+  /**
+   * Monthly list price in cents; null = sales-led / custom. Read from the
+   * generated matrix, so the page can't quote a price the checkout won't
+   * honour — `app.plan_price_*_cents` picks the Stripe Price too.
+   */
   monthlyCents: number | null;
   /** Charged per member of the account, rather than a flat account price. */
   perSeat: boolean;
@@ -172,7 +67,7 @@ export const PLAN_TIERS: PlanTier[] = [
     key: "free",
     name: "Free",
     tagline: "For individuals and trying things out.",
-    monthlyCents: 0,
+    monthlyCents: PLAN_MONTHLY_CENTS.free,
     perSeat: false,
     cta: { label: "Get started", href: "/signup" },
     highlights: [
@@ -186,7 +81,7 @@ export const PLAN_TIERS: PlanTier[] = [
     key: "pro",
     name: "Pro",
     tagline: "For power users who want more room.",
-    monthlyCents: 1000,
+    monthlyCents: PLAN_MONTHLY_CENTS.pro,
     perSeat: false,
     cta: { label: "Start Pro", href: "/signup" },
     highlights: [
@@ -200,7 +95,7 @@ export const PLAN_TIERS: PlanTier[] = [
     key: "business",
     name: "Business",
     tagline: "For teams that collaborate in shared spaces.",
-    monthlyCents: 1500,
+    monthlyCents: PLAN_MONTHLY_CENTS.business,
     perSeat: true,
     highlighted: true,
     cta: { label: "Start Business", href: "/signup" },
@@ -215,7 +110,7 @@ export const PLAN_TIERS: PlanTier[] = [
     key: "enterprise",
     name: "Enterprise",
     tagline: "For organizations with advanced needs.",
-    monthlyCents: null,
+    monthlyCents: PLAN_MONTHLY_CENTS.enterprise,
     perSeat: true,
     cta: { label: "Contact us", href: "/feedback" },
     highlights: [
