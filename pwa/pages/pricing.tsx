@@ -1,107 +1,73 @@
 import { useState } from "react";
 import Head from "next/head";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { pageTitle } from "@/lib/pageTitle";
+import {
+  COMPARISON_GROUPS,
+  PLAN_KEYS,
+  PLAN_TIERS,
+  priceFor,
+  type ComparisonValue,
+  type PlanKey,
+  type PlanTier,
+} from "@/lib/planTiers";
 
 /**
- * Public pricing page.
+ * Public plans & pricing page.
  *
- * Prices: Pro $10/mo (flat), Business $15/mo per seat; annual = ×10 (2 months
- * free). These must match the Stripe Prices
- * (STRIPE_PRICE_{PRO,BUSINESS}_{MONTHLY,YEARLY}) — update both together. Free-tier
- * limits mirror the app.free_* backend defaults (member cap 5, 100 MCP calls/day).
+ * Both the cards and the comparison table read from `@/lib/planTiers`, which
+ * mirrors `App\Billing\PlanCatalog` — so what we advertise here can't drift
+ * from what the server actually grants. Edit the matrix, not this file, to
+ * change a plan's contents.
  */
 
-interface Tier {
-  name: string;
-  tagline: string;
-  /** Monthly price in whole currency units; null = custom / contact us. */
-  monthly: number | null;
-  /** Whether the price is charged per seat (vs a flat account price). */
-  perSeat?: boolean;
-  cta: { label: string; href: string };
-  highlighted?: boolean;
-  features: string[];
-}
+const TIER_BY_KEY = new Map<PlanKey, PlanTier>(
+  PLAN_TIERS.map((tier) => [tier.key, tier]),
+);
 
-const TIERS: Tier[] = [
-  {
-    name: "Free",
-    tagline: "For individuals and trying things out.",
-    monthly: 0,
-    cta: { label: "Get started", href: "/signup" },
-    features: [
-      "Unlimited personal tasks, boards & pages",
-      "Up to 5 members per shared space",
-      "100 MCP (programmatic API) calls per day",
-      "Calendar & file attachments",
-    ],
-  },
-  {
-    name: "Pro",
-    tagline: "For power users who want more room.",
-    monthly: 10,
-    cta: { label: "Start Pro", href: "/signup" },
-    features: [
-      "Everything in Free",
-      "Higher MCP / API limits",
-      "Calendar sync (Google & Microsoft)",
-      "Priority email support",
-    ],
-  },
-  {
-    name: "Business",
-    tagline: "For teams that collaborate in shared spaces.",
-    monthly: 15,
-    perSeat: true,
-    highlighted: true,
-    cta: { label: "Start Business", href: "/signup" },
-    features: [
-      "Everything in Pro",
-      "Unlimited members & unlimited MCP usage",
-      "Custom roles & per-space permissions",
-      "SSO sign-in, automations & AI assist",
-    ],
-  },
-  {
-    name: "Enterprise",
-    tagline: "For organizations with advanced needs.",
-    monthly: null,
-    cta: { label: "Contact us", href: "/feedback" },
-    features: [
-      "Everything in Business",
-      "SCIM provisioning & advanced controls",
-      "Dedicated onboarding & support",
-      "Custom terms & invoicing",
-    ],
-  },
-];
+/**
+ * Render one comparison cell. Booleans become icons carrying an `sr-only`
+ * word, because a bare ✓/✗ glyph tells a screen-reader user nothing about
+ * which plan column it sits in once the row label is read separately.
+ */
+const ValueCell = ({ value }: { value: ComparisonValue }) => {
+  if (typeof value === "string") {
+    return <span className="text-sm text-foreground">{value}</span>;
+  }
+
+  return value ? (
+    <>
+      <Check aria-hidden="true" className="mx-auto h-4 w-4 text-emerald-600" />
+      <span className="sr-only">Included</span>
+    </>
+  ) : (
+    <>
+      <Minus aria-hidden="true" className="mx-auto h-4 w-4 text-muted-foreground/50" />
+      <span className="sr-only">Not included</span>
+    </>
+  );
+};
 
 const Pricing = () => {
   const [annual, setAnnual] = useState(false);
 
-  const priceLabel = (tier: Tier): { amount: string; period: string } => {
-    if (tier.monthly === null) return { amount: "Custom", period: "" };
-    if (tier.monthly === 0) return { amount: "$0", period: "forever" };
-    // Annual billed at 10× the monthly rate → two months free.
-    const amount = annual ? tier.monthly * 10 : tier.monthly;
-    const unit = tier.perSeat ? "/seat" : "";
-    return {
-      amount: `$${amount}${unit}`,
-      period: annual ? "per year" : "per month",
-    };
-  };
-
   return (
     <>
       <Head>
-        <title>{pageTitle("Pricing")}</title>
+        <title>{pageTitle("Plans & pricing")}</title>
         <meta
           name="description"
-          content="Madori pricing — a free plan for individuals, plus Pro, Business, and Enterprise tiers for teams."
+          content="Madori plans and pricing — a free plan for individuals, plus Pro, Business, and Enterprise tiers for teams. Compare features, limits, and costs side by side."
         />
       </Head>
 
@@ -109,7 +75,7 @@ const Pricing = () => {
         <div className="max-w-6xl mx-auto px-4 py-12 md:py-16">
           <header className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-3">
-              Simple, transparent pricing
+              Plans &amp; pricing
             </h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Start free and upgrade when your team grows. Every plan includes
@@ -146,17 +112,24 @@ const Pricing = () => {
                 aria-pressed={annual}
               >
                 Annual
-                <span className="ml-1.5 text-xs text-emerald-600">2 months free</span>
+                <span
+                  className={cn(
+                    "ml-1.5 text-xs",
+                    annual ? "text-primary-foreground/80" : "text-emerald-600",
+                  )}
+                >
+                  2 months free
+                </span>
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {TIERS.map((tier) => {
-              const { amount, period } = priceLabel(tier);
+            {PLAN_TIERS.map((tier) => {
+              const { amount, unit, period } = priceFor(tier, annual);
               return (
                 <div
-                  key={tier.name}
+                  key={tier.key}
                   className={cn(
                     "flex flex-col rounded-xl border bg-card p-6 shadow-sm",
                     tier.highlighted
@@ -170,9 +143,18 @@ const Pricing = () => {
                     </span>
                   ) : null}
                   <h2 className="text-lg font-semibold text-foreground">{tier.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground min-h-10">{tier.tagline}</p>
+                  <p className="mt-1 text-sm text-muted-foreground min-h-10">
+                    {tier.tagline}
+                  </p>
                   <div className="mt-4 flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-foreground">{amount}</span>
+                    <span className="text-3xl font-bold text-foreground">
+                      {amount}
+                      {unit ? (
+                        <span className="text-base font-medium text-muted-foreground">
+                          {unit}
+                        </span>
+                      ) : null}
+                    </span>
                     {period ? (
                       <span className="text-sm text-muted-foreground">{period}</span>
                     ) : null}
@@ -185,9 +167,12 @@ const Pricing = () => {
                     <Link href={tier.cta.href}>{tier.cta.label}</Link>
                   </Button>
                   <ul className="mt-6 space-y-2.5 text-sm">
-                    {tier.features.map((feature) => (
+                    {tier.highlights.map((feature) => (
                       <li key={feature} className="flex items-start gap-2">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                        <Check
+                          aria-hidden="true"
+                          className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                        />
                         <span className="text-muted-foreground">{feature}</span>
                       </li>
                     ))}
@@ -197,13 +182,113 @@ const Pricing = () => {
             })}
           </div>
 
+          {/* Full comparison */}
+          <section className="mt-16" aria-labelledby="compare-heading">
+            <h2
+              id="compare-heading"
+              className="text-2xl font-bold tracking-tight text-foreground text-center"
+            >
+              Compare every plan
+            </h2>
+            <p className="mt-2 mb-8 text-center text-sm text-muted-foreground">
+              Everything each plan includes, side by side.
+            </p>
+
+            <div className="rounded-xl border border-border bg-card">
+              <Table
+                scrollRegionLabel="Plan comparison"
+                className="min-w-[46rem] border-separate border-spacing-0"
+              >
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    {/* Sticky so the row label stays put while the plan
+                        columns scroll sideways on a narrow screen. */}
+                    <TableHead className="sticky left-0 z-10 bg-card w-[38%] px-4 normal-case tracking-normal text-sm font-semibold text-foreground">
+                      Feature
+                    </TableHead>
+                    {PLAN_KEYS.map((key) => {
+                      const tier = TIER_BY_KEY.get(key);
+                      if (!tier) return null;
+                      const { amount, unit, period } = priceFor(tier, annual);
+                      return (
+                        <TableHead
+                          key={key}
+                          scope="col"
+                          className={cn(
+                            "px-4 py-3 text-center normal-case tracking-normal align-top",
+                            tier.highlighted && "bg-primary/5",
+                          )}
+                        >
+                          <span className="block text-sm font-semibold text-foreground">
+                            {tier.name}
+                          </span>
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {amount}
+                            {unit}
+                            {period ? ` ${period}` : ""}
+                          </span>
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {/* flatMap, not a fragment per group: the rows must stay
+                      direct <tbody> children for the Table primitive's
+                      last-child border rules to apply. */}
+                  {COMPARISON_GROUPS.flatMap((group) => [
+                    <TableRow key={`${group.title}-header`} className="hover:bg-transparent">
+                      <th
+                        scope="colgroup"
+                        colSpan={PLAN_KEYS.length + 1}
+                        className="sticky left-0 bg-muted/50 px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                      >
+                        {group.title}
+                      </th>
+                    </TableRow>,
+                    ...group.rows.map((row) => (
+                      <TableRow key={`${group.title}-${row.key}`}>
+                        <th
+                          scope="row"
+                          className="sticky left-0 z-10 bg-card px-4 py-2.5 text-left align-middle font-normal"
+                        >
+                          <span className="block text-sm text-foreground">{row.label}</span>
+                          {row.hint ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {row.hint}
+                            </span>
+                          ) : null}
+                        </th>
+                        {PLAN_KEYS.map((key) => (
+                          <td
+                            key={key}
+                            className={cn(
+                              "px-4 py-2.5 text-center align-middle",
+                              TIER_BY_KEY.get(key)?.highlighted && "bg-primary/5",
+                            )}
+                          >
+                            <ValueCell value={row.values[key]} />
+                          </td>
+                        ))}
+                      </TableRow>
+                    )),
+                  ])}
+                </TableBody>
+              </Table>
+            </div>
+          </section>
+
           <p className="mt-10 text-center text-sm text-muted-foreground">
-            Prices in USD. Business is billed per seat. Questions?{" "}
+            Prices in USD, excluding any applicable tax. Business and Enterprise
+            are billed per seat; guests are always free. Questions?{" "}
             <Link href="/faq" className="underline underline-offset-4 hover:text-foreground">
               Read the FAQ
             </Link>{" "}
             or{" "}
-            <Link href="/feedback" className="underline underline-offset-4 hover:text-foreground">
+            <Link
+              href="/feedback"
+              className="underline underline-offset-4 hover:text-foreground"
+            >
               get in touch
             </Link>
             .
