@@ -146,6 +146,20 @@ jobs:
         # units. Continue ratcheting toward 90% as the remaining controllers get
         # endpoint tests.
         run: docker compose exec -T php php bin/coverage-check.php var/coverage.xml 85.0
+      -
+        name: Check the PWA plan matrix is in sync with PlanCatalog
+        # The public pricing page is statically built with no API reachable, so
+        # it carries a generated copy of the plan entitlement matrix. Regenerate
+        # it here and fail on any diff — otherwise a plan change on the server
+        # ships a pricing page that advertises the old one. Lives in this job
+        # rather than its own so it gates without a branch-protection change.
+        run: |
+          scripts/gen-plan-matrix.sh
+          if ! git diff --quiet -- pwa/lib/planEntitlements.generated.ts; then
+            echo "::error file=pwa/lib/planEntitlements.generated.ts::Stale: PlanCatalog changed but the PWA copy wasn't regenerated. Run scripts/gen-plan-matrix.sh and commit the result."
+            git --no-pager diff -- pwa/lib/planEntitlements.generated.ts
+            exit 1
+          fi
 
   phpstan:
     name: PHPStan

@@ -235,10 +235,52 @@ with test card `4242 4242 4242 4242` (any future expiry / CVC / ZIP). Watch the
    `Stripe is in TEST mode on a production instance` critical. If they don't,
    the container is still on the sandbox key (see step 4's gotcha).
 
+## The public pricing page is generated from the catalog
+
+`/pricing` advertises what each plan grants, but it's a **public, statically
+built** page: the entitlement API (`GET /spaces/{id}/billing`) is authenticated
+and per-space, so a visitor who hasn't signed up has no space to read
+entitlements from — and the PWA image is built in CI with no API reachable. The
+page therefore carries its own copy of the matrix.
+
+A hand-kept copy drifts, and did: the page advertised priority support on Pro,
+which `PlanCatalog` grants only to Business and up. So the copy is **generated**:
+
+```
+api/src/Billing/PlanCatalog.php          the source of truth
+  └─ PlanMatrixExporter                  renders it as TypeScript
+       └─ bin/console app:plans:export-matrix   (prints to stdout)
+            └─ scripts/gen-plan-matrix.sh       (writes the file)
+                 └─ pwa/lib/planEntitlements.generated.ts   committed
+                      └─ pwa/lib/planTiers.ts               marketing copy
+```
+
+**After changing a plan's features, limits, or price, run:**
+
+```console
+$ scripts/gen-plan-matrix.sh     # needs the php service up
+```
+
+CI re-runs it in the **Tests** job and fails on any diff, so a catalog change
+can't ship a stale pricing page. The command prints to stdout and the script
+does the redirect because the api container only bind-mounts `./api` — it can't
+write into `pwa/`.
+
+Only *entitlements* are generated: the feature/limit matrix and the two
+self-serve monthly prices (from `app.plan_price_*_cents`, the same parameters
+that pick the Stripe Price at checkout, so the page can't quote a price the
+checkout won't honour). Plan names, taglines, card bullets, and how the
+comparison table is worded and grouped stay hand-written in `planTiers.ts` —
+that's marketing copy, not something the server has an opinion about.
+
 ## Testing
 
 - `App\Tests\Service\UsageLimiterTest` — caps + entitlement against the real DB,
   building the limiter with enforcement on.
+- `App\Tests\Billing\PlanMatrixExporterTest` — the generator feeding the CI
+  drift gate: byte-stable output (an unstable exporter would fail every PR),
+  and every plan/feature/limit actually present (one that silently dropped a row
+  would let real drift through with a clean diff).
 - `App\Tests\Api\BillingTest` — endpoint gating + webhook sync via the in-memory
   fake (`App\Tests\Billing\InMemoryStripeGateway`, which reports itself
   configured and accepts a fixed signature).
