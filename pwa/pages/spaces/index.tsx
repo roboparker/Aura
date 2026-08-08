@@ -15,9 +15,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/common/PageHeader";
 import SpaceCard from "@/components/spaces/SpaceCard";
+import { pageTitle } from "@/lib/pageTitle";
 
 type FilterKey = "all" | "shared" | "personal" | "owned";
 type SortKey = "recent" | "name" | "members";
@@ -125,10 +127,10 @@ const SpacesIndex = () => {
   return (
     <>
       <Head>
-        <title>Spaces - Madori</title>
+        <title>{pageTitle("Spaces")}</title>
       </Head>
 
-      <main className="px-6 py-8 max-w-7xl mx-auto">
+      <div className="px-6 py-8 max-w-7xl mx-auto">
         <PageHeader
           title="Spaces"
           subtitle="Workspaces and shared rooms you belong to. Each space has its own members, boards, and pages."
@@ -174,7 +176,7 @@ const SpacesIndex = () => {
               <Button
                 asChild
                 size="sm"
-                className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                className="gap-1.5"
               >
                 <Link href="/spaces/new">
                   <Plus className="h-3.5 w-3.5" />
@@ -239,7 +241,13 @@ const SpacesIndex = () => {
         </div>
 
         {spacesLoading && spaces.length === 0 ? (
-          <p className="text-muted-foreground">Loading spaces…</p>
+          // Matches the SpaceCard grid below (measured 130px per tile).
+          <SkeletonList
+            rows={3}
+            label="Loading spaces"
+            className="grid gap-3 space-y-0 sm:grid-cols-1 lg:grid-cols-2"
+            itemClassName="h-32"
+          />
         ) : filteredSpaces.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
             {search.trim() || filter !== "all"
@@ -262,7 +270,7 @@ const SpacesIndex = () => {
             ))}
           </ul>
         )}
-      </main>
+      </div>
     </>
   );
 };

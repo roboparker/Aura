@@ -50,6 +50,51 @@ const ButtonPage = () => (
         code: `<Button disabled>Saving…</Button>`,
         preview: <Button disabled>Saving…</Button>,
       },
+      {
+        title: "Loading (`loading`)",
+        code: `{/* Sets aria-busy AND disables, so the pending state is exposed
+    programmatically rather than only via the swapped label.
+    You keep owning the label — this is semantics, not copy. */}
+<Button loading>Signing in…</Button>`,
+        preview: (
+          <div className="space-y-2">
+            <Button loading>Signing in…</Button>
+            <p className="text-sm text-muted-foreground">
+              A <code>disabled</code> button says it can&apos;t be used;{" "}
+              <code>loading</code> says why. Passing <code>disabled</code>{" "}
+              explicitly still wins, so an already-invalid form stays disabled
+              without claiming to be busy.
+            </p>
+          </div>
+        ),
+      },
+      {
+        title: "Pressed state",
+        code: `{/* Every variant has an active: step. Press and hold to see it. */}
+<Button>Default</Button>
+<Button variant="secondary">Secondary</Button>
+<Button variant="outline">Outline</Button>
+<Button variant="destructive">Destructive</Button>`,
+        preview: (
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button>Default</Button>
+              <Button variant="secondary">Secondary</Button>
+              <Button variant="outline">Outline</Button>
+              <Button variant="destructive">Destructive</Button>
+              <Button variant="ghost">Ghost</Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              On touch there is no hover, so the pressed state is the{" "}
+              <em>only</em> confirmation a tap registered — without it users
+              re-tap, which is what turns a slow request into a double submit.
+              The colour step carries the signal; the{" "}
+              <code>scale-[.98]</code> is suppressed under{" "}
+              <code>prefers-reduced-motion</code>.
+            </p>
+          </div>
+        ),
+      },
     ]}
   />
 );

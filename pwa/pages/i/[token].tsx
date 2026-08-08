@@ -7,6 +7,7 @@ import { formatMoney, InvoiceStatus, STATUS_META } from "@/lib/invoiceTypes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface PublicLine {
   description: string;
@@ -312,7 +313,7 @@ const PublicInvoicePage = () => {
   return (
     <>
       <Head>
-        <title>Invoice — Madori</title>
+        <title>{pageTitle("Invoice")}</title>
       </Head>
       <div className="container mx-auto max-w-2xl px-4 py-16">
         <Card>

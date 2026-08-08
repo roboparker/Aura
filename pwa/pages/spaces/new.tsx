@@ -18,6 +18,7 @@ import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import EmailChipInput from "@/components/common/EmailChipInput";
 import SpaceTile from "@/components/spaces/SpaceTile";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MAX_INVITES = 50;
 
@@ -169,10 +170,10 @@ const NewSpacePage = () => {
   return (
     <>
       <Head>
-        <title>Create a space — Madori</title>
+        <title>{pageTitle("Create a space")}</title>
       </Head>
 
-      <main className="px-4 py-10 max-w-5xl mx-auto">
+      <div className="px-4 py-10 max-w-5xl mx-auto">
         <Card>
           <CardContent className="pt-6 space-y-6">
             <div className="flex items-start gap-3">
@@ -323,7 +324,6 @@ const NewSpacePage = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !name.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white"
                 >
                   {isSubmitting ? "Creating…" : "Create space"}
                 </Button>
@@ -331,7 +331,7 @@ const NewSpacePage = () => {
             </form>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </>
   );
 };

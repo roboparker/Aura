@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 type State =
   | { status: "idle" }
@@ -68,9 +69,9 @@ const RevertEmailChange = () => {
   return (
     <>
       <Head>
-        <title>Undo Email Change - Madori</title>
+        <title>{pageTitle("Undo Email Change")}</title>
       </Head>
-      <main className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
+      <div className="min-h-screen flex items-center justify-center bg-muted px-4 py-12">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-2xl text-center">Undo Email Change</CardTitle>
@@ -112,7 +113,7 @@ const RevertEmailChange = () => {
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
     </>
   );
 };

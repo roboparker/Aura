@@ -12,6 +12,7 @@ import AttachmentsPanel, { type Attachment } from "@/components/tasks/Attachment
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +24,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { pageTitle } from "@/lib/pageTitle";
 
 const SELECT_CLASS =
   "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
@@ -352,9 +354,9 @@ const ProjectsPage = () => {
   return (
     <>
       <Head>
-        <title>Projects — Madori</title>
+        <title>{pageTitle("Projects")}</title>
       </Head>
-      <main className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-4xl px-6 py-8">
         <PageHeader
           title="Projects"
           icon={<Briefcase className="h-6 w-6 text-orange-600 dark:text-orange-400" />}
@@ -404,7 +406,7 @@ const ProjectsPage = () => {
                   {projects.length === 0 ? (
                     <tr>
                       <td colSpan={COL_COUNT} className="px-4 py-10 text-center text-muted-foreground">
-                        No projects yet. Use “Add project” to create one.
+                        No projects yet — add one to start tracking time against a client.
                       </td>
                     </tr>
                   ) : (
@@ -456,7 +458,7 @@ const ProjectsPage = () => {
             </div>
           </Card>
         )}
-      </main>
+      </div>
 
       <Sheet open={sheetFor !== null} onOpenChange={(o: boolean) => !o && closeSheet()} modal={false}>
         <SheetContent
@@ -695,12 +697,11 @@ const ProjectsPage = () => {
                     const checked = assigned.includes(p["@id"]);
                     return (
                       <label key={p["@id"]} className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={checked}
-                          onChange={(e) =>
+                          onCheckedChange={(c) =>
                             setAssigned((prev) =>
-                              e.target.checked ? [...prev, p["@id"]] : prev.filter((x) => x !== p["@id"]),
+                              c === true ? [...prev, p["@id"]] : prev.filter((x) => x !== p["@id"]),
                             )
                           }
                         />

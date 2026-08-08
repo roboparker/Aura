@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { useField } from "formik";
+import { useField, useFormikContext } from "formik";
 import { Checkbox } from "@/components/ui/checkbox";
+import { FIELD_NAME_ATTR } from "@/components/ui/formik-focus-error";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,7 +16,12 @@ import { cn } from "@/lib/utils";
  */
 const TermsConsentField = ({ name = "acceptTerms" }: { name?: string }) => {
   const [field, meta, helpers] = useField<boolean>(name);
-  const showError = Boolean(meta.error) && meta.touched;
+  const { submitCount } = useFormikContext();
+  // Submit-gated, matching FormikField. A checkbox has no half-filled state to
+  // judge — it's ticked or it isn't — so blur is never evidence the user has
+  // decided. Erroring on it means tabbing toward the Terms link to read them
+  // tells you off for not having agreed yet.
+  const showError = Boolean(meta.error) && submitCount > 0;
   const id = `consent-${name}`;
 
   return (
@@ -23,6 +29,12 @@ const TermsConsentField = ({ name = "acceptTerms" }: { name?: string }) => {
       <div className="flex items-start gap-2.5">
         <Checkbox
           id={id}
+          // Makes this field addressable by its Formik name, like every
+          // FormikField — the error summary and focus-on-failed-submit both
+          // resolve targets that way. It can't be found by `name` (Radix puts
+          // that on a hidden proxy input, so focus would land somewhere
+          // invisible) and its id is `consent-acceptTerms`, not the field name.
+          {...{ [FIELD_NAME_ATTR]: name }}
           checked={field.value}
           onCheckedChange={(checked) => {
             // Mark touched without validating against the stale snapshot, then

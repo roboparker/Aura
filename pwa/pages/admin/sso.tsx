@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface FieldSpec {
   key: string;
@@ -222,7 +223,7 @@ const SsoAdminPage: NextPage = () => {
   return (
     <>
       <Head>
-        <title>SSO - Madori Admin</title>
+        <title>{pageTitle("SSO", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-5xl space-y-6">

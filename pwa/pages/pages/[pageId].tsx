@@ -44,6 +44,7 @@ import CommentsPanel, {
   type Comment as PageCommentRow,
 } from "@/components/common/CommentsPanel";
 import { useCommentLiveUpdates } from "@/lib/useCommentLiveUpdates";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ChildPage {
   "@id": string;
@@ -283,7 +284,7 @@ const PageDetailView = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <Card className="max-w-2xl mx-auto">
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Page not found</h1>
@@ -295,16 +296,16 @@ const PageDetailView = () => {
             </Link>
           </CardContent>
         </Card>
-      </main>
+      </div>
     );
   }
 
   return (
     <>
       <Head>
-        <title>{page ? `${page.title} - Madori` : "Page - Madori"}</title>
+        <title>{pageTitle(page?.title ?? "Page")}</title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-6">
           {error && (
             <Alert variant="destructive">
@@ -449,7 +450,7 @@ const PageDetailView = () => {
             </>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };

@@ -22,6 +22,7 @@ import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
 import ExpenseCategoriesCard from "@/components/spaces/ExpenseCategoriesCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 // Billing (Stripe) is off until a real payment system is wired up. Flip
 // NEXT_PUBLIC_BILLING_ENABLED=true (and configure the Stripe env) to surface
@@ -254,7 +255,7 @@ const SpaceSettings = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <p className="text-muted-foreground mb-4">
@@ -264,7 +265,7 @@ const SpaceSettings = () => {
             <Link href="/spaces">Back to spaces</Link>
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -281,9 +282,9 @@ const SpaceSettings = () => {
   return (
     <>
       <Head>
-        <title>Space settings · {space.name}</title>
+        <title>{pageTitle("Space settings", space.name)}</title>
       </Head>
-      <main className="mx-auto max-w-5xl px-4 py-8 pb-24">
+      <div className="mx-auto max-w-5xl px-4 py-8 pb-24">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Space settings</h1>
           <p className="text-sm text-muted-foreground">
@@ -291,7 +292,7 @@ const SpaceSettings = () => {
             and groups live on the{" "}
             <Link
               href={`/spaces/${space.id}/users`}
-              className="text-cyan-700 hover:underline dark:text-cyan-400"
+              className="text-primary hover:underline"
             >
               Users page
             </Link>
@@ -508,7 +509,7 @@ const SpaceSettings = () => {
             )}
           </CardContent>
         </Card>
-      </main>
+      </div>
 
       {/* Sticky save bar for the metadata form. */}
       <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur">
@@ -522,7 +523,7 @@ const SpaceSettings = () => {
             </Button>
             <Button
               size="sm"
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="gap-1.5"
               disabled={!isDirty || !name.trim() || isSaving}
               onClick={handleSave}
             >

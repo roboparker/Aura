@@ -7,6 +7,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatBlogDate, type BlogPost } from "@/lib/blogTypes";
 import { getAllPosts, getPostBySlug, siteUrl } from "@/lib/blog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Props {
   post: BlogPost;
@@ -21,7 +22,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
   return (
     <>
       <Head>
-        <title>{`${post.title} — Madori`}</title>
+        <title>{pageTitle(post.title)}</title>
         <meta name="description" content={description} />
         <link rel="canonical" href={canonical} />
         {post.draft ? <meta name="robots" content="noindex" /> : null}
@@ -47,7 +48,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
         {ogImage ? <meta name="twitter:image" content={ogImage} /> : null}
       </Head>
 
-      <main className="bg-background">
+      <div className="bg-background">
         <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
           <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2 gap-1">
             <Link href="/blog">
@@ -76,7 +77,7 @@ const BlogPostPage: NextPage<Props> = ({ post, origin }) => {
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.body}</ReactMarkdown>
           </article>
         </div>
-      </main>
+      </div>
     </>
   );
 };

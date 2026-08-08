@@ -25,6 +25,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { trackEvent } from "@/lib/analytics";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { type CommentLiveEvent } from "@/lib/useCommentLiveUpdates";
+import { useUndoableDelete } from "@/lib/useUndoableDelete";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import AssigneesCombobox, {
   type AssigneeOption,
@@ -53,6 +54,7 @@ import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { SkeletonList } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -71,6 +73,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { pageTitle as buildPageTitle } from "@/lib/pageTitle";
 
 interface BoardMembership {
   "@id": string;
@@ -467,9 +470,31 @@ const Tasks = () => {
     }
   };
 
-  const handleDelete = async (task: Task) => {
-    setError(null);
-    try {
+  // Where each optimistically-removed task sat, so Undo restores it to its
+  // original position instead of dropping it at the end of the list.
+  const deletedIndex = useRef(new Map<string, number>());
+
+  const handleDelete = useUndoableDelete<Task>({
+    keyOf: (task) => task["@id"],
+    remove: (task) => {
+      setError(null);
+      const index = tasks.findIndex((t) => t["@id"] === task["@id"]);
+      if (index !== -1) {
+        deletedIndex.current.set(task["@id"], index);
+      }
+      setTasks((prev) => prev.filter((t) => t["@id"] !== task["@id"]));
+    },
+    restore: (task) => {
+      setTasks((prev) => {
+        if (prev.some((t) => t["@id"] === task["@id"])) return prev;
+        const next = [...prev];
+        const index = deletedIndex.current.get(task["@id"]) ?? next.length;
+        next.splice(Math.min(index, next.length), 0, task);
+        return next;
+      });
+      deletedIndex.current.delete(task["@id"]);
+    },
+    request: async (task) => {
       const res = await fetch(`${ENTRYPOINT}${task["@id"]}`, {
         method: "DELETE",
         credentials: "include",
@@ -477,11 +502,13 @@ const Tasks = () => {
       if (!res.ok) {
         throw new Error("Failed to delete task.");
       }
-      await loadData();
-    } catch (err) {
+      deletedIndex.current.delete(task["@id"]);
+    },
+    message: (task) => `Deleted “${task.title}”`,
+    onError: (_task, err) => {
       setError(err instanceof Error ? err.message : "Failed to delete task.");
-    }
-  };
+    },
+  });
 
   const handleTitleChange = async (task: Task, nextTitle: string) => {
     // Optimistic title update — input has already returned to read mode.
@@ -1081,7 +1108,7 @@ const Tasks = () => {
   return (
     <>
       <Head>
-        <title>{pageTitle} - Madori</title>
+        <title>{buildPageTitle(pageTitle)}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-7xl mx-auto">
@@ -1218,7 +1245,13 @@ const Tasks = () => {
           )}
 
           {isLoading ? (
-            <p className="text-muted-foreground">Loading tasks...</p>
+            // Same Card the table lands in, so the surface is already there
+            // when the rows arrive. Row height measured off the real list.
+            <Card>
+              <CardContent className="p-4">
+                <SkeletonList rows={6} label="Loading tasks" itemClassName="h-14" />
+              </CardContent>
+            </Card>
           ) : view === "calendar" ? (
             activeSpace ? (
               <CalendarView

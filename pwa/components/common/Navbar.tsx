@@ -24,7 +24,7 @@ const Navbar = () => {
   const { waitlistEnabled } = useSignupStatus();
 
   return (
-    <nav className="h-14 w-full border-b bg-background">
+    <nav aria-label="Utility" className="h-14 w-full border-b bg-background">
       <div className="flex h-full items-center gap-3 px-4">
         {/* Signed-out viewers get the Madori wordmark as the home anchor.
             Signed-in viewers get the active-space switcher at the top of the

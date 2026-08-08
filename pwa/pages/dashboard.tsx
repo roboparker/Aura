@@ -35,6 +35,8 @@ import WidgetFrame from "@/components/dashboard/WidgetFrame";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * The configurable space dashboard (#759).
@@ -179,7 +181,7 @@ const DashboardPage = () => {
   return (
     <>
       <Head>
-        <title>Dashboard — Madori</title>
+        <title>{pageTitle("Dashboard")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-6xl">
@@ -209,7 +211,10 @@ const DashboardPage = () => {
           {query.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-4">
               {[0, 1, 2].map((i) => (
-                <Card key={i} className="h-[288px] animate-pulse bg-muted/40 sm:col-span-2" />
+                <Skeleton
+                  key={i}
+                  className="h-[288px] rounded-xl border bg-muted/40 sm:col-span-2"
+                />
               ))}
             </div>
           ) : widgets.length === 0 ? (

@@ -10,8 +10,10 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ApprovalRow {
   id: string;
@@ -94,7 +96,7 @@ const ApprovalsPage = () => {
   return (
     <>
       <Head>
-        <title>Approvals — Madori</title>
+        <title>{pageTitle("Approvals")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">
@@ -119,10 +121,9 @@ const ApprovalsPage = () => {
 
               <div className="mb-3 flex justify-end">
                 <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={showAll}
-                    onChange={(e) => setShowAll(e.target.checked)}
+                    onCheckedChange={(c) => setShowAll(c === true)}
                   />
                   Show decided weeks
                 </label>

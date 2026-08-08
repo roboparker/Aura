@@ -3,13 +3,14 @@ import Head from "next/head";
 import Link from "next/link";
 import { formatBlogDate, type BlogPostSummary } from "@/lib/blogTypes";
 import { getPostSummaries, siteUrl } from "@/lib/blog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Props {
   posts: BlogPostSummary[];
   origin: string;
 }
 
-const PAGE_TITLE = "Blog — Madori";
+const PAGE_TITLE = pageTitle("Blog");
 const PAGE_DESCRIPTION =
   "Tips, tricks, and progress updates from the team building Madori — the API-first workspace for tasks, docs, and boards.";
 
@@ -31,7 +32,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
         <meta name="twitter:description" content={PAGE_DESCRIPTION} />
       </Head>
 
-      <main className="bg-background">
+      <div className="bg-background">
         <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
           <header className="mb-10 border-b pb-6">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -72,7 +73,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
                     ) : null}
                     <Link
                       href={`/blog/${post.slug}`}
-                      className="mt-3 inline-block text-sm font-medium text-cyan-700 dark:text-cyan-400 hover:underline"
+                      className="mt-3 inline-block text-sm font-medium text-primary hover:underline"
                     >
                       Read more →
                     </Link>
@@ -82,7 +83,7 @@ const BlogIndex: NextPage<Props> = ({ posts, origin }) => {
             </ul>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };

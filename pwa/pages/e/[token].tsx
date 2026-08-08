@@ -8,6 +8,7 @@ import { ESTIMATE_STATUS_META, EstimateStatus } from "@/lib/estimateTypes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface PublicLine {
   description: string;
@@ -236,7 +237,7 @@ const PublicEstimatePage = () => {
   return (
     <>
       <Head>
-        <title>Estimate — Madori</title>
+        <title>{pageTitle("Estimate")}</title>
       </Head>
       <div className="container mx-auto max-w-2xl px-4 py-16">
         <Card>

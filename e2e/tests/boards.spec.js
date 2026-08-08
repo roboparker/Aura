@@ -20,7 +20,7 @@ test.describe("Boards", () => {
     await registerAndSignIn(page, email);
 
     await page.goto(`${BASE_URL}/boards`);
-    await expect(page).toHaveTitle("Boards - Madori");
+    await expect(page).toHaveTitle("Boards — Madori");
     await expect(page.locator("text=No boards yet")).toBeVisible();
 
     // Create — the form lives behind the "New board" toggle now.
@@ -180,7 +180,7 @@ test.describe("Boards", () => {
     // Seed a tag so the tags combobox has something to pick.
     const tagRes = await page.request.post(`${BASE_URL}/tags`, {
       headers: { "Content-Type": "application/ld+json" },
-      data: { title: `urgent-${Date.now()}`, color: "#ef4444", space: spaceIri },
+      data: { title: `urgent-${Date.now()}`, color: "#b91c1c", space: spaceIri },
     });
     expect(tagRes.ok()).toBeTruthy();
     const tag = await tagRes.json();

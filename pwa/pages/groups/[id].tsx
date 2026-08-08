@@ -28,6 +28,7 @@ import DeleteGroupDialog from "@/components/groups/DeleteGroupDialog";
 import GroupTile from "@/components/groups/GroupTile";
 import SpaceTile from "@/components/spaces/SpaceTile";
 import UserAvatar from "@/components/user/UserAvatar";
+import { pageTitle } from "@/lib/pageTitle";
 
 const formatDate = (iso: string): string => {
   const d = new Date(iso);
@@ -291,7 +292,7 @@ const GroupDetail = () => {
 
   if (notFound) {
     return (
-      <main className="px-4 py-12 max-w-5xl mx-auto">
+      <div className="px-4 py-12 max-w-5xl mx-auto">
         <Card>
           <CardContent className="pt-6">
             <h1 className="text-xl font-bold mb-2">Group not found</h1>
@@ -303,16 +304,16 @@ const GroupDetail = () => {
             </Link>
           </CardContent>
         </Card>
-      </main>
+      </div>
     );
   }
 
   return (
     <>
       <Head>
-        <title>{group ? `${group.title} - Madori` : "Group - Madori"}</title>
+        <title>{pageTitle(group?.title ?? "Group")}</title>
       </Head>
-      <main className="px-6 py-8 max-w-6xl mx-auto">
+      <div className="px-6 py-8 max-w-6xl mx-auto">
         {isLoading || !group ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : (
@@ -531,7 +532,7 @@ const GroupDetail = () => {
                       <Button
                         type="submit"
                         size="sm"
-                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+                        className="gap-1.5"
                         disabled={isAddingMember || !newMemberEmail.trim()}
                       >
                         <Plus className="h-3.5 w-3.5" aria-hidden />
@@ -725,7 +726,7 @@ const GroupDetail = () => {
             />
           </>
         )}
-      </main>
+      </div>
     </>
   );
 };

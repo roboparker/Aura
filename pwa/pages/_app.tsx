@@ -4,6 +4,7 @@ import "../styles/globals.css"
 import { useEffect } from "react"
 import Script from "next/script"
 import Layout from "../components/common/Layout"
+import { Toaster } from "../components/ui/sonner"
 import { UMAMI_SCRIPT_SRC, UMAMI_WEBSITE_ID } from "../lib/analytics"
 import { registerPushServiceWorker } from "../lib/push"
 import type { AppProps } from "next/app"
@@ -30,6 +31,7 @@ function MyApp({ Component, pageProps }: AppProps<{dehydratedState: DehydratedSt
     <Layout dehydratedState={pageProps.dehydratedState}>
       <Component {...pageProps} />
     </Layout>
+    <Toaster />
   </>
 }
 

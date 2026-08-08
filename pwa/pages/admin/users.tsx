@@ -11,6 +11,7 @@ import UserAvatar from "@/components/user/UserAvatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface AdminUser {
   id: string;
@@ -169,7 +171,7 @@ const AdminUsers: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -195,7 +197,7 @@ const AdminUsers: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Users - Madori Admin</title>
+        <title>{pageTitle("Users", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">
@@ -454,10 +456,9 @@ const AdminUsers: NextPage = () => {
                   />
                 </div>
                 <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={skipWaitlist}
-                    onChange={(e) => setSkipWaitlist(e.target.checked)}
+                    onCheckedChange={(c) => setSkipWaitlist(c === true)}
                   />
                   Skip the waitlist (account can use the app immediately)
                 </label>

@@ -8,6 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CodeFence from "@/components/editor/CodeFence";
 import { getAllDocs, loadDoc, type LoadedDoc } from "@/lib/docs";
+import { pageTitle } from "@/lib/pageTitle";
 
 // `<pre>` override: react-markdown wraps a fenced code block as
 // `<pre><code className="language-xxx">{code}</code></pre>`. Unwrap it
@@ -41,13 +42,13 @@ const SECTION_LABELS: Record<string, string> = {
 const GuidePage = ({ doc, sectionLabel }: Props) => (
   <>
     <Head>
-      <title>{`${doc.title} — Madori guides`}</title>
+      <title>{pageTitle(doc.title, "Guides")}</title>
       <meta
         name="description"
         content={`${doc.title} — ${sectionLabel} documentation for Madori.`}
       />
     </Head>
-    <main className="bg-background">
+    <div className="bg-background">
       <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
         <Button asChild variant="ghost" size="sm" className="mb-6 -ml-2 gap-1">
           <Link href="/guides">
@@ -74,7 +75,7 @@ const GuidePage = ({ doc, sectionLabel }: Props) => (
           </ReactMarkdown>
         </article>
       </div>
-    </main>
+    </div>
   </>
 );
 

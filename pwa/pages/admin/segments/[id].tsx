@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, X } from "lucide-react";
+import { pageTitle } from "@/lib/pageTitle";
 
 const AdminSegmentDetail: NextPage = () => {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -228,7 +229,7 @@ const AdminSegmentDetail: NextPage = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-muted px-4 gap-3">
         <h1 className="text-2xl font-bold">Segment not found</h1>
-        <Link href="/admin/segments" className="text-sm text-cyan-700 hover:underline">
+        <Link href="/admin/segments" className="text-sm text-primary hover:underline">
           Back to segments
         </Link>
       </div>
@@ -248,7 +249,7 @@ const AdminSegmentDetail: NextPage = () => {
   return (
     <>
       <Head>
-        <title>{segment.name} - Madori Segments</title>
+        <title>{pageTitle(segment.name, "Segments", "Admin")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="max-w-5xl mx-auto space-y-6">

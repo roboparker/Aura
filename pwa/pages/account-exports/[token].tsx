@@ -8,6 +8,7 @@ import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ExportStatus {
   status: "ready" | "expired";
@@ -157,7 +158,7 @@ const AccountExportDownloadPage = () => {
   return (
     <>
       <Head>
-        <title>Data export - Madori</title>
+        <title>{pageTitle("Data export")}</title>
       </Head>
       <div className="container mx-auto max-w-lg px-4 py-16">
         <Card>

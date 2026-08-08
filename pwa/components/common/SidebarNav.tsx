@@ -9,6 +9,7 @@ import {
   ChevronDown,
   CreditCard,
   FlaskConical,
+  KeyRound,
   Plus,
   Settings,
   ShieldCheck,
@@ -35,6 +36,15 @@ const NAV_ITEM_ACTIVE_CLASS =
 // Section heading: same 2px transparent left inset so its label lines up with
 // the item rows below it.
 const NAV_HEADING_CLASS = "border-l-2 border-l-transparent";
+
+// Collapsible section header (Admin / User management / Taxonomy / Billing).
+// `min-h-6` is load-bearing: at its natural 20px these rows sat 10px from the
+// nav item below, which fails WCAG 2.2 §2.5.8 — under 24px *and* too close for
+// the spacing exception to apply. 24px clears it without moving the label,
+// since the extra height is absorbed by the existing bottom padding.
+const NAV_SECTION_BUTTON_CLASS =
+  "flex min-h-6 w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold " +
+  "uppercase tracking-wide text-muted-foreground hover:text-foreground";
 
 // The account menu (avatar + personal links + sign out + stop
 // impersonation) and the notification bell live in the top bar now —
@@ -333,7 +343,7 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Admin`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <ShieldCheck className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <span className="truncate">Admin</span>
@@ -393,11 +403,20 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
 };
 
 /**
- * Space membership + access management (Users, Roles, API keys) as a
- * collapsible nav group, mirroring {@see AdminSection}. Users + Roles are
- * space-admin only; API keys is gated on the `api_keys` read capability
- * (admins have it by default, a role can grant it to a member too). The
- * "General" space settings live in a standalone link above this group.
+ * Space membership management (Users, Roles) as a collapsible nav group,
+ * mirroring {@see AdminSection}. Space-admin only.
+ *
+ * API keys deliberately does *not* live here, even though it is adjacent
+ * access-management. It is gated on the `api_keys` capability rather than on
+ * admin, so a member granted that one capability used to see the whole "User
+ * management" heading standing over a single "API keys" child — a category
+ * label promising user management and delivering one unrelated item, which
+ * reads as a permissions bug and sends members hunting for controls they will
+ * never have. Hiding the header on a child count would have been the wrong
+ * cure: the mismatch is semantic, not numeric, and a count rule would also
+ * swallow a section that legitimately has one child. So API keys is a
+ * top-level item instead — the shape Tags and Custom fields already use — and
+ * it sits in the same place for every role.
  */
 const UserManagementSection = ({
   wrap,
@@ -405,7 +424,7 @@ const UserManagementSection = ({
   wrap: (children: ReactNode) => ReactNode;
 }) => {
   const router = useRouter();
-  const { activeSpace, isActiveSpaceAdmin, can } = useActiveSpace();
+  const { activeSpace, isActiveSpaceAdmin } = useActiveSpace();
 
   const storageKey = "madori.navCollapsed.userManagement";
   const [collapsed, setCollapsed] = useState(false);
@@ -440,15 +459,6 @@ const UserManagementSection = ({
           },
         ]
       : []),
-    ...(activeSpace && can("api_keys", "read")
-      ? [
-          {
-            href: `/spaces/${activeSpace.id}/api-keys`,
-            label: "API keys",
-            match: "/spaces/[id]/api-keys",
-          },
-        ]
-      : []),
   ];
 
   if (links.length === 0) return null;
@@ -460,7 +470,7 @@ const UserManagementSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} User management`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <Users className="size-3.5 shrink-0 text-indigo-600 dark:text-indigo-400" />
         <span className="truncate">User management</span>
@@ -541,7 +551,7 @@ const TaxonomySection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Taxonomy`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <Tag className="size-3.5 shrink-0 text-teal-600 dark:text-teal-400" />
         <span className="truncate">Taxonomy</span>
@@ -632,7 +642,7 @@ const BillingSection = ({
         onClick={toggle}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Expand" : "Collapse"} Billing`}
-        className={cn("flex w-full items-center gap-1.5 px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground", NAV_HEADING_CLASS)}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
       >
         <CreditCard className="size-3.5 shrink-0 text-orange-600 dark:text-orange-400" />
         <span className="truncate">Billing</span>
@@ -709,6 +719,7 @@ const SidebarNav = ({
       )}
 
       <nav
+        aria-label="Primary"
         className={cn(
           "flex flex-col gap-0.5 px-0 pt-2 pb-4",
           scrollable && "flex-1 overflow-y-auto",
@@ -792,6 +803,32 @@ const SidebarNav = ({
         {activeSpace && <BillingSection wrap={wrap} canInvoices={canInvoices} />}
 
         <UserManagementSection wrap={wrap} />
+
+        {/* Top-level rather than inside User management: it's gated on the
+            `api_keys` capability, not on admin, so grouping it under that
+            heading left a member with only this one item standing under a
+            "User management" label. Same place for every role now. */}
+        {activeSpace && can("api_keys", "read") && (
+          <div className="mt-3">
+            {wrap(
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  NAV_ITEM_CLASS,
+                  router.pathname === "/spaces/[id]/api-keys" &&
+                    NAV_ITEM_ACTIVE_CLASS,
+                )}
+              >
+                <Link href={`/spaces/${activeSpace.id}/api-keys`}>
+                  <KeyRound className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="truncate">API keys</span>
+                </Link>
+              </Button>,
+            )}
+          </div>
+        )}
 
         {activeSpace && isActiveSpaceAdmin && (
           <div className="mt-3">

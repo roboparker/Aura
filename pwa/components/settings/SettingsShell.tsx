@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import SettingsNav, { type SettingsSectionKey } from "./SettingsNav";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface SettingsShellProps {
   active: SettingsSectionKey;
@@ -46,9 +47,9 @@ const SettingsShell = ({
   return (
     <>
       <Head>
-        <title>{title} · Settings - Madori</title>
+        <title>{pageTitle(title, "Settings")}</title>
       </Head>
-      <main className="min-h-screen bg-muted">
+      <div className="min-h-screen bg-muted">
         <div className="mx-auto max-w-5xl px-4 py-10">
           <div className="mb-6">
             <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
@@ -74,7 +75,7 @@ const SettingsShell = ({
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </>
   );
 };

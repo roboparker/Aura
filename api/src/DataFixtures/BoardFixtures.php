@@ -59,10 +59,10 @@ class BoardFixtures extends Fixture implements DependentFixtureInterface
         // Tags are scoped to a space (#tags): create them in the launch space
         // whose tasks attach them. Owner = Uma (the space admin).
         $tagDefinitions = [
-            'urgent' => '#dc2626',
-            'design' => '#7c3aed',
-            'backend' => '#0d9488',
-            'docs' => '#f59e0b',
+            'urgent' => '#b91c1c',
+            'design' => '#6d28d9',
+            'backend' => '#0f766e',
+            'docs' => '#854d0e',
         ];
         $tags = [];
         foreach ($tagDefinitions as $title => $color) {

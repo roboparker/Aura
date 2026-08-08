@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\TagRepository;
+use App\Service\AvatarColorService;
 use App\State\TagOwnerProcessor;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -86,15 +87,21 @@ class Tag
     /**
      * Hex color for badge rendering. Stored as lowercase `#RRGGBB` so the
      * PWA can drop it straight into an inline style.
+     *
+     * Constrained to the same WCAG-AA palette as user avatars, spaces and
+     * groups. Before this, any of the 16.7M hex values passed the regex, and
+     * chips render their label over this colour — seeded tags reached only
+     * 2.15:1. The PWA picker already offered just the palette; the API is
+     * what accepted anything.
      */
     #[ORM\Column(length: 7)]
     #[Assert\NotBlank(message: 'Color is required.')]
-    #[Assert\Regex(
-        pattern: '/^#[0-9a-fA-F]{6}$/',
-        message: 'Color must be a hex value like #22c55e.',
+    #[Assert\Choice(
+        choices: AvatarColorService::PALETTE,
+        message: 'Color must be one of the supported avatar palette values.',
     )]
     #[Groups(['tag:read', 'tag:write', 'task:read'])]
-    private string $color = '#6b7280';
+    private string $color = '#334155';
 
     /**
      * Inverse side of the Task↔Tag relation. The Task entity owns the join

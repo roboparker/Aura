@@ -116,7 +116,7 @@ class AdminDeskFixtures extends Fixture implements DependentFixtureInterface
 
         // Tags (space-scoped, owned by Ada).
         $tags = [];
-        foreach (['ops' => '#0d9488', 'finance' => '#f59e0b'] as $title => $color) {
+        foreach (['ops' => '#0f766e', 'finance' => '#854d0e'] as $title => $color) {
             $tag = (new Tag())->setOwner($ada)->setSpace($desk)->setTitle($title)->setColor($color);
             $manager->persist($tag);
             $tags[$title] = $tag;

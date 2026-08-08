@@ -12,6 +12,7 @@ import { Invoice, STATUS_META, clientName, formatMoney } from "@/lib/invoiceType
 import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { pageTitle } from "@/lib/pageTitle";
 
 type InvoiceAction = "issue" | "send" | "mark-paid" | "void";
 
@@ -283,7 +285,7 @@ const InvoicesPage = () => {
   return (
     <>
       <Head>
-        <title>Invoices — Madori</title>
+        <title>{pageTitle("Invoices")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">
@@ -423,10 +425,9 @@ const InvoicesPage = () => {
                                           )}
                                         >
                                           <td className="px-3 py-1.5">
-                                            <input
-                                              type="checkbox"
+                                            <Checkbox
                                               checked={checked.has(entry["@id"])}
-                                              onChange={() => toggleChecked(entry["@id"])}
+                                              onCheckedChange={() => toggleChecked(entry["@id"])}
                                               aria-label="Include this entry"
                                             />
                                           </td>
@@ -471,10 +472,9 @@ const InvoicesPage = () => {
                                           )}
                                         >
                                           <td className="px-3 py-1.5">
-                                            <input
-                                              type="checkbox"
+                                            <Checkbox
                                               checked={checkedExpenses.has(expense["@id"])}
-                                              onChange={() =>
+                                              onCheckedChange={() =>
                                                 toggleCheckedExpense(expense["@id"])
                                               }
                                               aria-label="Include this expense"

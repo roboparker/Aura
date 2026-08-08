@@ -16,9 +16,11 @@ import PageHeader from "@/components/common/PageHeader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { pageTitle } from "@/lib/pageTitle";
 
 const MERGE_PATCH = "application/merge-patch+json";
 
@@ -225,7 +227,7 @@ const ExpensesPage = () => {
   return (
     <>
       <Head>
-        <title>Expenses — Madori</title>
+        <title>{pageTitle("Expenses")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-5xl">
@@ -397,10 +399,9 @@ const ExpensesPage = () => {
                               </div>
                               <div className="flex flex-wrap items-center gap-4">
                                 <label className="flex items-center gap-2 text-sm">
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={billable}
-                                    onChange={(e) => setBillable(e.target.checked)}
+                                    onCheckedChange={(c) => setBillable(c === true)}
                                   />
                                   Billable
                                 </label>
@@ -649,10 +650,9 @@ const EditExpenseRow = ({
             />
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={eBillable}
-              onChange={(e) => setEBillable(e.target.checked)}
+              onCheckedChange={(c) => setEBillable(c === true)}
             />
             Billable
           </label>

@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 // Roles an admin can assign from the member row. Owner transfer is a heavier
 // action (kept out of the quick menu until a dedicated flow exists).
@@ -140,7 +141,7 @@ const OrganizationDetail = () => {
 
   if (notFound) {
     return (
-      <main className="px-6 py-16 max-w-2xl mx-auto text-center">
+      <div className="px-6 py-16 max-w-2xl mx-auto text-center">
         <h1 className="text-lg font-semibold">Organization not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           It may have been deleted, or you&apos;re no longer a member.
@@ -148,17 +149,17 @@ const OrganizationDetail = () => {
         <Button asChild variant="outline" className="mt-4">
           <Link href="/organizations">Back to organizations</Link>
         </Button>
-      </main>
+      </div>
     );
   }
 
   return (
     <>
       <Head>
-        <title>{org ? `${org.name} - Madori` : "Organization - Madori"}</title>
+        <title>{pageTitle(org?.name ?? "Organization")}</title>
       </Head>
 
-      <main className="px-6 py-8 max-w-4xl mx-auto">
+      <div className="px-6 py-8 max-w-4xl mx-auto">
         <Link
           href="/organizations"
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -329,7 +330,7 @@ const OrganizationDetail = () => {
             </section>
           </>
         )}
-      </main>
+      </div>
     </>
   );
 };

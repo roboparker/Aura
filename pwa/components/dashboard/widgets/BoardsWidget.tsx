@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { WidgetProps } from "./registry";
 
 interface BoardRow {
@@ -10,7 +11,7 @@ interface BoardRow {
 
 const BoardsWidget = ({ data, isLoading }: WidgetProps) => {
   if (isLoading) {
-    return <div className="h-full animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-full rounded-md bg-muted/40" />;
   }
 
   const rows = ((data ?? {}) as { rows?: BoardRow[] }).rows ?? [];

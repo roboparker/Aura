@@ -21,11 +21,13 @@ export default defineConfig({
       include: [
         "lib/authRedirect.ts",
         "lib/avatarPalette.ts",
+        "lib/contrast.ts",
         "lib/currencies.ts",
         "lib/landingDestination.ts",
         "lib/notificationPrefs.ts",
         "lib/notificationTypes.ts",
         "lib/passwordStrength.ts",
+        "lib/planTiers.ts",
         "lib/relativeTime.ts",
         "lib/searchQuery.ts",
         "lib/userDisplay.ts",

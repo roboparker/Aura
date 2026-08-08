@@ -22,6 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ClientLite {
   "@id": string;
@@ -133,7 +134,7 @@ const EstimatesPage = () => {
   return (
     <>
       <Head>
-        <title>Estimates — Madori</title>
+        <title>{pageTitle("Estimates")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-4xl">

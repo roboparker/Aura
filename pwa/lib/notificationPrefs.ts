@@ -50,7 +50,7 @@ export const NOTIFICATION_ROWS: NotificationRow[] = [
   {
     key: "budgets",
     label: "Budget alerts",
-    description: "An project you administer crosses 80% or 100% of its budget.",
+    description: "A project you administer crosses 80% or 100% of its budget.",
   },
 ];
 
@@ -70,3 +70,23 @@ export const allOnMatrix = (): Record<string, NotificationChannel> =>
   Object.fromEntries(
     NOTIFICATION_ROWS.map((r) => [r.key, { inApp: true, email: true }]),
   );
+
+/**
+ * Human copy for each browser push-permission state.
+ *
+ * The Notification API's own vocabulary can't be shown to users as-is:
+ * `"default"` is a spec term meaning *permission has not been requested yet*,
+ * but it reads as "this is the normal setting, nothing to do" — exactly
+ * inverting the one state that needs the user to act. Each state is phrased as
+ * what it means for the user, and `default` is paired with an Enable control at
+ * the call site.
+ */
+export const PUSH_PERMISSION_COPY: Record<
+  NotificationPermission | "unsupported",
+  string
+> = {
+  default: "Push isn't enabled yet.",
+  granted: "Push is allowed in this browser.",
+  denied: "Push is blocked — re-enable it in your browser's site settings.",
+  unsupported: "This browser doesn't support push notifications.",
+};

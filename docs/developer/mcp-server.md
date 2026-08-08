@@ -64,6 +64,7 @@ Tokens authenticate via `Authorization: Bearer` on both the `/mcp` firewall and 
 | Task        | `create_task`, `get_task`, `update_task`, `delete_task`, `list_tasks`, `search_tasks` |
 | Relationships| `link_tasks`, `unlink_tasks`, `list_task_relationships` (subtasks / dependencies / links) |
 | Board       | `create_board`, `get_board`, `update_board`, `delete_board`, `list_boards` |
+| Automations | `list_automations`, `get_automation_runs` — **read-only** |
 | Space       | `list_spaces`                                                                   |
 | Page        | `create_page`, `get_page`, `update_page`, `delete_page`, `list_pages`          |
 | Assignment  | `assign_task`, `unassign_task`, `get_my_tasks`                                 |
@@ -119,6 +120,21 @@ time- and expense-tracking loop.
 tracking concern like logging time (everyone records their own), distinct from
 seeing what the business bills. `list_estimates`, by contrast, rides `invoices`.
 This mirrors the REST `security:` expressions exactly.
+
+### Automations are read-only on purpose
+
+`list_automations` and `get_automation_runs` expose board rules, but there is
+deliberately **no `create_automation`**.
+
+Every other write tool here makes one reversible change to one item. A rule is
+different in kind: it edits *other people's* tasks, repeatedly, on a schedule
+nobody is watching. Letting a model author one would hand it durable authority
+over a board rather than a single action a human would notice going wrong.
+
+The read side is where the value is anyway — "why did this task move on its
+own?" is answerable from the rules plus their run history, and that's precisely
+what a model gets asked. Authoring rules stays a space admin in the UI. See
+[board-automations.md](board-automations.md).
 
 ### Analytics
 

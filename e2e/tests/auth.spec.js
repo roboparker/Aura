@@ -10,7 +10,7 @@ test.describe("Authentication", () => {
     const email = uniqueEmail();
 
     await page.goto(`${BASE_URL}/signup`);
-    await expect(page).toHaveTitle("Sign Up - Madori");
+    await expect(page).toHaveTitle("Sign Up — Madori");
 
     // Step 1 — form. The redesigned signup no longer has a confirm
     // field; the strength meter does the safety work instead.
@@ -42,10 +42,55 @@ test.describe("Authentication", () => {
     await page.goto(`${BASE_URL}/signup`);
 
     // Submit empty form → top-of-form summary + inline messages.
+    // Each message appears twice by design (once in the summary, once beside
+    // its field), so assert against each location specifically rather than a
+    // bare text match.
     await page.getByRole("button", { name: "Create account" }).click();
-    await expect(page.getByTestId("signup-error-summary")).toBeVisible();
-    await expect(page.locator("text=Email is required")).toBeVisible();
-    await expect(page.locator("text=Password is required")).toBeVisible();
+
+    const summary = page.getByTestId("signup-error-summary");
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText("Email is required");
+    await expect(summary).toContainText("Password is required");
+
+    // Inline messages, associated with their input via aria-describedby.
+    await expect(page.locator("#email-error")).toBeVisible();
+    await expect(page.locator("#password-error")).toBeVisible();
+    await expect(page.locator('input[name="email"]')).toHaveAttribute(
+      "aria-describedby",
+      "email-error",
+    );
+
+    // A failed submit must move focus to the summary, not leave it on <body>.
+    await expect(summary).toBeFocused();
+  });
+
+  test("tabbing through empty fields does not flag them as errors", async ({
+    page,
+  }) => {
+    await page.goto(`${BASE_URL}/signup`);
+
+    // Walk the form the way someone orienting on it does: focus the first
+    // field and tab onward without typing. Formik marks each field touched on
+    // blur, so the naive `touched && error` render told the user off for
+    // fields they hadn't reached a decision on yet.
+    await page.focus("#givenName");
+    for (let i = 0; i < 4; i++) await page.keyboard.press("Tab");
+
+    await expect(page.locator("#givenName-error")).toHaveCount(0);
+    await expect(page.locator("#email-error")).toHaveCount(0);
+    await expect(page.locator("#password-error")).toHaveCount(0);
+    await expect(page.locator('[aria-invalid="true"]')).toHaveCount(0);
+
+    // But typing something genuinely wrong and leaving SHOULD complain — this
+    // is "reward early, punish late", not "never validate before submit".
+    await page.fill("#email", "not-an-email");
+    await page.keyboard.press("Tab");
+    await expect(page.locator("#email-error")).toBeVisible();
+    await expect(page.locator("#email-error")).toContainText("Invalid email");
+
+    // ...and only for that field. The still-empty password is untouched by
+    // the user's mistake and must stay quiet.
+    await expect(page.locator("#password-error")).toHaveCount(0);
   });
 
   test("sign in with valid credentials", async ({ page }) => {
@@ -59,7 +104,7 @@ test.describe("Authentication", () => {
 
     // Sign in via UI
     await page.goto(`${BASE_URL}/signin`);
-    await expect(page).toHaveTitle("Sign In - Madori");
+    await expect(page).toHaveTitle("Sign In — Madori");
 
     await page.fill("#email", email);
     await page.fill("#password", "Password123!@#");

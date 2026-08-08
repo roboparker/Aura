@@ -40,7 +40,7 @@ const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
       href={`/spaces/${space.id}`}
       className={cn(
         "no-underline group block focus:outline-none",
-        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "rounded-lg",
       )}
     >
@@ -54,7 +54,8 @@ const SpaceCard = ({ space, role, effectiveMemberCount }: Props) => {
           />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h3 className="font-semibold truncate min-w-0">{space.name}</h3>
+              {/* h2: sits directly under the page's "Spaces" h1. */}
+              <h2 className="font-semibold truncate min-w-0">{space.name}</h2>
               {role && (
                 <Badge
                   variant="outline"

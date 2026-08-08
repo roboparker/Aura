@@ -95,6 +95,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import {
@@ -109,6 +110,7 @@ import { Label } from "@/components/ui/label";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface Member {
   "@id": string;
@@ -197,13 +199,14 @@ interface NewTaskDraft {
 
 const BoardDetail = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { spaces } = useActiveSpace();
+  const { spaces, activeSpace, can } = useActiveSpace();
   const router = useRouter();
   const { id } = router.query;
   const boardId = typeof id === "string" ? id : null;
   const currentUserIri = user ? `/users/${user.id}` : null;
 
   const [board, setBoard] = useState<Board | null>(null);
+  const [enablingTimeline, setEnablingTimeline] = useState(false);
   const [tasks, setTasks] = useState<BoardTask[]>([]);
   // Bumped to nudge the Calendar tab to refetch after drawer/list edits.
   const [calendarRefresh, setCalendarRefresh] = useState(0);
@@ -919,9 +922,26 @@ const BoardDetail = () => {
   // Timeline (#timeline): flip the feature on/off. Enabling attaches the
   // canonical global "Start date" field server-side (BoardTimelineProcessor),
   // so a reload of the board's field set is needed to pick it up.
+  /**
+   * Whether to offer "Turn on Timeline" in the Timeline tab's empty state.
+   *
+   * Mirrors the server's `space.boards.update` check. `can()` answers for the
+   * **active** space, so it's only trustworthy when that's the space this board
+   * actually lives in — otherwise we'd be reading someone's permissions in the
+   * wrong space. When they differ we withhold the button rather than guess:
+   * Settings still has the switch, and a button that 403s is worse than one
+   * that isn't there.
+   */
+  const canEnableTimeline = useMemo(() => {
+    if (!board || !activeSpace) return false;
+    if (boardSpaceIri(board) !== activeSpace["@id"]) return false;
+    return can("boards", "update");
+  }, [board, activeSpace, can]);
+
   const handleSetTimelineEnabled = useCallback(
     async (enabled: boolean) => {
       if (!board) return;
+      setEnablingTimeline(true);
       try {
         const res = await fetch(`${ENTRYPOINT}/boards/${encodeURIComponent(board.id)}`, {
           method: "PATCH",
@@ -937,6 +957,8 @@ const BoardDetail = () => {
         await load();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to update Timeline.");
+      } finally {
+        setEnablingTimeline(false);
       }
     },
     [board, load],
@@ -1249,12 +1271,26 @@ const BoardDetail = () => {
   return (
     <>
       <Head>
-        <title>{board ? `${board.title} - Madori` : "Board - Madori"}</title>
+        <title>{pageTitle(board?.title ?? "Board")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="w-full">
           {isLoading || !board ? (
-            <p className="text-muted-foreground">Loading board...</p>
+            // The board swaps in title, tab bar and table at once, so the
+            // placeholder stands in for all three. One region announces the
+            // whole thing — nesting SkeletonList here would announce twice.
+            <div role="status" aria-busy="true" className="space-y-4 pt-2">
+              <span className="sr-only">Loading board</span>
+              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-9 w-96 max-w-full" />
+              <Card>
+                <CardContent className="space-y-2 p-4">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <Skeleton key={i} className="h-14" />
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
           ) : (
             <>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1480,11 +1516,9 @@ const BoardDetail = () => {
                                   {isCopying ? "Copying…" : "Copy"}
                                 </Button>
                                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground select-none">
-                                  <input
-                                    type="checkbox"
+                                  <Checkbox
                                     checked={copyIncludeTasks}
-                                    onChange={(e) => setCopyIncludeTasks(e.target.checked)}
-                                    className="h-3.5 w-3.5"
+                                    onCheckedChange={(c) => setCopyIncludeTasks(c === true)}
                                     data-testid="board-copy-include-tasks"
                                   />
                                   include tasks
@@ -1779,6 +1813,9 @@ const BoardDetail = () => {
                     sections={sections}
                     enabled={board.timelineEnabled ?? false}
                     startFieldIri={timelineStartFieldIri}
+                    canEnable={canEnableTimeline}
+                    enabling={enablingTimeline}
+                    onEnable={() => handleSetTimelineEnabled(true)}
                     onOpenTask={(t) => openTaskDetail(t)}
                     onMoveDue={(t, iso) => void patchTask(t, { dueDate: iso })}
                     onMoveStart={(t, dateStr) =>

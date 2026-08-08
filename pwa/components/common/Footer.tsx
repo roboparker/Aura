@@ -5,9 +5,9 @@ const Footer = () => (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Product
-          </h3>
+          </h2>
           <ul className="space-y-1.5 text-sm">
             <li>
               <Link href="/" className="text-foreground hover:underline">
@@ -56,9 +56,9 @@ const Footer = () => (
           </ul>
         </div>
         <div>
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Developers
-          </h3>
+          </h2>
           <ul className="space-y-1.5 text-sm">
             <li>
               <a href="/docs" className="text-foreground hover:underline">
@@ -92,9 +92,9 @@ const Footer = () => (
           </ul>
         </div>
         <div className="sm:col-span-1">
-          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Board
-          </h3>
+          </h2>
           <ul className="space-y-1.5 text-sm">
             <li>
               <a

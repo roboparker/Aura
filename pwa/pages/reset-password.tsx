@@ -26,6 +26,7 @@ import {
   MIN_PASSWORD_STRENGTH,
   estimatePasswordStrength,
 } from "@/lib/passwordStrength";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface ResetPasswordValues {
   newPassword: string;
@@ -346,7 +347,7 @@ const ResetPassword = () => {
   return (
     <>
       <Head>
-        <title>Set a new password — Madori</title>
+        <title>{pageTitle("Set a new password")}</title>
       </Head>
       <PageShell>{renderBody()}</PageShell>
     </>

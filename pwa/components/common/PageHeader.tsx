@@ -48,12 +48,15 @@ const PageHeader = ({
   className,
 }: Props) => {
   return (
-    <div className={cn("mb-8 border-b pb-6", className)}>
+    <div className={cn("mb-7 border-b border-border/50 pb-5", className)}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             {icon}
-            <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+            {/* 600, not 700: light text on a dark ground optically gains
+                weight (halation), so bold at this size blooms and softens
+                the edges. Semibold + tighter tracking reads sharper. */}
+            <h1 className="text-2xl font-semibold tracking-[-0.02em]">{title}</h1>
           </div>
           {subtitle && (
             <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>

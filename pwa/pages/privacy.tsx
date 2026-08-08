@@ -1,19 +1,20 @@
 import Head from "next/head";
 import Link from "next/link";
+import { pageTitle } from "@/lib/pageTitle";
 
 const LAST_UPDATED = "June 9, 2026";
 
 const Privacy = () => (
   <>
     <Head>
-      <title>Privacy Policy — Madori</title>
+      <title>{pageTitle("Privacy Policy")}</title>
       <meta
         name="description"
         content="How Madori collects, uses, and protects your personal data."
       />
     </Head>
 
-    <main className="bg-background">
+    <div className="bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12 md:py-16">
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-2">
@@ -197,7 +198,7 @@ const Privacy = () => (
           </section>
         </div>
       </div>
-    </main>
+    </div>
   </>
 );
 

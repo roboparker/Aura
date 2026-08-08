@@ -24,6 +24,7 @@ import AttachmentsPanel, {
 import DueDateCell from "@/components/tasks/DueDateCell";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { TableCell, TableRow } from "@/components/ui/table";
 import {
@@ -281,12 +282,18 @@ const TaskRow = ({
           </button>
         </TableCell>
         <TableCell className="w-10 align-top">
-          <input
-            type="checkbox"
+          {/* The completion toggle is the most-clicked control in the app, and
+              at 16x16 it is the smallest. It technically conforms to WCAG 2.2
+              §2.5.8 via the spacing exception, but Fitts's Law still applies:
+              a bigger target is faster for everyone and materially easier with
+              a tremor or a touch screen. `before:` grows the *hit area* to
+              24x24 without changing how the checkbox looks. */}
+          <Checkbox
             checked={!!task.completedOn}
-            onChange={() => onToggle(task)}
+            onCheckedChange={() => onToggle(task)}
             aria-label={`Mark "${task.title}" as ${task.completedOn ? "incomplete" : "complete"}`}
-            className="mt-1 h-4 w-4 shrink-0 cursor-pointer"
+            data-testid="task-done"
+            className="relative mt-1 shrink-0 before:absolute before:-inset-1 before:content-['']"
           />
         </TableCell>
         <TableCell className="align-top pl-0">
@@ -353,24 +360,30 @@ const TaskRow = ({
           />
         </TableCell>
         <TableCell className="align-top text-right whitespace-nowrap">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onOpenDetail(task)}
-            aria-label={`Open details for "${task.title}"`}
-            data-testid="task-open-detail"
-          >
-            <PanelRight className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(task)}
-            aria-label={`Delete "${task.title}"`}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {/* The benign action and the destructive one are deliberately not
+              adjacent: a divider plus a gap separates them so a slipped click
+              on "Open details" can't land on Delete. */}
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenDetail(task)}
+              aria-label={`Open details for "${task.title}"`}
+              data-testid="task-open-detail"
+            >
+              <PanelRight className="h-4 w-4" />
+            </Button>
+            <span aria-hidden="true" className="mx-1 h-5 w-px bg-border" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDelete(task)}
+              aria-label={`Delete "${task.title}"`}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </TableCell>
       </TableRow>
       <TableRow

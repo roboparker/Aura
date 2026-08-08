@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import CustomFieldsManager from "@/components/custom-fields/CustomFieldsManager";
 import PageHeader from "@/components/common/PageHeader";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * Admin-only manager for instance-wide GLOBAL custom fields
@@ -41,7 +42,7 @@ const AdminGlobalCustomFields: NextPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="min-h-screen flex items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -60,7 +61,7 @@ const AdminGlobalCustomFields: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Global custom fields - Madori</title>
+        <title>{pageTitle("Global custom fields")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-8">
         <div className="mx-auto w-full max-w-4xl">

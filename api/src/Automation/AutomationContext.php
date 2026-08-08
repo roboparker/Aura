@@ -49,6 +49,14 @@ final class AutomationContext
          * user, and say so in what they write.
          */
         public readonly ?Automation $automation = null,
+        /**
+         * The task has already been deleted; `$task` is a detached shell kept
+         * only so conditions can read what it was.
+         *
+         * Nothing may be written to it — see {@see SurvivesTaskDeletion} and
+         * the guard in {@see AutomationRunner}.
+         */
+        public readonly bool $taskDeleted = false,
     ) {
     }
 
@@ -63,6 +71,7 @@ final class AutomationContext
             $this->actor,
             $this->depth,
             $automation,
+            $this->taskDeleted,
         );
     }
 

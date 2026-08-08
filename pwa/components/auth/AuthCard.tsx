@@ -265,7 +265,12 @@ const AuthCard = ({ defaultTab }: Props) => {
       <Card className="w-full max-w-lg overflow-hidden p-0">
         {cardCopy && !isInviteSignup && (
           <CardHeader className="p-8 pb-6">
-            <CardTitle className="text-3xl font-bold">{cardCopy.title}</CardTitle>
+            {/* h1: on the auth screens this card *is* the page, so its title
+                is the document's top-level heading. Without it these routes
+                had no heading of any level. */}
+            <CardTitle as="h1" className="text-3xl font-bold">
+              {cardCopy.title}
+            </CardTitle>
             <CardDescription className="text-base">{cardCopy.subtitle}</CardDescription>
           </CardHeader>
         )}

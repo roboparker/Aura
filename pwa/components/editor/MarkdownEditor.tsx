@@ -1,5 +1,6 @@
 import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export interface MarkdownEditorProps {
   value: string;
@@ -18,7 +19,7 @@ export interface MarkdownEditorProps {
 const MarkdownEditorInner = dynamic(() => import("./MarkdownEditorInner"), {
   ssr: false,
   loading: () => (
-    <div className="block w-full border border-input rounded-md px-3 py-2 bg-muted animate-pulse min-h-24" />
+    <Skeleton className="block w-full border border-input rounded-md px-3 py-2 bg-muted min-h-24" />
   ),
 });
 

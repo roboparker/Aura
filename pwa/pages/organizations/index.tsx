@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SkeletonList } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PageHeader from "@/components/common/PageHeader";
+import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationsIndex = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -108,10 +110,10 @@ const OrganizationsIndex = () => {
   return (
     <>
       <Head>
-        <title>Organizations - Madori</title>
+        <title>{pageTitle("Organizations")}</title>
       </Head>
 
-      <main className="px-6 py-8 max-w-5xl mx-auto">
+      <div className="px-6 py-8 max-w-5xl mx-auto">
         <PageHeader
           title="Organizations"
           icon={<Building2 className="h-6 w-6 text-cyan-600" />}
@@ -119,7 +121,7 @@ const OrganizationsIndex = () => {
           actions={
             <Button
               size="sm"
-              className="gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white"
+              className="gap-1.5"
               onClick={() => {
                 setError(null);
                 setName("");
@@ -133,7 +135,12 @@ const OrganizationsIndex = () => {
         />
 
         {loading && orgs.length === 0 ? (
-          <p className="text-muted-foreground">Loading organizations…</p>
+          <SkeletonList
+            rows={2}
+            label="Loading organizations"
+            className="grid gap-3 space-y-0 sm:grid-cols-1 lg:grid-cols-2"
+            itemClassName="h-[5.5rem]"
+          />
         ) : sorted.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
             You don&apos;t belong to any organizations yet. Create one to invite
@@ -176,7 +183,7 @@ const OrganizationsIndex = () => {
             })}
           </ul>
         )}
-      </main>
+      </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>

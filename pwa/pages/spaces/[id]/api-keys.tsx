@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import PageHeader from "@/components/common/PageHeader";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
+import { pageTitle } from "@/lib/pageTitle";
 
 interface SpaceApiKey {
   id: string;
@@ -192,14 +193,14 @@ const SpaceApiKeys = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <Button asChild variant="outline">
             <Link href="/spaces">Back to spaces</Link>
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -216,9 +217,9 @@ const SpaceApiKeys = () => {
   return (
     <>
       <Head>
-        <title>API keys · {space.name}</title>
+        <title>{pageTitle("API keys", space.name)}</title>
       </Head>
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader
           title="API keys"
           icon={<KeyRound className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
@@ -236,7 +237,7 @@ const SpaceApiKeys = () => {
           this space&apos;s content. Define what it can do by assigning{" "}
           <Link
             href={`/spaces/${space.id}/roles`}
-            className="text-cyan-700 hover:underline dark:text-cyan-400"
+            className="text-primary hover:underline"
           >
             roles
           </Link>{" "}
@@ -297,7 +298,7 @@ const SpaceApiKeys = () => {
             </button>
           )}
         </div>
-      </main>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">

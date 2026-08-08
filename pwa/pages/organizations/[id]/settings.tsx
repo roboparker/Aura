@@ -9,6 +9,7 @@ import { apiGet, ApiError } from "@/lib/apiClient";
 import { type Organization } from "@/lib/organizationTypes";
 import { Button } from "@/components/ui/button";
 import AccountBillingCard from "@/components/billing/AccountBillingCard";
+import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationSettings = () => {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
@@ -53,22 +54,22 @@ const OrganizationSettings = () => {
 
   if (notFound) {
     return (
-      <main className="px-6 py-16 max-w-2xl mx-auto text-center">
+      <div className="px-6 py-16 max-w-2xl mx-auto text-center">
         <h1 className="text-lg font-semibold">Organization not found</h1>
         <Button asChild variant="outline" className="mt-4">
           <Link href="/organizations">Back to organizations</Link>
         </Button>
-      </main>
+      </div>
     );
   }
 
   return (
     <>
       <Head>
-        <title>{org ? `${org.name} settings - Madori` : "Organization settings - Madori"}</title>
+        <title>{pageTitle(org ? `${org.name} settings` : "Organization settings")}</title>
       </Head>
 
-      <main className="px-6 py-8 max-w-3xl mx-auto">
+      <div className="px-6 py-8 max-w-3xl mx-auto">
         <Link
           href={orgId ? `/organizations/${orgId}` : "/organizations"}
           className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
@@ -97,7 +98,7 @@ const OrganizationSettings = () => {
             enterpriseNote
           />
         )}
-      </main>
+      </div>
     </>
   );
 };

@@ -2,6 +2,17 @@
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // @sentry/nextjs (via @sentry/server-utils) loads meriyah's ESM build at
+  // runtime through an external require. Next's standalone output-file-tracing
+  // only picks up meriyah.cjs, so `node server.js` crashes with "Cannot find
+  // module .../meriyah/dist/meriyah.mjs" (every task container is then
+  // unhealthy). Force the whole meriyah dist into the trace so the symlinked
+  // copies under @apm-js-collab/code-transformer and @sentry/server-utils
+  // resolve. Keyed broadly since the Sentry load happens at server startup
+  // (instrumentation), not on a single route.
+  outputFileTracingIncludes: {
+    '/**/*': ['./node_modules/.pnpm/meriyah@*/node_modules/meriyah/dist/**'],
+  },
   // Next.js dev tools indicator (dev-only) pinned to the bottom-right corner.
   devIndicators: {
     position: 'bottom-right',

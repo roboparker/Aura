@@ -8,6 +8,7 @@ import {
 } from "react";
 import { CalendarRange, CornerDownRight } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { valuePairDefinitionIri } from "@/components/tasks/CustomFieldValueList";
 import { analyseSchedule, edgeKey, nestByParent } from "@/lib/timelineAnalysis";
@@ -81,6 +82,16 @@ interface BoardTimelineProps<T extends TimelineTask> {
    * the field arrives.
    */
   startFieldIri: string | null;
+  /**
+   * Whether this viewer may switch Timeline on. Mirrors the server's
+   * `space.boards.update` check — offering a button that 403s is worse than
+   * not offering one.
+   */
+  canEnable?: boolean;
+  /** Turn Timeline on from here. Omitted on the cross-board view. */
+  onEnable?: () => void | Promise<void>;
+  /** True while the enable request is in flight, so the button can say so. */
+  enabling?: boolean;
   onOpenTask: (task: T) => void;
   /** Persist a new due date (ISO) or clear it. */
   onMoveDue: (task: T, dueIso: string | null) => void;
@@ -146,6 +157,9 @@ const BoardTimeline = <T extends TimelineTask>({
   readOnly = false,
   enabled,
   startFieldIri,
+  canEnable = false,
+  onEnable,
+  enabling = false,
   onOpenTask,
   onMoveDue,
   onMoveStart,
@@ -353,14 +367,39 @@ const BoardTimeline = <T extends TimelineTask>({
   }, [zoom]);
 
   if (!enabled) {
+    // Turn it on from here when the viewer is allowed to. Sending someone to
+    // Settings for a one-field toggle is a pointless detour, and telling
+    // someone who *can't* change it to go there is worse than pointless.
+    const offerButton = canEnable === true && typeof onEnable === "function";
+
     return (
       <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed py-16 text-center">
         <CalendarRange className="h-8 w-8 text-muted-foreground" aria-hidden />
         <p className="font-medium">Timeline isn&apos;t turned on</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Enable Timeline in the board&apos;s Settings to plan tasks on a Gantt
-          chart. Each bar runs from its Start date to its due date.
+          {offerButton
+            ? "Plan this board's tasks on a Gantt chart. Each bar runs from its Start date to its due date."
+            : "Someone who can manage this board needs to turn Timeline on before it can be used here."}
         </p>
+
+        {offerButton && (
+          <>
+            <Button
+              className="mt-2"
+              data-testid="timeline-enable-button"
+              disabled={enabling}
+              onClick={() => void onEnable?.()}
+            >
+              {enabling ? "Turning on…" : "Turn on Timeline"}
+            </Button>
+            {/* Says what else the switch does before it's flipped, rather than
+                leaving the new field to be discovered afterwards. */}
+            <p className="max-w-sm text-xs text-muted-foreground">
+              This adds the shared <strong>Start date</strong> field to the
+              board. It can&apos;t be removed while Timeline is on.
+            </p>
+          </>
+        )}
       </div>
     );
   }

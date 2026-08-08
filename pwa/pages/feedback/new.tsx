@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 const NewFeedbackPage = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -70,9 +71,9 @@ const NewFeedbackPage = () => {
   return (
     <>
       <Head>
-        <title>New feedback - Madori</title>
+        <title>{pageTitle("New feedback")}</title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="max-w-5xl mx-auto px-4 py-8 space-y-4">
           <h1 className="text-2xl font-bold">New feedback</h1>
 
@@ -150,7 +151,7 @@ const NewFeedbackPage = () => {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </>
   );
 };

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { Switch } from "@/components/ui/switch";
+import { SkeletonList } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   isGlobalDefinition,
@@ -248,7 +249,7 @@ const BoardCustomFieldPicker = ({
           Toggle where each field shows on this board — the task list, the
           board, and/or the calendar (all off = not on this board). Space
           fields are defined in{" "}
-          <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+          <Link href="/custom-fields" className="text-primary hover:underline">
             space settings
           </Link>
           ; global fields are managed by admins.
@@ -258,7 +259,7 @@ const BoardCustomFieldPicker = ({
       {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading fields…</p>
+        <SkeletonList rows={4} label="Loading fields" itemClassName="h-10" />
       ) : (
         <div className="space-y-4">
           <section className="space-y-1.5">
@@ -268,7 +269,7 @@ const BoardCustomFieldPicker = ({
             {spaceFields.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 This space has no custom fields yet. Define them in{" "}
-                <Link href="/custom-fields" className="text-cyan-700 hover:underline dark:text-cyan-400">
+                <Link href="/custom-fields" className="text-primary hover:underline">
                   space settings
                 </Link>
                 .

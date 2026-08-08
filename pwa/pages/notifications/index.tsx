@@ -16,6 +16,7 @@ import NotificationRow from "@/components/notifications/NotificationRow";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { pageTitle } from "@/lib/pageTitle";
 
 const GROUP_ORDER: TimeGroup[] = ["Today", "This week", "Earlier"];
 
@@ -113,9 +114,9 @@ const NotificationsPage = () => {
   return (
     <>
       <Head>
-        <title>Notifications - Madori</title>
+        <title>{pageTitle("Notifications")}</title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-5xl space-y-5 px-4 py-8">
           <header className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
@@ -238,7 +239,7 @@ const NotificationsPage = () => {
                 <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                   <Bell className="h-6 w-6 text-muted-foreground" />
                 </span>
-                <h3 className="mt-4 text-lg font-semibold">You&apos;re all caught up</h3>
+                <h2 className="mt-4 text-lg font-semibold">You&apos;re all caught up</h2>
                 <p className="mt-1 max-w-sm text-sm text-muted-foreground">
                   {archived
                     ? "Nothing archived yet."
@@ -272,7 +273,7 @@ const NotificationsPage = () => {
             </div>
           )}
         </div>
-      </main>
+      </div>
     </>
   );
 };

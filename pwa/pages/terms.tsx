@@ -1,19 +1,20 @@
 import Head from "next/head";
 import Link from "next/link";
+import { pageTitle } from "@/lib/pageTitle";
 
 const LAST_UPDATED = "June 9, 2026";
 
 const Terms = () => (
   <>
     <Head>
-      <title>Terms and Conditions — Madori</title>
+      <title>{pageTitle("Terms and Conditions")}</title>
       <meta
         name="description"
         content="The terms and conditions that govern your use of Madori."
       />
     </Head>
 
-    <main className="bg-background">
+    <div className="bg-background">
       <div className="max-w-3xl mx-auto px-4 py-12 md:py-16">
         <header className="mb-10">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-2">
@@ -160,7 +161,7 @@ const Terms = () => (
           </section>
         </div>
       </div>
-    </main>
+    </div>
   </>
 );
 

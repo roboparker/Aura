@@ -418,13 +418,13 @@ class McpTest extends ApiTestCase
         $client = static::createClient();
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'create_tag',
-            'arguments' => ['title' => 'urgent', 'color' => '#ef4444'],
+            'arguments' => ['title' => 'urgent', 'color' => '#b91c1c'],
         ]);
         $this->assertFalse($body['result']['isError'] ?? null);
         $structured = $body['result']['structuredContent'] ?? null;
         $this->assertIsArray($structured);
         $this->assertSame('urgent', $structured['title']);
-        $this->assertSame('#ef4444', $structured['color']);
+        $this->assertSame('#b91c1c', $structured['color']);
 
         $body = $this->callMcp($client, $plain, 'tools/call', [
             'name' => 'list_tags',
@@ -642,6 +642,80 @@ class McpTest extends ApiTestCase
             'name' => 'get_analytics',
             'arguments' => ['spaceId' => (string) $mine->getId(), 'metrics' => ['profit']],
         ]);
+        $this->assertTrue($body['result']['isError'] ?? null);
+    }
+
+    public function testListAutomationsFlattensARuleIntoWhenIfThen(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $board = $this->makeProject($alice, [], 'Automated');
+
+        $rule = new \App\Entity\Automation();
+        $rule->setBoard($board)
+            ->setName('Tag on completion')
+            ->setTriggerEvent(\App\Automation\AutomationEvents::TASK_COMPLETED)
+            ->setGraph([
+                'nodes' => [
+                    ['id' => 't', 'kind' => 'trigger', 'type' => 'task.completed', 'config' => []],
+                    ['id' => 'c', 'kind' => 'condition', 'type' => 'task.has_tag', 'config' => ['tag' => 'urgent']],
+                    ['id' => 'a', 'kind' => 'action', 'type' => 'task.add_tag', 'config' => ['tag' => 'done']],
+                ],
+                'edges' => [['from' => 't', 'to' => 'c'], ['from' => 'c', 'to' => 'a']],
+            ])
+            ->setCreatedBy($alice);
+        $this->entityManager->persist($rule);
+        $this->entityManager->flush();
+
+        $plain = $this->mintToken($alice, 'CLI');
+        $client = static::createClient();
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_automations',
+            'arguments' => ['boardId' => (string) $board->getId()],
+        ]);
+        $this->assertFalse($body['result']['isError'] ?? null);
+
+        $structured = $body['result']['structuredContent'] ?? null;
+        $this->assertIsArray($structured);
+        $items = $structured['items'];
+        $this->assertIsArray($items);
+        $this->assertCount(1, $items);
+        $this->assertIsArray($items[0]);
+
+        // Flattened rather than handing back raw nodes and edges — a model can
+        // reason about a sentence, not an adjacency list.
+        $summary = $items[0]['summary'];
+        $this->assertIsString($summary);
+        $this->assertStringContainsString('when task.completed', $summary);
+        $this->assertStringContainsString('only if task.has_tag', $summary);
+        $this->assertStringContainsString('then task.add_tag', $summary);
+
+        // The runs tool reads the same rule cleanly with no history yet.
+        $runs = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'get_automation_runs',
+            'arguments' => ['automationId' => (string) $rule->getId()],
+        ]);
+        $this->assertFalse($runs['result']['isError'] ?? null);
+        $runsStructured = $runs['result']['structuredContent'] ?? null;
+        $this->assertIsArray($runsStructured);
+        $this->assertSame([], $runsStructured['items']);
+    }
+
+    public function testAutomationToolsHideAnotherUsersBoard(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $bob = $this->createUser('bob@example.com');
+        $board = $this->makeProject($bob, [], "Bob's board");
+
+        $plain = $this->mintToken($alice, 'CLI');
+        $client = static::createClient();
+
+        $body = $this->callMcp($client, $plain, 'tools/call', [
+            'name' => 'list_automations',
+            'arguments' => ['boardId' => (string) $board->getId()],
+        ]);
+
+        // Existence-hiding, same as every other board-scoped tool.
         $this->assertTrue($body['result']['isError'] ?? null);
     }
 

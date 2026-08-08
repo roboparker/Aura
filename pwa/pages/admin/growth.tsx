@@ -22,10 +22,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { pageTitle } from "@/lib/pageTitle";
 
 const FunnelChart = dynamic(() => import("@/components/admin/FunnelChart"), {
   ssr: false,
-  loading: () => <div className="h-[260px] animate-pulse rounded-md bg-muted/50" />,
+  loading: () => <Skeleton className="h-[260px] rounded-md bg-muted/50" />,
 });
 
 const INTERVALS = [
@@ -100,7 +102,7 @@ const GrowthPage = () => {
     return (
       <>
         <Head>
-          <title>Access Denied - Madori</title>
+          <title>{pageTitle("Access Denied")}</title>
         </Head>
         <div className="flex min-h-screen items-center justify-center bg-muted px-4">
           <div className="text-center">
@@ -124,7 +126,7 @@ const GrowthPage = () => {
   return (
     <>
       <Head>
-        <title>Growth — Madori</title>
+        <title>{pageTitle("Growth")}</title>
       </Head>
       <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-5xl">
@@ -208,7 +210,7 @@ const GrowthPage = () => {
 
           <Card className="mb-6 p-4">
             {query.isLoading ? (
-              <div className="h-[260px] animate-pulse rounded-md bg-muted/40" />
+              <Skeleton className="h-[260px] rounded-md bg-muted/40" />
             ) : (
               <FunnelChart funnel={funnel ?? {}} />
             )}

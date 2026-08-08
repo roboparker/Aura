@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 import { formatMetricValue, type AnalyticsMetric } from "@/lib/analyticsTypes";
 import type { WidgetProps } from "./registry";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatPayload {
   metric: { key: string; label: string; unit: AnalyticsMetric["unit"] } | null;
@@ -13,7 +14,7 @@ interface StatPayload {
 /** One metric as a headline figure, with its change across the period. */
 const AnalyticsStatWidget = ({ data, isLoading }: WidgetProps) => {
   if (isLoading) {
-    return <div className="h-full animate-pulse rounded-md bg-muted/40" />;
+    return <Skeleton className="h-full rounded-md bg-muted/40" />;
   }
 
   const payload = (data ?? {}) as StatPayload;

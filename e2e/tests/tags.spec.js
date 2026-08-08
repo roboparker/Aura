@@ -44,7 +44,7 @@ test.describe("Tags", () => {
     await registerAndSignIn(page, uniqueEmail());
 
     await page.goto(`${BASE_URL}/tags`);
-    await expect(page).toHaveTitle("Tags - Madori");
+    await expect(page).toHaveTitle("Tags — Madori");
     await expect(page.locator("text=No tags yet")).toBeVisible();
 
     const title = `Urgent-${Date.now()}`;

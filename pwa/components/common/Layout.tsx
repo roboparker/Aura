@@ -16,6 +16,25 @@ import ImpersonationBanner from "./ImpersonationBanner";
 import Navbar from "./Navbar";
 import Sidebar from "./Sidebar";
 
+/** Target of the skip link and id of the app's single <main> landmark. */
+const CONTENT_ID = "content";
+
+/**
+ * Public-facing surfaces that keep the marketing footer.
+ *
+ * Every link in it — Pricing, FAQ, Blog, Guides, the AGPL notice — is an
+ * acquisition link, which is noise inside a tool someone has already signed
+ * into: it sat below every board, task list and settings pane, and took 28% of
+ * total scroll length on `/tasks` at 375px. Signed-in users visiting a
+ * marketing page still get it; the app itself doesn't.
+ */
+const MARKETING_PATHS = new Set(["/", "/pricing", "/faq", "/privacy", "/terms"]);
+const MARKETING_PREFIXES = ["/blog", "/guides", "/dev"];
+
+const isMarketingPath = (pathname: string): boolean =>
+  MARKETING_PATHS.has(pathname) ||
+  MARKETING_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
 /**
  * Standalone auth/entry screens that must NEVER render inside the app chrome
  * (sidebar/navbar) — even if a stale `user` lingers from an expired session
@@ -37,7 +56,7 @@ const CHROME_FREE_PATHS = new Set([
  * sidebar/navbar) — it reads as a standalone screen rather than the empty app.
  */
 const AppShell = ({ children }: { children: ReactNode }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
   if (
@@ -45,7 +64,9 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     user?.emailVerified === false ||
     CHROME_FREE_PATHS.has(router.pathname)
   ) {
-    return <>{children}</>;
+    // Still a main landmark — these are standalone screens, but "standalone"
+    // isn't "structureless". No skip link: there's no nav to skip past.
+    return <main id={CONTENT_ID}>{children}</main>;
   }
 
   return (
@@ -61,18 +82,36 @@ const AppShell = ({ children }: { children: ReactNode }) => {
     // sidebar case. The Sidebar renders nothing for unauthenticated visitors
     // so the marketing/auth screens keep their original full-width layout.
     <div className="flex min-h-screen">
+      {/* First focusable element on the page. Visually hidden until focused,
+          so keyboard and screen-reader users can jump the ~20 sidebar links
+          instead of tabbing through them on every navigation. */}
+      <a
+        href={`#${CONTENT_ID}`}
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        Skip to content
+      </a>
       <Sidebar />
       <div className="flex flex-1 min-w-0 flex-col">
         {/* Above the page's sticky layers (board title/tabs bar = z-30,
             column header = z-20) so a short page scrolling up can't push them
             over the navbar. Stays below portalled popovers/menus (z-50). */}
-        <div className="sticky top-0 z-40">
+        <header className="sticky top-0 z-40">
           <ImpersonationBanner />
           <Navbar />
-        </div>
+        </header>
         <div className="flex flex-1 min-h-0 flex-col">
-          <div className="flex-1">{children}</div>
-          <Footer />
+          {/* The single main landmark for the whole app. Pages must not render
+              their own — a nested <main> is invalid and exposes two landmarks.
+              tabIndex={-1} so the skip link can move focus here, not just
+              scroll to it. */}
+          <main id={CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
+            {children}
+          </main>
+          {/* Marketing chrome, so only on marketing surfaces. An
+              unauthenticated visitor can only reach public pages anyway (app
+              routes bounce to sign-in), so they always keep it. */}
+          {(!isAuthenticated || isMarketingPath(router.pathname)) && <Footer />}
         </div>
       </div>
     </div>

@@ -31,6 +31,7 @@ import PageHeader from "@/components/common/PageHeader";
 import ColorSwatchPicker from "@/components/common/ColorSwatchPicker";
 import ConfirmDialog from "@/components/common/ConfirmDialog";
 import RolePermissionMatrix from "@/components/spaces/RolePermissionMatrix";
+import { pageTitle } from "@/lib/pageTitle";
 
 const SpaceRoles = () => {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -198,14 +199,14 @@ const SpaceRoles = () => {
 
   if (notFound) {
     return (
-      <main className="min-h-screen bg-background px-4 py-12">
+      <div className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-md text-center">
           <h1 className="text-xl font-semibold mb-2">Space not found</h1>
           <Button asChild variant="outline">
             <Link href="/spaces">Back to spaces</Link>
           </Button>
         </div>
-      </main>
+      </div>
     );
   }
 
@@ -222,9 +223,9 @@ const SpaceRoles = () => {
   return (
     <>
       <Head>
-        <title>Roles · {space.name}</title>
+        <title>{pageTitle("Roles", space.name)}</title>
       </Head>
-      <main className="mx-auto max-w-5xl px-4 py-8">
+      <div className="mx-auto max-w-5xl px-4 py-8">
         <PageHeader
           title="Roles"
           icon={<ShieldCheck className="h-6 w-6 text-cyan-600 dark:text-cyan-400" />}
@@ -241,7 +242,7 @@ const SpaceRoles = () => {
           Assign roles to members on the{" "}
           <Link
             href={`/spaces/${space.id}/users`}
-            className="text-cyan-700 hover:underline dark:text-cyan-400"
+            className="text-primary hover:underline"
           >
             Users
           </Link>{" "}
@@ -255,7 +256,7 @@ const SpaceRoles = () => {
           <ul className="divide-y divide-border">
             {orderedRoles.length === 0 && (
               <li className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No roles yet. Create one to start restricting members.
+                No roles yet — members have full access until a role narrows it.
               </li>
             )}
             {orderedRoles.map((role) => (
@@ -313,7 +314,7 @@ const SpaceRoles = () => {
             <Plus className="h-3.5 w-3.5" aria-hidden /> New role
           </button>
         </div>
-      </main>
+      </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">

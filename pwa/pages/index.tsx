@@ -22,7 +22,9 @@ import {
   Plus,
   Receipt,
   Repeat,
+  LayoutDashboard,
   Search,
+  Workflow,
   ShieldCheck,
   SlidersHorizontal,
   Users,
@@ -603,6 +605,16 @@ const FEATURES: { icon: LucideIcon; title: string; desc: string }[] = [
     desc: "Track time and expenses against clients, then turn them into branded invoices, estimates, and retainers — with reports and approvals.",
   },
   {
+    icon: Workflow,
+    title: "Automations",
+    desc: "Rules on a board, drawn as a graph: when a task is completed, if it's tagged urgent, then reassign it and post a comment. Every run is logged so you can see why something changed.",
+  },
+  {
+    icon: LayoutDashboard,
+    title: "Dashboards & analytics",
+    desc: "Build a space dashboard from widgets, and chart the numbers that matter — revenue invoiced and collected, hours tracked, and work you haven't billed yet.",
+  },
+  {
     icon: Search,
     title: "Search & ⌘K",
     desc: "Full-text search across tasks, docs, and boards — reachable from a command palette anywhere.",
@@ -698,7 +710,7 @@ const Home = () => {
         />
       </Head>
 
-      <main className="relative overflow-hidden">
+      <div className="relative overflow-hidden">
         {/* atmospheric glows */}
         <div
           aria-hidden
@@ -963,7 +975,7 @@ const Home = () => {
             </div>
           </div>
         </section>
-      </main>
+      </div>
     </>
   );
 };

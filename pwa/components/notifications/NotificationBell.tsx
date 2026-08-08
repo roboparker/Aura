@@ -282,7 +282,7 @@ const NotificationBell = ({ enabled }: NotificationBellProps) => {
           <Link
             href="/notifications"
             onClick={() => setOpen(false)}
-            className="font-medium text-cyan-700 hover:underline dark:text-cyan-400"
+            className="font-medium text-primary hover:underline"
             data-testid="notification-view-all"
           >
             View all

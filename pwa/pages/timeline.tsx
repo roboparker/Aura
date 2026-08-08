@@ -11,6 +11,7 @@ import TaskDetailDrawer from "@/components/tasks/TaskDetailDrawer";
 import { type AssigneeOption } from "@/components/tasks/AssigneesCombobox";
 import { type TagOption } from "@/components/tasks/TagsCombobox";
 import { type CustomFieldValuePair } from "@/components/tasks/CustomFieldValueList";
+import { pageTitle } from "@/lib/pageTitle";
 
 /**
  * `/timeline` — the cross-board Gantt for the active space (#timeline).
@@ -178,9 +179,9 @@ const TimelinePage = () => {
   return (
     <>
       <Head>
-        <title>Timeline - Madori</title>
+        <title>{pageTitle("Timeline")}</title>
       </Head>
-      <main className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <div className="w-full px-4 py-8">
           <h1 className="mb-1 text-2xl font-bold">Timeline</h1>
           <p className="mb-4 text-sm text-muted-foreground">
@@ -218,7 +219,7 @@ const TimelinePage = () => {
             />
           )}
         </div>
-      </main>
+      </div>
 
       <TaskDetailDrawer
         taskId={activeTaskId}
