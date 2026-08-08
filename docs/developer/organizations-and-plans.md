@@ -1,7 +1,7 @@
 # Organizations, accounts & plans
 
 Status: **in progress** — Phase 0 (plan entitlements) shipped; Phase 1
-(Organizations) is landing in sub-phases.
+(Organizations) is landing in sub-phases. 1a–1c are in; 1d (PWA) is partial.
 
 ## The account model (GitHub-style)
 
@@ -39,9 +39,89 @@ custom/`guest`) governs *content within a space* — two independent layers.
 
 - **Seat count** = distinct org members whose role ≠ Guest → the Stripe quantity.
 - **Guest invariant (security-critical):** an org Guest can *only* ever be
-  assigned the `guest` built-in `SpaceRole` in any of the org's spaces — enforced
-  in the membership processor + a voter, so a Guest can never be elevated into a
-  paying seat's capabilities. A dedicated test is the safety net.
+  assigned the `guest` built-in `SpaceRole` in any of the org's spaces, so a
+  Guest can never be elevated into a paying seat's capabilities. Enforced in
+  three places, because each covers a direction the others miss:
+  - `SpaceMemberAdder::attach()` caps the role at creation (both the
+    add-by-email endpoint and invite acceptance route through it — a gap
+    between those two paths would be a way in);
+  - `SpaceMemberController::changeRole()` rejects promoting a guest;
+  - `OrganizationGuestPolicy::applyGuestCap()` handles the *reverse* direction —
+    demoting an existing member to Guest, which used to leave every space role
+    they already held untouched. The account said guest, the spaces said admin,
+    and the spaces won.
+
+  `App\Tests\Api\OrganizationGuestInvariantTest` +
+  `OrganizationSeatSyncTest::testDemotingToGuestCapsExistingSpaceAccess` are the
+  safety net.
+
+## Seat accounting (1c)
+
+**Auto org-join.** Adding someone to an org-owned space they're not yet in the
+org for auto-joins them, with the org role **mirrored from the space role**:
+
+| Space role granted | Org role joined | Seat? |
+|---|---|---|
+| `admin` | `member` | ✅ billable |
+| `member` | `guest` | ❌ free |
+
+The reasoning: the space role is the only signal available at that moment.
+Someone trusted to administer a space is a full participant; someone added to
+collaborate on one space is an external guest until an org admin says otherwise.
+The consequence worth knowing is that **the default path now produces a
+read-mostly guest** — an org admin who wants a full seat passes an explicit
+`orgRole` on `POST /spaces/{id}/members` (owner is not grantable there, and the
+override itself is org-admin-gated: a space admin can add collaborators but
+can't unilaterally raise the org's bill).
+
+An **existing** org member's role is never touched by a space add — being added
+to another space is not a reason to demote an admin to a guest.
+
+**Seat → Stripe quantity sync.** Every membership change that crosses the seat
+boundary queues `SyncOrganizationSeats`; `OrganizationSeatSync::sync()` pushes
+`max(1, seatCount())` to the subscription's single item on the worker. Async on
+purpose: sizing the seat count is our business, billing for it is Stripe's, and
+a member add shouldn't fail because Stripe was briefly unreachable. Proration is
+left to Stripe's default, and the gateway skips the write when the quantity
+already matches, so a retry can't generate a spurious proration line.
+
+## Organization deletion (1c)
+
+Deleting an org cascades to every space it owns, which makes it the most
+destructive action in the product: one owner's click would otherwise destroy
+every board, task, page and comment every other member ever wrote. So deletion
+is a **state**, not an event.
+
+1. `POST /organizations/{id}/delete` — owner-only, step-up verified
+   (`SensitiveActionVerifier`), name typed to confirm, cancellation reason
+   required. Stamps `deletedAt` + `purgeAfter`, cancels billing **immediately**
+   (nobody should pay through a grace period they asked to end), and queues a
+   data export of every space.
+2. Access stops at once. The org drops out of `GET /organizations`, and its
+   spaces — plus everything in them — stop resolving, via a `NOT EXISTS` folded
+   into `SpaceMembershipDql::userBelongsToBoardSpace()` so every consumer of
+   that fragment inherits it in one place. The org's *item* route stays
+   readable so its members can see the "scheduled for deletion" state.
+3. `POST /organizations/{id}/restore` reverses it, any time before the purge.
+   It deliberately does **not** resurrect the subscription — that money movement
+   should be a decision someone makes again, not a side effect of undo.
+4. `PurgeDeletedOrganizations` (nightly 04:20 UTC, or
+   `bin/console app:organizations:purge [--dry-run]`) hard-deletes the ones
+   whose window has lapsed. Subscription rows are detached rather than cascaded:
+   what an account paid should outlive the account.
+
+`GET /organizations/deleted` lists the caller's restorable orgs — without it a
+deleted org is invisible in every listing and its owner has no route back to it.
+
+Window: `app.organization_deletion_grace_days` (default 30, env
+`ORGANIZATION_DELETION_GRACE_DAYS`). Each org stores its own `purge_after` at
+deletion time rather than deriving it, so shortening the setting can never
+retroactively bring forward a deletion someone was already promised.
+
+> **Note on the exports:** they follow normal space-export retention
+> (`app.space_export_retention_days`, default 7), which is *shorter* than the
+> grace period. The download link is emailed at deletion time and is the
+> delivery mechanism — it is not an archive that sits around until the purge.
 
 ## Entities (Phase 1a)
 
@@ -77,14 +157,16 @@ Subscription  (Phase 1b)
   (`/organizations/{id}/billing`, `/me/billing`), plan constraints per account
   type. `/spaces/{id}/billing` kept as a shim.
 - **1c** — guest role + seat invariant + auto org-join on space-add + seat →
-  Stripe quantity sync.
+  Stripe quantity sync + the deletion/restore/purge flow. ← *shipped*
 - **1d** — PWA: org switcher, org settings/members/roles pages, personal-vs-org
-  billing UI.
+  billing UI. *(Partial: the org index + detail pages exist; the danger-zone
+  delete/restore UI and the seat-count surface are still to do.)*
 
 ## Deferred / open
 - Space-moves between accounts.
-- Org deletion flow (export + reassign, like account deletion) — the
-  `space.organization` FK is `CASCADE` at the DB layer but no app flow triggers
-  it yet.
+- PWA danger zone for org deletion — the API is in, the UI isn't, so deletion
+  is currently API-only.
+- Org **invites** for unknown email addresses; `POST /organizations/{id}/members`
+  still requires an existing user.
 - AI usage-pack overflow (Phase 3), Enterprise SSO/SCIM/audit enforcement
   (Phase 4).

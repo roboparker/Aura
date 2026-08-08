@@ -278,6 +278,44 @@ final class StripeGateway implements StripeGatewayInterface
         $this->request('DELETE', '/subscriptions/' . rawurlencode($subscriptionId), []);
     }
 
+    public function updateSubscriptionQuantity(string $subscriptionId, int $quantity): void
+    {
+        if ($quantity < 1) {
+            throw new BillingException('Seat quantity must be at least 1.');
+        }
+
+        // Quantity lives on the subscription *item*, so read the subscription
+        // to find it. Our per-seat plans always have exactly one item; more
+        // than one means someone built a subscription we don't model, and
+        // picking an item at random would silently bill the wrong line.
+        $subscription = $this->request('GET', '/subscriptions/' . rawurlencode($subscriptionId), []);
+        $items = $subscription['items'] ?? null;
+        $data = is_array($items) ? ($items['data'] ?? null) : null;
+        if (!is_array($data) || 1 !== \count($data)) {
+            throw new BillingException(sprintf(
+                'Expected exactly one subscription item on %s, got %d.',
+                $subscriptionId,
+                is_array($data) ? \count($data) : 0,
+            ));
+        }
+        $first = reset($data);
+        $itemId = is_array($first) ? ($first['id'] ?? null) : null;
+        if (!is_string($itemId) || '' === $itemId) {
+            throw new BillingException('Stripe subscription item is missing an id.');
+        }
+
+        $currentQuantity = is_array($first) ? ($first['quantity'] ?? null) : null;
+        if (is_int($currentQuantity) && $currentQuantity === $quantity) {
+            // Already correct — skip the write so a retry or a no-op member
+            // change can't generate a spurious proration line.
+            return;
+        }
+
+        $this->request('POST', '/subscription_items/' . rawurlencode($itemId), [
+            'quantity' => (string) $quantity,
+        ]);
+    }
+
     public function parseWebhookEvent(string $payload, string $signatureHeader): ?array
     {
         if ('' === $this->webhookSecret) {

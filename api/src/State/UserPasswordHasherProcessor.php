@@ -5,12 +5,13 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\State\ProcessorInterface;
-use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Repository\UserInviteRepository;
 use App\Service\AvatarColorService;
 use App\Service\EmailVerificationService;
+use App\Service\OrganizationSeatSync;
 use App\Service\PersonalSpaceProvisioner;
+use App\Service\SpaceMemberAdder;
 use App\Service\WaitlistJoinedMailer;
 use App\Service\WaitlistSettings;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,6 +51,8 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         private RateLimiterFactoryInterface $signupLimiter,
         private RequestStack $requestStack,
         private PersonalSpaceProvisioner $personalSpaceProvisioner,
+        private SpaceMemberAdder $spaceMemberAdder,
+        private OrganizationSeatSync $seatSync,
     ) {
     }
 
@@ -216,6 +219,8 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
         // (#186). Idempotent against the (space, user) unique index in
         // case a parallel signup flow already created the row — the
         // duplicate would surface during flush; we filter it out here.
+        /** @var list<array{0: \App\Entity\Organization, 1: string}> $seatChanges */
+        $seatChanges = [];
         foreach ($invite->getSpaceInvites() as $spaceInvite) {
             $space = $spaceInvite->getSpace();
             $alreadyMember = false;
@@ -226,14 +231,25 @@ final class UserPasswordHasherProcessor implements ProcessorInterface
                 }
             }
             if (!$alreadyMember) {
-                $space->addUserMembership(
-                    (new SpaceMembership())
-                        ->setUser($user)
-                        ->setRole($spaceInvite->getRole()),
-                );
+                // Through SpaceMemberAdder rather than building the membership
+                // inline, so an invited user lands under exactly the same org
+                // auto-join + guest-cap rules as one added directly (#billing
+                // Phase 1c). A gap between the two paths would be a way to get
+                // a paying seat's capabilities for free.
+                $orgRole = $this->spaceMemberAdder->attach($space, $user, $spaceInvite->getRole());
+                $organization = $space->getOrganization();
+                if (null !== $organization && null !== $orgRole) {
+                    $seatChanges[] = [$organization, $orgRole];
+                }
             }
         }
         $invite->markAccepted();
         $this->em->flush();
+
+        // After the flush — the seat sync handler re-reads the roster, so an
+        // earlier dispatch would push the count from before these joins.
+        foreach ($seatChanges as [$organization, $orgRole]) {
+            $this->seatSync->scheduleIfBillable($organization, $orgRole);
+        }
     }
 }

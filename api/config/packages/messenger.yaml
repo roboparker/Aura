@@ -43,6 +43,11 @@ framework:
             # Phase D) — async so the provider callback returns immediately (the
             # scheduled sweep reaches the same handler via scheduler_default).
             App\Message\PullCalendarChanges: async
+            # Seat → Stripe quantity sync (#billing Phase 1c): every org
+            # membership change re-sizes the per-seat subscription. Async so a
+            # member add never waits on (or fails because of) a Stripe call —
+            # the roster is ours, the invoice is Stripe's.
+            App\Message\SyncOrganizationSeats: async
             # Admin-only Sentry verification: a job that fails on purpose so the
             # worker→Sentry pipeline can be confirmed (SentryTestController).
             App\Message\SentryTestFailure: async

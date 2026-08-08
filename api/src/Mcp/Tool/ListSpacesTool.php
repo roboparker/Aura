@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tool;
 
+use App\Doctrine\SpaceMembershipDql;
 use App\Entity\Space;
 use App\Entity\UserGroup;
 use App\Entity\SpaceMembership;
@@ -60,6 +61,10 @@ final class ListSpacesTool implements McpToolInterface
         $spaces = $this->em->getRepository(Space::class)
             ->createQueryBuilder('s')
             ->where(sprintf('(EXISTS(%s) OR EXISTS(%s))', $direct, $group))
+            // Spaces of an organization mid-deletion are hidden over REST, so
+            // they're hidden here too — MCP must not become the surface that
+            // still sees them.
+            ->andWhere(SpaceMembershipDql::organizationIsLive('s', 'sp_org'))
             ->setParameter('user', $user)
             ->orderBy('s.isPersonal', 'DESC')
             ->addOrderBy('s.createdAt', 'ASC')

@@ -2,6 +2,7 @@
 
 namespace App\Tests\Billing;
 
+use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
 
 /**
@@ -42,6 +43,12 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
 
     /** @var list<string> Stripe subscription ids asked to cancel immediately. */
     public array $immediatelyCanceledSubscriptions = [];
+
+    /** @var list<array{subscriptionId: string, quantity: int}> Seat-quantity pushes. */
+    public array $quantityUpdates = [];
+
+    /** Set to throw from updateSubscriptionQuantity(), to exercise the failure path. */
+    public bool $failQuantityUpdates = false;
 
     public bool $configured = true;
 
@@ -158,6 +165,14 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         $this->immediatelyCanceledSubscriptions[] = $subscriptionId;
     }
 
+    public function updateSubscriptionQuantity(string $subscriptionId, int $quantity): void
+    {
+        if ($this->failQuantityUpdates) {
+            throw new BillingException('Simulated Stripe failure.');
+        }
+        $this->quantityUpdates[] = ['subscriptionId' => $subscriptionId, 'quantity' => $quantity];
+    }
+
     public function parseWebhookEvent(string $payload, string $signatureHeader): ?array
     {
         if (self::VALID_SIGNATURE !== $signatureHeader) {
@@ -184,6 +199,8 @@ final class InMemoryStripeGateway implements StripeGatewayInterface
         $this->portalSessions = [];
         $this->canceledSubscriptions = [];
         $this->immediatelyCanceledSubscriptions = [];
+        $this->quantityUpdates = [];
+        $this->failQuantityUpdates = false;
         $this->connectAccounts = [];
         $this->accountLinks = [];
         $this->connectCounter = 0;

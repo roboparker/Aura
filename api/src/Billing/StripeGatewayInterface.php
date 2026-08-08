@@ -128,6 +128,24 @@ interface StripeGatewayInterface
     public function cancelSubscription(string $subscriptionId): void;
 
     /**
+     * Set the seat quantity on a per-seat subscription (#billing Phase 1c).
+     * Stripe prices the change from the moment it lands, so this is what keeps
+     * an org's bill honest as members join and leave.
+     *
+     * Stripe requires the target **subscription item** id, not the
+     * subscription's — so the implementation reads the subscription first and
+     * updates its sole item. Per-seat plans have exactly one item; a
+     * multi-item subscription is not something we create, and is rejected
+     * rather than guessed at.
+     *
+     * Proration is left to Stripe's default (`create_prorations`), so a seat
+     * added mid-cycle is charged for the remainder of the period and a seat
+     * removed earns a credit. Throws {@see BillingException} on a transport /
+     * API error.
+     */
+    public function updateSubscriptionQuantity(string $subscriptionId, int $quantity): void;
+
+    /**
      * Verify the `Stripe-Signature` header against the raw request body and
      * return the decoded event, or null when the signature is missing /
      * invalid / outside the timestamp tolerance (caller answers 400).

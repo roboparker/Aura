@@ -67,6 +67,12 @@ final class SpaceCreateProcessor implements ProcessorInterface
             if (null === $role || Organization::ROLE_GUEST === $role) {
                 throw new AccessDeniedHttpException('You cannot create a space in this organization.');
             }
+            // Don't let work be added to an account on its way out — the new
+            // space would be invisible immediately (the access extensions hide
+            // a deleted org's spaces) and destroyed by the purge.
+            if ($organization->isDeleted()) {
+                throw new AccessDeniedHttpException('This organization is scheduled for deletion.');
+            }
         }
 
         $membership = (new SpaceMembership())

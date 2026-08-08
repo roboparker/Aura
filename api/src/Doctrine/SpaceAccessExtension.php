@@ -81,8 +81,12 @@ final class SpaceAccessExtension implements
             UserGroup::class,
             $rootAlias,
         );
+        // A space whose organization is mid-deletion drops out entirely: the
+        // grace period only means something if members stop working in the
+        // thing that's scheduled to vanish.
         $queryBuilder
             ->andWhere(sprintf('(EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
+            ->andWhere(SpaceMembershipDql::organizationIsLive($rootAlias, 'space_access_org'))
             ->setParameter('currentUser', $user);
     }
 }

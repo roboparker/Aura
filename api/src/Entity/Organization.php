@@ -48,6 +48,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity(repositoryClass: OrganizationRepository::class)]
 #[ORM\Table(name: 'organization')]
 #[ORM\UniqueConstraint(name: 'uniq_organization_slug', columns: ['slug'])]
+#[ORM\Index(columns: ['purge_after'], name: 'idx_organization_purge_after')]
 class Organization
 {
     public const ROLE_OWNER = 'owner';
@@ -112,6 +113,27 @@ class Organization
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    /**
+     * When an owner deleted the account. Non-null puts the org in the grace
+     * period: its spaces stop being reachable (the access extensions exclude
+     * them) but nothing is destroyed, so {@see \App\Service\OrganizationDeletionService::restore()}
+     * can put it back. The nightly purge hard-deletes it once the window
+     * lapses. Server-written only — never in `organization:write`.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['organization:read'])]
+    private ?\DateTimeImmutable $deletedAt = null;
+
+    /**
+     * The instant the grace period lapses and the purge may run. Stored rather
+     * than derived from `deletedAt + N days` so shortening the configured
+     * window can never retroactively bring forward a deletion someone was
+     * already promised — the date they were shown is the date that binds.
+     */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    #[Groups(['organization:read'])]
+    private ?\DateTimeImmutable $purgeAfter = null;
+
     public function __construct()
     {
         $this->memberships = new ArrayCollection();
@@ -174,6 +196,42 @@ class Organization
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function getPurgeAfter(): ?\DateTimeImmutable
+    {
+        return $this->purgeAfter;
+    }
+
+    /** True while the org is in its post-deletion grace period. */
+    public function isDeleted(): bool
+    {
+        return null !== $this->deletedAt;
+    }
+
+    /** Enter the grace period. `$purgeAfter` is when the hard delete may run. */
+    public function markDeleted(\DateTimeImmutable $at, \DateTimeImmutable $purgeAfter): static
+    {
+        $this->deletedAt = $at;
+        $this->purgeAfter = $purgeAfter;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    /** Leave the grace period, back to a live account. */
+    public function clearDeleted(): static
+    {
+        $this->deletedAt = null;
+        $this->purgeAfter = null;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
     }
 
     /** Number of paid seats (members whose role isn't guest). */
