@@ -119,8 +119,12 @@ class OrganizationDeletionTest extends ApiTestCase
         // Without this the owner has no route back to the thing they need to
         // restore — it's dropped out of every other listing.
         $body = $client->request('GET', '/organizations/deleted')->toArray();
-        $this->assertCount(1, $body['organizations']);
-        $this->assertSame((string) $org->getId(), $body['organizations'][0]['id']);
+        $organizations = $body['organizations'];
+        $this->assertIsArray($organizations);
+        $this->assertCount(1, $organizations);
+        $first = $organizations[0];
+        $this->assertIsArray($first);
+        $this->assertSame((string) $org->getId(), $first['id']);
     }
 
     public function testNonOwnerCannotDelete(): void
@@ -328,18 +332,12 @@ class OrganizationDeletionTest extends ApiTestCase
 
     private function deletionService(): OrganizationDeletionService
     {
-        $service = static::getContainer()->get(OrganizationDeletionService::class);
-        assert($service instanceof OrganizationDeletionService);
-
-        return $service;
+        return static::getContainer()->get(OrganizationDeletionService::class);
     }
 
     private function gateway(): InMemoryStripeGateway
     {
-        $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
-        assert($gateway instanceof InMemoryStripeGateway);
-
-        return $gateway;
+        return static::getContainer()->get(InMemoryStripeGateway::class);
     }
 
     private function find(Organization $org): ?Organization

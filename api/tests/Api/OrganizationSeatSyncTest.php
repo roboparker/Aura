@@ -272,10 +272,7 @@ class OrganizationSeatSyncTest extends ApiTestCase
 
     private function gateway(): InMemoryStripeGateway
     {
-        $gateway = static::getContainer()->get(InMemoryStripeGateway::class);
-        assert($gateway instanceof InMemoryStripeGateway);
-
-        return $gateway;
+        return static::getContainer()->get(InMemoryStripeGateway::class);
     }
 
     private function reloadOrg(Organization $org): Organization

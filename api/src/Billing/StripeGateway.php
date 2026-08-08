@@ -304,7 +304,9 @@ final class StripeGateway implements StripeGatewayInterface
             throw new BillingException('Stripe subscription item is missing an id.');
         }
 
-        $currentQuantity = is_array($first) ? ($first['quantity'] ?? null) : null;
+        // $first is known to be an array here — the $itemId check above throws
+        // otherwise.
+        $currentQuantity = $first['quantity'] ?? null;
         if (is_int($currentQuantity) && $currentQuantity === $quantity) {
             // Already correct — skip the write so a retry or a no-op member
             // change can't generate a spurious proration line.
