@@ -283,13 +283,17 @@ class OrganizationDeletionTest extends ApiTestCase
         $this->makeOrgSpace($client, $org);
         $this->deleteOrg($client, $org);
 
+        // Read the id before the purge — remove() nulls it on any instance the
+        // EntityManager still holds.
+        $id = (string) $org->getId();
+
         // Stand at a point past the stored purgeAfter rather than rewriting the
         // row, so the test exercises the same comparison the nightly job makes.
         $purged = $this->deletionService()->purgeDue(new \DateTimeImmutable('+31 days'));
 
         $this->assertSame(1, $purged);
         $this->entityManager->clear();
-        $this->assertNull($this->find($org), 'the org should be gone after the grace period');
+        $this->assertNull($this->findById($id), 'the org should be gone after the grace period');
     }
 
     public function testPurgeKeepsTheBillingHistory(): void
@@ -342,7 +346,12 @@ class OrganizationDeletionTest extends ApiTestCase
 
     private function find(Organization $org): ?Organization
     {
-        return $this->entityManager->getRepository(Organization::class)->find($org->getId());
+        return $this->findById((string) $org->getId());
+    }
+
+    private function findById(string $id): ?Organization
+    {
+        return $this->entityManager->getRepository(Organization::class)->find($id);
     }
 
     private function makeOrgSpace(Client $client, Organization $org): string

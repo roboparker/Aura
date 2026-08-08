@@ -41,17 +41,17 @@ class OrganizationPurgeCommandTest extends KernelTestCase
 
     public function testSkipsAnOrgStillInsideItsGracePeriod(): void
     {
-        $org = $this->makeOrg('Recent Co', deletedDaysAgo: 1);
+        $id = (string) $this->makeOrg('Recent Co', deletedDaysAgo: 1)->getId();
 
         $this->invoke()->assertCommandIsSuccessful();
 
         $this->em->clear();
-        $this->assertNotNull($this->find($org), 'an org inside its window must survive');
+        $this->assertNotNull($this->find($id), 'an org inside its window must survive');
     }
 
     public function testDryRunListsWithoutDeleting(): void
     {
-        $org = $this->makeOrg('Lapsed Co', deletedDaysAgo: 40);
+        $id = (string) $this->makeOrg('Lapsed Co', deletedDaysAgo: 40)->getId();
 
         $tester = $this->invoke(dryRun: true);
         $tester->assertCommandIsSuccessful();
@@ -59,24 +59,26 @@ class OrganizationPurgeCommandTest extends KernelTestCase
         $this->assertStringContainsString('would be purged', $tester->getDisplay());
 
         $this->em->clear();
-        $this->assertNotNull($this->find($org), '--dry-run must not delete anything');
+        $this->assertNotNull($this->find($id), '--dry-run must not delete anything');
     }
 
     public function testPurgesAnOrgPastItsGracePeriod(): void
     {
-        $org = $this->makeOrg('Lapsed Co', deletedDaysAgo: 40);
+        // Capture the id *before* the purge: the command shares this test's
+        // EntityManager, so remove() nulls the id on the very instance we hold.
+        $id = (string) $this->makeOrg('Lapsed Co', deletedDaysAgo: 40)->getId();
 
         $tester = $this->invoke();
         $tester->assertCommandIsSuccessful();
         $this->assertStringContainsString('Purged 1', $tester->getDisplay());
 
         $this->em->clear();
-        $this->assertNull($this->find($org));
+        $this->assertNull($this->find($id));
     }
 
-    private function find(Organization $org): ?Organization
+    private function find(string $id): ?Organization
     {
-        return $this->em->getRepository(Organization::class)->find($org->getId());
+        return $this->em->getRepository(Organization::class)->find($id);
     }
 
     private function makeOrg(string $name, ?int $deletedDaysAgo): Organization
