@@ -262,6 +262,16 @@ class RestoreLinkTest extends ApiTestCase
         // applied by the mailer envelope at send time, so serializing the
         // collected message throws.
         $this->assertInstanceOf(Email::class, $message, 'scheduling a deletion should send a notice email');
+
+        // A From address is required or the transport rejects the message —
+        // and because the collector runs *before* the transport, an email with
+        // no sender still shows up in every count assertion while never
+        // actually being delivered. This is the only thing that catches it.
+        $this->assertNotEmpty(
+            $message->getFrom(),
+            'the notice must carry a From address or it never leaves the queue',
+        );
+
         $body = (string) $message->getHtmlBody() . (string) $message->getTextBody();
 
         $matched = preg_match('#/restore/([0-9a-f]{64})#', $body, $matches);
