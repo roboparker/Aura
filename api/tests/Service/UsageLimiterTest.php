@@ -6,6 +6,7 @@ namespace App\Tests\Service;
 
 use App\Billing\PlanCatalog;
 use App\Billing\PlanGate;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
@@ -241,14 +242,6 @@ class UsageLimiterTest extends KernelTestCase
         $this->em->flush();
 
         return $space;
-    }
-
-    private function addMember(Space $space, User $user): void
-    {
-        $membership = (new SpaceMembership())->setUser($user)->setRole(Space::ROLE_MEMBER);
-        $space->addUserMembership($membership);
-        $this->em->persist($membership);
-        $this->em->flush();
     }
 
     private function createSubscription(Space $space, string $status): Subscription
