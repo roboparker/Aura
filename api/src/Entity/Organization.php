@@ -16,6 +16,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -54,6 +55,15 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Index(columns: ['purge_after'], name: 'idx_organization_purge_after')]
 class Organization implements SoftDeletable
 {
+    /**
+     * Deletion grace period: `deletedAt` / `purgeAfter` and their transitions
+     * come from {@see SoftDeletableTrait}, shared with Space and User so all
+     * three behave identically. Non-null `deletedAt` puts the org in its
+     * window — its spaces stop being reachable (the access extensions exclude
+     * them) but nothing is destroyed until the nightly purge.
+     */
+    use SoftDeletableTrait;
+
     public const ROLE_OWNER = 'owner';
     public const ROLE_ADMIN = 'admin';
     public const ROLE_BILLING = 'billing';
@@ -116,14 +126,6 @@ class Organization implements SoftDeletable
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    /**
-     * Deletion grace period: `deletedAt` / `purgeAfter` and their transitions
-     * come from {@see SoftDeletableTrait}, shared with Space and User so all
-     * three behave identically. Non-null `deletedAt` puts the org in its
-     * window — its spaces stop being reachable (the access extensions exclude
-     * them) but nothing is destroyed until the nightly purge.
-     */
-    use SoftDeletableTrait;
 
     public function __construct()
     {
@@ -187,6 +189,26 @@ class Organization implements SoftDeletable
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    /**
+     * Grace-period state on the wire. Exposed through grouped getters rather
+     * than on the trait's properties: the trait is shared with Space, and a
+     * `space:read` group there would drag the whole organization inline into
+     * every Space payload instead of an IRI.
+     */
+    #[Groups(['organization:read'])]
+    #[SerializedName('deletedAt')]
+    public function getDeletedAtIso(): ?string
+    {
+        return $this->deletedAt?->format(\DateTimeInterface::ATOM);
+    }
+
+    #[Groups(['organization:read'])]
+    #[SerializedName('purgeAfter')]
+    public function getPurgeAfterIso(): ?string
+    {
+        return $this->purgeAfter?->format(\DateTimeInterface::ATOM);
     }
 
     public function deletionTargetType(): string

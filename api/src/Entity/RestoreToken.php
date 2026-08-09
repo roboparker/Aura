@@ -28,7 +28,11 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: RestoreTokenRepository::class)]
 #[ORM\Table(name: 'restore_token')]
-#[ORM\Index(columns: ['token_hash'], name: 'idx_restore_token_hash')]
+// Named explicitly so the migration and the mapping agree — an auto-named
+// unique index would drift from the DDL and fail doctrine:schema:validate.
+// The unique index also serves the by-token lookup, so there's no separate
+// non-unique index on the same column.
+#[ORM\UniqueConstraint(name: 'uniq_restore_token_hash', columns: ['token_hash'])]
 #[ORM\Index(columns: ['target_type', 'target_id'], name: 'idx_restore_token_target')]
 class RestoreToken
 {
@@ -48,7 +52,7 @@ class RestoreToken
     #[ORM\Column(length: 255)]
     private string $targetLabel;
 
-    #[ORM\Column(length: 64, unique: true)]
+    #[ORM\Column(length: 64)]
     private string $tokenHash;
 
     #[ORM\Column(type: 'datetime_immutable')]

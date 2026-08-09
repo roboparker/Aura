@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Deletion;
 
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
  * The two columns and the state transitions behind {@see SoftDeletable}.
@@ -14,18 +13,18 @@ use Symfony\Component\Serializer\Attribute\Groups;
  * Deletion goes through {@see SoftDeletionService} so the restore token and
  * the notice email can't be skipped by writing the column directly.
  *
- * Serialization groups are listed for all three consumers because a trait
- * can't know which entity mixes it in, and an unknown group on an entity is
- * simply ignored.
+ * **Deliberately carries no `#[Groups]`.** A trait can't know which entity
+ * mixes it in, so listing every consumer's group here would put Organization
+ * into `space:read` — which is enough to make the serializer embed the whole
+ * organization inside every Space payload instead of emitting an IRI. Each
+ * entity exposes these through its own grouped getter instead.
  */
 trait SoftDeletableTrait
 {
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['organization:read', 'space:read'])]
     private ?\DateTimeImmutable $deletedAt = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    #[Groups(['organization:read', 'space:read'])]
     private ?\DateTimeImmutable $purgeAfter = null;
 
     public function getDeletedAt(): ?\DateTimeImmutable
