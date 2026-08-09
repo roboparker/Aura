@@ -79,7 +79,8 @@ class GrowthDigestTest extends ApiTestCase
         $owner = $this->makeUser('buyer@example.com');
 
         $sub = new Subscription();
-        $sub->setOwnerUser($owner);
+        // A personal plan lives on the buyer's personal organization.
+        $sub->setOrganization($this->personalOrgOf($owner));
         $sub->setPlan('pro');
         $sub->setSeats(1);
         $sub->setBillingInterval('month');
@@ -98,6 +99,16 @@ class GrowthDigestTest extends ApiTestCase
     }
 
     /** @param list<string> $roles */
+    /** The user's personal organization; tests build users by direct persistence. */
+    private function personalOrgOf(User $user): Organization
+    {
+        $provisioner = static::getContainer()->get(PersonalOrganizationProvisioner::class);
+        $org = $provisioner->provision($user);
+        $this->entityManager->flush();
+
+        return $org;
+    }
+
     private function makeUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
