@@ -8,6 +8,7 @@ use App\Entity\Space;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
+use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -206,8 +207,11 @@ class RestoreLinkTest extends ApiTestCase
     private function plainTokenFromEmail(): string
     {
         $message = $this->getMailerMessage();
-        $this->assertNotNull($message, 'scheduling a deletion should send a notice email');
-        $body = $message->toString();
+        // Read the rendered bodies rather than toString(): the From header is
+        // applied by the mailer envelope at send time, so serializing the
+        // collected message throws.
+        $this->assertInstanceOf(Email::class, $message, 'scheduling a deletion should send a notice email');
+        $body = (string) $message->getHtmlBody() . (string) $message->getTextBody();
 
         $matched = preg_match('#/restore/([0-9a-f]{64})#', $body, $matches);
         $this->assertSame(1, $matched, 'the email should carry a restore link');
