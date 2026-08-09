@@ -3,8 +3,10 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Organization;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\PersonalOrganizationProvisioner;
 use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -132,9 +134,9 @@ class MeBillingTest extends ApiTestCase
      * The user's personal organization, provisioning it if this test built the
      * user by direct persistence (which skips the signup provisioner).
      */
-    private function personalOrgOf(User $user): AppntityOrganization
+    private function personalOrgOf(User $user): Organization
     {
-        $provisioner = static::getContainer()->get(AppServicePersonalOrganizationProvisioner::class);
+        $provisioner = static::getContainer()->get(PersonalOrganizationProvisioner::class);
         $org = $provisioner->provision($user);
         $this->entityManager->flush();
 
