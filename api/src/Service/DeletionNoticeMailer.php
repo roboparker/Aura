@@ -7,9 +7,8 @@ namespace App\Service;
 use App\Deletion\SoftDeletable;
 use App\Deletion\SoftDeletionService;
 use App\Entity\User;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * "X is scheduled for deletion — here's how to undo it."
@@ -24,11 +23,8 @@ use Symfony\Component\Mailer\MailerInterface;
  */
 final class DeletionNoticeMailer
 {
-    public function __construct(
-        private MailerInterface $mailer,
-        #[Autowire('%env(APP_FRONTEND_URL)%')]
-        private string $frontendUrl,
-    ) {
+    public function __construct(private MailDispatcher $dispatcher)
+    {
     }
 
     public function sendDeletionScheduled(
@@ -49,10 +45,13 @@ final class DeletionNoticeMailer
                 'label' => $target->deletionLabel(),
                 'isAccount' => SoftDeletionService::TYPE_ACCOUNT === $target->deletionTargetType(),
                 'purgeAfter' => $purgeAfter,
-                'restoreUrl' => rtrim($this->frontendUrl, '/') . '/restore/' . $plainToken,
+                'restoreUrl' => $this->dispatcher->frontendLink('/restore/' . $plainToken),
             ]);
 
-        $this->mailer->send($email);
+        // Through MailDispatcher, which stamps the From address — without it
+        // the transport rejects the message and the only route back from a
+        // deletion never arrives.
+        $this->dispatcher->send($email);
     }
 
     private static function noun(string $targetType): string

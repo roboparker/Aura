@@ -7,8 +7,8 @@ namespace App\Service;
 use App\Deletion\SoftDeletable;
 use App\Deletion\SoftDeletionService;
 use App\Entity\User;
+use App\Service\Mail\MailDispatcher;
 use Symfony\Bridge\Twig\Mime\TemplatedEmail;
-use Symfony\Component\Mailer\MailerInterface;
 
 /**
  * "A site administrator deleted your X."
@@ -22,7 +22,7 @@ use Symfony\Component\Mailer\MailerInterface;
  */
 final class AdminDeletionNoticeMailer
 {
-    public function __construct(private MailerInterface $mailer)
+    public function __construct(private MailDispatcher $dispatcher)
     {
     }
 
@@ -38,7 +38,7 @@ final class AdminDeletionNoticeMailer
             default => 'account',
         };
 
-        $this->mailer->send(
+        $this->dispatcher->send(
             (new TemplatedEmail())
                 ->to($recipient->getEmail())
                 ->subject(sprintf(
