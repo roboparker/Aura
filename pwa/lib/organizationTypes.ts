@@ -68,6 +68,9 @@ export interface Organization {
   memberList: OrgMember[];
   seatCount: number;
   createdAt: string;
+  /** Set while the org is inside its deletion grace period (see deletionTypes). */
+  deletedAt?: string | null;
+  purgeAfter?: string | null;
 }
 
 export interface OrganizationCollection {
