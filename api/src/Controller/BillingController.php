@@ -18,6 +18,7 @@ use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use App\Service\CancellationFeedbackRecorder;
 use App\Service\GrowthDigestMailer;
+use App\Service\PersonalOrganizationProvisioner;
 use App\Service\SubscriptionReceiptMailer;
 use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -57,6 +58,7 @@ class BillingController extends AbstractController
         private PlanGate $planGate,
         private SubscriptionReceiptMailer $receiptMailer,
         private GrowthDigestMailer $growthMailer,
+        private PersonalOrganizationProvisioner $personalOrganizations,
         private LoggerInterface $logger,
         #[Autowire('%env(string:default:app.stripe_price_pro_monthly:STRIPE_PRICE_PRO_MONTHLY)%')]
         private string $proMonthly,
@@ -355,9 +357,14 @@ class BillingController extends AbstractController
      */
     private function receiptRecipientFor(string $stripeSubId): ?string
     {
-        $owner = $this->subscriptions->findByStripeSubscriptionId($stripeSubId)?->getOwnerUser();
+        // A personal plan lives on the buyer's personal organization, so the
+        // recipient is that organization's creator.
+        $organization = $this->subscriptions->findByStripeSubscriptionId($stripeSubId)?->getOrganization();
+        if (null === $organization || !$organization->getIsPersonal()) {
+            return null;
+        }
 
-        return $owner instanceof User ? $owner->getEmail() : null;
+        return $organization->getCreatedBy()?->getEmail();
     }
 
     /**
@@ -460,19 +467,30 @@ class BillingController extends AbstractController
                 }
                 $row->setOrganization($org);
             } elseif (null !== $userId) {
+                // A personal plan now lands on the user's personal organization
+                // — their account — rather than a row pointed at the user, so
+                // every plan in the system has exactly one kind of owner
+                // (#billing Phase 2).
                 $account = $this->em->getRepository(User::class)->find($userId);
                 if (!$account instanceof User) {
                     $this->logger->warning('Stripe webhook could not resolve personal account.', ['subscription' => $stripeSubId, 'user_id' => $userId]);
                     return;
                 }
-                $row->setOwnerUser($account);
+                $row->setOrganization($this->personalOrganizations->provision($account));
             } elseif (null !== $spaceId) {
+                // Legacy checkout sessions that predate the account model still
+                // name a space; resolve it to the org that owns it.
                 $space = $this->em->getRepository(Space::class)->find($spaceId);
                 if (!$space instanceof Space) {
                     $this->logger->warning('Stripe webhook could not resolve space.', ['subscription' => $stripeSubId, 'space_id' => $spaceId]);
                     return;
                 }
-                $row->setSpace($space);
+                $spaceOrg = $space->getOrganization();
+                if (null === $spaceOrg) {
+                    $this->logger->warning('Stripe webhook resolved a space with no organization.', ['subscription' => $stripeSubId, 'space_id' => $spaceId]);
+                    return;
+                }
+                $row->setOrganization($spaceOrg);
             } else {
                 $this->logger->warning('Stripe webhook carried no billing account.', ['subscription' => $stripeSubId]);
                 return;
