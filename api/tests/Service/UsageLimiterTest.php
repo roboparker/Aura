@@ -229,8 +229,10 @@ class UsageLimiterTest extends KernelTestCase
 
     private function createSubscription(Space $space, string $status): Subscription
     {
+        // Subscriptions hang off the organization that owns the space; the
+        // default listener attached one when the space was persisted.
         $subscription = (new Subscription())
-            ->setSpace($space)
+            ->setOrganization($space->getOrganization())
             ->setStatus($status)
             ->setStripeSubscriptionId('sub_' . bin2hex(random_bytes(6)))
             ->setStripeCustomerId('cus_' . bin2hex(random_bytes(6)));

@@ -44,6 +44,7 @@ final class AccountDeletionService
         private SubscriptionRepository $subscriptions,
         private StripeGatewayInterface $stripe,
         private SoftDeletionService $softDeletion,
+        private PersonalOrganizationProvisioner $personalOrganizations,
         private LoggerInterface $logger,
     ) {
     }
@@ -268,11 +269,57 @@ final class AccountDeletionService
     {
         $personal = $this->em->getRepository(Organization::class)
             ->findOneBy(['createdBy' => $user, 'isPersonal' => true]);
-        if (null !== $personal) {
-            // Any space still attached cascades away with it at the DB layer,
-            // which is what should happen — those are this user's own spaces.
-            $this->em->remove($personal);
+        if (null === $personal) {
+            return;
         }
+
+        // Spaces the departing user created but *shared* also live in their
+        // personal organization, and removing it CASCADEs. Without this, a
+        // shared space would be destroyed along with everything its other
+        // members wrote — silently defeating the promote-or-archive rule
+        // handleSpaces() just applied, one layer up.
+        //
+        // So each survivor follows its new admin into *their* personal account.
+        // Runs after handleSpaces(), which has already done the promotion, so
+        // "who inherits this" is a question that already has an answer.
+        foreach ($this->em->getRepository(Space::class)->findBy(['organization' => $personal]) as $space) {
+            if ($space->getIsPersonal()) {
+                // The "Private" space is an artefact of the account; it goes.
+                continue;
+            }
+            $heir = $this->survivingAdmin($space, $user);
+            if (null === $heir) {
+                // Nobody left to inherit it — cascading with the org is the
+                // same outcome handleSpaces() reaches for an empty space.
+                continue;
+            }
+            $space->setOrganization($this->personalOrganizations->provision($heir));
+        }
+
+        $this->em->remove($personal);
+    }
+
+    /**
+     * Whoever should inherit a shared space: its admin other than the departing
+     * user, falling back to any remaining member. Null when nobody is left.
+     */
+    private function survivingAdmin(Space $space, User $leaving): ?User
+    {
+        $leavingId = (string) $leaving->getId();
+        $fallback = null;
+
+        foreach ($space->getUserMemberships() as $membership) {
+            $candidate = $membership->getUser();
+            if (null === $candidate || (string) $candidate->getId() === $leavingId) {
+                continue;
+            }
+            if (Space::ROLE_ADMIN === $membership->getRole()) {
+                return $candidate;
+            }
+            $fallback ??= $candidate;
+        }
+
+        return $fallback;
     }
 
     private function sentinel(): User

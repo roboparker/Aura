@@ -39,28 +39,38 @@ final class SubscriptionRepository extends ServiceEntityRepository
     }
 
     /** The user's personal entitling subscription (newest), or null. */
+    /**
+     * The user's **personal account** subscription — now the one on their
+     * personal organization rather than a row pointed at the user directly.
+     *
+     * A personal org is the user's account, so `ownerUser` was a second way of
+     * saying the same thing; keeping both meant every billing surface had to
+     * remember which one applied.
+     */
     public function findActiveForUser(User $user): ?Subscription
     {
-        return $this->newestEntitling('s.ownerUser = :account', 'account', $user);
+        return $this->newestEntitling(
+            's.organization = (SELECT po.id FROM ' . Organization::class
+                . ' po WHERE po.createdBy = :account AND po.isPersonal = true)',
+            'account',
+            $user,
+        );
     }
 
     /**
-     * The subscription that governs a space: its organization account, else a
-     * legacy space-owned row, else the creator's personal account.
+     * The subscription that governs a space: the one on its organization.
+     *
+     * Every space has an organization since Phase 2 step 1, so this is a single
+     * lookup rather than the org → legacy-space-row → creator's-personal-account
+     * chain it used to be. The nullable branch survives only as a defensive
+     * return for a row written before the backfill; it can go with the NOT NULL
+     * constraint in step 3.
      */
     public function findActiveForSpace(Space $space): ?Subscription
     {
         $organization = $space->getOrganization();
-        if (null !== $organization) {
-            return $this->findActiveForOrganization($organization);
-        }
-        $legacy = $this->newestEntitling('s.space = :account', 'account', $space);
-        if (null !== $legacy) {
-            return $legacy;
-        }
-        $creator = $space->getCreatedBy();
 
-        return null === $creator ? null : $this->findActiveForUser($creator);
+        return null === $organization ? null : $this->findActiveForOrganization($organization);
     }
 
     public function findByStripeSubscriptionId(string $stripeSubscriptionId): ?Subscription
@@ -79,8 +89,13 @@ final class SubscriptionRepository extends ServiceEntityRepository
     public function findCancelableForUser(User $user): array
     {
         /** @var list<Subscription> $result */
+        // Their personal organization's subscriptions. Organizations they merely
+        // belong to are still excluded — those accounts outlive the user, and
+        // cancelling someone else's plan because a member left would be wrong.
         $result = $this->createQueryBuilder('s')
-            ->where('s.ownerUser = :user')
+            ->join('s.organization', 'o')
+            ->where('o.createdBy = :user')
+            ->andWhere('o.isPersonal = true')
             ->andWhere('s.status IN (:statuses)')
             ->andWhere('s.stripeSubscriptionId IS NOT NULL')
             ->setParameter('user', $user)
@@ -110,29 +125,18 @@ final class SubscriptionRepository extends ServiceEntityRepository
     {
         $em = $this->getEntityManager();
 
-        $orgPlans = $em->createQuery(sprintf(
+        // One query, not three. Organization membership is now the only route
+        // to a plan: a user's personal account *is* an organization they own, so
+        // it comes back through the same join rather than a separate branch, and
+        // the legacy per-space rows have been moved onto their space's org.
+        $plans = $em->createQuery(sprintf(
             'SELECT DISTINCT s.plan FROM %s s JOIN s.organization o JOIN o.memberships m'
             . ' WHERE m.user = :user AND s.status IN (:statuses) AND o.deletedAt IS NULL',
             Subscription::class,
         ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
             ->getSingleColumnResult();
 
-        $personalPlans = $em->createQuery(sprintf(
-            'SELECT DISTINCT s.plan FROM %s s WHERE s.ownerUser = :user AND s.status IN (:statuses)',
-            Subscription::class,
-        ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
-            ->getSingleColumnResult();
-
-        $legacyPlans = $em->createQuery(sprintf(
-            'SELECT DISTINCT s.plan FROM %s s WHERE s.space IS NOT NULL AND s.status IN (:statuses) AND %s',
-            Subscription::class,
-            SpaceMembershipDql::userBelongsToBoardSpace('s'),
-        ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
-            ->getSingleColumnResult();
-
-        $merged = array_merge($orgPlans, $personalPlans, $legacyPlans);
-
-        return array_values(array_unique(array_filter($merged, 'is_string')));
+        return array_values(array_unique(array_filter($plans, 'is_string')));
     }
 
     private function newestEntitling(string $predicate, string $param, mixed $value): ?Subscription

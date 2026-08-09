@@ -4,12 +4,14 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Entity\CancellationFeedback;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Entity\UserGroup;
 use App\Service\AccountDeletionService;
+use App\Service\PersonalOrganizationProvisioner;
 use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -546,7 +548,7 @@ class BillingTest extends ApiTestCase
     {
         $user = $this->createUser('leaver@example.com');
         $subscription = (new Subscription())
-            ->setOwnerUser($user)
+            ->setOrganization($this->personalOrgOf($user))
             ->setStatus(Subscription::STATUS_ACTIVE)
             ->setStripeCustomerId('cus_leaver')
             ->setStripeSubscriptionId('sub_leaver');
@@ -570,8 +572,10 @@ class BillingTest extends ApiTestCase
         string $customerId,
         ?string $stripeSubscriptionId = null,
     ): Subscription {
+        // Subscriptions belong to organizations now, so seed against the one
+        // that owns the space (the default listener attached it on persist).
         $subscription = (new Subscription())
-            ->setSpace($space)
+            ->setOrganization($space->getOrganization())
             ->setStatus($status)
             ->setStripeCustomerId($customerId)
             ->setStripeSubscriptionId($stripeSubscriptionId ?? 'sub_' . bin2hex(random_bytes(6)));
@@ -598,6 +602,19 @@ class BillingTest extends ApiTestCase
         $this->entityManager->flush();
 
         return $space;
+    }
+
+    /**
+     * The user's personal organization, provisioning it if this test built the
+     * user by direct persistence (which skips the signup provisioner).
+     */
+    private function personalOrgOf(User $user): Organization
+    {
+        $provisioner = static::getContainer()->get(PersonalOrganizationProvisioner::class);
+        $org = $provisioner->provision($user);
+        $this->entityManager->flush();
+
+        return $org;
     }
 
     /**

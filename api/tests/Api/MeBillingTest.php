@@ -3,8 +3,10 @@
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Organization;
 use App\Entity\Subscription;
 use App\Entity\User;
+use App\Service\PersonalOrganizationProvisioner;
 use App\Tests\Billing\InMemoryStripeGateway;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -91,9 +93,12 @@ class MeBillingTest extends ApiTestCase
         $this->entityManager->clear();
         $row = $this->entityManager->getRepository(Subscription::class)->findOneBy(['stripeSubscriptionId' => 'sub_me']);
         $this->assertInstanceOf(Subscription::class, $row);
-        $owner = $row->getOwnerUser();
-        $this->assertNotNull($owner);
-        $this->assertSame((string) $user->getId(), (string) $owner->getId());
+        // A personal plan lands on the buyer's personal organization — their
+        // account — rather than a row pointed at the user.
+        $organization = $row->getOrganization();
+        $this->assertNotNull($organization);
+        $this->assertTrue($organization->getIsPersonal());
+        $this->assertSame((string) $user->getId(), (string) $organization->getCreatedBy()?->getId());
         $this->assertSame('pro', $row->getPlan());
     }
 
@@ -119,13 +124,26 @@ class MeBillingTest extends ApiTestCase
     private function seedPersonalSubscription(User $user, string $plan): void
     {
         $subscription = (new Subscription())
-            ->setOwnerUser($user)
+            ->setOrganization($this->personalOrgOf($user))
             ->setPlan($plan)
             ->setStatus(Subscription::STATUS_ACTIVE)
             ->setStripeCustomerId('cus_p')
             ->setStripeSubscriptionId('sub_' . bin2hex(random_bytes(4)));
         $this->entityManager->persist($subscription);
         $this->entityManager->flush();
+    }
+
+    /**
+     * The user's personal organization, provisioning it if this test built the
+     * user by direct persistence (which skips the signup provisioner).
+     */
+    private function personalOrgOf(User $user): Organization
+    {
+        $provisioner = static::getContainer()->get(PersonalOrganizationProvisioner::class);
+        $org = $provisioner->provision($user);
+        $this->entityManager->flush();
+
+        return $org;
     }
 
     private function createUser(string $email): User

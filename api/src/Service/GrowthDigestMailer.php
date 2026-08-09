@@ -85,10 +85,17 @@ final class GrowthDigestMailer
      */
     public function sendPaidSignupAlert(Subscription $subscription): void
     {
-        $who = $subscription->getOwnerUser()?->getEmail()
-            ?? $subscription->getOrganization()?->getName()
-            ?? $subscription->getSpace()?->getName()
-            ?? 'an account';
+        // Every subscription is owned by an organization now. For a personal
+        // one, name the person rather than their account's display name —
+        // "alex@example.com upgraded" is more useful in an alert than "Alex".
+        $organization = $subscription->getOrganization();
+        if (null === $organization) {
+            $who = 'an account';
+        } elseif ($organization->getIsPersonal()) {
+            $who = $organization->getCreatedBy()?->getEmail() ?? 'an account';
+        } else {
+            $who = $organization->getName();
+        }
 
         foreach ($this->admins() as $admin) {
             $email = (new TemplatedEmail())

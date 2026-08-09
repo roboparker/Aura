@@ -43,6 +43,21 @@ final class PersonalOrganizationProvisioner
             return $existing;
         }
 
+        $organization = $this->build($user);
+        $this->em->persist($organization);
+
+        return $organization;
+    }
+
+    /**
+     * Construct a personal organization **without persisting it**, so callers
+     * that already own the flush can wire it in themselves — notably
+     * {@see \App\EventListener\SpaceOrganizationDefaultListener}, which runs
+     * inside `onFlush` where an ordinary persist() would be too late to be
+     * picked up.
+     */
+    public function build(User $user): Organization
+    {
         $organization = (new Organization())
             ->setName($this->nameFor($user))
             ->setSlug($this->uniqueSlugFor($user))
@@ -51,8 +66,6 @@ final class PersonalOrganizationProvisioner
         // Owner, so every invariant that asks "does this org have an owner?"
         // holds for personal accounts too without a special case.
         $organization->addMember($user, Organization::ROLE_OWNER);
-
-        $this->em->persist($organization);
 
         return $organization;
     }
