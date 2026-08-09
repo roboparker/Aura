@@ -36,11 +36,21 @@ final class Version20260809090000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE organization ADD is_personal BOOLEAN DEFAULT FALSE NOT NULL');
-        $this->addSql(
-            'CREATE UNIQUE INDEX uniq_organization_personal_per_user'
-            . ' ON organization (created_by_id) WHERE (is_personal = true)',
-        );
+        // Added nullable → filled → made NOT NULL, rather than with a DEFAULT.
+        // The entity maps a plain `bool` with no column default, and a lingering
+        // server default is exactly the kind of drift doctrine:schema:validate
+        // fails on.
+        $this->addSql('ALTER TABLE organization ADD is_personal BOOLEAN');
+        $this->addSql('UPDATE organization SET is_personal = FALSE WHERE is_personal IS NULL');
+        $this->addSql('ALTER TABLE organization ALTER COLUMN is_personal SET NOT NULL');
+
+        // Matches the formatting of `uniq_space_personal_per_user` so the two
+        // partial indexes normalise identically in pg_indexes.
+        $this->addSql(<<<'SQL'
+            CREATE UNIQUE INDEX uniq_organization_personal_per_user
+            ON organization (created_by_id)
+            WHERE is_personal = TRUE
+        SQL);
 
         // One personal organization per user who doesn't already have one.
         //
