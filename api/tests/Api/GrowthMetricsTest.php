@@ -282,7 +282,6 @@ class GrowthMetricsTest extends ApiTestCase
         $this->entityManager->persist($sub);
     }
 
-    /** @param list<string> $roles */
     /** The user's personal organization; tests build users by direct persistence. */
     private function personalOrgOf(User $user): Organization
     {
@@ -293,6 +292,7 @@ class GrowthMetricsTest extends ApiTestCase
         return $org;
     }
 
+    /** @param list<string> $roles */
     private function makeUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
