@@ -45,6 +45,17 @@ final class OrganizationRepository extends ServiceEntityRepository
      *
      * @return list<Organization>
      */
+    /**
+     * The user's personal organization — their own account. At most one exists;
+     * the partial unique index `uniq_organization_personal_per_user` guarantees
+     * it, and we still take the first hit defensively in case that index is
+     * ever dropped in a migration.
+     */
+    public function findPersonalFor(User $user): ?Organization
+    {
+        return $this->findOneBy(['createdBy' => $user, 'isPersonal' => true]);
+    }
+
     public function findDueForPurge(\DateTimeImmutable $now, int $limit = 50): array
     {
         /** @var list<Organization> $orgs */

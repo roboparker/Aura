@@ -168,9 +168,13 @@ class AdminDeletionController extends AbstractController
         }
         $entity = $this->em->getRepository($class)->find($targetId);
 
-        // A personal space is an artefact of its owner's account, not a thing
-        // with an independent existence — it goes when the account does.
+        // A personal space or personal organization is an artefact of its
+        // owner's account, not a thing with independent existence — both go
+        // when the account does. Delete the account instead.
         if ($entity instanceof Space && $entity->getIsPersonal()) {
+            return null;
+        }
+        if ($entity instanceof Organization && $entity->getIsPersonal()) {
             return null;
         }
 

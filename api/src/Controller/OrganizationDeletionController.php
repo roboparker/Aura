@@ -61,6 +61,15 @@ class OrganizationDeletionController extends AbstractController
         if ($org->isDeleted()) {
             return $this->json(['error' => 'This organization is already scheduled for deletion.'], 409);
         }
+        // A personal organization is the user's own account — it exists only to
+        // own their spaces and hold their plan, and goes when the account does.
+        // Deleting it on its own would strand their personal space.
+        if ($org->getIsPersonal()) {
+            return $this->json([
+                'error' => 'Your personal organization goes with your account. '
+                    . 'Delete the account from Settings → Danger zone instead.',
+            ], 409);
+        }
 
         $body = $this->body($request);
 
