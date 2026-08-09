@@ -88,10 +88,19 @@ const Terms = () => (
             <h2 className="text-xl font-semibold mb-2">5. Termination</h2>
             <p className="text-muted-foreground">
               You may stop using the Service at any time and may delete your
-              account from your settings. We may suspend or terminate your
-              access if you breach these Terms or if we are required to do so
-              by law. Provisions that by their nature should survive
-              termination will do so.
+              account from your settings. Deletion takes effect immediately but
+              is reversible for 30 days — see the{" "}
+              <Link
+                href="/privacy"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                Privacy Policy
+              </Link>{" "}
+              for what we retain and for how long. We may suspend or terminate
+              your access if you breach these Terms or if we are required to do
+              so by law, and may remove content or accounts that violate them.
+              Provisions that by their nature should survive termination will do
+              so.
             </p>
           </section>
 

@@ -24,12 +24,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+// Ordered by when it happens: everything immediate first, then what the
+// 30-day purge does. Leading with the reversible part would bury the fact
+// that access stops today.
 const DELETE_CONSEQUENCES = [
-  "Spaces you solely admin are transferred to another member, or archived if empty.",
-  "Pages and comments you authored stay published, reattributed to “Former member”.",
-  "Tasks & boards you own are kept under “Former member”; you're unassigned everywhere.",
-  "API tokens and sessions are revoked immediately.",
-  "You're signed out of all devices. This cannot be undone.",
+  "You're signed out everywhere and can't sign in while the deletion is pending.",
+  "API tokens and sessions are revoked, and any subscription is cancelled immediately.",
+  "For 30 days nothing is destroyed — use the link we email you to restore the account.",
+  "After 30 days: spaces you solely admin transfer to another member, or are archived if empty.",
+  "After 30 days: pages, comments, tasks and boards you authored stay published, reattributed to “Former member”.",
 ];
 
 const DangerPage = () => {
@@ -40,7 +43,7 @@ const DangerPage = () => {
     <SettingsShell
       active="danger"
       title="Danger zone"
-      description="Destructive actions on your account. Most can't be undone."
+      description="Destructive actions on your account. Deletion is reversible for 30 days; the rest take effect immediately."
     >
       <DeactivateCard twoFactorEnabled={twoFactorEnabled} />
       <ExportCard twoFactorEnabled={twoFactorEnabled} />
@@ -201,7 +204,8 @@ const DeleteCard = ({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm text-muted-foreground">
-          Permanently removes your Madori account. This cannot be undone.
+          Removes your Madori account. Reversible for 30 days — we email you a
+          restore link — then permanently deleted.
         </p>
         <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           {DELETE_CONSEQUENCES.map((c) => (
