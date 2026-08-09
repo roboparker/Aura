@@ -265,6 +265,7 @@ Developer docs:
 - `docs/developer/two-factor-auth.md` - 2FA implementation reference (entity model, endpoints, recovery flow, threat model)
 - `docs/developer/password-reset.md` - Forgot/reset implementation, token model, email-enumeration mitigations, rate limiting
 - `docs/developer/data-export.md` - Space + account (GDPR) data exports: shared async-build/token/prune machinery, access bars, retention
+- `docs/developer/deletion-and-restore.md` - The 30-day grace period shared by organizations, spaces and accounts: soft-delete state, emailed restore links, why the endpoint is public, purge ordering, GDPR posture
 - `docs/developer/web-push.md` - Web Push (#100): PushSubscription, WebPushSender, the service worker + enable flow, VAPID key setup
 - `docs/developer/task-organization.md` - Task sections, the Kanban board view, and task relationships (entities, endpoints, validation, UI)
 - `docs/developer/billing.md` - Billing & the freemium gate: the Team plan, hybrid seat/usage caps, Stripe Checkout/Portal + webhook, enforcement flag, going-live setup
