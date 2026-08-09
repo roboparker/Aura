@@ -53,8 +53,7 @@ final class Version20260808150000 extends AbstractMigration
                 PRIMARY KEY (id)
             )
             SQL);
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_restore_token_hash ON restore_token (token_hash)');
-        $this->addSql('CREATE INDEX idx_restore_token_hash ON restore_token (token_hash)');
+        $this->addSql('CREATE UNIQUE INDEX uniq_restore_token_hash ON restore_token (token_hash)');
         $this->addSql('CREATE INDEX idx_restore_token_target ON restore_token (target_type, target_id)');
     }
 

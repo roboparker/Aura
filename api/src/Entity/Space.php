@@ -23,6 +23,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -402,6 +403,21 @@ class Space implements SoftDeletable
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    /** Grace-period state on the wire — see Organization for why these are getters. */
+    #[Groups(['space:read'])]
+    #[SerializedName('deletedAt')]
+    public function getDeletedAtIso(): ?string
+    {
+        return $this->deletedAt?->format(\DateTimeInterface::ATOM);
+    }
+
+    #[Groups(['space:read'])]
+    #[SerializedName('purgeAfter')]
+    public function getPurgeAfterIso(): ?string
+    {
+        return $this->purgeAfter?->format(\DateTimeInterface::ATOM);
     }
 
     public function deletionTargetType(): string

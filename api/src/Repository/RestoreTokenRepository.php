@@ -43,7 +43,7 @@ final class RestoreTokenRepository extends ServiceEntityRepository
     /** Drop spent/expired rows; called from the nightly purge. */
     public function pruneExpired(\DateTimeImmutable $now): int
     {
-        return (int) $this->createQueryBuilder('t')
+        return $this->createQueryBuilder('t')
             ->delete()
             ->where('t.expiresAt <= :now')
             ->setParameter('now', $now)
