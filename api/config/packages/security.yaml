@@ -96,6 +96,11 @@ security:
         - { path: ^/auth/reset-password$, roles: PUBLIC_ACCESS }
         # Email confirmation: the clicker holds only the token (no session).
         - { path: ^/verify-email$, methods: [POST], roles: PUBLIC_ACCESS }
+        # Deletion restore links. Public by necessity, not convenience: an
+        # account inside its deletion grace period cannot sign in, so requiring
+        # a session would make the link useless for exactly the case it exists
+        # for. The token is the credential and restoring is non-destructive.
+        - { path: ^/restore/, roles: PUBLIC_ACCESS }
         # Allow the half-authenticated 2FA token through the check endpoint
         # (and only that endpoint) so users can submit their code.
         - { path: ^/auth/2fa-check$, roles: IS_AUTHENTICATED_2FA_IN_PROGRESS }
@@ -132,6 +137,11 @@ security:
         # Admin account provisioning (#admin-user-create) — creates a sign-in-ready
         # account, so it's an account-creation vector: platform admins only.
         - { path: ^/admin/users, roles: ROLE_ADMIN }
+        # Admin deletion of another person's account / organization / space,
+        # including the immediate (no grace period) variant. The single most
+        # destructive surface in the product — platform admins only, and
+        # step-up verified in the controller on top of this.
+        - { path: ^/admin/deletions, roles: ROLE_ADMIN }
         # Sentry verification triggers (error/worker) — platform admins only.
         - { path: ^/admin/sentry-test, roles: ROLE_ADMIN }
         - { path: ^/admin/growth, roles: ROLE_ADMIN }

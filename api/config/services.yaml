@@ -107,14 +107,17 @@ parameters:
     app.billing_enforcement_enabled: '%env(bool:default:app.billing_enforcement_enabled_default:BILLING_ENFORCEMENT_ENABLED)%'
     app.billing_enforcement_enabled_default: false
 
-    # How long a deleted organization stays restorable before the nightly purge
-    # hard-deletes it (#billing Phase 1c). Deleting an org cascades to every
-    # space it owns, so this window is the thing standing between one owner's
-    # click and the loss of every member's work. Each org stores its own
-    # `purgeAfter` at deletion time, so shortening this can never bring forward
+    # How long a deleted organization, space, or account stays restorable before
+    # the nightly purge hard-deletes it. Deleting any of the three cascades to
+    # everything inside it, so this window is what stands between one click and
+    # the loss of other people's work — and it's the lifetime of the restore
+    # link emailed at deletion time. One knob for all three deliberately: a
+    # space that outlived its org's window (or vice versa) would be confusing to
+    # explain and worse to reason about. Each record stores its own
+    # `purge_after` at deletion time, so shortening this can never bring forward
     # a deletion someone was already promised.
-    app.organization_deletion_grace_days: '%env(int:default:app.organization_deletion_grace_days_default:ORGANIZATION_DELETION_GRACE_DAYS)%'
-    app.organization_deletion_grace_days_default: 30
+    app.deletion_grace_days: '%env(int:default:app.deletion_grace_days_default:DELETION_GRACE_DAYS)%'
+    app.deletion_grace_days_default: 30
 
     # Platform fee kept on each client invoice paid through a space's Stripe
     # Connect account, in basis points (100 = 1%). 0 = the platform takes no

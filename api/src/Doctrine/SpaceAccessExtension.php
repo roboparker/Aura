@@ -43,7 +43,7 @@ final class SpaceAccessExtension implements
         ?Operation $operation = null,
         array $context = [],
     ): void {
-        $this->applyFilter($queryBuilder, $resourceClass);
+        $this->applyFilter($queryBuilder, $resourceClass, hideDeleted: true);
     }
 
     public function applyToItem(
@@ -54,10 +54,15 @@ final class SpaceAccessExtension implements
         ?Operation $operation = null,
         array $context = [],
     ): void {
-        $this->applyFilter($queryBuilder, $resourceClass);
+        // Item reads stay open on a space inside its grace period so its admins
+        // can load the "scheduled for deletion, restorable until …" state.
+        // Hiding it here would 404 the page they'd undo from. The space's
+        // *contents* are hidden regardless — that guard lives in
+        // SpaceMembershipDql, which every content resource routes through.
+        $this->applyFilter($queryBuilder, $resourceClass, hideDeleted: false);
     }
 
-    private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
+    private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass, bool $hideDeleted): void
     {
         if (Space::class !== $resourceClass) {
             return;
@@ -81,12 +86,15 @@ final class SpaceAccessExtension implements
             UserGroup::class,
             $rootAlias,
         );
-        // A space whose organization is mid-deletion drops out entirely: the
-        // grace period only means something if members stop working in the
-        // thing that's scheduled to vanish.
+        // A space that's mid-deletion — or whose organization is — drops out of
+        // listings: the grace period only means something if members stop
+        // working in the thing that's scheduled to vanish.
         $queryBuilder
             ->andWhere(sprintf('(EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
-            ->andWhere(SpaceMembershipDql::organizationIsLive($rootAlias, 'space_access_org'))
             ->setParameter('currentUser', $user);
+
+        if ($hideDeleted) {
+            $queryBuilder->andWhere(SpaceMembershipDql::organizationIsLive($rootAlias, 'space_access_org'));
+        }
     }
 }

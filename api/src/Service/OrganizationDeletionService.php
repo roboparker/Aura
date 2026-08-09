@@ -6,13 +6,14 @@ namespace App\Service;
 
 use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
+use App\Deletion\SoftDeletionService;
 use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\Subscription;
+use App\Entity\User;
 use App\Repository\OrganizationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Deleting an organization, in two stages.
@@ -44,9 +45,8 @@ final class OrganizationDeletionService
         private OrganizationRepository $organizations,
         private StripeGatewayInterface $stripe,
         private SpaceExportRequester $exportRequester,
+        private SoftDeletionService $softDeletion,
         private LoggerInterface $logger,
-        #[Autowire('%app.organization_deletion_grace_days%')]
-        private int $graceDays,
     ) {
     }
 
@@ -63,16 +63,15 @@ final class OrganizationDeletionService
             }
         }
 
-        $now = new \DateTimeImmutable();
-        $purgeAfter = $now->modify(sprintf('+%d days', $this->graceDays));
-
         // Stop the money first. Doing this before the state change means a
         // Stripe failure surfaces while the org is still live and the owner can
         // retry, rather than after we've already told them it's deleted.
         $this->cancelSubscriptions($organization);
 
-        $organization->markDeleted($now, $purgeAfter);
-        $this->em->flush();
+        // Shared half: stamp the window, mint the restore token, email the
+        // link. Every owner gets it, not just whoever clicked delete — the
+        // others didn't ask for this and need a way to undo it.
+        $purgeAfter = $this->softDeletion->schedule($organization, $this->owners($organization));
 
         // Best-effort: an export that fails to queue must not fail the
         // deletion, but it's the only copy of the data that outlives the purge,
@@ -80,6 +79,31 @@ final class OrganizationDeletionService
         $this->requestExports($organization);
 
         return $purgeAfter;
+    }
+
+    /**
+     * Everyone who should hear that the org is going away: its owners, deduped.
+     *
+     * @return list<User>
+     */
+    private function owners(Organization $organization): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($organization->getMemberships() as $membership) {
+            if (Organization::ROLE_OWNER !== $membership->getRole()) {
+                continue;
+            }
+            $user = $membership->getUser();
+            $id = (string) $user?->getId();
+            if (null === $user || '' === $id || isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $out[] = $user;
+        }
+
+        return $out;
     }
 
     /**
@@ -93,6 +117,10 @@ final class OrganizationDeletionService
         }
 
         $organization->clearDeleted();
+        // Retire the emailed link: the decision has been made in-app, and a
+        // still-live token would let a later click re-restore something that
+        // has since been deleted again.
+        $this->softDeletion->retireTokens($organization);
         $this->em->flush();
 
         return true;
@@ -136,6 +164,9 @@ final class OrganizationDeletionService
      */
     public function purge(Organization $organization): void
     {
+        // The restore link dies with the thing it pointed at.
+        $this->softDeletion->retireTokens($organization);
+
         $this->em->wrapInTransaction(function () use ($organization): void {
             $this->em->createQueryBuilder()
                 ->update(Subscription::class, 's')

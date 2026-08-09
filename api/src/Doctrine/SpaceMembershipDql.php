@@ -84,9 +84,14 @@ final class SpaceMembershipDql
         string $boardAlias,
         string $aliasPrefix = 'sm_check',
     ): string {
+        // One NOT EXISTS covering both levels: the space itself being deleted,
+        // and its owning organization being deleted. Either puts the content
+        // inside a grace period, and both have to stop reads at the same
+        // moment — a space that survived its org's deletion (or content that
+        // survived its space's) would be the exact leak this guard exists for.
         return sprintf(
-            'NOT EXISTS(SELECT 1 FROM %s %s_sp JOIN %s_sp.organization %s_org'
-            . ' WHERE %s_sp = %s.space AND %s_org.deletedAt IS NOT NULL)',
+            'NOT EXISTS(SELECT 1 FROM %s %s_sp LEFT JOIN %s_sp.organization %s_org'
+            . ' WHERE %s_sp = %s.space AND (%s_sp.deletedAt IS NOT NULL OR %s_org.deletedAt IS NOT NULL))',
             Space::class,
             $aliasPrefix,
             $aliasPrefix,
@@ -94,19 +99,23 @@ final class SpaceMembershipDql
             $aliasPrefix,
             $boardAlias,
             $aliasPrefix,
+            $aliasPrefix,
         );
     }
 
     /**
      * The same guard for a query whose alias **is** the Space (rather than an
-     * entity holding a `space` association) — no hop through Space needed.
+     * entity holding a `space` association): the space must not be deleted, and
+     * neither must its organization.
      */
     public static function organizationIsLive(
         string $spaceAlias,
         string $aliasPrefix = 'sm_check',
     ): string {
         return sprintf(
-            'NOT EXISTS(SELECT 1 FROM %s %s_org WHERE %s_org = %s.organization AND %s_org.deletedAt IS NOT NULL)',
+            '(%s.deletedAt IS NULL AND NOT EXISTS('
+            . 'SELECT 1 FROM %s %s_org WHERE %s_org = %s.organization AND %s_org.deletedAt IS NOT NULL))',
+            $spaceAlias,
             Organization::class,
             $aliasPrefix,
             $aliasPrefix,

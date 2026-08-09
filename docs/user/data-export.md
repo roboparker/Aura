@@ -36,3 +36,12 @@ If you open the link and Madori says the export has expired, the 7-day window ha
 - Check your spam or junk folder for a message from `no-reply@madori.test` (or your deployment's configured sender).
 - Large archives take longer to build. Give it a few minutes before assuming something went wrong.
 - If it never arrives, request the export again — and if that still fails, contact your administrator.
+
+## Exporting before you delete your account
+
+Request the export **first**, while you can still sign in. Once your account is
+pending deletion you're signed out and can't request one — and the export link
+is emailed to you either way, so there's no reason to wait.
+
+See [Deleting and restoring](./deleting-and-restoring.md) for what deletion
+actually does and how to reverse it within 30 days.

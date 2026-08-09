@@ -124,15 +124,16 @@ const DeleteSpaceDialog = ({
             </span>
             <div>
               <DialogTitle>Delete this space?</DialogTitle>
-              <DialogDescription>This cannot be undone.</DialogDescription>
+              <DialogDescription>
+                You&apos;ll have 30 days to change your mind.
+              </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <p className="text-sm text-muted-foreground">
-          You&apos;re about to permanently delete{" "}
           <span className="font-semibold text-foreground">{space.name}</span> and
-          everything inside it:
+          everything inside it becomes inaccessible right away:
         </p>
 
         <ul className="space-y-2">
@@ -148,6 +149,12 @@ const DeleteSpaceDialog = ({
             </li>
           ))}
         </ul>
+
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-muted-foreground">
+          Nothing is permanently deleted today. We&apos;ll email every space
+          admin a link that restores all of this, valid for 30 days — after that
+          it&apos;s gone for good.
+        </p>
 
         <div className="space-y-1.5">
           <Label htmlFor="delete-confirm-name">

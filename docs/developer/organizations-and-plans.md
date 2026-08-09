@@ -105,18 +105,21 @@ is a **state**, not an event.
 3. `POST /organizations/{id}/restore` reverses it, any time before the purge.
    It deliberately does **not** resurrect the subscription — that money movement
    should be a decision someone makes again, not a side effect of undo.
-4. `PurgeDeletedOrganizations` (nightly 04:20 UTC, or
-   `bin/console app:organizations:purge [--dry-run]`) hard-deletes the ones
-   whose window has lapsed. Subscription rows are detached rather than cascaded:
+4. `PurgeDeletedRecords` (nightly 04:20 UTC, or
+   `bin/console app:deletions:purge [--dry-run]`) hard-deletes the ones whose
+   window has lapsed. Subscription rows are detached rather than cascaded:
    what an account paid should outlive the account.
+
+The same mechanism now covers **spaces and accounts** — see
+`docs/developer/deletion-and-restore.md`.
 
 `GET /organizations/deleted` lists the caller's restorable orgs — without it a
 deleted org is invisible in every listing and its owner has no route back to it.
 
-Window: `app.organization_deletion_grace_days` (default 30, env
-`ORGANIZATION_DELETION_GRACE_DAYS`). Each org stores its own `purge_after` at
-deletion time rather than deriving it, so shortening the setting can never
-retroactively bring forward a deletion someone was already promised.
+Window: `app.deletion_grace_days` (default 30, env `DELETION_GRACE_DAYS`). Each
+record stores its own `purge_after` at deletion time rather than deriving it, so
+shortening the setting can never retroactively bring forward a deletion someone
+was already promised.
 
 > **Note on the exports:** they follow normal space-export retention
 > (`app.space_export_retention_days`, default 7), which is *shorter* than the
@@ -163,9 +166,14 @@ Subscription  (Phase 1b)
   delete/restore UI and the seat-count surface are still to do.)*
 
 ## Deferred / open
+- **Phase 2 — every space under an organization.** `Space.organization` becomes
+  NOT NULL, each user gets a personal organization that owns their personal
+  space, and `Subscription` drops both `space` and `ownerUser` so an
+  organization is the only thing that can hold a plan. This retires the
+  nullable-organization branch that the rest of this document keeps having to
+  explain, and with it the three-way fallback in
+  `SubscriptionRepository::findActiveForSpace()`.
 - Space-moves between accounts.
-- PWA danger zone for org deletion — the API is in, the UI isn't, so deletion
-  is currently API-only.
 - Org **invites** for unknown email addresses; `POST /organizations/{id}/members`
   still requires an existing user.
 - AI usage-pack overflow (Phase 3), Enterprise SSO/SCIM/audit enforcement

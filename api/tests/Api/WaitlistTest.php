@@ -4,6 +4,7 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
+use App\Deletion\PurgeRunner;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Service\WaitlistSettings;
@@ -155,7 +156,9 @@ class WaitlistTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(202);
 
-        // Delete works too, and reaps the personal space with the account.
+        // Delete works too. It schedules (202) rather than removing on the
+        // spot; the purge past the window is what reaps the personal space
+        // with the account.
         $client->request('POST', '/me/delete', [
             'json' => [
                 'confirmEmail' => 'leaver@example.com',
@@ -164,7 +167,10 @@ class WaitlistTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseStatusCodeSame(204);
+        $this->assertResponseStatusCodeSame(202);
+
+        $purge = static::getContainer()->get(PurgeRunner::class);
+        $purge->run(new \DateTimeImmutable('+31 days'));
 
         $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);

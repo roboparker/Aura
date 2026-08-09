@@ -66,6 +66,9 @@ export interface Space {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Set while the space is inside its deletion grace period (see deletionTypes). */
+  deletedAt?: string | null;
+  purgeAfter?: string | null;
   createdBy: {
     "@id": string;
     id: string;

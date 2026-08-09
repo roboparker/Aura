@@ -8,6 +8,9 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Deletion\SoftDeletable;
+use App\Deletion\SoftDeletableTrait;
+use App\Deletion\SoftDeletionService;
 use App\Repository\SpaceRepository;
 use App\Service\AvatarColorService;
 use App\State\SpaceCreateProcessor;
@@ -20,6 +23,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Gedmo\Mapping\Annotation as Gedmo;
 use Symfony\Component\Serializer\Attribute\Groups;
+use Symfony\Component\Serializer\Attribute\SerializedName;
 use Symfony\Component\Uid\Uuid;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -77,9 +81,18 @@ use Symfony\Component\Validator\Constraints as Assert;
     columns: ['created_by_id'],
     options: ['where' => '(is_personal = true)'],
 )]
+#[ORM\Index(columns: ['purge_after'], name: 'idx_space_purge_after')]
 #[ValidSpaceAttachments]
-class Space
+class Space implements SoftDeletable
 {
+    /**
+     * Deletion grace period, shared with Organization and User. Deleting a
+     * space cascades to every board, task and page in it, so it gets the same
+     * window + emailed restore link as the other two rather than vanishing on
+     * confirm.
+     */
+    use SoftDeletableTrait;
+
     public const ROLE_ADMIN = 'admin';
     public const ROLE_MEMBER = 'member';
 
@@ -390,6 +403,31 @@ class Space
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    /** Grace-period state on the wire — see Organization for why these are getters. */
+    #[Groups(['space:read'])]
+    #[SerializedName('deletedAt')]
+    public function getDeletedAtIso(): ?string
+    {
+        return $this->deletedAt?->format(\DateTimeInterface::ATOM);
+    }
+
+    #[Groups(['space:read'])]
+    #[SerializedName('purgeAfter')]
+    public function getPurgeAfterIso(): ?string
+    {
+        return $this->purgeAfter?->format(\DateTimeInterface::ATOM);
+    }
+
+    public function deletionTargetType(): string
+    {
+        return SoftDeletionService::TYPE_SPACE;
+    }
+
+    public function deletionLabel(): string
+    {
+        return $this->name;
     }
 
     public function getName(): string

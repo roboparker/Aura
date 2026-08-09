@@ -136,7 +136,20 @@ class AccountLifecycleTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseStatusCodeSame(204);
+        // 202: scheduled, not done — deletion now waits out a grace period.
+        $this->assertResponseStatusCodeSame(202);
+
+        // Still there, just locked: the account is inside its window.
+        $this->entityManager->clear();
+        $pending = $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'alice@example.com']);
+        $this->assertNotNull($pending);
+        $this->assertTrue($pending->isDeleted());
+        $this->assertSame([], $pending->getRoles(), 'a pending-deletion account holds no role');
+
+        // Run the purge from past the window — this is where the irreversible
+        // part happens now.
+        $purge = static::getContainer()->get(\App\Deletion\PurgeRunner::class);
+        $purge->run(new \DateTimeImmutable('+31 days'));
 
         $this->entityManager->clear();
         // Alice is gone.
@@ -237,12 +250,15 @@ class AccountLifecycleTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $this->assertResponseStatusCodeSame(204);
+        $this->assertResponseStatusCodeSame(202);
 
+        // A waitlisted account can still start its own deletion — the point is
+        // that the endpoint stays reachable without ROLE_USER, not that the row
+        // disappears synchronously.
         $this->entityManager->clear();
-        $this->assertNull(
-            $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'waiter@example.com']),
-        );
+        $pending = $this->entityManager->getRepository(User::class)->findOneBy(['email' => 'waiter@example.com']);
+        $this->assertNotNull($pending);
+        $this->assertTrue($pending->isDeleted());
     }
 
     private function createWaitlistedUser(string $email): User

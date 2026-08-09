@@ -7,6 +7,9 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Deletion\SoftDeletable;
+use App\Deletion\SoftDeletableTrait;
+use App\Deletion\SoftDeletionService;
 use App\Security\Access\AccessPolicy;
 use App\Service\AvatarColorService;
 use App\State\UserPasswordHasherProcessor;
@@ -45,9 +48,24 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Entity]
 #[ORM\Table(name: '`user`')]
 #[ORM\Index(columns: ['avatar_id'], name: 'idx_user_avatar')]
+#[ORM\Index(columns: ['purge_after'], name: 'idx_user_purge_after')]
 #[UniqueEntity('email', message: 'This email is already registered.')]
-class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFactorInterface, BackupCodeInterface
+class User implements
+    UserInterface,
+    PasswordAuthenticatedUserInterface,
+    TwoFactorInterface,
+    BackupCodeInterface,
+    SoftDeletable
 {
+    /**
+     * Deletion grace period, shared with Organization and Space. Account
+     * deletion reassigns authorship to a sentinel and is irreversible once
+     * run, so it waits out the same window behind the same emailed restore
+     * link. Distinct from `deactivatedAt`, which is a pause the user can end
+     * simply by signing in.
+     */
+    use SoftDeletableTrait;
+
     #[ORM\Id]
     #[ORM\Column(type: 'uuid', unique: true)]
     #[ORM\GeneratedValue(strategy: 'CUSTOM')]
@@ -399,6 +417,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
         return $this->id;
     }
 
+    public function deletionTargetType(): string
+    {
+        return SoftDeletionService::TYPE_ACCOUNT;
+    }
+
+    public function deletionLabel(): string
+    {
+        return $this->email;
+    }
+
     public function getEmail(): string
     {
         return $this->email;
@@ -446,6 +474,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, TwoFact
     /** @return string[] */
     public function getRoles(): array
     {
+        // An account inside its deletion grace period holds no role at all —
+        // not even ROLE_WAITLISTED. Same fail-closed idiom as the two below,
+        // taken one step further: a pending deletion should be reversible only
+        // through the emailed restore link, so there is nothing for a signed-in
+        // session to do and no resource it should reach. UserChecker refuses
+        // the sign-in outright; this is the belt to that braces, covering any
+        // session or token minted before the deletion landed.
+        if ($this->isDeleted()) {
+            return [];
+        }
+
         // A waitlisted account is deliberately denied ROLE_USER: nearly
         // every resource (security expressions + access extensions) requires
         // it, so withholding it fails closed and boxes a waiting user into

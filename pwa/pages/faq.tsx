@@ -81,7 +81,11 @@ const SECTIONS: Section[] = [
       },
       {
         q: "Can I delete my account?",
-        a: "Yes. Account deletion is self-service from Settings → Danger zone. It removes your personal data and cancels any active subscription.",
+        a: "Yes, self-service from Settings → Danger zone. Your subscription is cancelled straight away and you're signed out, then there's a 30-day recovery period — we email you a link that restores everything if you change your mind. After 30 days it's permanently deleted. The same window applies to deleting a space or an organization.",
+      },
+      {
+        q: "I deleted something by mistake. Can I get it back?",
+        a: "Yes, for 30 days. Check your email for the restore link we sent when it was deleted — it works even if you can't sign in. Deleted spaces and organizations also show up under 'Recently deleted' on their list pages.",
       },
       {
         q: "Is my data private?",
