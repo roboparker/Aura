@@ -1,0 +1,28 @@
+Hi {{ recipientName ?: 'there' }},
+
+{% if isAccount %}
+Your Madori account {{ label }} is scheduled for deletion.
+{% else %}
+The {{ noun }} "{{ label }}" is scheduled for deletion.
+{% endif %}
+
+Nothing has been deleted yet. Everything stays intact until {{ purgeAfter|date('F j, Y') }},
+and you can undo this at any point before then:
+
+{{ restoreUrl }}
+
+{% if isAccount %}
+While the deletion is pending you won't be able to sign in — use the link above
+if you've changed your mind.
+{% else %}
+In the meantime the {{ noun }} and everything in it is hidden from everyone who
+had access.
+{% endif %}
+
+After {{ purgeAfter|date('F j, Y') }} the {{ isAccount ? 'account' : noun }} and its
+contents are permanently deleted and this link stops working. That cannot be undone.
+
+If you didn't request this, use the restore link right away and then change your
+password — someone else may have access to your account.
+
+— Madori

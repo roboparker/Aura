@@ -18,6 +18,28 @@ final class SpaceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Soft-deleted spaces whose grace period has lapsed, oldest first so a
+     * backlog drains in the order the deletions were requested.
+     *
+     * @return list<Space>
+     */
+    public function findDueForPurge(\DateTimeImmutable $now, int $limit = 50): array
+    {
+        /** @var list<Space> $spaces */
+        $spaces = $this->createQueryBuilder('s')
+            ->where('s.deletedAt IS NOT NULL')
+            ->andWhere('s.purgeAfter IS NOT NULL')
+            ->andWhere('s.purgeAfter <= :now')
+            ->setParameter('now', $now)
+            ->orderBy('s.purgeAfter', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $spaces;
+    }
+
+    /**
      * Locate the user's personal space — the one auto-created at
      * signup. The DB-level partial unique index `uniq_space_personal_per_user`
      * guarantees at most one row matches; we still take the first hit

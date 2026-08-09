@@ -8,6 +8,9 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
+use App\Deletion\SoftDeletable;
+use App\Deletion\SoftDeletableTrait;
+use App\Deletion\SoftDeletionService;
 use App\Repository\SpaceRepository;
 use App\Service\AvatarColorService;
 use App\State\SpaceCreateProcessor;
@@ -77,9 +80,18 @@ use Symfony\Component\Validator\Constraints as Assert;
     columns: ['created_by_id'],
     options: ['where' => '(is_personal = true)'],
 )]
+#[ORM\Index(columns: ['purge_after'], name: 'idx_space_purge_after')]
 #[ValidSpaceAttachments]
-class Space
+class Space implements SoftDeletable
 {
+    /**
+     * Deletion grace period, shared with Organization and User. Deleting a
+     * space cascades to every board, task and page in it, so it gets the same
+     * window + emailed restore link as the other two rather than vanishing on
+     * confirm.
+     */
+    use SoftDeletableTrait;
+
     public const ROLE_ADMIN = 'admin';
     public const ROLE_MEMBER = 'member';
 
@@ -390,6 +402,16 @@ class Space
     public function getId(): ?Uuid
     {
         return $this->id;
+    }
+
+    public function deletionTargetType(): string
+    {
+        return SoftDeletionService::TYPE_SPACE;
+    }
+
+    public function deletionLabel(): string
+    {
+        return $this->name;
     }
 
     public function getName(): string
