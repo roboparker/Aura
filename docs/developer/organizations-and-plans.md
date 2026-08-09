@@ -166,9 +166,14 @@ Subscription  (Phase 1b)
   delete/restore UI and the seat-count surface are still to do.)*
 
 ## Deferred / open
+- **Phase 2 — every space under an organization.** `Space.organization` becomes
+  NOT NULL, each user gets a personal organization that owns their personal
+  space, and `Subscription` drops both `space` and `ownerUser` so an
+  organization is the only thing that can hold a plan. This retires the
+  nullable-organization branch that the rest of this document keeps having to
+  explain, and with it the three-way fallback in
+  `SubscriptionRepository::findActiveForSpace()`.
 - Space-moves between accounts.
-- PWA danger zone for org deletion — the API is in, the UI isn't, so deletion
-  is currently API-only.
 - Org **invites** for unknown email addresses; `POST /organizations/{id}/members`
   still requires an existing user.
 - AI usage-pack overflow (Phase 3), Enterprise SSO/SCIM/audit enforcement
