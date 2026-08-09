@@ -1,0 +1,42 @@
+<p>Hi {{ recipientName ?: 'there' }},</p>
+
+{% if isAccount %}
+    <p>Your Madori account <strong>{{ label }}</strong> is scheduled for deletion.</p>
+{% else %}
+    <p>The {{ noun }} <strong>{{ label }}</strong> is scheduled for deletion.</p>
+{% endif %}
+
+<p>
+    Nothing has been deleted yet. Everything stays intact until
+    <strong>{{ purgeAfter|date('F j, Y') }}</strong>, and you can undo this at
+    any point before then:
+</p>
+
+<p>
+    <a href="{{ restoreUrl }}">Restore {{ isAccount ? 'my account' : 'this ' ~ noun }}</a>
+</p>
+
+{% if isAccount %}
+    <p>
+        While the deletion is pending you won't be able to sign in — use the link
+        above if you've changed your mind.
+    </p>
+{% else %}
+    <p>
+        In the meantime the {{ noun }} and everything in it is hidden from
+        everyone who had access.
+    </p>
+{% endif %}
+
+<p>
+    After {{ purgeAfter|date('F j, Y') }} the {{ isAccount ? 'account' : noun }}
+    and its contents are permanently deleted and this link stops working. That
+    cannot be undone.
+</p>
+
+<p style="color: #9ca3af; font-size: 12px;">
+    If you didn't request this, use the restore link right away and then change
+    your password &mdash; someone else may have access to your account.
+</p>
+
+<p>&mdash; Madori</p>

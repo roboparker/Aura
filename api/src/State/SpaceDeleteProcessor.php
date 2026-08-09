@@ -7,8 +7,8 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Service\SensitiveActionVerifier;
+use App\Service\SpaceDeletionService;
 use Symfony\Bundle\SecurityBundle\Security;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -18,22 +18,19 @@ use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
  * security expression already restricts this to admins of a non-personal
  * space; this processor adds the {@see SensitiveActionVerifier} check on
  * top so a stolen cookie can't nuke a space without the user's TOTP code
- * (or their password when 2FA is off). Once verification passes it
- * delegates to the default Doctrine remove processor.
+ * (or their password when 2FA is off). Once verification passes it hands off
+ * to {@see SpaceDeletionService}, which schedules the deletion rather than
+ * performing it — see there for why the row now outlives the request.
  *
  * @implements ProcessorInterface<Space, mixed>
  */
 final class SpaceDeleteProcessor implements ProcessorInterface
 {
-    /**
-     * @param ProcessorInterface<Space, mixed> $removeProcessor
-     */
     public function __construct(
-        #[Autowire(service: 'api_platform.doctrine.orm.state.remove_processor')]
-        private ProcessorInterface $removeProcessor,
         private Security $security,
         private SensitiveActionVerifier $verifier,
         private RequestStack $requestStack,
+        private SpaceDeletionService $deletion,
     ) {
     }
 
@@ -55,7 +52,14 @@ final class SpaceDeleteProcessor implements ProcessorInterface
             throw new HttpException($error[0], $error[1]);
         }
 
-        return $this->removeProcessor->process($data, $operation, $uriVariables, $context);
+        // Schedule rather than remove. A space cascades to every board, task,
+        // page and comment inside it — other people's work — so it gets the
+        // same grace period + emailed restore link as organizations and
+        // accounts. The endpoint's contract is unchanged (204 on success); what
+        // changed is that the row survives until the purge.
+        $this->deletion->softDelete($data, $user);
+
+        return null;
     }
 
     /**

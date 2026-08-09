@@ -11,11 +11,11 @@ use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
- * The manual half of the organization purge (#billing Phase 1c). This is a
+ * The manual half of the deletion purge. This is a
  * cascading delete of whole organizations, so `--dry-run` — being able to look
  * before pulling the trigger — is behaviour worth pinning, not a convenience.
  */
-class OrganizationPurgeCommandTest extends KernelTestCase
+class PurgeDeletedRecordsCommandTest extends KernelTestCase
 {
     private EntityManagerInterface $em;
 
@@ -30,13 +30,13 @@ class OrganizationPurgeCommandTest extends KernelTestCase
         $this->em->createQuery('DELETE FROM App\Entity\User')->execute();
     }
 
-    public function testReportsNothingDueWhenNoOrgIsDeleted(): void
+    public function testReportsNothingDueWhenNothingIsDeleted(): void
     {
         $this->makeOrg('Live Co', deletedDaysAgo: null);
 
-        $tester = $this->invoke();
+        $tester = $this->invoke(dryRun: true);
         $tester->assertCommandIsSuccessful();
-        $this->assertStringContainsString('No organizations are due', $tester->getDisplay());
+        $this->assertStringContainsString('Nothing is due', $tester->getDisplay());
     }
 
     public function testSkipsAnOrgStillInsideItsGracePeriod(): void
@@ -70,7 +70,7 @@ class OrganizationPurgeCommandTest extends KernelTestCase
 
         $tester = $this->invoke();
         $tester->assertCommandIsSuccessful();
-        $this->assertStringContainsString('Purged 1', $tester->getDisplay());
+        $this->assertStringContainsString('Purged 1 organization', $tester->getDisplay());
 
         $this->em->clear();
         $this->assertNull($this->find($id));
@@ -117,7 +117,7 @@ class OrganizationPurgeCommandTest extends KernelTestCase
         $kernel = self::$kernel;
         assert(null !== $kernel);
         $application = new Application($kernel);
-        $tester = new CommandTester($application->find('app:organizations:purge'));
+        $tester = new CommandTester($application->find('app:deletions:purge'));
         $input = [];
         if ($dryRun) {
             $input['--dry-run'] = true;

@@ -136,10 +136,18 @@ class AccountLifecycleController extends AbstractController
         // the (now anonymized) feedback behind.
         $this->feedback->record(CancellationFeedback::CONTEXT_ACCOUNT_DELETION, $user, null, $body);
 
-        $this->deletion->deleteAccount($user);
+        // Scheduled, not immediate: account deletion reassigns authorship to a
+        // sentinel and cannot be undone once it runs, so it waits out the same
+        // grace period as spaces and organizations behind an emailed restore
+        // link. Sign-in is refused meanwhile (UserChecker), so the account is
+        // as unusable as if it were already gone.
+        $purgeAfter = $this->deletion->scheduleDeletion($user);
         $this->endSession($request);
 
-        return new JsonResponse(null, 204);
+        return new JsonResponse([
+            'status' => 'scheduled',
+            'purgeAfter' => $purgeAfter->format(\DateTimeInterface::ATOM),
+        ], 202);
     }
 
     private function endSession(Request $request): void

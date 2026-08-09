@@ -13,6 +13,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
+use App\Deletion\SoftDeletionService;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -41,10 +42,98 @@ final class AccountDeletionService
         private UserPasswordHasherInterface $hasher,
         private SubscriptionRepository $subscriptions,
         private StripeGatewayInterface $stripe,
+        private SoftDeletionService $softDeletion,
         private LoggerInterface $logger,
     ) {
     }
 
+    /**
+     * Begin deletion: stamp the grace window and email the restore link.
+     * Returns when the account becomes purgeable.
+     *
+     * Billing is cancelled now rather than at purge — the user asked to leave,
+     * and charging them through a 30-day window they're locked out of would be
+     * indefensible. If they restore, they re-subscribe.
+     */
+    public function scheduleDeletion(User $user): \DateTimeImmutable
+    {
+        if (self::SENTINEL_EMAIL === $user->getEmail()) {
+            throw new \RuntimeException('The system sentinel account cannot be deleted.');
+        }
+
+        $this->cancelPersonalSubscriptions($user);
+
+        // Only the account holder — nobody else has standing to reverse this,
+        // and it's their address on the account.
+        return $this->softDeletion->schedule($user, [$user]);
+    }
+
+    public function restore(User $user): bool
+    {
+        if (!$user->isDeleted()) {
+            return false;
+        }
+        $user->clearDeleted();
+        $this->softDeletion->retireTokens($user);
+        $this->em->flush();
+
+        return true;
+    }
+
+    /**
+     * Hard-delete accounts past their window. Returns how many went.
+     */
+    public function purgeDue(?\DateTimeImmutable $now = null): int
+    {
+        $now ??= new \DateTimeImmutable();
+        $purged = 0;
+
+        foreach ($this->dueForPurge($now) as $user) {
+            $id = (string) $user->getId();
+            try {
+                $this->softDeletion->retireTokens($user);
+                $this->deleteAccount($user);
+                ++$purged;
+                $this->logger->info('Purged account {user} after its deletion grace period.', ['user' => $id]);
+            } catch (\Throwable $e) {
+                $this->logger->error('Failed to purge account {user}: {error}', [
+                    'user' => $id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $purged;
+    }
+
+    /**
+     * Accounts whose grace period has lapsed, oldest first.
+     *
+     * @return list<User>
+     */
+    private function dueForPurge(\DateTimeImmutable $now, int $limit = 50): array
+    {
+        /** @var list<User> $users */
+        $users = $this->em->createQueryBuilder()
+            ->select('u')
+            ->from(User::class, 'u')
+            ->where('u.deletedAt IS NOT NULL')
+            ->andWhere('u.purgeAfter IS NOT NULL')
+            ->andWhere('u.purgeAfter <= :now')
+            ->setParameter('now', $now)
+            ->orderBy('u.purgeAfter', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $users;
+    }
+
+    /**
+     * The irreversible part: reassign authorship to the sentinel, then remove
+     * the row. Called by the purge once the grace period lapses — not from the
+     * request path.
+     */
     public function deleteAccount(User $user): void
     {
         if (self::SENTINEL_EMAIL === $user->getEmail()) {
