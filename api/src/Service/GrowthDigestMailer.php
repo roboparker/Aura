@@ -89,9 +89,13 @@ final class GrowthDigestMailer
         // one, name the person rather than their account's display name —
         // "alex@example.com upgraded" is more useful in an alert than "Alex".
         $organization = $subscription->getOrganization();
-        $who = ($organization?->getIsPersonal() ?? false)
-            ? ($organization?->getCreatedBy()?->getEmail() ?? 'an account')
-            : ($organization?->getName() ?? 'an account');
+        if (null === $organization) {
+            $who = 'an account';
+        } elseif ($organization->getIsPersonal()) {
+            $who = $organization->getCreatedBy()?->getEmail() ?? 'an account';
+        } else {
+            $who = $organization->getName();
+        }
 
         foreach ($this->admins() as $admin) {
             $email = (new TemplatedEmail())
