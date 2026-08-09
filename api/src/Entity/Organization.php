@@ -53,6 +53,14 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: 'organization')]
 #[ORM\UniqueConstraint(name: 'uniq_organization_slug', columns: ['slug'])]
 #[ORM\Index(columns: ['purge_after'], name: 'idx_organization_purge_after')]
+// One personal organization per user, enforced at the DB rather than in code:
+// a duplicate would give someone two personal accounts and two places a plan
+// could live. Mirrors `uniq_space_personal_per_user`.
+#[ORM\UniqueConstraint(
+    name: 'uniq_organization_personal_per_user',
+    columns: ['created_by_id'],
+    options: ['where' => '(is_personal = true)'],
+)]
 class Organization implements SoftDeletable
 {
     /**
@@ -108,6 +116,20 @@ class Organization implements SoftDeletable
     #[Groups(['organization:read'])]
     private string $slug = '';
 
+    /**
+     * A user's own account, provisioned at signup and owning their personal
+     * space (#billing Phase 2). Exactly the role a GitHub personal account
+     * plays: it holds a plan and owns spaces, so nothing in the model has to
+     * special-case "a space with no account behind it".
+     *
+     * Non-deletable and non-leavable — it goes only when its owner's account
+     * does. Server-written: never in `organization:write`, so it can't be set
+     * or cleared through the API.
+     */
+    #[ORM\Column]
+    #[Groups(['organization:read'])]
+    private bool $isPersonal = false;
+
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['organization:read'])]
@@ -154,6 +176,18 @@ class Organization implements SoftDeletable
     public function getSlug(): string
     {
         return $this->slug;
+    }
+
+    public function getIsPersonal(): bool
+    {
+        return $this->isPersonal;
+    }
+
+    public function setIsPersonal(bool $isPersonal): static
+    {
+        $this->isPersonal = $isPersonal;
+
+        return $this;
     }
 
     public function setSlug(string $slug): static

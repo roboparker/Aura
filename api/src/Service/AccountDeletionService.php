@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\Comment;
 use App\Entity\Feedback;
 use App\Entity\MediaObject;
+use App\Entity\Organization;
 use App\Entity\Page;
 use App\Entity\Board;
 use App\Entity\Space;
@@ -162,6 +163,7 @@ final class AccountDeletionService
             $this->reassign(MediaObject::class, 'owner', $user, $sentinel);
 
             $this->handleSpaces($user, $userId);
+            $this->handlePersonalOrganization($user);
 
             $managed = $this->em->find(User::class, $userId);
             if (null !== $managed) {
@@ -252,6 +254,24 @@ final class AccountDeletionService
             } else {
                 $this->em->remove($space);
             }
+        }
+    }
+
+    /**
+     * The user's personal organization is their own account — it exists only to
+     * own their spaces and hold their plan, so it goes with them (#billing
+     * Phase 2). Shared organizations they merely belonged to are untouched;
+     * their membership row clears via CASCADE, and the account itself outlives
+     * them.
+     */
+    private function handlePersonalOrganization(User $user): void
+    {
+        $personal = $this->em->getRepository(Organization::class)
+            ->findOneBy(['createdBy' => $user, 'isPersonal' => true]);
+        if (null !== $personal) {
+            // Any space still attached cascades away with it at the DB layer,
+            // which is what should happen — those are this user's own spaces.
+            $this->em->remove($personal);
         }
     }
 

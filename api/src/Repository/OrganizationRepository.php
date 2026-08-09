@@ -39,6 +39,17 @@ final class OrganizationRepository extends ServiceEntityRepository
     }
 
     /**
+     * The user's personal organization — their own account. At most one exists;
+     * the partial unique index `uniq_organization_personal_per_user` guarantees
+     * it, and we still take the first hit defensively in case that index is
+     * ever dropped in a migration.
+     */
+    public function findPersonalFor(User $user): ?Organization
+    {
+        return $this->findOneBy(['createdBy' => $user, 'isPersonal' => true]);
+    }
+
+    /**
      * Soft-deleted organizations whose grace period has lapsed, so the purge
      * may hard-delete them. Ordered oldest-first so a backlog drains in the
      * order the deletions were requested.

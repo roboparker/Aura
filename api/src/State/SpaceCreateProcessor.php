@@ -9,6 +9,7 @@ use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\User;
 use App\Security\AuthenticatedUserResolver;
+use App\Service\PersonalOrganizationProvisioner;
 use App\Service\SpaceMemberAdder;
 use App\Service\SpaceRoleSeeder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,6 +46,7 @@ final class SpaceCreateProcessor implements ProcessorInterface
         private EntityManagerInterface $em,
         private SpaceMemberAdder $memberAdder,
         private SpaceRoleSeeder $roleSeeder,
+        private PersonalOrganizationProvisioner $personalOrganizations,
     ) {
     }
 
@@ -59,8 +61,8 @@ final class SpaceCreateProcessor implements ProcessorInterface
         $data->setIsPersonal(false);
 
         // A space can be created under an organization (owner = that org) — the
-        // caller must be a non-guest member of it. Otherwise it's a personal
-        // space owned by the creator (organization stays null). #billing Phase 1
+        // caller must be a non-guest member of it. Otherwise it falls back to
+        // the creator's own personal organization (#billing Phase 2).
         $organization = $data->getOrganization();
         if (null !== $organization) {
             $role = $organization->roleFor($user);
@@ -73,6 +75,13 @@ final class SpaceCreateProcessor implements ProcessorInterface
             if ($organization->isDeleted()) {
                 throw new AccessDeniedHttpException('This organization is scheduled for deletion.');
             }
+        } else {
+            // No organization named: the space belongs to the creator's own
+            // account (#billing Phase 2). Previously this left `organization`
+            // null, which is the branch the whole phase exists to remove — every
+            // space now has an account behind it, so the plan that governs it is
+            // always a single lookup away.
+            $data->setOrganization($this->personalOrganizations->provision($user));
         }
 
         $membership = (new SpaceMembership())
