@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import PageHeader from "@/components/common/PageHeader";
+import RecentlyDeletedList from "@/components/deletion/RecentlyDeletedList";
 import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationsIndex = () => {
@@ -183,6 +184,13 @@ const OrganizationsIndex = () => {
             })}
           </ul>
         )}
+
+        <RecentlyDeletedList
+          endpoint="/organizations/deleted"
+          collectionKey="organizations"
+          hrefFor={(id) => `/organizations/${id}/settings`}
+          noun="organization"
+        />
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

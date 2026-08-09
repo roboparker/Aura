@@ -195,7 +195,9 @@ export const DeleteAccountDialog = ({
           ...feedback,
         }),
       });
-      if (!res.ok && res.status !== 204) {
+      // 202: the deletion is scheduled, not done — the account enters its
+      // grace period and the restore link is on its way.
+      if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed to delete account.");
       }
@@ -213,9 +215,25 @@ export const DeleteAccountDialog = ({
         <DialogHeader>
           <DialogTitle className="text-destructive">Delete your account</DialogTitle>
           <DialogDescription>
-            This permanently deletes {email}. Type your email and confirm.
+            You&apos;ll have 30 days to change your mind. Type your email and
+            confirm.
           </DialogDescription>
         </DialogHeader>
+        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+          <p className="font-medium">What happens now</p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-4 text-muted-foreground">
+            <li>You&apos;re signed out and can&apos;t sign in again.</li>
+            <li>Any active subscription is cancelled straight away.</li>
+            <li>
+              We&apos;ll email {email} a link that restores your account, valid
+              for 30 days.
+            </li>
+            <li>
+              After 30 days your account and the content you authored are
+              permanently deleted. <em>That</em> can&apos;t be undone.
+            </li>
+          </ul>
+        </div>
         {error && (
           <Alert variant="destructive">
             <AlertDescription>{error}</AlertDescription>

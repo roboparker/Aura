@@ -21,6 +21,7 @@ import SpaceConnectCard from "@/components/spaces/SpaceConnectCard";
 import InvoiceBrandingCard from "@/components/spaces/InvoiceBrandingCard";
 import ExpenseCategoriesCard from "@/components/spaces/ExpenseCategoriesCard";
 import DeleteSpaceDialog from "@/components/spaces/DeleteSpaceDialog";
+import ScheduledDeletionBanner from "@/components/deletion/ScheduledDeletionBanner";
 import ChangeVisibilityDialog from "@/components/spaces/ChangeVisibilityDialog";
 import { pageTitle } from "@/lib/pageTitle";
 
@@ -126,6 +127,28 @@ const SpaceSettings = () => {
       setError(err instanceof Error ? err.message : "Failed to load space.");
     }
   }, [spaceId, user]);
+
+  const restoreSpace = useCallback(
+    async (credential: string) => {
+      const twoFactorEnabled = user?.twoFactor?.enabled ?? false;
+      const res = await fetch(`${ENTRYPOINT}/spaces/${spaceId}/restore`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          twoFactorEnabled
+            ? { totpCode: credential.trim() }
+            : { currentPassword: credential },
+        ),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not restore this space.");
+      }
+      await load();
+    },
+    [spaceId, user, load],
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -285,6 +308,17 @@ const SpaceSettings = () => {
         <title>{pageTitle("Space settings", space.name)}</title>
       </Head>
       <div className="mx-auto max-w-5xl px-4 py-8 pb-24">
+        {space.deletedAt && (
+          <div className="mb-6">
+            <ScheduledDeletionBanner
+              targetType="space"
+              name={space.name}
+              purgeAfter={space.purgeAfter}
+              twoFactorEnabled={user?.twoFactor?.enabled ?? false}
+              onRestore={restoreSpace}
+            />
+          </div>
+        )}
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Space settings</h1>
           <p className="text-sm text-muted-foreground">
@@ -487,12 +521,11 @@ const SpaceSettings = () => {
                       Delete this space
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Permanently removes {space.name} and all{" "}
-                      {space.boardsCount} board
+                      Removes {space.name} and all {space.boardsCount} board
                       {space.boardsCount === 1 ? "" : "s"} and{" "}
                       {space.pagesCount} page
-                      {space.pagesCount === 1 ? "" : "s"}. This can&apos;t be
-                      undone.
+                      {space.pagesCount === 1 ? "" : "s"}. Restorable for 30
+                      days — we&apos;ll email every admin a link.
                     </p>
                   </div>
                   <Button

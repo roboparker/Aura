@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { SkeletonList } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import PageHeader from "@/components/common/PageHeader";
+import RecentlyDeletedList from "@/components/deletion/RecentlyDeletedList";
 import SpaceCard from "@/components/spaces/SpaceCard";
 import { pageTitle } from "@/lib/pageTitle";
 
@@ -270,6 +271,13 @@ const SpacesIndex = () => {
             ))}
           </ul>
         )}
+
+        <RecentlyDeletedList
+          endpoint="/spaces/deleted"
+          collectionKey="spaces"
+          hrefFor={(id) => `/spaces/${id}/settings`}
+          noun="space"
+        />
       </div>
     </>
   );

@@ -6,19 +6,31 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { apiGet, ApiError } from "@/lib/apiClient";
+import { ENTRYPOINT } from "@/config/entrypoint";
 import { type Organization } from "@/lib/organizationTypes";
 import { Button } from "@/components/ui/button";
 import AccountBillingCard from "@/components/billing/AccountBillingCard";
+import DeleteOrganizationDialog from "@/components/organizations/DeleteOrganizationDialog";
+import ScheduledDeletionBanner from "@/components/deletion/ScheduledDeletionBanner";
 import { pageTitle } from "@/lib/pageTitle";
 
 const OrganizationSettings = () => {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const router = useRouter();
   const orgId = typeof router.query.id === "string" ? router.query.id : null;
 
   const [org, setOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
+  const twoFactorEnabled = Boolean(user?.twoFactor?.enabled);
+  // Deleting or restoring the account is the owner's call — admins manage
+  // members and settings, which is a different thing from ending the account.
+  const isOwner =
+    org?.memberList?.some(
+      (m) => m.role === "owner" && m.user.id === user?.id,
+    ) ?? false;
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -43,6 +55,27 @@ const OrganizationSettings = () => {
   useEffect(() => {
     if (isAuthenticated && orgId) void load();
   }, [isAuthenticated, orgId, load]);
+
+  const restore = useCallback(
+    async (credential: string) => {
+      const res = await fetch(`${ENTRYPOINT}/organizations/${orgId}/restore`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          twoFactorEnabled
+            ? { totpCode: credential.trim() }
+            : { currentPassword: credential },
+        ),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Could not restore this organization.");
+      }
+      await load();
+    },
+    [orgId, twoFactorEnabled, load],
+  );
 
   if (authLoading || !isAuthenticated) {
     return (
@@ -88,17 +121,67 @@ const OrganizationSettings = () => {
           </div>
         </div>
 
+        {org?.deletedAt && (
+          <div className="mb-6">
+            <ScheduledDeletionBanner
+              targetType="organization"
+              name={org.name}
+              purgeAfter={org.purgeAfter}
+              twoFactorEnabled={twoFactorEnabled}
+              onRestore={restore}
+            />
+          </div>
+        )}
+
         {loading && !org ? (
           <p className="text-muted-foreground">Loading…</p>
         ) : (
-          <AccountBillingCard
-            endpointBase={`/organizations/${orgId}/billing`}
-            upgradeLabel="Business"
-            upgradeBlurb="Unlimited members, automations, reporting, SSO, and AI assist for everyone in the organization."
-            enterpriseNote
-          />
+          <>
+            <AccountBillingCard
+              endpointBase={`/organizations/${orgId}/billing`}
+              upgradeLabel="Business"
+              upgradeBlurb="Unlimited members, automations, reporting, SSO, and AI assist for everyone in the organization."
+              enterpriseNote
+            />
+
+            {org && isOwner && !org.deletedAt && (
+              <section className="mt-8 rounded-lg border border-destructive/40 p-4">
+                <h2 className="text-sm font-semibold text-destructive">
+                  Danger zone
+                </h2>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Delete this organization</p>
+                    <p className="text-sm text-muted-foreground">
+                      Every space it owns goes with it. You&apos;ll have 30 days
+                      to undo, and we&apos;ll email every owner a restore link.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setDeleteOpen(true)}
+                  >
+                    Delete organization
+                  </Button>
+                </div>
+              </section>
+            )}
+          </>
         )}
       </div>
+
+      {org && (
+        <DeleteOrganizationDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          organization={org}
+          twoFactorEnabled={twoFactorEnabled}
+          onScheduled={() => {
+            setDeleteOpen(false);
+            void load();
+          }}
+        />
+      )}
     </>
   );
 };
