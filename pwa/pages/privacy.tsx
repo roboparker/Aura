@@ -98,14 +98,27 @@ const Privacy = () => (
             <h2 className="text-xl font-semibold mb-2">4. Data retention</h2>
             <p className="text-muted-foreground">
               We retain your account data and content for as long as your
-              account is active. When you delete your account, we delete your
-              personal data — your profile, credentials, sessions, tokens, and
-              notifications — within a reasonable period, except where
+              account is active.
+            </p>
+            <p className="text-muted-foreground mt-3">
+              When you delete your account, it enters a{" "}
+              <strong className="text-foreground">30-day recovery period</strong>
+              . During that time you can&apos;t sign in, and we email you a link
+              that restores the account if you change your mind. After 30 days
+              we permanently delete your personal data — your profile,
+              credentials, sessions, tokens, and notifications — except where
               retention is required for legal, security, or fraud-prevention
-              purposes. Content you contributed to shared spaces (such as
-              tasks, pages, comments, and attachments) may remain
-              available to the other members of those spaces, disassociated
-              from your identity.
+              purposes. The same 30-day window applies to deleting a space or an
+              organization.
+            </p>
+            <p className="text-muted-foreground mt-3">
+              Content you contributed to shared spaces (such as tasks, pages,
+              comments, and attachments) may remain available to the other
+              members of those spaces, disassociated from your identity.
+            </p>
+            <p className="text-muted-foreground mt-3">
+              If you need your data erased sooner than the 30-day window, contact
+              us and an administrator can delete it immediately.
             </p>
           </section>
 
