@@ -605,9 +605,6 @@ class BillingTest extends ApiTestCase
     }
 
     /**
-     * @param list<string> $roles
-     */
-    /**
      * The user's personal organization, provisioning it if this test built the
      * user by direct persistence (which skips the signup provisioner).
      */
@@ -620,6 +617,9 @@ class BillingTest extends ApiTestCase
         return $org;
     }
 
+    /**
+     * @param list<string> $roles
+     */
     private function createUser(string $email, array $roles = ['ROLE_USER']): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
