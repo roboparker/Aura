@@ -226,8 +226,13 @@ class Space implements SoftDeletable
      * GitHub-style split: a space belongs to a person or an org, never both. The
      * plan a space runs on resolves through this owner (see PlanGate).
      */
+    // NOT NULL as of Phase 2 step 3: every space belongs to an account. The
+    // PHP type stays nullable because the property is unset between `new
+    // Space()` and the point SpaceCreateProcessor or
+    // SpaceOrganizationDefaultListener fills it — the database is what
+    // guarantees no such row is ever written.
     #[ORM\ManyToOne(targetEntity: Organization::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['space:read', 'space:write'])]
     private ?Organization $organization = null;
 
