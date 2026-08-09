@@ -4,11 +4,10 @@ namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use App\Deletion\PurgeRunner;
-use App\Deletion\SoftDeletionService;
-use App\Entity\RestoreToken;
 use App\Entity\Space;
 use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Test\MailerAssertionsTrait;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
@@ -21,6 +20,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 class RestoreLinkTest extends ApiTestCase
 {
+    use MailerAssertionsTrait;
+
     private const PASSWORD = 'Password123!@#';
 
     private EntityManagerInterface $entityManager;
@@ -55,7 +56,7 @@ class RestoreLinkTest extends ApiTestCase
         ]);
         $this->assertResponseStatusCodeSame(202);
 
-        $token = $this->plainTokenFor('account');
+        $token = $this->plainTokenFromEmail();
 
         // A brand-new client with no session at all — the account can't sign
         // in, so this is the only way back.
@@ -68,8 +69,8 @@ class RestoreLinkTest extends ApiTestCase
         $anonymous->request('POST', '/restore/' . $token);
         $this->assertResponseIsSuccessful();
 
-        $this->entityManager->clear();
-        $restored = $this->entityManager->getRepository(User::class)
+        $this->em()->clear();
+        $restored = $this->em()->getRepository(User::class)
             ->findOneBy(['email' => 'leaver@example.com']);
         $this->assertNotNull($restored);
         $this->assertFalse($restored->isDeleted(), 'the account should be live again');
@@ -90,7 +91,7 @@ class RestoreLinkTest extends ApiTestCase
             'headers' => ['Content-Type' => 'application/json'],
         ]);
 
-        $token = $this->plainTokenFor('account');
+        $token = $this->plainTokenFromEmail();
         $anonymous = static::createClient();
         $anonymous->request('POST', '/restore/' . $token);
         $this->assertResponseIsSuccessful();
@@ -147,7 +148,7 @@ class RestoreLinkTest extends ApiTestCase
             ],
             'headers' => ['Content-Type' => 'application/json'],
         ]);
-        $token = $this->plainTokenFor('account');
+        $token = $this->plainTokenFromEmail();
 
         $purge = static::getContainer()->get(PurgeRunner::class);
         $purge->run(new \DateTimeImmutable('+31 days'));
@@ -179,8 +180,8 @@ class RestoreLinkTest extends ApiTestCase
         $this->assertResponseIsSuccessful();
 
         // Row survives, but drops out of the listing.
-        $this->entityManager->clear();
-        $space = $this->entityManager->getRepository(Space::class)->find($spaceId);
+        $this->em()->clear();
+        $space = $this->em()->getRepository(Space::class)->find($spaceId);
         $this->assertNotNull($space);
         $this->assertTrue($space->isDeleted());
 
@@ -189,25 +190,38 @@ class RestoreLinkTest extends ApiTestCase
 
         // ...and is reachable again through the recovery listing.
         $deleted = $client->request('GET', '/spaces/deleted')->toArray();
-        $this->assertCount(1, $deleted['spaces']);
+        $deletedSpaces = $deleted['spaces'];
+        $this->assertIsArray($deletedSpaces);
+        $this->assertCount(1, $deletedSpaces);
     }
 
-    /** The plaintext token isn't stored, so re-mint the hash lookup by brute mapping. */
-    private function plainTokenFor(string $targetType): string
+    /**
+     * Pull the token out of the email we actually sent.
+     *
+     * The plaintext is deliberately never stored — only its hash is — so
+     * reading it back from the message is both the only way and the more
+     * honest test: it proves the link that lands in someone's inbox is the one
+     * that works, rather than a token the test minted for itself.
+     */
+    private function plainTokenFromEmail(): string
     {
-        // The service hands the plaintext only to the mailer, so tests can't
-        // read it back. Re-issue deterministically instead: replace the stored
-        // row's hash with one we know, which exercises the same lookup path.
-        $row = $this->entityManager->getRepository(RestoreToken::class)
-            ->findOneBy(['targetType' => $targetType]);
-        $this->assertNotNull($row, 'deletion should have minted a restore token');
+        $message = $this->getMailerMessage();
+        $this->assertNotNull($message, 'scheduling a deletion should send a notice email');
+        $body = $message->toString();
 
-        $plain = bin2hex(random_bytes(32));
-        $reflection = new \ReflectionProperty(RestoreToken::class, 'tokenHash');
-        $reflection->setValue($row, hash('sha256', $plain));
-        $this->entityManager->flush();
+        $matched = preg_match('#/restore/([0-9a-f]{64})#', $body, $matches);
+        $this->assertSame(1, $matched, 'the email should carry a restore link');
 
-        return $plain;
+        return $matches[1];
+    }
+
+    /** Re-acquire the EM: creating a client reboots the kernel. */
+    private function em(): EntityManagerInterface
+    {
+        $em = static::getContainer()->get('doctrine')->getManager();
+        assert($em instanceof EntityManagerInterface);
+
+        return $em;
     }
 
     private function createUser(string $email): User
