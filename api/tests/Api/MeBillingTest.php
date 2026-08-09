@@ -119,13 +119,26 @@ class MeBillingTest extends ApiTestCase
     private function seedPersonalSubscription(User $user, string $plan): void
     {
         $subscription = (new Subscription())
-            ->setOwnerUser($user)
+            ->setOrganization($this->personalOrgOf($user))
             ->setPlan($plan)
             ->setStatus(Subscription::STATUS_ACTIVE)
             ->setStripeCustomerId('cus_p')
             ->setStripeSubscriptionId('sub_' . bin2hex(random_bytes(4)));
         $this->entityManager->persist($subscription);
         $this->entityManager->flush();
+    }
+
+    /**
+     * The user's personal organization, provisioning it if this test built the
+     * user by direct persistence (which skips the signup provisioner).
+     */
+    private function personalOrgOf(User $user): AppntityOrganization
+    {
+        $provisioner = static::getContainer()->get(AppServicePersonalOrganizationProvisioner::class);
+        $org = $provisioner->provision($user);
+        $this->entityManager->flush();
+
+        return $org;
     }
 
     private function createUser(string $email): User
