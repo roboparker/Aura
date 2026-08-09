@@ -140,13 +140,19 @@ final class TaskOwnerExtension implements QueryCollectionExtensionInterface, Que
             'SELECT 1 FROM %s task_access_group_obj JOIN task_access_group_obj.memberships task_access_group_member WHERE task_access_group_obj.space = tp_access.space AND task_access_group_member.user = :currentUser',
             UserGroup::class,
         );
+        // ...and not in an organization that's mid-deletion — including via the
+        // owner branch, since a board task in a deleted org is that org's
+        // content whoever happens to own the row. A standalone task has no
+        // board, so `tp_access.space` is NULL, the inner subquery matches
+        // nothing, and the NOT EXISTS leaves it visible.
         $queryBuilder
             ->leftJoin(sprintf('%s.board', $rootAlias), 'tp_access')
             ->andWhere(sprintf(
-                '(%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s))',
+                '((%s.owner = :currentUser OR EXISTS(%s) OR EXISTS(%s)) AND %s)',
                 $rootAlias,
                 $directSubquery,
                 $groupSubquery,
+                SpaceMembershipDql::spaceOrganizationIsLive('tp_access', 'task_org'),
             ))
             ->setParameter('currentUser', $user);
     }

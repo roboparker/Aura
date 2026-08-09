@@ -31,12 +31,14 @@ class CancellationFeedback
     public const CONTEXT_ACCOUNT_DEACTIVATION = 'account_deactivation';
     public const CONTEXT_ACCOUNT_DELETION = 'account_deletion';
     public const CONTEXT_SUBSCRIPTION_CANCELLATION = 'subscription_cancellation';
+    public const CONTEXT_ORGANIZATION_DELETION = 'organization_deletion';
 
     /** @var list<string> */
     public const CONTEXTS = [
         self::CONTEXT_ACCOUNT_DEACTIVATION,
         self::CONTEXT_ACCOUNT_DELETION,
         self::CONTEXT_SUBSCRIPTION_CANCELLATION,
+        self::CONTEXT_ORGANIZATION_DELETION,
     ];
 
     public const REASON_TOO_EXPENSIVE = 'too_expensive';

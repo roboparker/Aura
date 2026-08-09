@@ -112,6 +112,76 @@ class StripeGatewayTest extends TestCase
         $gateway->createCheckoutSession('price_1', 1, 'https://ok', 'https://no', 'cus_1', null, []);
     }
 
+    /**
+     * Seat sync (#billing Phase 1c). Quantity lives on the subscription
+     * *item*, so the gateway reads the subscription first and updates the item
+     * it finds — these pin that two-call shape.
+     */
+    public function testUpdateSubscriptionQuantityUpdatesTheItem(): void
+    {
+        $read = new MockResponse((string) json_encode([
+            'id' => 'sub_1',
+            'items' => ['data' => [['id' => 'si_1', 'quantity' => 3]]],
+        ]));
+        $write = new MockResponse((string) json_encode(['id' => 'si_1', 'quantity' => 7]));
+        $gateway = new StripeGateway(new MockHttpClient([$read, $write]), 'sk_test', self::SECRET);
+
+        $gateway->updateSubscriptionQuantity('sub_1', 7);
+
+        $this->assertStringContainsString('/subscriptions/sub_1', $read->getRequestUrl());
+        $this->assertSame('POST', $write->getRequestMethod());
+        $this->assertStringContainsString('/subscription_items/si_1', $write->getRequestUrl());
+    }
+
+    public function testUpdateSubscriptionQuantitySkipsAWriteWhenAlreadyCorrect(): void
+    {
+        $read = new MockResponse((string) json_encode([
+            'id' => 'sub_1',
+            'items' => ['data' => [['id' => 'si_1', 'quantity' => 4]]],
+        ]));
+        // Only one response queued: a second HTTP call would exhaust the mock
+        // and fail, which is precisely the assertion — an unchanged quantity
+        // must not generate a spurious proration line.
+        $gateway = new StripeGateway(new MockHttpClient([$read]), 'sk_test', self::SECRET);
+
+        $gateway->updateSubscriptionQuantity('sub_1', 4);
+
+        $this->assertStringContainsString('/subscriptions/sub_1', $read->getRequestUrl());
+    }
+
+    public function testUpdateSubscriptionQuantityRejectsAMultiItemSubscription(): void
+    {
+        // Picking an item at random would silently bill the wrong line.
+        $read = new MockResponse((string) json_encode([
+            'id' => 'sub_1',
+            'items' => ['data' => [['id' => 'si_1'], ['id' => 'si_2']]],
+        ]));
+        $gateway = new StripeGateway(new MockHttpClient([$read]), 'sk_test', self::SECRET);
+
+        $this->expectException(BillingException::class);
+        $gateway->updateSubscriptionQuantity('sub_1', 2);
+    }
+
+    public function testUpdateSubscriptionQuantityRejectsZeroSeats(): void
+    {
+        $gateway = new StripeGateway(new MockHttpClient([]), 'sk_test', self::SECRET);
+
+        $this->expectException(BillingException::class);
+        $gateway->updateSubscriptionQuantity('sub_1', 0);
+    }
+
+    public function testUpdateSubscriptionQuantityRejectsAnItemWithoutAnId(): void
+    {
+        $read = new MockResponse((string) json_encode([
+            'id' => 'sub_1',
+            'items' => ['data' => [['quantity' => 1]]],
+        ]));
+        $gateway = new StripeGateway(new MockHttpClient([$read]), 'sk_test', self::SECRET);
+
+        $this->expectException(BillingException::class);
+        $gateway->updateSubscriptionQuantity('sub_1', 2);
+    }
+
     public function testCreateBillingPortalSessionReturnsUrl(): void
     {
         $response = new MockResponse((string) json_encode(['url' => 'https://portal.stripe.test/p1']));

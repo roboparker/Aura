@@ -27,6 +27,14 @@ final class SubscriptionRepository extends ServiceEntityRepository
     /** The organization's current entitling subscription (newest), or null. */
     public function findActiveForOrganization(Organization $organization): ?Subscription
     {
+        // A deleted org stops entitling the moment it's deleted, not when the
+        // cancellation webhook lands. Reading the flag here rather than waiting
+        // for `status` to flip closes the window where the account is gone from
+        // every listing but its members still hold its plan.
+        if ($organization->isDeleted()) {
+            return null;
+        }
+
         return $this->newestEntitling('s.organization = :account', 'account', $organization);
     }
 
@@ -104,7 +112,7 @@ final class SubscriptionRepository extends ServiceEntityRepository
 
         $orgPlans = $em->createQuery(sprintf(
             'SELECT DISTINCT s.plan FROM %s s JOIN s.organization o JOIN o.memberships m'
-            . ' WHERE m.user = :user AND s.status IN (:statuses)',
+            . ' WHERE m.user = :user AND s.status IN (:statuses) AND o.deletedAt IS NULL',
             Subscription::class,
         ))->setParameter('user', $user)->setParameter('statuses', Subscription::ENTITLING_STATUSES)
             ->getSingleColumnResult();

@@ -126,14 +126,19 @@ final class CommentAccessExtension implements QueryCollectionExtensionInterface,
             ->leftJoin(sprintf('%s.page', $rootAlias), 'ca_page')
             ->leftJoin(sprintf('%s.feedback', $rootAlias), 'ca_feedback')
             ->andWhere(sprintf(
-                '(ca_task.id IS NOT NULL AND (%s OR EXISTS(%s) OR EXISTS(%s)))
-                 OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)))
+                '(ca_task.id IS NOT NULL AND (%s OR EXISTS(%s) OR EXISTS(%s)) AND %s)
+                 OR (ca_page.id IS NOT NULL AND (EXISTS(%s) OR EXISTS(%s)) AND %s)
                  OR ca_feedback.id IS NOT NULL',
                 $taskOwnerCheck,
                 $taskSpaceDirect,
                 $taskSpaceGroup,
+                // Both content branches also drop out when the owning
+                // organization is mid-deletion (#billing Phase 1c). Feedback is
+                // instance-level and has no space, so it's unaffected.
+                SpaceMembershipDql::spaceOrganizationIsLive('ca_board', 'ca_t_org'),
                 $pageSpaceDirect,
                 $pageSpaceGroup,
+                SpaceMembershipDql::spaceOrganizationIsLive('ca_page', 'ca_p_org'),
             ))
             ->setParameter('currentUser', $user);
     }

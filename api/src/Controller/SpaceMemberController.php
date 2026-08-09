@@ -2,10 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Entity\SpaceRole;
 use App\Entity\User;
+use App\Service\OrganizationSeatSync;
 use App\Service\SpaceMemberAdder;
 use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +34,7 @@ class SpaceMemberController extends AbstractController
         private SpaceMemberAdder $memberAdder,
         private ValidatorInterface $validator,
         private UsageLimiter $usageLimiter,
+        private OrganizationSeatSync $seatSync,
     ) {
     }
 
@@ -97,7 +100,16 @@ class SpaceMemberController extends AbstractController
             return $this->json(['error' => 'Role must be one of: admin, member.'], 422);
         }
 
-        $result = $this->memberAdder->add($space, $email, $user, $role);
+        // Optional escape hatch from the space-role → org-role mirror (#billing
+        // Phase 1c): an org admin adding a collaborator who should be a full
+        // seat rather than the guest the mirror would infer can say so. Owner is
+        // excluded — account ownership is not something a space endpoint grants.
+        $orgRole = $this->readOrgRole($space, $payload, $user);
+        if ($orgRole instanceof JsonResponse) {
+            return $orgRole;
+        }
+
+        $result = $this->memberAdder->add($space, $email, $user, $role, $orgRole);
         if ('already_member' === $result['status']) {
             return $this->json(['error' => 'That user is already a member.'], 409);
         }
@@ -106,12 +118,21 @@ class SpaceMemberController extends AbstractController
 
         if ('added' === $result['status']) {
             $candidate = $result['user'];
+            // After the flush: the sync handler re-reads the roster, so an
+            // earlier dispatch would push the count from before this add.
+            $this->seatSync->scheduleIfBillable($space->getOrganization(), $result['orgRole']);
+
             return $this->json([
                 'status' => 'added',
                 'id' => (string) $candidate->getId(),
                 '@id' => '/users/' . $candidate->getId(),
                 'email' => $candidate->getEmail(),
                 'role' => $role,
+                // The org role they now hold, so the caller can see that adding
+                // someone to an org space also placed them in the org (and
+                // whether that consumed a seat) rather than discovering it on
+                // the next invoice.
+                'organizationRole' => $result['orgRole'],
             ], 200);
         }
 
@@ -214,6 +235,44 @@ class SpaceMemberController extends AbstractController
             'id' => (string) $membership->getId(),
             'role' => $membership->getRole(),
         ], 200);
+    }
+
+    /**
+     * Read the optional `orgRole` override, or a JsonResponse error. Returns
+     * null when absent — the mirror in {@see SpaceMemberAdder} then applies.
+     *
+     * Gated on org-admin because it decides whether the added person occupies a
+     * paid seat: a space admin who isn't an org admin can add collaborators,
+     * but not unilaterally raise the organization's bill.
+     *
+     * @param array<int|string, mixed> $payload
+     */
+    private function readOrgRole(Space $space, array $payload, User $user): string|JsonResponse|null
+    {
+        if (!array_key_exists('orgRole', $payload) || null === $payload['orgRole']) {
+            return null;
+        }
+        $organization = $space->getOrganization();
+        if (null === $organization) {
+            return $this->json(['error' => 'This space is not owned by an organization.'], 422);
+        }
+        if (!$this->isGranted('ROLE_ADMIN') && !$organization->isAdmin($user)) {
+            return $this->json(['error' => 'Only organization admins can set an organization role.'], 403);
+        }
+
+        $orgRole = $payload['orgRole'];
+        if (
+            !is_string($orgRole)
+            || Organization::ROLE_OWNER === $orgRole
+            || !in_array($orgRole, Organization::ALLOWED_ROLES, true)
+        ) {
+            return $this->json(
+                ['error' => 'orgRole must be one of: admin, billing, member, guest.'],
+                422,
+            );
+        }
+
+        return $orgRole;
     }
 
     /**

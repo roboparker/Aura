@@ -5,14 +5,13 @@ namespace App\Controller;
 use App\Entity\Space;
 use App\Entity\SpaceExport;
 use App\Entity\User;
-use App\Message\GenerateSpaceExport;
+use App\Service\SpaceExportRequester;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
@@ -38,7 +37,7 @@ class SpaceExportController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private MessageBusInterface $bus,
+        private SpaceExportRequester $exportRequester,
     ) {
     }
 
@@ -62,22 +61,13 @@ class SpaceExportController extends AbstractController
             return $this->json(['error' => 'Only space admins can export space data.'], 403);
         }
 
-        $inFlight = $this->em->getRepository(SpaceExport::class)->findOneBy([
-            'space' => $space,
-            'status' => [SpaceExport::STATUS_PENDING, SpaceExport::STATUS_PROCESSING],
-        ]);
-        if (null !== $inFlight) {
+        $export = $this->exportRequester->request($space, $user);
+        if (null === $export) {
             return $this->json(
                 ['error' => 'An export of this space is already being prepared. You\'ll get an email when it\'s ready.'],
                 409,
             );
         }
-
-        $export = new SpaceExport($space, $user);
-        $this->em->persist($export);
-        $this->em->flush();
-
-        $this->bus->dispatch(new GenerateSpaceExport((string) $export->getId()));
 
         return $this->json([
             'id' => (string) $export->getId(),

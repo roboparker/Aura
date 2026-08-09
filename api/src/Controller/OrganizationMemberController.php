@@ -4,6 +4,8 @@ namespace App\Controller;
 
 use App\Entity\Organization;
 use App\Entity\User;
+use App\Service\OrganizationGuestPolicy;
+use App\Service\OrganizationSeatSync;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -20,8 +22,11 @@ use Symfony\Component\Uid\Uuid;
  */
 class OrganizationMemberController extends AbstractController
 {
-    public function __construct(private EntityManagerInterface $em)
-    {
+    public function __construct(
+        private EntityManagerInterface $em,
+        private OrganizationSeatSync $seatSync,
+        private OrganizationGuestPolicy $guestPolicy,
+    ) {
     }
 
     #[Route('/organizations/{id}/members', name: 'organization_add_member', methods: ['POST'])]
@@ -46,6 +51,7 @@ class OrganizationMemberController extends AbstractController
 
         $org->addMember($target, $role);
         $this->em->flush();
+        $this->syncSeatsIfBillable($org, $role);
 
         return $this->json(['ok' => true, 'role' => $role], 201);
     }
@@ -62,18 +68,48 @@ class OrganizationMemberController extends AbstractController
             return $this->json(['error' => 'Not a member.'], 404);
         }
 
+        $previous = $org->roleFor($target);
         $role = $this->readRole($this->body($request)['role'] ?? null);
         // Don't let the last owner be demoted.
         if (
-            Organization::ROLE_OWNER === $org->roleFor($target)
+            Organization::ROLE_OWNER === $previous
             && Organization::ROLE_OWNER !== $role
             && $this->ownerCount($org) <= 1
         ) {
             return $this->json(['error' => 'An organization must keep at least one owner.'], 409);
         }
 
+        // Demoting to Guest has to reach back into the spaces they're already
+        // in, or the account would say "guest" while the spaces still said
+        // "admin" (#billing Phase 1c). Refuse when that would strand a space
+        // with no admin — the org admin needs to appoint one first, and doing
+        // it for them by picking an arbitrary member would be worse.
+        $demotingToGuest = Organization::ROLE_GUEST === $role && Organization::ROLE_GUEST !== $previous;
+        if ($demotingToGuest) {
+            $stranded = $this->guestPolicy->spacesSolelyAdminedBy($org, $target);
+            if ([] !== $stranded) {
+                return $this->json([
+                    'error' => 'This member is the only admin of ' . \count($stranded)
+                        . ' space(s). Promote another admin there before making them a guest.',
+                    'spaces' => array_map(
+                        static fn ($space) => ['id' => (string) $space->getId(), 'name' => $space->getName()],
+                        $stranded,
+                    ),
+                ], 409);
+            }
+        }
+
         $org->addMember($target, $role);
+        if ($demotingToGuest) {
+            $this->guestPolicy->applyGuestCap($org, $target);
+        }
         $this->em->flush();
+
+        // A role change crosses the seat boundary in either direction: guest →
+        // anything adds a seat, anything → guest frees one.
+        if (Organization::ROLE_GUEST === $role || Organization::ROLE_GUEST === $previous) {
+            $this->seatSync->schedule($org);
+        }
 
         return $this->json(['ok' => true, 'role' => $role]);
     }
@@ -93,10 +129,22 @@ class OrganizationMemberController extends AbstractController
             return $this->json(['error' => 'An organization must keep at least one owner.'], 409);
         }
 
+        $wasBillable = Organization::ROLE_GUEST !== $org->roleFor($target);
         $org->removeMember($target);
         $this->em->flush();
+        if ($wasBillable) {
+            $this->seatSync->schedule($org);
+        }
 
         return $this->json(['ok' => true]);
+    }
+
+    /** Queue a seat push when the change actually moved the billable count. */
+    private function syncSeatsIfBillable(Organization $org, string $role): void
+    {
+        if (Organization::ROLE_GUEST !== $role) {
+            $this->seatSync->schedule($org);
+        }
     }
 
     private function requireAdmin(string $id, ?User $user): Organization|JsonResponse

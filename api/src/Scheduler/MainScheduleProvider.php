@@ -12,6 +12,7 @@ use App\Message\PruneAccountExports;
 use App\Message\PruneAutomationRuns;
 use App\Message\PruneSpaceExports;
 use App\Message\PullCalendarChanges;
+use App\Message\PurgeDeletedOrganizations;
 use App\Message\RunBackup;
 use App\Message\SendGrowthDigest;
 use App\Message\SendTimesheetNudges;
@@ -126,6 +127,13 @@ final class MainScheduleProvider implements ScheduleProviderInterface
                 // tracked time last week but haven't submitted it
                 // (App\Service\TimesheetNudgeDispatcher).
                 RecurringMessage::cron('0 9 * * 1', new SendTimesheetNudges(), $utc),
+                // Organization purge (#billing Phase 1c): hard-delete orgs whose
+                // 30-day deletion grace period has lapsed
+                // (App\Service\OrganizationDeletionService). 04:20 keeps it
+                // clear of the backup and the export prunes, and running it
+                // daily means the delete lands within a day of the date the
+                // owner was shown — never before it.
+                RecurringMessage::cron('20 4 * * *', new PurgeDeletedOrganizations(), $utc),
             )
             ->stateful($this->cache)
             ->processOnlyLastMissedRun(true)

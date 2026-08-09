@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Doctrine\SpaceMembershipDql;
 use App\Entity\Project;
 use App\Entity\Expense;
 use App\Entity\MediaObject;
@@ -165,7 +166,15 @@ class MediaObjectDownloadController extends AbstractController
             ->select('COUNT(t.id)')
             ->leftJoin('t.board', 'p')
             ->where(':media MEMBER OF t.attachments')
-            ->andWhere(sprintf('(t.owner = :user OR EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
+            ->andWhere(sprintf(
+                '((t.owner = :user OR EXISTS(%s) OR EXISTS(%s)) AND %s)',
+                $directSubquery,
+                $groupSubquery,
+                // A deleted org's attachments stop being served too — this
+                // endpoint hands out bytes, so it can't be the one path that
+                // keeps working after the content is supposed to be gone.
+                SpaceMembershipDql::spaceOrganizationIsLive('p', 'media_dl_org'),
+            ))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)
@@ -204,7 +213,12 @@ class MediaObjectDownloadController extends AbstractController
             ->createQueryBuilder('s')
             ->select('COUNT(s.id)')
             ->where(':media MEMBER OF s.attachments')
-            ->andWhere(sprintf('(EXISTS(%s) OR EXISTS(%s))', $directSubquery, $groupSubquery))
+            ->andWhere(sprintf(
+                '((EXISTS(%s) OR EXISTS(%s)) AND %s)',
+                $directSubquery,
+                $groupSubquery,
+                SpaceMembershipDql::organizationIsLive('s', 'space_attach_org'),
+            ))
             ->setParameter('media', $media)
             ->setParameter('user', $user)
             ->setMaxResults(1)

@@ -36,7 +36,7 @@ final class OrganizationAccessExtension implements
         ?Operation $operation = null,
         array $context = [],
     ): void {
-        $this->applyFilter($queryBuilder, $resourceClass);
+        $this->applyFilter($queryBuilder, $resourceClass, hideDeleted: true);
     }
 
     public function applyToItem(
@@ -47,10 +47,13 @@ final class OrganizationAccessExtension implements
         ?Operation $operation = null,
         array $context = [],
     ): void {
-        $this->applyFilter($queryBuilder, $resourceClass);
+        // Item reads stay open on a soft-deleted org so its members can still
+        // load the "scheduled for deletion, restorable until …" state. Hiding
+        // it here would 404 the very page the owner needs to undo from.
+        $this->applyFilter($queryBuilder, $resourceClass, hideDeleted: false);
     }
 
-    private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass): void
+    private function applyFilter(QueryBuilder $queryBuilder, string $resourceClass, bool $hideDeleted): void
     {
         if (Organization::class !== $resourceClass) {
             return;
@@ -69,5 +72,9 @@ final class OrganizationAccessExtension implements
         $queryBuilder
             ->andWhere(sprintf('EXISTS(%s)', $subquery))
             ->setParameter('orgAccessUser', $user);
+
+        if ($hideDeleted) {
+            $queryBuilder->andWhere(sprintf('%s.deletedAt IS NULL', $rootAlias));
+        }
     }
 }

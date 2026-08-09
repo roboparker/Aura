@@ -314,12 +314,17 @@ an API resource). The PWA mirrors the reason list in
 
 ## Known follow-ups
 
-- **Seat sync** — Checkout sets the initial quantity to the current member
-  count; we don't yet push quantity changes back to Stripe as members come and
-  go (entitlement lifts caps entirely, so seat count is informational today).
+- ~~**Seat sync**~~ — shipped in #billing Phase 1c for **organization**
+  accounts: every membership change queues `SyncOrganizationSeats` and
+  `App\Service\OrganizationSeatSync` pushes `seatCount()` to the subscription
+  item. See `docs/developer/organizations-and-plans.md` § Seat accounting.
+  Legacy *space*-owned subscriptions are not re-sized — they predate the
+  account model and are on their way out.
 - **Invite acceptance** isn't gated by the member cap — already-issued invites
   are always honored; only *new* adds/invites are blocked at the cap.
 - **Individual Pro ($8/mo)** plan is deferred; the Team product covers launch.
+  (Note: the shipped price is **$10/mo**, not $8 — see the pricing page and
+  `PlanCatalog`, which are authoritative.)
 - **Group attach** to a Space isn't cap-checked yet.
 
 ## Client payments via Stripe Connect (#connect)
