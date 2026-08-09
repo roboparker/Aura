@@ -137,6 +137,11 @@ security:
         # Admin account provisioning (#admin-user-create) — creates a sign-in-ready
         # account, so it's an account-creation vector: platform admins only.
         - { path: ^/admin/users, roles: ROLE_ADMIN }
+        # Admin deletion of another person's account / organization / space,
+        # including the immediate (no grace period) variant. The single most
+        # destructive surface in the product — platform admins only, and
+        # step-up verified in the controller on top of this.
+        - { path: ^/admin/deletions, roles: ROLE_ADMIN }
         # Sentry verification triggers (error/worker) — platform admins only.
         - { path: ^/admin/sentry-test, roles: ROLE_ADMIN }
         - { path: ^/admin/growth, roles: ROLE_ADMIN }
