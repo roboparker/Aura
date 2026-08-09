@@ -94,10 +94,52 @@ GitHub, Google and Slack do. The confirmation dialog and the email both state
 the date explicitly. Billing is cancelled at *schedule* time, not at purge —
 charging someone through a window they're locked out of would be indefensible.
 
-If an erasure request needs to be honoured faster than the window, run
-`app:deletions:purge` once the record is past its date, or clear `purge_after`
-manually and re-run. A self-serve "delete permanently now" option was considered
-and deferred.
+**There is deliberately no "delete permanently now" option for end users.** The
+window is the safety property; letting people opt out of it would hand the
+footgun straight back, and the overwhelmingly common case for wanting it —
+"I made a mistake, undo" — is what the window already solves.
+
+Erasure requests that genuinely can't wait are handled by a site admin instead:
+see below.
+
+## Admin deletion
+
+Site admins can delete another person's account, organization, or space, at
+`POST /admin/deletions` (`ROLE_ADMIN`, and step-up verified on top — a stolen
+admin cookie must not be enough for the most destructive surface in the
+product).
+
+Two modes:
+
+- **Scheduled** — identical to a self-service delete, restore link and all.
+  This is the default, because most admin deletions are cleanup rather than
+  emergencies and being reversible costs nothing.
+- **Immediate** (`immediate: true`) — skips the window and purges now. Available
+  *only* here. It exists for erasure requests that can't wait and for abuse
+  takedowns where leaving content live for 30 days isn't acceptable. No undo.
+
+Guards, in order: `ROLE_ADMIN` → a required free-text `reason` → type-to-confirm
+the target's exact name → step-up. An admin gets no easier path than a user
+deleting their own. Deleting your *own* account through this surface is refused
+— that route skips the churn survey and reads as an accident.
+
+**Owner notification is per action** (`notifyOwner`, default true). Someone who
+requested erasure deserves the confirmation; warning a spam account before you
+finish removing it does not help. The notice
+(`emails/admin_deletion.*`) is deliberately separate from the restore email —
+it carries no restore link, because for an immediate deletion that would be a
+lie.
+
+`GET /admin/deletions/user-assets/{id}` lists what deleting a user would strand
+(organizations they solely own, shared spaces they solely administer) so the
+blast radius is a decision rather than a surprise. The default takes none of
+them, preserving the existing promote-or-archive behaviour.
+
+Everything lands in `admin_action_log` (`App\Entity\AdminActionLog`) — **written
+before** the destructive work, so an action that dies half-way still leaves a
+record of what was attempted. Every column but `actor_id` is a snapshot, since
+the row has to outlive its target; `actor_id` is `SET NULL` so it outlives the
+admin too. Readable at `GET /admin/deletions/log`.
 
 ## Exports
 

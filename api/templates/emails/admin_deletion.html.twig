@@ -1,0 +1,27 @@
+<p>Hi {{ recipientName ?: 'there' }},</p>
+
+{% if immediate %}
+    <p>
+        A Madori site administrator has permanently deleted
+        {% if isAccount %}your account{% else %}the {{ noun }} <strong>{{ label }}</strong>{% endif %}.
+    </p>
+    <p>This action cannot be reversed, and the content it held is gone.</p>
+{% else %}
+    <p>
+        A Madori site administrator has scheduled
+        {% if isAccount %}your account{% else %}the {{ noun }} <strong>{{ label }}</strong>{% endif %}
+        for deletion.
+    </p>
+    {% if purgeAfter %}
+        <p>It will be permanently deleted on {{ purgeAfter|date('F j, Y') }}.</p>
+    {% endif %}
+{% endif %}
+
+<p><strong>Reason given:</strong> {{ reason }}</p>
+
+<p>
+    If you believe this was a mistake, reply to this email and an administrator
+    will look into it.
+</p>
+
+<p>&mdash; Madori</p>

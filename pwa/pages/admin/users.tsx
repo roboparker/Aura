@@ -2,7 +2,7 @@ import type { NextPage } from "next";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { UserPlus, VenetianMask } from "lucide-react";
+import { Trash2, UserPlus, VenetianMask } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiGetCollection, apiSend } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import AdminDeleteDialog from "@/components/admin/AdminDeleteDialog";
 import { pageTitle } from "@/lib/pageTitle";
 
 interface AdminUser {
@@ -66,6 +67,8 @@ const AdminUsers: NextPage = () => {
   const [error, setError] = useState<string | null>(null);
   // The user a confirm dialog is currently asking about, or null.
   const [target, setTarget] = useState<AdminUser | null>(null);
+  // The user an admin-deletion dialog is asking about, or null.
+  const [deleteTarget, setDeleteTarget] = useState<AdminUser | null>(null);
   const [busy, setBusy] = useState(false);
 
   // Create-user dialog (#admin-user-create).
@@ -290,6 +293,21 @@ const AdminUsers: NextPage = () => {
                       >
                         <VenetianMask className="h-4 w-4" />
                       </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={isSelf}
+                        onClick={() => setDeleteTarget(u)}
+                        aria-label={`Delete ${displayName(u)}'s account`}
+                        title={
+                          isSelf
+                            ? "Use Settings → Danger zone for your own account"
+                            : "Delete this account"
+                        }
+                        data-testid="users-delete"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   );
                 })}
@@ -484,6 +502,23 @@ const AdminUsers: NextPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {deleteTarget && (
+        <AdminDeleteDialog
+          open
+          onOpenChange={(next) => {
+            if (!next) setDeleteTarget(null);
+          }}
+          targetType="account"
+          targetId={deleteTarget.id}
+          targetLabel={deleteTarget.email}
+          twoFactorEnabled={Boolean(user?.twoFactor?.enabled)}
+          onDone={() => {
+            setDeleteTarget(null);
+            void load();
+          }}
+        />
+      )}
     </>
   );
 };
