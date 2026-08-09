@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Organization;
 use App\Entity\Subscription;
 use App\Entity\Task;
 use App\Entity\User;
 use App\Growth\GrowthMetrics;
+use App\Service\PersonalOrganizationProvisioner;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
