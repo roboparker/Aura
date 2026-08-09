@@ -6,6 +6,7 @@ use App\Entity\Organization;
 use App\Entity\User;
 use App\Service\OrganizationGuestPolicy;
 use App\Service\OrganizationSeatSync;
+use App\Service\UsageLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,6 +27,7 @@ class OrganizationMemberController extends AbstractController
         private EntityManagerInterface $em,
         private OrganizationSeatSync $seatSync,
         private OrganizationGuestPolicy $guestPolicy,
+        private UsageLimiter $usageLimiter,
     ) {
     }
 
@@ -47,6 +49,23 @@ class OrganizationMemberController extends AbstractController
         $target = $this->em->getRepository(User::class)->findOneBy(['email' => $email]);
         if (null === $target) {
             return $this->json(['error' => 'No user with that email. Invites are coming soon.'], 404);
+        }
+
+        // The free seat cap. Guests are free, so only a billable role is
+        // checked — and this is the one place a seat can be taken without
+        // touching a space at all, which is why the check has to live here as
+        // well as on the space endpoint.
+        if (
+            Organization::ROLE_GUEST !== $role
+            && !$org->hasMember($target)
+            && !$this->usageLimiter->canAddMembersToOrganization($org)
+        ) {
+            return $this->json([
+                'error' => sprintf(
+                    'Free organizations are limited to %d seats. Upgrade to add more, or add them as a guest.',
+                    $this->usageLimiter->freeSpaceMemberLimit(),
+                ),
+            ], 402);
         }
 
         $org->addMember($target, $role);

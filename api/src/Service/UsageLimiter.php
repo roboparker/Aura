@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Billing\PlanGate;
+use App\Entity\Organization;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
@@ -153,19 +154,41 @@ final class UsageLimiter
      * free ceiling. Personal spaces (always solo) and subscribed spaces are
      * unbounded. Counts the current effective members (direct + via group).
      */
+    /**
+     * Whether the space's **account** can take another member.
+     *
+     * Counted per organization rather than per space (#billing Phase 2). The
+     * old per-space rule let a free user hold three spaces of five and pay for
+     * none of them, and "5 members per space" was never a sentence anyone could
+     * price against. Guests don't consume seats, so this reads as "N free seats
+     * per account" — which is how the rest of the industry states it.
+     */
     public function canAddMembersToSpace(Space $space, int $count = 1): bool
     {
-        if (!$this->enforcementEnabled || $space->getIsPersonal()) {
+        $organization = $space->getOrganization();
+        if (!$this->enforcementEnabled || $space->getIsPersonal() || null === $organization) {
             return true;
         }
-        // The space's plan sets the member ceiling; paid plans lift it entirely.
-        $limit = $this->planGate->spaceEntitlements($space)->limit('space_members');
+
+        return $this->canAddMembersToOrganization($organization, $count);
+    }
+
+    /**
+     * The cap itself. Exposed directly so the organization member endpoint —
+     * the one place a seat can be taken without touching a space at all —
+     * enforces the same rule rather than a parallel one.
+     */
+    public function canAddMembersToOrganization(Organization $organization, int $count = 1): bool
+    {
+        if (!$this->enforcementEnabled) {
+            return true;
+        }
+        // Paid plans lift the ceiling entirely.
+        $limit = $this->planGate->organizationEntitlements($organization)->limit('space_members');
         if (null === $limit) {
             return true;
         }
 
-        $current = \count($space->getEffectiveUsers());
-
-        return ($current + $count) <= $limit;
+        return ($organization->seatCount() + $count) <= $limit;
     }
 }

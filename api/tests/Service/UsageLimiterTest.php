@@ -139,24 +139,48 @@ class UsageLimiterTest extends KernelTestCase
         $this->assertNull($limiter->remainingMcpCalls($user));
     }
 
-    public function testFreeSpaceMemberCap(): void
+    public function testFreeSeatCapIsCountedPerOrganization(): void
     {
         $alice = $this->createUser('alice@example.com');
         $bob = $this->createUser('bob@example.com');
-        $space = $this->createSpace($alice, 'Team'); // alice is one admin member
-        $this->addMember($space, $bob);              // now two members
+        $space = $this->createSpace($alice, 'Team');
+        $org = $space->getOrganization();
+        $this->assertNotNull($org);
+
+        // Seats are org members, not space members (#billing Phase 2): alice
+        // owns the account, bob takes the second seat.
+        $org->addMember($bob, Organization::ROLE_MEMBER);
+        $this->em->flush();
 
         $limiter = $this->limiter(mcpLimit: 100, memberLimit: 2);
 
-        // At the cap (2 members, limit 2) → no more on free.
+        // At the cap (2 seats, limit 2) → no more on free.
         $this->assertFalse($limiter->canAddMembersToSpace($space));
+        $this->assertFalse($limiter->canAddMembersToOrganization($org));
 
-        // A subscription lifts the cap.
+        // A subscription lifts it entirely.
         $this->createSubscription($space, Subscription::STATUS_ACTIVE);
         $this->em->clear();
         $reloaded = $this->em->getRepository(Space::class)->findOneBy(['name' => 'Team']);
         $this->assertInstanceOf(Space::class, $reloaded);
         $this->assertTrue($limiter->canAddMembersToSpace($reloaded));
+    }
+
+    public function testGuestsDoNotConsumeASeat(): void
+    {
+        $alice = $this->createUser('alice@example.com');
+        $guest = $this->createUser('guest@example.com');
+        $space = $this->createSpace($alice, 'Team');
+        $org = $space->getOrganization();
+        $this->assertNotNull($org);
+
+        $org->addMember($guest, Organization::ROLE_GUEST);
+        $this->em->flush();
+
+        // Two members, but one is free — that is the whole point of the guest
+        // role, and it is what makes "N free seats" a truthful description.
+        $limiter = $this->limiter(mcpLimit: 100, memberLimit: 2);
+        $this->assertTrue($limiter->canAddMembersToOrganization($org));
     }
 
     public function testPersonalSpaceIsNeverCapped(): void
