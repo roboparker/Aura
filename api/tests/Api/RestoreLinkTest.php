@@ -196,6 +196,57 @@ class RestoreLinkTest extends ApiTestCase
         $this->assertCount(1, $deletedSpaces);
     }
 
+    public function testSpaceCanBeRestoredInApp(): void
+    {
+        $user = $this->createUser('admin@example.com');
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        $body = $client->request('POST', '/spaces', [
+            'json' => ['name' => 'Second Thoughts'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $spaceId = $body['id'];
+        $this->assertIsString($spaceId);
+
+        $client->request('DELETE', '/spaces/' . $spaceId, [
+            'json' => ['currentPassword' => self::PASSWORD],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        // The in-app path, for an admin who's already signed in and doesn't
+        // want to go hunting through their inbox.
+        $client->request('POST', '/spaces/' . $spaceId . '/restore', [
+            'json' => ['currentPassword' => self::PASSWORD],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $list = $client->request('GET', '/spaces')->toArray();
+        $this->assertSame(1, $list['totalItems'], 'the space should be listed again');
+    }
+
+    public function testRestoringASpaceThatIsNotDeletedIsRejected(): void
+    {
+        $user = $this->createUser('admin@example.com');
+        $client = static::createClient();
+        $client->loginUser($user);
+
+        $body = $client->request('POST', '/spaces', [
+            'json' => ['name' => 'Perfectly Fine'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $spaceId = $body['id'];
+        $this->assertIsString($spaceId);
+
+        $client->request('POST', '/spaces/' . $spaceId . '/restore', [
+            'json' => ['currentPassword' => self::PASSWORD],
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseStatusCodeSame(409);
+    }
+
     /**
      * Pull the token out of the email we actually sent.
      *
