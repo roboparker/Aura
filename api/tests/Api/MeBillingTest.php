@@ -93,9 +93,12 @@ class MeBillingTest extends ApiTestCase
         $this->entityManager->clear();
         $row = $this->entityManager->getRepository(Subscription::class)->findOneBy(['stripeSubscriptionId' => 'sub_me']);
         $this->assertInstanceOf(Subscription::class, $row);
-        $owner = $row->getOwnerUser();
-        $this->assertNotNull($owner);
-        $this->assertSame((string) $user->getId(), (string) $owner->getId());
+        // A personal plan lands on the buyer's personal organization — their
+        // account — rather than a row pointed at the user.
+        $organization = $row->getOrganization();
+        $this->assertNotNull($organization);
+        $this->assertTrue($organization->getIsPersonal());
+        $this->assertSame((string) $user->getId(), (string) $organization->getCreatedBy()?->getId());
         $this->assertSame('pro', $row->getPlan());
     }
 
