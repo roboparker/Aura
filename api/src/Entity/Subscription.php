@@ -26,9 +26,7 @@ use Symfony\Component\Uid\Uuid;
  */
 #[ORM\Entity(repositoryClass: SubscriptionRepository::class)]
 #[ORM\Table(name: 'subscription')]
-#[ORM\Index(columns: ['space_id'], name: 'idx_subscription_space')]
 #[ORM\Index(columns: ['organization_id'], name: 'idx_subscription_organization')]
-#[ORM\Index(columns: ['owner_user_id'], name: 'idx_subscription_owner_user')]
 #[ORM\Index(columns: ['created_by_id'], name: 'idx_subscription_created_by')]
 #[ORM\UniqueConstraint(name: 'uniq_subscription_stripe_id', columns: ['stripe_subscription_id'])]
 class Subscription
@@ -67,29 +65,22 @@ class Subscription
     private ?Uuid $id = null;
 
     /**
-     * The **account** this subscription pays for (#billing Phase 1b): either an
-     * {@see Organization} (a team account) or a {@see User} (a personal
-     * account) — exactly one is set for new rows. Legacy rows also carry the
-     * originating {@see $space} (now nullable + transitional); resolution goes
-     * account-first, falling back to the space.
+     * The **account** this subscription pays for — always an
+     * {@see Organization} (#billing Phase 2).
+     *
+     * It used to be one of three things: an organization, a user (personal
+     * plan), or a space (pre-account-model). A user's personal organization now
+     * *is* their account, so the other two were different spellings of the same
+     * fact, and every billing surface had to remember which spelling applied.
+     * Both columns are gone.
+     *
+     * Still nullable at the column level only because a subscription outlives
+     * the account it paid for — {@see \App\Service\OrganizationDeletionService::purge()}
+     * detaches it so the billing history survives.
      */
     #[ORM\ManyToOne(targetEntity: Organization::class)]
     #[ORM\JoinColumn(name: 'organization_id', nullable: true, onDelete: 'CASCADE')]
     private ?Organization $organization = null;
-
-    /** The personal account (a User) this subscription pays for, when personal. */
-    #[ORM\ManyToOne(targetEntity: User::class)]
-    #[ORM\JoinColumn(name: 'owner_user_id', nullable: true, onDelete: 'CASCADE')]
-    private ?User $ownerUser = null;
-
-    /**
-     * Legacy: the space this subscription originally paid for (transitional;
-     * superseded by {@see $organization}). Nullable now; a later cleanup drops
-     * it once nothing reads it.
-     */
-    #[ORM\ManyToOne(targetEntity: Space::class)]
-    #[ORM\JoinColumn(name: 'space_id', nullable: true, onDelete: 'CASCADE')]
-    private ?Space $space = null;
 
     #[ORM\Column(length: 32, options: ['default' => self::PLAN_TEAM])]
     private string $plan = self::PLAN_TEAM;
@@ -157,28 +148,6 @@ class Subscription
     public function setOrganization(?Organization $organization): static
     {
         $this->organization = $organization;
-        return $this;
-    }
-
-    public function getOwnerUser(): ?User
-    {
-        return $this->ownerUser;
-    }
-
-    public function setOwnerUser(?User $ownerUser): static
-    {
-        $this->ownerUser = $ownerUser;
-        return $this;
-    }
-
-    public function getSpace(): ?Space
-    {
-        return $this->space;
-    }
-
-    public function setSpace(?Space $space): static
-    {
-        $this->space = $space;
         return $this;
     }
 

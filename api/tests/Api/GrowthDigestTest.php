@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Api;
 
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Entity\Organization;
 use App\Entity\Subscription;
 use App\Entity\User;
 use App\Service\GrowthDigestMailer;
+use App\Service\PersonalOrganizationProvisioner;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
@@ -79,7 +81,8 @@ class GrowthDigestTest extends ApiTestCase
         $owner = $this->makeUser('buyer@example.com');
 
         $sub = new Subscription();
-        $sub->setOwnerUser($owner);
+        // A personal plan lives on the buyer's personal organization.
+        $sub->setOrganization($this->personalOrgOf($owner));
         $sub->setPlan('pro');
         $sub->setSeats(1);
         $sub->setBillingInterval('month');
@@ -95,6 +98,16 @@ class GrowthDigestTest extends ApiTestCase
 
         $this->assertEmailCount(1);
         $this->assertNotNull($admin->getId());
+    }
+
+    /** The user's personal organization; tests build users by direct persistence. */
+    private function personalOrgOf(User $user): Organization
+    {
+        $provisioner = static::getContainer()->get(PersonalOrganizationProvisioner::class);
+        $org = $provisioner->provision($user);
+        $this->entityManager->flush();
+
+        return $org;
     }
 
     /** @param list<string> $roles */
