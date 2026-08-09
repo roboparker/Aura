@@ -106,7 +106,7 @@ class AdminDeletionController extends AbstractController
         // An admin must not be able to delete their own account through the
         // admin surface — that would skip the churn survey and the step-up
         // flow the self-service path enforces, and reads as an accident.
-        if ($target instanceof User && $target->getId()?->equals($admin->getId())) {
+        if ($target instanceof User && true === $target->getId()?->equals($admin->getId())) {
             return $this->json(
                 ['error' => 'Use Settings → Danger zone to delete your own account.'],
                 409,
