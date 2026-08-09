@@ -209,6 +209,92 @@ class AdminDeletionTest extends ApiTestCase
         $this->assertSame('Solo Corp', $first['name']);
     }
 
+    public function testImmediateOrganizationDeletionNotifiesTheOwner(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
+        $owner = $this->createUser('owner@example.com');
+        $org = (new Organization())
+            ->setName('Bad Actor Inc')
+            ->setSlug('o-' . bin2hex(random_bytes(4)))
+            ->setCreatedBy($owner);
+        $org->addMember($owner, Organization::ROLE_OWNER);
+        $this->entityManager->persist($org);
+        $this->entityManager->flush();
+        $orgId = (string) $org->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $payload = $this->payload('organization', $orgId, 'Bad Actor Inc', immediate: true);
+        $payload['notifyOwner'] = true;
+        $client->request('POST', '/admin/deletions', [
+            'json' => $payload,
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $em = $this->em();
+        $em->clear();
+        $this->assertNull($em->getRepository(Organization::class)->find($orgId));
+
+        $log = $em->getRepository(AdminActionLog::class)->findOneBy([]);
+        $this->assertNotNull($log);
+        $this->assertTrue($log->wasOwnerNotified(), 'the owner should have been emailed');
+        $this->assertSame('owner@example.com', $log->getTargetOwnerEmail());
+    }
+
+    public function testAdminCanScheduleASpaceDeletion(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
+        $owner = $this->createUser('owner@example.com');
+
+        $ownerClient = static::createClient();
+        $ownerClient->loginUser($owner);
+        $body = $ownerClient->request('POST', '/spaces', [
+            'json' => ['name' => 'Dodgy Space'],
+            'headers' => ['Content-Type' => 'application/ld+json'],
+        ])->toArray();
+        $spaceId = $body['id'];
+        $this->assertIsString($spaceId);
+
+        $adminClient = static::createClient();
+        $adminClient->loginUser($admin);
+        $adminClient->request('POST', '/admin/deletions', [
+            'json' => $this->payload('space', $spaceId, 'Dodgy Space'),
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+        $this->assertResponseIsSuccessful();
+
+        $em = $this->em();
+        $em->clear();
+        $space = $em->getRepository(\App\Entity\Space::class)->find($spaceId);
+        $this->assertNotNull($space);
+        $this->assertTrue($space->isDeleted(), 'the default admin path stays reversible');
+    }
+
+    public function testPersonalSpacesCannotBeTargetedDirectly(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
+        $owner = $this->createUser('owner@example.com');
+
+        $space = new \App\Entity\Space();
+        $space->setName('Private');
+        $space->setIsPersonal(true);
+        $space->setCreatedBy($owner);
+        $this->entityManager->persist($space);
+        $this->entityManager->flush();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('POST', '/admin/deletions', [
+            'json' => $this->payload('space', (string) $space->getId(), 'Private', immediate: true),
+            'headers' => ['Content-Type' => 'application/json'],
+        ]);
+
+        // A personal space is an artefact of its owner's account, not an
+        // independently deletable thing — it goes when the account does.
+        $this->assertResponseStatusCodeSame(404);
+    }
+
     public function testAuditLogIsReadable(): void
     {
         $admin = $this->createUser('admin@example.com', ['ROLE_USER', 'ROLE_ADMIN']);
