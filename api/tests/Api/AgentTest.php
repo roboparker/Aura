@@ -234,7 +234,7 @@ class AgentTest extends ApiTestCase
 
         $client = static::createClient();
 
-        // A plain member holds no `api_keys` grant → 403.
+        // A plain member holds no `api_keys` grant → 403 on creating one.
         $client->loginUser($member);
         $client->request('POST', '/spaces/' . $space->getId() . '/agents', [
             'json' => ['name' => 'Sneaky', 'roles' => []],
@@ -246,6 +246,30 @@ class AgentTest extends ApiTestCase
         $client->loginUser($stranger);
         $client->request('GET', '/spaces/' . $space->getId() . '/agents');
         $this->assertResponseStatusCodeSame(404);
+    }
+
+    public function testAnyMemberCanSeeTheSpacesAgentsWithoutTheKeysGrant(): void
+    {
+        // The sidebar's Agents section (#827 step 4) has to list agents for
+        // everyone who may talk to one, which is every member — while creating
+        // one, which mints a credential, stays `api_keys` work. The payload
+        // carries no secret: a token is shown once, at creation.
+        $admin = $this->createUser('admin@example.com');
+        $member = $this->createUser('member@example.com');
+        $space = $this->createSpace($admin, $member);
+        $this->provisionAgent($space, 'Helper');
+
+        $client = static::createClient();
+        $client->loginUser($member);
+        $client->request('GET', '/spaces/' . $space->getId() . '/agents');
+        $this->assertResponseIsSuccessful();
+
+        $agents = $this->arrayField($this->body($client), 'agents');
+        $this->assertCount(1, $agents);
+        $first = $agents[0];
+        $this->assertIsArray($first);
+        $this->assertSame('Helper', $first['name'] ?? null);
+        $this->assertArrayNotHasKey('plainToken', $first);
     }
 
     // --- Role changes + removal ------------------------------------------
