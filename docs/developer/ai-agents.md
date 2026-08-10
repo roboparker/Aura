@@ -3,11 +3,11 @@
 An **AI agent** is a member of a space that isn't a person: it holds
 permissions, holds a credential, and (from a later step) can be talked to.
 
-This document covers **steps 1 and 2** of
+This document covers **steps 1–3** of
 [#827](https://github.com/roboparker/Aura/issues/827) — an agent that exists,
-has permissions and holds a token (step 1), and the model provider seam plus
-the credit ledger that meters it (step 2). Chat storage and the chat box are
-steps 3–4.
+has permissions and holds a token (step 1), the model provider seam plus the
+credit ledger that meters it (step 2), and conversation storage with the chat
+dock (step 3). The left-nav Agents section is step 4.
 
 ## An agent is a `User` row
 
@@ -314,3 +314,105 @@ is where "how much is left" is the question you actually have.
   the in-memory double by definition cannot cover.
 - `pwa/lib/agentTypes.test.ts` — the roster filter and the usage meter's
   clamping and zero-allowance guard.
+
+---
+
+# Step 3 — conversations and the chat dock
+
+## One thread per (person, agent)
+
+`AgentConversation` is unique on `(agent, user)`. Not per space, and never
+shared: an agent belongs to a space, but a conversation is *someone talking to
+it*, and two colleagues talking to the same agent are having two different
+conversations. A shared thread would also make everything one person said into
+context the model sees for everybody else — a privacy surprise, and a way to
+plant instructions in a colleague's session.
+
+Threads are flat and chronological, like the `Comment` threads. No branching in
+v1.
+
+`AgentMessage` stores only what a turn *is* — role and body, plus a `truncated`
+flag. Token counts stay in the credit ledger, which is the record of what was
+spent; a second copy here could disagree with the bill. The **system prompt is
+not stored**: it is rebuilt from the agent and space on every send, so changing
+it takes effect on existing threads immediately rather than leaving old
+conversations running under an instruction nobody can see.
+
+## A turn is one transaction
+
+`AgentConversationService::send()` wraps the person's message, the model call
+and the answer in a single transaction. If the model fails, the question is
+rolled back with it.
+
+The alternative — keeping the unanswered question — leaves the thread in a state
+whose only escape is a retry that then posts the message twice. Rolling back
+means the client simply keeps the draft, which is the one place a retry is
+unambiguous. `AgentChatDock` therefore clears its composer only on success.
+
+## What the model is shown
+
+Only the last `HISTORY_TURNS` (20) turns are replayed, plus the system prompt.
+
+**This is a cost control, not a UI limit.** The whole window is re-sent on every
+message, so an unbounded history means each message in a long conversation costs
+more than the last, without anyone choosing that. The stored thread is never
+trimmed — only what the model sees.
+
+The system prompt has two jobs. It says **what the agent can do**: a v1 agent is
+chat-only, and one that cheerfully agrees to move a card it cannot touch is
+worse than one that declines. And it says **conversation content is data**:
+everything after it was written by people, and a message trying to rewrite the
+agent's rules is exactly the prompt-injection shape to expect. That line is the
+cheap first defence; the real backstop is still the narrow token scope from
+step 1.
+
+## Endpoints
+
+`App\Controller\AgentChatController` — deliberately not an API Platform
+resource, because sending a message is a *command with a cost* (it reserves
+credits, calls a third party, and fails in ways that must be told apart) rather
+than a collection POST.
+
+| Route | Notes |
+|---|---|
+| `GET /agents/{id}/chat` | The caller's thread, created on first open, plus availability |
+| `POST /agents/{id}/chat/messages` | `{body}` → both turns |
+| `DELETE /agents/{id}/chat` | Forget the thread; idempotent |
+
+**Any member of the agent's space may chat with it.** An agent is a space
+resource, like a board: provisioning one is admin-gated because it mints a
+credential, but using one is not. Privacy still holds, because the conversation
+is keyed on the caller — no route here takes an id that could address someone
+else's thread.
+
+Everything unreachable is a flat **404**, including a perfectly real human user
+id. These routes must not become a way to probe which accounts exist or which
+of them are agents.
+
+Failure statuses are split on purpose: **402** when the *account* can't spend
+(plan or credits — an upgrade helps) and **503** when the *instance* has no
+model configured (an upgrade would not help at all). Collapsing them would send
+half of these users to a pricing page that cannot fix their problem.
+
+## The dock
+
+`AgentChatDock` is mounted once in `Layout`, outside `AppShell`, and renders
+nothing until an agent is opened — so it costs no DOM for sessions that never
+use one. It is **not a route**: it stays open across navigation, which is the
+point of a dock, and it doesn't take over the page someone is working on.
+`AgentChatContext` holds only the open agent's identity, so any surface that
+lists agents can open it without knowing where it's mounted.
+
+Until the left-nav Agents section lands (step 4), the way in is a **Chat** button
+on each row of the space Users page.
+
+v1 is send-and-wait: a spinner while the model answers, then the reply. The
+issue calls streaming a nice-to-have that shouldn't block v1, and it isn't free
+— it needs a second transport (SSE) and a partial-message state in storage, both
+of which want designing rather than bolting on.
+
+## Tests
+
+`App\Tests\Api\AgentChatTest` covers the round trip, what the model is actually
+shown, thread privacy between colleagues, the flat-404 surface, rollback on a
+failed call, and the history window.

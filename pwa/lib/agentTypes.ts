@@ -74,6 +74,42 @@ export interface AiCreditBalance {
   unavailableMessage: string | null;
 }
 
+/** Why an agent can't answer — the same keys the API returns. */
+export type AiUnavailableReason =
+  | "plan_not_entitled"
+  | "credits_exhausted"
+  | "provider_not_configured"
+  | "no_account";
+
+export interface AgentMessage {
+  id: string;
+  /** `user` for the person, `assistant` for the agent. */
+  role: string;
+  body: string;
+  /**
+   * The model hit its output ceiling mid-answer. Surfaced because otherwise a
+   * truncated reply just looks like the agent trailed off.
+   */
+  truncated: boolean;
+  createdAt: string;
+}
+
+/**
+ * A person's thread with one agent (#827), from `GET /agents/{id}/chat`.
+ *
+ * Private per person — the server keys the conversation on (user, agent), so
+ * there is no id here that could address a colleague's thread.
+ */
+export interface AgentConversation {
+  id: string;
+  agent: { id: string; name: string; personalizedColor: string };
+  space: { id: string; name: string };
+  messages: AgentMessage[];
+  unavailableReason: AiUnavailableReason | null;
+  unavailableMessage: string | null;
+  maxMessageLength: number;
+}
+
 /** Percentage of the monthly allowance consumed, clamped for the meter bar. */
 export const creditUsagePercent = (balance: AiCreditBalance): number => {
   if (balance.unlimited || !balance.allowanceCredits) return 0;

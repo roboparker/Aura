@@ -8,6 +8,8 @@ import {
 } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ActiveSpaceProvider } from "@/contexts/ActiveSpaceContext";
+import { AgentChatProvider } from "@/contexts/AgentChatContext";
+import AgentChatDock from "@/components/agents/AgentChatDock";
 import TwoFactorRecoveryInterstitial from "@/components/auth/TwoFactorRecoveryInterstitial";
 import WaitlistGate from "@/components/auth/WaitlistGate";
 import EmailVerificationGate from "@/components/auth/EmailVerificationGate";
@@ -132,20 +134,27 @@ const Layout = ({
       <HydrationBoundary state={dehydratedState}>
         <AuthProvider>
           <ActiveSpaceProvider>
-            <AppShell>{children}</AppShell>
-            {/* Forced modal that appears the moment the API signals
-                this session signed in with a backup code. See
-                TwoFactorRecoveryInterstitial for the flow. Renders
-                nothing when not pending so it costs no DOM. */}
-            <TwoFactorRecoveryInterstitial />
-            {/* Keeps a waitlisted account pinned to the /waitlist gate
-                wherever it tries to navigate. Renders nothing for normal
-                users. */}
-            <WaitlistGate />
-            {/* Keeps an unverified account pinned to the /verify-email
-                gate until it confirms its email. Renders nothing for
-                verified users. */}
-            <EmailVerificationGate />
+            <AgentChatProvider>
+              <AppShell>{children}</AppShell>
+              {/* The agent chat dock (#827). Deliberately outside AppShell so
+                  it survives navigation — it's a dock, not a route — and
+                  renders nothing until an agent is opened, so it costs no DOM
+                  for sessions that never use one. */}
+              <AgentChatDock />
+              {/* Forced modal that appears the moment the API signals
+                  this session signed in with a backup code. See
+                  TwoFactorRecoveryInterstitial for the flow. Renders
+                  nothing when not pending so it costs no DOM. */}
+              <TwoFactorRecoveryInterstitial />
+              {/* Keeps a waitlisted account pinned to the /waitlist gate
+                  wherever it tries to navigate. Renders nothing for normal
+                  users. */}
+              <WaitlistGate />
+              {/* Keeps an unverified account pinned to the /verify-email
+                  gate until it confirms its email. Renders nothing for
+                  verified users. */}
+              <EmailVerificationGate />
+            </AgentChatProvider>
           </ActiveSpaceProvider>
         </AuthProvider>
       </HydrationBoundary>
