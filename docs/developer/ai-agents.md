@@ -3,9 +3,11 @@
 An **AI agent** is a member of a space that isn't a person: it holds
 permissions, holds a credential, and (from a later step) can be talked to.
 
-This document covers **step 1** of [#827](https://github.com/roboparker/Aura/issues/827) —
-an agent that exists, has permissions, and holds a token. There is no model
-provider, no chat and no credit metering yet; those are steps 2–4.
+This document covers **steps 1 and 2** of
+[#827](https://github.com/roboparker/Aura/issues/827) — an agent that exists,
+has permissions and holds a token (step 1), and the model provider seam plus
+the credit ledger that meters it (step 2). Chat storage and the chat box are
+steps 3–4.
 
 ## An agent is a `User` row
 
@@ -162,8 +164,153 @@ people who predate roles; an agent's credential is a space-scoped key, which
 grants nothing without roles, so "default" would read as more access than it
 has.
 
+---
+
+# Step 2 — the model provider and the credit meter
+
+## The provider seam
+
+`App\Ai\ChatProviderInterface` is the same shape as `StripeGatewayInterface` and
+`CalendarClientInterface`: a thin domain-typed interface, HTTP via Symfony
+HttpClient rather than a vendor SDK, an in-memory double for tests, and a
+`ChatProviderRegistry` keyed by name so a second model drops in as one class.
+
+The types that cross it are `ChatMessage`, `ChatRequest` and `ChatResponse`, and
+they are deliberately the smallest thing that works — a role and some text in,
+text plus token counts out. Providers have far richer message shapes (content
+parts, tool calls, images), and **every one of those we adopt becomes something
+the second provider has to be translated into**. Anything richer belongs inside
+an implementation, built from these fields. The one unavoidable leak is the
+model *identifier*, a bare string; call sites take
+`ChatProviderInterface::defaultModel()` rather than hard-coding one, so changing
+models is configuration.
+
+Failures collapse onto one `ChatProviderException` because a caller's response
+is identical whichever it is. The single distinction preserved is `retryable`,
+since that is the only thing that changes what a caller may do next.
+
+`OpenAiChatProvider` reads `OPENAI_API_KEY` (blank = not configured, like the
+Stripe and VAPID keys) with an optional `OPENAI_MODEL` override; the default is
+a small cheap model, because the default is what an unattended loop multiplies.
+
+## The credit meter
+
+`ai_credits_per_month` has existed in `PlanCatalog` since Phase 0 — Free/Pro 0,
+Business 2000, Enterprise 10000 — and until now **nothing read it**: the pricing
+page sold credits that were never granted or spent. `App\Service\AiCreditMeter`
+is the thing that reads it.
+
+### Reserve, then reconcile
+
+Per the issue: charge on tokens consumed, not messages, and reserve before the
+call so a mid-flight failure cannot overspend.
+
+1. `reserve()` writes a `pending` ledger row for the **most** the call could cost
+   (prompt estimate + `maxOutputTokens`) and refuses outright if it won't fit.
+   From that instant it counts against the balance.
+2. `settle()` rewrites the row to the provider's reported usage — nearly always
+   less, releasing the difference.
+3. `release()` deletes the row when the call failed. A failed call is not a
+   charge.
+
+Charging *afterwards* would make a crash between the call and the write free,
+and "free when it breaks" is what turns an agent loop into an unbounded bill.
+
+### Why a ledger, and why it locks
+
+A single running total cannot express an in-flight amount that might yet be
+released, so each charge is its own row with a `pending → settled` lifecycle.
+
+Writes go through DBAL rather than the ORM, like `UsageRecorder` over
+`UserUsageCounter`. Here it is load-bearing rather than stylistic: reserving is
+*check the balance and insert, atomically*, and without that atomicity two
+concurrent requests both see the last of the allowance and both spend it.
+`reserve()` takes a `FOR UPDATE` row lock on the organization for the duration,
+which serialises reservations per account. At chat volumes that costs nothing,
+and it is the difference between a cap and a suggestion.
+
+### Self-healing reservations
+
+If a process dies between reserving and settling, the pending row would hold
+credits hostage forever. Rather than depend on a cron to notice, the balance
+query ignores pending rows past `expiresAt` (15 minutes — well above the 60s
+provider timeout, well below anything a person would wait). The sweep that
+deletes them rides along on the nightly usage-snapshot job and is pure
+housekeeping: it can never be the difference between a customer being able to
+use the product or not.
+
+### Tokens, not credits
+
+The ledger stores **tokens**, the unit providers bill in. Credits are a
+presentation layer over them (`app.ai_tokens_per_credit`, default 1000), applied
+only at the plan boundary and in the UI, so rounding never accumulates across a
+month of charges. Displayed usage rounds **up** — a partial credit spent is a
+credit spent, and rounding down would let a long tail of small calls read as
+zero usage against a plan being quietly consumed.
+
+### Not behind the billing dark-launch flag
+
+Every other cap in `UsageLimiter` short-circuits to "allowed" while
+`app.billing_enforcement_enabled` is false, so the freemium gate could ship
+before Stripe was live. **Credit enforcement is always on.**
+
+The other caps protect revenue: too permissive and we undercharge, which is
+recoverable. This one protects spend against a third party's meter: too
+permissive and we are the ones being billed, without limit, by something a
+language model drives. Those two failures do not deserve the same default.
+
+A consequence worth stating: on an instance where nobody is on Business or
+Enterprise, no agent can call a model. That is the correct posture — and no
+provider key is configured on such an instance either.
+
+## The metered entry point
+
+`App\Service\AgentChatService::reply()` is the **only** way to make an agent say
+something, so no future caller can reach a provider without paying for it. It
+checks plan entitlement, resolves a provider, reserves, calls, and settles or
+releases. Step 3's chat storage calls this and nothing else.
+
+`unavailableReason()` runs the same checks without the reservation, so a UI can
+disable a composer with a reason instead of letting someone type a message that
+was never going to be answered.
+
+## Reading the balance
+
+`GET /spaces/{id}/ai-credits` (`App\Controller\AiCreditController`), readable by
+**any space member** — someone about to talk to an agent needs to know whether
+it can answer, and the numbers are aggregate usage rather than anything
+sensitive. Addressed by space even though credits pool at the organization,
+because a space is what the PWA has in hand everywhere agents are managed; the
+payload names the account so the pooling is visible rather than surprising when
+two spaces show the same numbers.
+
+It also returns `unavailableReason` as a stable key. That matters because
+`plan_not_entitled` is a sales moment that should link to the upgrade, while
+`provider_not_configured` is an operator problem the viewer can do nothing
+about — showing an upgrade button for the latter would charge someone for a fix
+that isn't theirs to make.
+
+PWA: `AiCreditsMeter` sits above the agent list on the space Users page, which
+is where "how much is left" is the question you actually have.
+
+## Configuration
+
+| Key | Default | Meaning |
+|---|---|---|
+| `OPENAI_API_KEY` | blank | Blank = no model configured; agents report themselves unavailable |
+| `OPENAI_MODEL` | blank | Overrides the provider's own default |
+| `app.ai_tokens_per_credit` | 1000 | Exchange rate between the ledger's tokens and the plan's credits |
+
 ## Tests
 
-`App\Tests\Api\AgentTest` covers provisioning, the one-shot plaintext, the
-permission gate, role rewriting across both grants, removal, and each thing the
-flag suppresses.
+- `App\Tests\Api\AgentTest` — provisioning, the one-shot plaintext, the
+  permission gate, role rewriting across both grants, removal, and each thing
+  the `isAgent` flag suppresses.
+- `App\Tests\Api\AiCreditTest` — the reserve/settle ordering (including
+  observing the balance *while the provider is mid-call*), release on failure,
+  plan enforcement, allowance arithmetic, self-healing reservations, and the
+  read endpoint.
+- `App\Tests\Ai\OpenAiChatProviderTest` — the OpenAI translation layer, which
+  the in-memory double by definition cannot cover.
+- `pwa/lib/agentTypes.test.ts` — the roster filter and the usage meter's
+  clamping and zero-allowance guard.

@@ -22,6 +22,20 @@ parameters:
     # audit trail — every task edit on an automated board writes one.
     app.automation_run_retention_days: 30
 
+    # AI agents (#827). The ledger stores tokens, which is what providers
+    # actually bill in; `ai_credits_per_month` in PlanCatalog is what the
+    # pricing page sells. This is the exchange rate between them, applied only
+    # at the plan boundary and in the UI so rounding never accumulates across a
+    # month of charges. 1 credit = 1k tokens puts Business (2000/mo) at ~2M
+    # tokens, which is a working team's usage rather than a token gesture.
+    app.ai_tokens_per_credit: 1000
+    # Blank = this instance can't talk to a model at all, and every agent
+    # reports itself unavailable rather than failing mid-conversation. Same
+    # posture as the Stripe and VAPID keys.
+    env(OPENAI_API_KEY): ''
+    # Optional override for the provider's own default model.
+    env(OPENAI_MODEL): ''
+
     app.plan_price_pro_monthly_cents: 1000
     app.plan_price_business_monthly_cents: 1500
 
@@ -239,6 +253,16 @@ services:
         arguments:
             $webhookBaseUrl: '%app.calendar_webhook_base_url%'
 
+    # AI model providers (#827): the real OpenAI-over-HttpClient implementation
+    # in prod/dev; the suite swaps in an in-memory double (see when@test), which
+    # is what keeps the test run off a paid API. The registry routes by name so
+    # AgentChatService never names an implementation — a second model is one
+    # class plus one line here.
+    App\Ai\ChatProviderRegistry:
+        arguments:
+            $providers:
+                openai: '@App\Ai\OpenAiChatProvider'
+
     App\Validator\PasswordPolicyValidator:
         arguments:
             $minStrength: '%app.password_min_strength%'
@@ -348,3 +372,19 @@ when@test:
                 $clients:
                     google: '@App\Tests\Calendar\InMemoryCalendarClient'
                     microsoft: '@App\Tests\Calendar\InMemoryCalendarClient'
+        # AI: never call a model in tests. The double reports itself configured
+        # so the metering path runs end-to-end, and lets a test dictate exactly
+        # what a call "cost". Public so tests can fetch + drive it.
+        App\Tests\Ai\InMemoryChatProvider:
+            public: true
+        App\Ai\ChatProviderRegistry:
+            arguments:
+                $providers:
+                    openai: '@App\Tests\Ai\InMemoryChatProvider'
+        # Each has a single prod consumer, so the container inlines it and the
+        # test container can't fetch it. The credit tests drive both directly —
+        # asserting the reserve/settle ordering is only possible from inside.
+        App\Service\AgentChatService:
+            public: true
+        App\Service\AiCreditMeter:
+            public: true
