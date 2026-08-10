@@ -24,6 +24,12 @@ export interface SpaceMember {
   nickname?: string | null;
   personalizedColor?: string;
   avatarUrls?: { thumb?: string; profile?: string } | null;
+  /**
+   * True for an AI agent (#827) rather than a person. Agents hold ordinary
+   * space memberships, so they appear in this collection; human-facing lists
+   * filter them out with `isAgentMember` from `@/lib/agentTypes`.
+   */
+  isAgent?: boolean;
 }
 
 export interface SpaceMembershipRow {

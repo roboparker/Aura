@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowDownAZ, Clock, Filter, ListFilter, Plus, Search, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace, type Space } from "@/contexts/ActiveSpaceContext";
+import { isAgentMember } from "@/lib/agentTypes";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +40,12 @@ const SORTS: { key: SortKey; label: string; icon: typeof Clock }[] = [
 ];
 
 const effectiveMemberCount = (space: Space): number => {
-  const direct = new Set(space.userMemberships.map((m) => m.user.id));
+  const direct = new Set(
+    // AI agents (#827) hold memberships but aren't people — a space with one
+    // agent and one person is a one-member space, and it's also the number the
+    // seat-based plan is priced on, so counting them would be doubly wrong.
+    space.userMemberships.filter((m) => !isAgentMember(m.user)).map((m) => m.user.id),
+  );
   // Group members aren't expanded on the list endpoint — counts that
   // include group-inherited users would require a separate roundtrip
   // per space. For now show the direct count; UI copy says "members"

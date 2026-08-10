@@ -127,14 +127,21 @@ final class NotificationDispatcher
         // the disturbing channels (email + push) but not the bell.
         $inAppAllowed = $this->matrixAllows($recipient, $notification->getType(), 'inApp');
         $quiet = $this->quietHours->isQuiet($recipient);
+        // An AI agent (#827) has no inbox and no browser. It carries the same
+        // default preferences as any User row, so both outbound channels have
+        // to be suppressed explicitly or every notification addressed to one
+        // would queue mail to an unroutable address. The in-app row still
+        // persists — that is the record of what the agent was told, and the
+        // chat surface in a later step reads it.
+        $reachable = !$recipient->isAgent();
 
         if ($inAppAllowed) {
             $this->mercure->publishCreated($notification);
-            if (!$quiet) {
+            if (!$quiet && $reachable) {
                 $this->sendPush($recipient, $notification);
             }
         }
-        if (!$quiet) {
+        if (!$quiet && $reachable) {
             $this->sendEmail($recipient, $notification);
         }
 

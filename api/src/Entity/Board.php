@@ -403,11 +403,22 @@ class Board
      * Will be removed once PR 4 (#187) updates the PWA to read
      * membership directly from the space.
      *
+     * AI agents (#827) are filtered out. This getter feeds the human-facing
+     * surfaces — member chips and the assignee picker — and an agent has no
+     * business in either: v1 agents are chat-only and cannot be assigned work.
+     * The filter is deliberately *here* rather than in
+     * {@see getEffectiveMembers()}, which answers "who has access" and is what
+     * the attachment gate and mention parsing build on; narrowing that would
+     * be a permission change wearing a UI change's clothes.
+     *
      * @return list<User>
      */
     #[Groups(['board:read'])]
     public function getMembers(): array
     {
-        return array_values($this->getEffectiveMembers());
+        return array_values(array_filter(
+            $this->getEffectiveMembers(),
+            static fn (User $member) => !$member->isAgent(),
+        ));
     }
 }

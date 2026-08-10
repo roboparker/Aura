@@ -78,7 +78,17 @@ final class CommentMentionService
             return 0;
         }
 
-        $candidates = $this->collectMentionableUsers($comment);
+        // AI agents (#827) are members like anyone else, so they land in the
+        // candidate set — and are dropped here. v1 agents are chat-only: they
+        // do not act on being @-mentioned, so resolving a mention to one would
+        // file a notification nothing ever reads and, worse, tell the author
+        // their message was delivered to something that will answer it.
+        // Mentioning an agent becomes meaningful when the autonomy step lands;
+        // this is the surface that opts in then.
+        $candidates = array_filter(
+            $this->collectMentionableUsers($comment),
+            static fn (User $candidate) => !$candidate->isAgent(),
+        );
         if ([] === $candidates) {
             return 0;
         }

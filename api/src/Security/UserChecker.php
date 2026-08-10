@@ -40,6 +40,15 @@ final class UserChecker implements UserCheckerInterface
         if (!$user instanceof User) {
             return;
         }
+        // An AI agent (#827) is not a person and has no interactive session.
+        // No password is ever set on one, so the form login already cannot
+        // succeed; this closes the paths that skip credential verification —
+        // SSO identity linking, and anything else that authenticates on an
+        // external assertion — where an agent's synthetic address could
+        // otherwise be claimed.
+        if ($user->isAgent()) {
+            throw new AgentSignInDeniedException();
+        }
         if ($user->isDeleted()) {
             throw new AccountDeletionPendingException();
         }

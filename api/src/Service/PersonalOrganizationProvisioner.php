@@ -38,6 +38,8 @@ final class PersonalOrganizationProvisioner
      */
     public function provision(User $user): Organization
     {
+        $this->refuseAgents($user);
+
         $existing = $this->organizations->findPersonalFor($user);
         if (null !== $existing) {
             return $existing;
@@ -58,6 +60,8 @@ final class PersonalOrganizationProvisioner
      */
     public function build(User $user): Organization
     {
+        $this->refuseAgents($user);
+
         $organization = (new Organization())
             ->setName($this->nameFor($user))
             ->setSlug($this->uniqueSlugFor($user))
@@ -68,6 +72,28 @@ final class PersonalOrganizationProvisioner
         $organization->addMember($user, Organization::ROLE_OWNER);
 
         return $organization;
+    }
+
+    /**
+     * An AI agent (#827) never gets a personal organization.
+     *
+     * A personal org is *an account*: it can hold a plan, own spaces and be
+     * billed. An agent is a credential belonging to the org that created it,
+     * so giving it one would invent an account nobody owns — and one holding
+     * an Owner membership, which several invariants read as "a real person is
+     * responsible for this".
+     *
+     * This throws rather than returning null because there is no caller for
+     * which "an agent with no organization" is a recoverable outcome: every
+     * one of them is about to attach a space or a subscription to the result.
+     * Reaching here means a code path treated an agent as a person, which is
+     * a bug to see, not to absorb.
+     */
+    private function refuseAgents(User $user): void
+    {
+        if ($user->isAgent()) {
+            throw new \LogicException('AI agents do not have a personal organization.');
+        }
     }
 
     /**

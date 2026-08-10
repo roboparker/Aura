@@ -150,6 +150,34 @@ class User implements
     private bool $emailVerified = true;
 
     /**
+     * When true this row is an **AI agent** rather than a person (#827).
+     *
+     * An agent is a User — not a parallel entity — because every permission
+     * check, membership join, authorship FK and mention resolver in the
+     * codebase already takes a `User`. Modelling it any other way would mean
+     * re-implementing all of them, and the two implementations would drift.
+     * Instead the flag *subtracts* the things a User implies that an agent
+     * must not have.
+     *
+     * What it suppresses:
+     *  - **Sign-in.** No password is ever set, and {@see getRoles()} withholds
+     *    ROLE_USER (see the fail-closed note there).
+     *  - **A personal organization.** Phase 2 gives every human one;
+     *    {@see \App\Service\PersonalOrganizationProvisioner} refuses agents.
+     *  - **A billable seat.** {@see Organization::seatCount()} skips them —
+     *    agents are free, and ride the AI credit allowance instead.
+     *  - **Mail.** No email verification, no digests, no push
+     *    ({@see \App\Service\NotificationDispatcher}).
+     *
+     * Its actual capabilities come from its {@see SpaceMembership} and the
+     * {@see SpaceRole}s assigned to it, exactly like a person's, plus an
+     * {@see ApiToken} for authentication. Set server-side only (never in a
+     * denormalization group), by {@see \App\Service\AgentProvisioner}.
+     */
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isAgent = false;
+
+    /**
      * Linked social-login identities (#267) — one per connected provider
      * (Google / Microsoft / GitHub). Any of them signs the user in. Managed
      * server-side by {@see \App\Controller\SsoController}; see {@see SsoIdentity}.
@@ -294,6 +322,22 @@ class User implements
      */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $totpRecoveryCodes = null;
+
+    /**
+     * The only role an AI agent holds (#827). Deliberately not ROLE_USER —
+     * see {@see getRoles()}. Nothing grants access on the strength of it; it
+     * exists so a security token for an agent is identifiable rather than
+     * empty.
+     */
+    public const ROLE_AGENT = 'ROLE_AGENT';
+
+    /**
+     * Domain for the synthetic addresses agents are given. `.invalid` is
+     * reserved by RFC 2606 and is guaranteed never to resolve, so an agent
+     * address cannot be mailed even by accident — the email column exists
+     * because it is the user identifier, not because anyone reads it.
+     */
+    public const AGENT_EMAIL_DOMAIN = 'agents.invalid';
 
     public const ALLOWED_FREQUENCIES = ['realtime', 'hourly', 'daily'];
     public const NOTIFICATION_MATRIX_ROWS = [
@@ -485,6 +529,23 @@ class User implements
             return [];
         }
 
+        // An AI agent (#827) is a User so the permission model doesn't fork,
+        // but it is not a person and must never hold a session. ROLE_USER is
+        // withheld for exactly the reason waitlisting withholds it below:
+        // nearly every resource requires it, so an agent identity reaches
+        // nothing by default and each surface an agent should reach has to be
+        // opened deliberately rather than inherited. That is the right default
+        // for a credential a language model drives — the blast radius of a
+        // successful prompt injection is bounded by what was opened on purpose.
+        //
+        // This does not make the agent's roles decorative: its SpaceMembership
+        // and SpaceRoles are read by SpacePermissionResolver, which never
+        // consults getRoles(), so the permission envelope an admin configures
+        // is live and is what the later autonomy steps narrow against.
+        if ($this->isAgent) {
+            return [self::ROLE_AGENT];
+        }
+
         // A waitlisted account is deliberately denied ROLE_USER: nearly
         // every resource (security expressions + access extensions) requires
         // it, so withholding it fails closed and boxes a waiting user into
@@ -533,6 +594,42 @@ class User implements
     {
         $this->emailVerified = $emailVerified;
         return $this;
+    }
+
+    /** Whether this row is an AI agent rather than a person (#827). */
+    public function isAgent(): bool
+    {
+        return $this->isAgent;
+    }
+
+    public function setIsAgent(bool $isAgent): static
+    {
+        $this->isAgent = $isAgent;
+        return $this;
+    }
+
+    /**
+     * Read-only mirror of {@see isAgent()} for the API, on every group that
+     * emits a user chip. Human-facing surfaces default agents *out*
+     * (see {@see Board::getMembers()} and
+     * {@see \App\Service\CommentMentionService}); this is what lets a client
+     * label the ones that do surface — a roster row, a comment author — so an
+     * agent is never mistaken for a colleague.
+     */
+    #[Groups([
+        'user:read',
+        'board:read',
+        'group:read',
+        'task:read',
+        'comment:read',
+        'feedback:read',
+        'space:read',
+        'page:read',
+        'notification:read',
+    ])]
+    public function getIsAgent(): bool
+    {
+        return $this->isAgent;
     }
 
     public function __construct()
