@@ -7,7 +7,6 @@ namespace App\Controller;
 use App\Ai\AiUnavailableException;
 use App\Ai\ChatProviderException;
 use App\Entity\AgentConversation;
-use App\Entity\AgentMessage;
 use App\Entity\Space;
 use App\Entity\User;
 use App\Service\AgentChatService;
@@ -147,7 +146,6 @@ final class AgentChatController extends AbstractController
     {
         $messages = [];
         foreach ($conversation->getMessages() as $message) {
-            \assert($message instanceof AgentMessage);
             $messages[] = $message->toArray();
         }
 

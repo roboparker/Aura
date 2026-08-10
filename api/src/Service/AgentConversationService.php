@@ -143,12 +143,13 @@ final class AgentConversationService
     public function window(AgentConversation $conversation): array
     {
         $stored = $conversation->getMessages()->toArray();
+        // array_slice reindexes, so the map already yields a list.
         $recent = array_slice($stored, -self::HISTORY_TURNS);
 
-        return array_values(array_map(
+        return array_map(
             static fn (AgentMessage $message) => $message->toChatMessage(),
             $recent,
-        ));
+        );
     }
 
     /**

@@ -35,10 +35,22 @@ class AgentChatTest extends ApiTestCase
 
     private EntityManagerInterface $entityManager;
 
+    /**
+     * One client for the whole test, created up front.
+     *
+     * `createClient()` reboots the kernel, so creating it mid-test would swap
+     * the container underneath us — the in-memory provider armed by a test
+     * would be a different instance from the one serving the request, and
+     * entities persisted through the old EntityManager would be strangers to
+     * the new one. Booting it once here keeps a single container for the
+     * duration.
+     */
+    private Client $client;
+
     protected function setUp(): void
     {
-        $kernel = self::bootKernel();
-        $em = $kernel->getContainer()->get('doctrine')->getManager();
+        $this->client = static::createClient();
+        $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
 
@@ -62,7 +74,7 @@ class AgentChatTest extends ApiTestCase
         [, $agent, $owner] = $this->scenario();
         $this->provider()->setReply('I can only chat for now.');
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $client->request('POST', '/agents/' . $agent->getId() . '/chat/messages', [
             'json' => ['body' => 'What can you do?'],
@@ -88,7 +100,7 @@ class AgentChatTest extends ApiTestCase
     {
         [, $agent, $owner] = $this->scenario();
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $this->post($client, $agent, 'First question');
         $this->post($client, $agent, 'Second question');
@@ -116,7 +128,7 @@ class AgentChatTest extends ApiTestCase
         [, $agent, $owner] = $this->scenario();
         $this->provider()->failWith(ChatProviderException::rateLimited('openai'));
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $client->request('POST', '/agents/' . $agent->getId() . '/chat/messages', [
             'json' => ['body' => 'Are you there?'],
@@ -135,7 +147,7 @@ class AgentChatTest extends ApiTestCase
         // instance has no model" (upgrading would not help at all).
         [, $agent, $owner] = $this->scenario(Plan::Free);
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $client->request('POST', '/agents/' . $agent->getId() . '/chat/messages', [
             'json' => ['body' => 'Hello?'],
@@ -158,7 +170,7 @@ class AgentChatTest extends ApiTestCase
     {
         [, $agent, $owner] = $this->scenario();
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $client->request('POST', '/agents/' . $agent->getId() . '/chat/messages', [
             'json' => ['body' => '   '],
@@ -185,7 +197,7 @@ class AgentChatTest extends ApiTestCase
         $colleague = $this->createUser('colleague@example.com');
         $this->joinSpace($space, $colleague);
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $this->post($client, $agent, 'My private question');
 
@@ -208,7 +220,7 @@ class AgentChatTest extends ApiTestCase
         $this->joinSpace($space, $member);
         $stranger = $this->createUser('stranger@example.com');
 
-        $client = static::createClient();
+        $client = $this->client;
         // Using an agent is open to the space; only provisioning one is gated.
         $client->loginUser($member);
         $client->request('GET', '/agents/' . $agent->getId() . '/chat');
@@ -225,7 +237,12 @@ class AgentChatTest extends ApiTestCase
         // which of them are agents — everything unreachable is a flat 404.
         [, , $owner] = $this->scenario();
 
-        $client = static::createClient();
+        $client = $this->client;
+        // Signed out first — once loginUser stamps a session on this client
+        // there is no way back to anonymous without rebooting the kernel.
+        $client->request('GET', '/agents/' . Uuid::v4() . '/chat');
+        $this->assertResponseStatusCodeSame(401);
+
         $client->loginUser($owner);
         $client->request('GET', '/agents/' . $owner->getId() . '/chat');
         $this->assertResponseStatusCodeSame(404);
@@ -233,17 +250,13 @@ class AgentChatTest extends ApiTestCase
         $this->assertResponseStatusCodeSame(404);
         $client->request('GET', '/agents/not-a-uuid/chat');
         $this->assertResponseStatusCodeSame(404);
-
-        $anonymous = static::createClient();
-        $anonymous->request('GET', '/agents/' . Uuid::v4() . '/chat');
-        $this->assertResponseStatusCodeSame(401);
     }
 
     public function testClearingForgetsTheThread(): void
     {
         [, $agent, $owner] = $this->scenario();
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $this->post($client, $agent, 'Something regrettable');
 
@@ -295,7 +308,7 @@ class AgentChatTest extends ApiTestCase
         [, $agent, $owner] = $this->scenario();
         $this->provider()->setFinishReason(ChatResponse::FINISH_LENGTH);
 
-        $client = static::createClient();
+        $client = $this->client;
         $client->loginUser($owner);
         $this->post($client, $agent, 'Tell me everything');
 
