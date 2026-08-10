@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import AiCreditsMeter from "@/components/spaces/AiCreditsMeter";
 
 /**
  * Multi-select over the space's custom roles, shared by the create form and
@@ -265,6 +266,8 @@ const SpaceAgents = ({
           can&rsquo;t sign in, don&rsquo;t use a seat, and only ever do what the
           roles you give them allow.
         </p>
+
+        <AiCreditsMeter spaceId={spaceId} />
 
         {error && (
           <Alert variant="destructive">
