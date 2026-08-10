@@ -34,6 +34,8 @@ final class InMemoryChatProvider implements ChatProviderInterface
 
     private int $completionTokens = 50;
 
+    private string $finishReason = ChatResponse::FINISH_STOP;
+
     private ?\Throwable $failure = null;
 
     /** @var (\Closure(ChatRequest): void)|null */
@@ -77,7 +79,14 @@ final class InMemoryChatProvider implements ChatProviderInterface
             promptTokens: $this->promptTokens,
             completionTokens: $this->completionTokens,
             model: $this->defaultModel(),
+            finishReason: $this->finishReason,
         );
+    }
+
+    /** Simulate the model stopping at its output ceiling. */
+    public function setFinishReason(string $finishReason): void
+    {
+        $this->finishReason = $finishReason;
     }
 
     public function setConfigured(bool $configured): void
@@ -122,5 +131,6 @@ final class InMemoryChatProvider implements ChatProviderInterface
         $this->reply = 'Hello from the test model.';
         $this->promptTokens = 100;
         $this->completionTokens = 50;
+        $this->finishReason = ChatResponse::FINISH_STOP;
     }
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bot, Check, ChevronDown, Copy, Plus, X } from "lucide-react";
+import { Bot, Check, ChevronDown, Copy, MessageSquare, Plus, X } from "lucide-react";
+import { useAgentChat } from "@/contexts/AgentChatContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { type SpaceAgent, type SpaceAgentCollection } from "@/lib/agentTypes";
 import { type SpaceRole, type SpaceRoleRef } from "@/lib/roleTypes";
@@ -156,6 +157,7 @@ const SpaceAgents = ({
   const [draftRoleIds, setDraftRoleIds] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
   const [freshToken, setFreshToken] = useState<string | null>(null);
+  const { openChat } = useAgentChat();
 
   const load = useCallback(async () => {
     const res = await fetch(
@@ -354,6 +356,25 @@ const SpaceAgents = ({
                       : agent.roles.map((r) => r.name).join(", ")}
                   </p>
                 </div>
+                {/* The only way into the dock until the left-nav Agents
+                    section lands. Chatting is open to any space member; only
+                    the role and remove controls beside it are admin work. */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() =>
+                    openChat({
+                      id: agent.id,
+                      name: agent.name,
+                      personalizedColor: agent.personalizedColor,
+                    })
+                  }
+                >
+                  <MessageSquare className="h-3.5 w-3.5" aria-hidden />
+                  Chat
+                </Button>
                 <RolePicker
                   allRoles={roles}
                   assignedIds={new Set(agent.roles.map((r) => r.id))}

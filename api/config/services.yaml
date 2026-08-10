@@ -393,3 +393,6 @@ when@test:
         App\Service\AiCreditMeter:
             public: true
             autowire: true
+        App\Service\AgentConversationService:
+            public: true
+            autowire: true
