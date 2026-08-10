@@ -122,12 +122,38 @@ Two behaviours worth knowing:
   a colleague — that would skip every invariant `SpaceMemberController` enforces
   (last-admin, org roster, seats).
 
-`DELETE` removes the `User` row outright rather than scheduling it like an
-account deletion. That is right *for an agent*: it is a credential, not a
-person, so there is no account holder with a claim to a grace period and
-nothing to restore. Note for a later step: once agents author content, deletion
-will need to route through the "Former member" sentinel reassignment in
-`AccountDeletionService`, the same way a human's does.
+### Deleting an agent
+
+`DELETE` removes the row outright rather than scheduling it like an account
+deletion. That is right *for an agent*: it is a credential, not a person, so
+there is no account holder with a claim to a grace period and nothing to email
+a restore link to.
+
+What it wrote is preserved. `App\Service\AgentDeletionService` reassigns
+authorship through `App\Service\AuthorshipSentinel` before removing the row —
+the same mechanism `AccountDeletionService` has always used for people, sharing
+one list of authorship FKs so the two paths can't drift as new authored
+entities are added.
+
+**Agents get their own placeholder**, "Removed agent", not the human "Former
+member" one. That name says *a person who used to work here*: a reader coming
+across a comment under it would reasonably believe a colleague wrote it, and
+misattributing machine output to a human is worse than either deleting it or
+leaving it unattributed. The placeholder is itself flagged `isAgent`, so every
+surface that already hides or labels agents keeps behaving correctly on the
+orphaned content. Neither placeholder can be deleted — doing so would cascade
+away exactly the content the reassignment saved.
+
+This landed *before* agents can write anything. A v1 agent authors nothing, so a
+plain `remove()` is correct today and would stay correct right up until autonomy
+ships — at which point it would silently start taking other people's task
+comments with it. Nothing would fail; content would just be gone.
+
+The rest goes by CASCADE, and each one is intended: the space membership (the
+agent leaves the space), the conversations and their messages (a thread with an
+agent that no longer exists is unreachable), and *not* the credit ledger —
+`ai_credit_ledger.agent_id` is `SET NULL`, so deleting an agent is never a way
+to make a month's spend disappear.
 
 ## Agents in human-facing lists
 
@@ -456,7 +482,8 @@ Pinned by `AgentTest::testAnyMemberCanSeeTheSpacesAgentsWithoutTheKeysGrant`.
 
 - **Autonomy.** Agents are chat-only. They don't act on `@mentions` or
   assignment, which is why `CommentMentionService` filters them out and the
-  system prompt says so explicitly.
+  system prompt says so explicitly. (Deletion is already ready for it — see
+  *Deleting an agent* above.)
 - **Streaming.** Send-and-wait. Streaming needs a second transport (SSE) and a
   partial-message state in storage.
 - **Usage packs.** Overflow credits beyond the plan allowance — the third thing

@@ -10,6 +10,7 @@ use App\Entity\SpaceRole;
 use App\Entity\User;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
+use App\Service\AgentDeletionService;
 use App\Service\AgentProvisioner;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -41,6 +42,7 @@ final class SpaceAgentController extends AbstractController
         private readonly EntityManagerInterface $em,
         private readonly SpacePermissionResolver $permissions,
         private readonly AgentProvisioner $provisioner,
+        private readonly AgentDeletionService $deletions,
     ) {
     }
 
@@ -178,12 +180,11 @@ final class SpaceAgentController extends AbstractController
      * Remove an agent entirely — its membership, its credentials and the row
      * itself.
      *
-     * Deleting the user rather than deactivating it is right *for an agent*:
-     * it is a credential, not a person, so there is no account holder with a
-     * claim to a grace period and nothing to restore. The FK cascades on
-     * `space_membership` and `api_token` do the revocation; the tokens are
-     * also removed explicitly so revocation is a stated intent rather than an
-     * inherited side effect of a schema decision.
+     * Deleting rather than scheduling is right *for an agent*: it is a
+     * credential, not a person, so there is no account holder with a claim to a
+     * grace period and nothing to email a restore link to. What it wrote is
+     * preserved — {@see AgentDeletionService} reassigns authorship to the
+     * "Removed agent" placeholder rather than letting the FK cascades take it.
      */
     #[Route('/spaces/{id}/agents/{agentId}', name: 'space_agents_delete', methods: ['DELETE'])]
     public function delete(string $id, string $agentId, #[CurrentUser] ?User $user): JsonResponse
@@ -201,12 +202,7 @@ final class SpaceAgentController extends AbstractController
             return $this->json(['error' => 'Agent not found.'], 404);
         }
 
-        foreach ($this->provisioner->tokensFor($agent) as $token) {
-            $this->em->remove($token);
-        }
-        $this->em->remove($membership);
-        $this->em->remove($agent);
-        $this->em->flush();
+        $this->deletions->delete($agent);
 
         return $this->json(null, 204);
     }

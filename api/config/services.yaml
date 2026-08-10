@@ -396,3 +396,9 @@ when@test:
         App\Service\AgentConversationService:
             public: true
             autowire: true
+        App\Service\AgentDeletionService:
+            public: true
+            autowire: true
+        App\Service\AuthorshipSentinel:
+            public: true
+            autowire: true
