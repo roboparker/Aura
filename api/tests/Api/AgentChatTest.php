@@ -36,20 +36,23 @@ class AgentChatTest extends ApiTestCase
     private EntityManagerInterface $entityManager;
 
     /**
-     * One client for the whole test, created up front.
+     * One client, one kernel, for the whole test.
      *
-     * `createClient()` reboots the kernel, so creating it mid-test would swap
-     * the container underneath us — the in-memory provider armed by a test
-     * would be a different instance from the one serving the request, and
-     * entities persisted through the old EntityManager would be strangers to
-     * the new one. Booting it once here keeps a single container for the
-     * duration.
+     * Both halves matter. `createClient()` reboots the kernel, so creating it
+     * mid-test would swap the container underneath us — entities persisted
+     * through the old EntityManager would be strangers to the new one. And the
+     * browser reboots the kernel *between requests* by default, which would
+     * hand every request a brand-new in-memory provider: state a test armed
+     * beforehand would be gone, and calls recorded across two requests would
+     * land on two different doubles. `disableReboot()` is the same fix the
+     * calendar-sync tests use for the same reason.
      */
     private Client $client;
 
     protected function setUp(): void
     {
         $this->client = static::createClient();
+        $this->client->getKernelBrowser()->disableReboot();
         $em = static::getContainer()->get('doctrine')->getManager();
         assert($em instanceof EntityManagerInterface);
         $this->entityManager = $em;
