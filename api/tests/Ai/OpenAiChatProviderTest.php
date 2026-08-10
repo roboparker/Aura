@@ -98,14 +98,17 @@ class OpenAiChatProviderTest extends TestCase
         // The meter reserved against this number; letting the model run past it
         // would mean charging for tokens nothing reserved.
         $seen = null;
-        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen) {
-            $seen = json_decode((string) ($options['body'] ?? '{}'), true);
+        /** @param array<string, mixed> $options */
+        $handler = static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $body = $options['body'] ?? '{}';
+            $seen = json_decode(is_string($body) ? $body : '{}', true);
 
             return new MockResponse((string) json_encode([
                 'choices' => [['message' => ['content' => 'ok'], 'finish_reason' => 'stop']],
                 'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1],
             ]));
-        });
+        };
+        $client = new MockHttpClient($handler);
 
         (new OpenAiChatProvider($client, 'sk-test'))->complete($this->request(maxOutputTokens: 321));
 

@@ -384,7 +384,12 @@ when@test:
         # Each has a single prod consumer, so the container inlines it and the
         # test container can't fetch it. The credit tests drive both directly —
         # asserting the reserve/settle ordering is only possible from inside.
+        # `autowire` has to be restated: a definition here replaces the
+        # autoconfigured one rather than amending it, and this block has no
+        # _defaults to inherit from.
         App\Service\AgentChatService:
             public: true
+            autowire: true
         App\Service\AiCreditMeter:
             public: true
+            autowire: true

@@ -137,6 +137,10 @@ final class AiCreditMeter
                 'period' => $period,
             ],
         );
+        // An aggregate-only SELECT always yields a row, so `false` is
+        // unreachable in practice — but reading a spend control's numbers off
+        // an unchecked value is not a habit worth having.
+        $row = false === $row ? [] : $row;
 
         return new AiCreditBalance(
             period: $period,

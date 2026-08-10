@@ -281,7 +281,8 @@ class AiCreditTest extends ApiTestCase
             (string) $organization->getId(),
             $this->stringField($this->arrayField($body, 'organization'), 'id'),
         );
-        $this->assertNull($body['unavailableReason'] ?? 'missing');
+        $this->assertArrayHasKey('unavailableReason', $body);
+        $this->assertNull($body['unavailableReason']);
 
         $client->loginUser($stranger);
         $client->request('GET', '/spaces/' . $space->getId() . '/ai-credits');
@@ -334,26 +335,17 @@ class AiCreditTest extends ApiTestCase
 
     private function provider(): InMemoryChatProvider
     {
-        $provider = static::getContainer()->get(InMemoryChatProvider::class);
-        assert($provider instanceof InMemoryChatProvider);
-
-        return $provider;
+        return static::getContainer()->get(InMemoryChatProvider::class);
     }
 
     private function chat(): AgentChatService
     {
-        $service = static::getContainer()->get(AgentChatService::class);
-        assert($service instanceof AgentChatService);
-
-        return $service;
+        return static::getContainer()->get(AgentChatService::class);
     }
 
     private function meter(): AiCreditMeter
     {
-        $meter = static::getContainer()->get(AiCreditMeter::class);
-        assert($meter instanceof AiCreditMeter);
-
-        return $meter;
+        return static::getContainer()->get(AiCreditMeter::class);
     }
 
     /** Book a settled charge directly, to put an account at a known balance. */
@@ -396,9 +388,8 @@ class AiCreditTest extends ApiTestCase
         }
         $space = $this->createSpace($owner, $organization);
 
-        $provisioner = static::getContainer()->get(AgentProvisioner::class);
-        assert($provisioner instanceof AgentProvisioner);
-        $result = $provisioner->provision($space, 'Helper', []);
+        $result = static::getContainer()->get(AgentProvisioner::class)
+            ->provision($space, 'Helper', []);
         $this->entityManager->flush();
 
         return [$space, $result['agent'], $organization];

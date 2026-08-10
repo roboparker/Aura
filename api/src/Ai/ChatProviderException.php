@@ -16,7 +16,7 @@ namespace App\Ai;
  * a caller may do next: a rate limit or a 5xx is worth trying again, a refused
  * or malformed request never is.
  */
-class ChatProviderException extends \RuntimeException
+final class ChatProviderException extends \RuntimeException
 {
     private function __construct(
         string $message,

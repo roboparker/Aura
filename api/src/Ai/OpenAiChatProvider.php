@@ -7,7 +7,6 @@ namespace App\Ai;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Contracts\HttpClient\Exception\ExceptionInterface as HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -99,11 +98,12 @@ final class OpenAiChatProvider implements ChatProviderInterface
             // `false` stops HttpClient throwing on 4xx/5xx so we can map the
             // status onto our own retryable/not distinction.
             $body = $response->toArray(false);
-        } catch (HttpExceptionInterface $e) {
+        } catch (\Throwable $e) {
+            // One arm: a transport failure and an unreadable body are the same
+            // thing to a caller — we never learned what the call cost, so the
+            // reservation has to be released either way.
             $this->logger->warning('OpenAI request failed', ['exception' => $e]);
-            throw ChatProviderException::transport(self::NAME, $e);
-        } catch (\JsonException | \Throwable $e) {
-            $this->logger->warning('OpenAI response could not be read', ['exception' => $e]);
+
             throw ChatProviderException::transport(self::NAME, $e);
         }
 
