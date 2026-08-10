@@ -330,11 +330,24 @@ class Organization implements SoftDeletable
         return self::ROLE_OWNER === $this->roleFor($user);
     }
 
-    /** Distinct members occupying a paid seat (everyone but guests). */
+    /**
+     * Distinct members occupying a paid seat (everyone but guests, and never
+     * an AI agent).
+     *
+     * Agents are free (#827) — they're metered on AI credits, not seats. They
+     * normally hold no organization membership at all, so this is the belt to
+     * that braces: whatever future path puts an agent on an org roster, it must
+     * not silently raise the customer's bill. This is the number pushed to
+     * Stripe as the subscription quantity, so a wrong answer here is a wrong
+     * invoice.
+     */
     public function seatCount(): int
     {
         $seats = 0;
         foreach ($this->memberships as $membership) {
+            if (true === $membership->getUser()?->isAgent()) {
+                continue;
+            }
             if (in_array($membership->getRole(), self::BILLABLE_ROLES, true)) {
                 ++$seats;
             }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Briefcase, Paperclip, Plus, Trash2, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
+import { isAgentMember } from "@/lib/agentTypes";
 import { apiGet, apiGetCollection, apiSend, ApiError } from "@/lib/apiClient";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
 import PageHeader from "@/components/common/PageHeader";
@@ -86,6 +87,8 @@ interface SpaceMemberRow {
     givenName?: string;
     familyName?: string;
     email?: string;
+    /** True for an AI agent (#827) — filtered out of the assignee picker. */
+    isAgent?: boolean;
   };
 }
 
@@ -179,7 +182,9 @@ const ProjectsPage = () => {
       setProjects(bps);
       setClients(cls);
       setTaskBoards(prj);
-      setMembers(space.userMemberships ?? []);
+      // People only — an engagement is staffed with colleagues, and AI agents
+      // (#827) can't be assigned to one.
+      setMembers((space.userMemberships ?? []).filter((m) => !isAgentMember(m.user)));
     } catch (e) {
       setLoadError(
         e instanceof ApiError && e.status === 403

@@ -14,6 +14,7 @@ import { signinHrefForCurrent } from "@/lib/authRedirect";
 import { formatRelative } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
 import { resolveGroupColor } from "@/lib/avatarPalette";
+import { isAgentMember } from "@/lib/agentTypes";
 import { type Group } from "@/lib/groupTypes";
 import {
   type SpaceRole,
@@ -33,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import PageHeader from "@/components/common/PageHeader";
+import SpaceAgents from "@/components/spaces/SpaceAgents";
 import GroupTile from "@/components/groups/GroupTile";
 import UserAvatar, { type AvatarUser } from "@/components/user/UserAvatar";
 import { pageTitle } from "@/lib/pageTitle";
@@ -312,6 +314,14 @@ const SpaceUsers = () => {
       (m) => m.user.id === user.id && m.role === "admin",
     );
 
+  // AI agents (#827) are space memberships like anyone else, so they arrive in
+  // this collection. They belong in their own card, not mixed into the people
+  // roster — an agent has no email to show, no cost rate, and no admin/member
+  // role to change, so every column here would be wrong for one.
+  const humanMemberships = (space?.userMemberships ?? []).filter(
+    (m) => !isAgentMember(m.user),
+  );
+
   useEffect(() => {
     if (space && user && !isAdmin && spaceId) {
       router.replace(`/spaces/${spaceId}`);
@@ -514,7 +524,7 @@ const SpaceUsers = () => {
                 <h2 className="font-semibold">
                   Members{" "}
                   <span className="text-muted-foreground font-normal">
-                    {space.userMemberships.length}
+                    {humanMemberships.length}
                   </span>
                 </h2>
 
@@ -565,7 +575,7 @@ const SpaceUsers = () => {
                 )}
 
                 <ul className="divide-y divide-border rounded-md border">
-                  {space.userMemberships.map((m) => {
+                  {humanMemberships.map((m) => {
                     const isSelf = m.user.id === user.id;
                     const label = displayName(m.user);
                     return (
@@ -672,6 +682,9 @@ const SpaceUsers = () => {
                 )}
               </CardContent>
             </Card>
+
+            {/* AI agents (#827) — members of the space, but not people. */}
+            <SpaceAgents spaceId={space.id} roles={roles} />
           </>
         )}
 

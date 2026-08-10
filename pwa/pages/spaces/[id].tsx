@@ -21,6 +21,7 @@ import {
 } from "@/contexts/ActiveSpaceContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { signinHrefForCurrent } from "@/lib/authRedirect";
+import { isAgentMember } from "@/lib/agentTypes";
 import { resolveSpaceColor } from "@/lib/avatarPalette";
 import { formatRelative } from "@/lib/relativeTime";
 import { displayName } from "@/lib/userDisplay";
@@ -230,6 +231,13 @@ const SpaceDetail = () => {
       (m) => m.user.id === user.id && m.role === "admin",
     );
 
+  // The roster is a list of people. AI agents (#827) hold space memberships
+  // too, so they'd otherwise show up in the avatar stack and the member count
+  // as if they were colleagues; they're managed on the Users page instead.
+  const memberships = (space?.userMemberships ?? []).filter(
+    (m) => !isAgentMember(m.user),
+  );
+
   const load = useCallback(async () => {
     if (!spaceId) return;
     setError(null);
@@ -400,7 +408,7 @@ const SpaceDetail = () => {
                   )}
                   <div className="flex items-center gap-2 mt-3">
                     <div className="flex -space-x-2">
-                      {space.userMemberships.slice(0, 4).map((m) => (
+                      {memberships.slice(0, 4).map((m) => (
                         <UserAvatar
                           key={m["@id"]}
                           user={toAvatarUser(m.user)}
@@ -409,14 +417,14 @@ const SpaceDetail = () => {
                         />
                       ))}
                     </div>
-                    {space.userMemberships.length > 4 && (
+                    {memberships.length > 4 && (
                       <span className="inline-flex h-6 items-center rounded-full bg-muted px-2 text-xs text-muted-foreground">
-                        +{space.userMemberships.length - 4}
+                        +{memberships.length - 4}
                       </span>
                     )}
                     <span className="text-sm text-muted-foreground">
-                      {space.userMemberships.length} member
-                      {space.userMemberships.length === 1 ? "" : "s"}
+                      {memberships.length} member
+                      {memberships.length === 1 ? "" : "s"}
                     </span>
                   </div>
                 </div>
@@ -601,7 +609,7 @@ const SpaceDetail = () => {
                             <h2 className="font-semibold">
                               Members{" "}
                               <span className="text-muted-foreground font-normal">
-                                {space.userMemberships.length}
+                                {memberships.length}
                               </span>
                             </h2>
                             {isAdmin && (
@@ -617,7 +625,7 @@ const SpaceDetail = () => {
                             className="space-y-2.5"
                             data-testid="space-member-list"
                           >
-                            {space.userMemberships.map((m) => {
+                            {memberships.map((m) => {
                               const isSelf = m.user.id === user.id;
                               return (
                                 <li

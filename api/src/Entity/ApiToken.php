@@ -207,6 +207,19 @@ class ApiToken
         return $this;
     }
 
+    /**
+     * Drop every assigned role, leaving a scoped key able to do nothing until
+     * roles are re-added. Used when an agent's permissions are re-set (#827),
+     * where the token's grant has to be rewritten in step with the
+     * membership's or the two ceilings diverge.
+     */
+    public function clearRoles(): static
+    {
+        $this->roles->clear();
+
+        return $this;
+    }
+
     public function getPlainToken(): ?string
     {
         return $this->plainToken;

@@ -105,8 +105,12 @@ final class NotificationDigestDispatcher
         return array_values(array_filter(
             $all,
             // notificationFrequency is the canonical cadence (the Settings UI
-            // keeps emailDigest.mode in sync with it).
-            static fn (User $u) => ($u->getPreferences()['notificationFrequency'] ?? 'realtime') === $period,
+            // keeps emailDigest.mode in sync with it). AI agents (#827) are
+            // excluded outright: they carry the default preferences like any
+            // User row, so without this an agent would qualify for a digest to
+            // an address that cannot receive mail.
+            static fn (User $u) => !$u->isAgent()
+                && ($u->getPreferences()['notificationFrequency'] ?? 'realtime') === $period,
         ));
     }
 
