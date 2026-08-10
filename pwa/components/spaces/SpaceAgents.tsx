@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, ChevronDown, Copy, MessageSquare, Plus, X } from "lucide-react";
 import { useAgentChat } from "@/contexts/AgentChatContext";
 import { ENTRYPOINT } from "@/config/entrypoint";
@@ -137,8 +138,8 @@ const TokenReveal = ({
  * human roster — the same place, because an agent is granted access the same
  * way a person is, but a separate card, because it is not one.
  *
- * v1 agents do nothing yet: they exist, hold roles, and hold a token. Chat
- * and the provider wiring are later steps.
+ * This is where agents are *managed*; talking to one happens in the dock,
+ * reachable from here or from the sidebar's Agents section.
  */
 const SpaceAgents = ({
   spaceId,
@@ -157,7 +158,18 @@ const SpaceAgents = ({
   const [draftRoleIds, setDraftRoleIds] = useState<Set<string>>(new Set());
   const [isCreating, setIsCreating] = useState(false);
   const [freshToken, setFreshToken] = useState<string | null>(null);
-  const { openChat } = useAgentChat();
+  const { openChat, closeChat, openAgent } = useAgentChat();
+  const queryClient = useQueryClient();
+
+  /**
+   * Refresh the sidebar's Agents section too. It reads the same list through
+   * react-query, and without this a newly created agent wouldn't appear in the
+   * nav — or a deleted one would linger there — until a reload.
+   */
+  const refreshNav = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["space-agents"] }),
+    [queryClient],
+  );
 
   const load = useCallback(async () => {
     const res = await fetch(
@@ -165,9 +177,9 @@ const SpaceAgents = ({
       { credentials: "include", headers: { Accept: "application/json" } },
     );
     if (!res.ok) {
-      // A caller without the `api_keys` permission simply has no agents
-      // section; that isn't an error worth shouting about on a page they can
-      // otherwise use.
+      // Listing is open to any space member, so a failure here is a transport
+      // problem rather than a permission one — degrade to an empty list rather
+      // than shouting on a page the caller can otherwise use.
       setAgents([]);
       return;
     }
@@ -205,6 +217,7 @@ const SpaceAgents = ({
       setName("");
       setDraftRoleIds(new Set());
       await load();
+      await refreshNav();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create the agent.");
     } finally {
@@ -249,7 +262,11 @@ const SpaceAgents = ({
       setError(data.error || "Failed to remove the agent.");
       return;
     }
+    // Don't leave the dock open on something that no longer exists — every
+    // request it makes from here on would 404.
+    if (openAgent?.id === agent.id) closeChat();
     await load();
+    await refreshNav();
   };
 
   if (disabled) return null;

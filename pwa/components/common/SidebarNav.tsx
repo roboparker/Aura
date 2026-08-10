@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Bot,
   CalendarDays,
   CalendarRange,
   LayoutDashboard,
@@ -18,7 +19,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useActiveSpace } from "@/contexts/ActiveSpaceContext";
-import { apiGetCollection } from "@/lib/apiClient";
+import { useAgentChat } from "@/contexts/AgentChatContext";
+import { type SpaceAgent, type SpaceAgentCollection } from "@/lib/agentTypes";
+import { apiGet, apiGetCollection } from "@/lib/apiClient";
 import { CONTENT_SECTIONS } from "@/lib/contentSections";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -398,6 +401,113 @@ const AdminSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) =>
           );
           return <span key={link.href}>{wrap(inner)}</span>;
         })}
+    </div>
+  );
+};
+
+/**
+ * The active space's AI agents (#827, step 4), as a collapsible nav group
+ * mirroring {@see AdminSection}.
+ *
+ * Rows are **buttons, not links**: clicking opens the chat dock, which is
+ * deliberately not a route (see `AgentChatDock`) so a conversation survives
+ * navigating away and doesn't take over the page you're on. That's why this
+ * section has no active-route styling — there is no route to be on.
+ *
+ * Hidden entirely when the space has no agents. A heading standing over an
+ * empty list would advertise a feature to every space that doesn't use one,
+ * and the place to create an agent is the Users page, which admins already
+ * reach from User management.
+ */
+const AgentsSection = ({ wrap }: { wrap: (children: ReactNode) => ReactNode }) => {
+  const { activeSpace } = useActiveSpace();
+  const { openChat, openAgent } = useAgentChat();
+
+  const storageKey = "madori.navCollapsed.agents";
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCollapsed(window.localStorage.getItem(storageKey) === "1");
+  }, []);
+
+  const spaceId = activeSpace?.id ?? null;
+  const query = useQuery({
+    queryKey: ["space-agents", spaceId, "nav"],
+    enabled: !!spaceId,
+    queryFn: async () => {
+      if (!spaceId) return [] as SpaceAgent[];
+      const data = await apiGet<SpaceAgentCollection>(
+        `/spaces/${encodeURIComponent(spaceId)}/agents`,
+        { errorMessage: "Failed to load agents." },
+      );
+      return data.agents ?? [];
+    },
+  });
+  // A failed fetch collapses to "this space has no agents" rather than
+  // breaking the nav — the same posture as the content sections.
+  const agents = query.data ?? [];
+
+  const toggle = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(storageKey, next ? "1" : "0");
+      } catch {
+        // Storage-disabled browsers: state still toggles for the session.
+      }
+      return next;
+    });
+
+  if (!activeSpace || agents.length === 0) return null;
+
+  return (
+    <div className="mt-3 first:mt-0">
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Expand" : "Collapse"} Agents`}
+        className={cn(NAV_SECTION_BUTTON_CLASS, NAV_HEADING_CLASS)}
+      >
+        <Bot className="size-3.5 shrink-0 text-fuchsia-600 dark:text-fuchsia-400" />
+        <span className="truncate">Agents</span>
+        <ChevronDown
+          className={cn(
+            "ml-auto size-3.5 transition-transform",
+            collapsed && "-rotate-90",
+          )}
+        />
+      </button>
+
+      {!collapsed &&
+        agents.map((agent) => (
+          <span key={agent.id}>
+            {wrap(
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  openChat({
+                    id: agent.id,
+                    name: agent.name,
+                    personalizedColor: agent.personalizedColor,
+                  })
+                }
+                className={cn(
+                  NAV_ITEM_CLASS,
+                  // The open conversation is the closest thing to "where you
+                  // are" this section has.
+                  openAgent?.id === agent.id && NAV_ITEM_ACTIVE_CLASS,
+                )}
+              >
+                {/* pl-5 ≈ heading icon (size-3.5) + gap-1.5, lining the row
+                    text up under the heading label. */}
+                <span className="truncate pl-5">{agent.name}</span>
+              </Button>,
+            )}
+          </span>
+        ))}
     </div>
   );
 };
@@ -797,6 +907,11 @@ const SidebarNav = ({
               wrap={wrap}
             />
           ))}
+
+        {/* Above the settings-shaped sections: an agent is something you talk
+            to while working, not something you configure. Renders nothing
+            until the space actually has one. */}
+        {activeSpace && <AgentsSection wrap={wrap} />}
 
         {activeSpace && <TaxonomySection wrap={wrap} />}
 

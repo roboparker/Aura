@@ -44,10 +44,21 @@ final class SpaceAgentController extends AbstractController
     ) {
     }
 
+    /**
+     * The space's agents, readable by **any member**.
+     *
+     * Deliberately a weaker gate than the writes below. Creating an agent mints
+     * a credential, which is `api_keys` work; *seeing* that the space has one is
+     * no more sensitive than seeing the human roster, which every member can
+     * already read — and step 3 opened chatting to every member, so a gate here
+     * would list agents only to the people least likely to want to talk to one.
+     * The response carries no secret: a token is shown exactly once, at
+     * creation, and never appears in this payload.
+     */
     #[Route('/spaces/{id}/agents', name: 'space_agents_list', methods: ['GET'])]
     public function list(string $id, #[CurrentUser] ?User $user): JsonResponse
     {
-        $space = $this->permittedSpaceOr($id, $user, SpacePermission::READ);
+        $space = $this->memberSpaceOr($id, $user);
         if ($space instanceof JsonResponse) {
             return $space;
         }
@@ -306,6 +317,27 @@ final class SpaceAgentController extends AbstractController
      */
     private function permittedSpaceOr(string $id, ?User $user, string $action): Space|JsonResponse
     {
+        $space = $this->memberSpaceOr($id, $user);
+        if ($space instanceof JsonResponse) {
+            return $space;
+        }
+        if ($this->isGranted('ROLE_ADMIN')) {
+            return $space;
+        }
+        \assert($user instanceof User);
+        if (!$this->permissions->canByExplicitGrant($user, $space, SpacePermission::API_KEYS, $action)) {
+            return $this->json(['error' => 'You do not have permission to manage agents.'], 403);
+        }
+
+        return $space;
+    }
+
+    /**
+     * Resolve the space, requiring only membership. Non-members get a 404 so
+     * the space's existence stays hidden, matching the rest of the space API.
+     */
+    private function memberSpaceOr(string $id, ?User $user): Space|JsonResponse
+    {
         if (null === $user) {
             return $this->json(['error' => 'Not authenticated.'], 401);
         }
@@ -316,14 +348,8 @@ final class SpaceAgentController extends AbstractController
         if (null === $space) {
             return $this->json(['error' => 'Space not found.'], 404);
         }
-        if ($this->isGranted('ROLE_ADMIN')) {
-            return $space;
-        }
-        if (!$space->hasMember($user)) {
+        if (!$this->isGranted('ROLE_ADMIN') && !$space->hasMember($user)) {
             return $this->json(['error' => 'Space not found.'], 404);
-        }
-        if (!$this->permissions->canByExplicitGrant($user, $space, SpacePermission::API_KEYS, $action)) {
-            return $this->json(['error' => 'You do not have permission to manage agents.'], 403);
         }
 
         return $space;

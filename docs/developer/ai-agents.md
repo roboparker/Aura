@@ -3,11 +3,11 @@
 An **AI agent** is a member of a space that isn't a person: it holds
 permissions, holds a credential, and (from a later step) can be talked to.
 
-This document covers **steps 1–3** of
+This document covers all four steps of
 [#827](https://github.com/roboparker/Aura/issues/827) — an agent that exists,
-has permissions and holds a token (step 1), the model provider seam plus the
-credit ledger that meters it (step 2), and conversation storage with the chat
-dock (step 3). The left-nav Agents section is step 4.
+has permissions and holds a token (1), the model provider seam plus the credit
+ledger that meters it (2), conversation storage and the chat dock (3), and the
+left-nav Agents section (4).
 
 ## An agent is a `User` row
 
@@ -107,7 +107,7 @@ space API.
 
 | Route | Notes |
 |---|---|
-| `GET /spaces/{id}/agents` | The space's agents with their roles |
+| `GET /spaces/{id}/agents` | The space's agents with their roles — **any member**, see below |
 | `POST /spaces/{id}/agents` | `{name, roles: [iri]}` → the agent + `plainToken`, once |
 | `PATCH /spaces/{id}/agents/{agentId}` | `{name?, roles?}` |
 | `DELETE /spaces/{id}/agents/{agentId}` | Removes the row, membership and credentials |
@@ -416,3 +416,48 @@ of which want designing rather than bolting on.
 `App\Tests\Api\AgentChatTest` covers the round trip, what the model is actually
 shown, thread privacy between colleagues, the flat-404 surface, rollback on a
 failed call, and the history window.
+
+---
+
+# Step 4 — the left-nav Agents section
+
+`SidebarNav`'s **Agents** section lists the active space's agents; clicking one
+opens the dock.
+
+The rows are **buttons, not links**, because the dock is not a route. That's
+also why the section has no active-route styling — there is no route to be on.
+The closest thing to "where you are" is which conversation is open, so that's
+what the highlight tracks.
+
+The section is **hidden entirely when the space has no agents**. A heading over
+an empty list would advertise the feature to every space that doesn't use one,
+and creating an agent belongs on the Users page, which admins already reach
+from User management.
+
+Creating or removing an agent invalidates the `["space-agents"]` query key, so
+the nav updates without a reload.
+
+## Listing agents is a weaker gate than managing them
+
+Step 4 needed one backend change: `GET /spaces/{id}/agents` moved from the
+`api_keys` permission to plain **space membership**.
+
+The split now sits where the sensitivity actually is. *Creating* an agent mints
+a space-confined Bearer credential — that is `api_keys` work, and it stays
+admin-reserved. *Seeing* that the space has an agent is no more sensitive than
+seeing the human roster, which every member can already read, and step 3 opened
+chatting to every member: gating the list would have shown agents only to the
+people least likely to want to talk to one. The payload carries no secret — a
+token is returned exactly once, at creation, and never appears in a listing.
+
+Pinned by `AgentTest::testAnyMemberCanSeeTheSpacesAgentsWithoutTheKeysGrant`.
+
+# What's deliberately still missing
+
+- **Autonomy.** Agents are chat-only. They don't act on `@mentions` or
+  assignment, which is why `CommentMentionService` filters them out and the
+  system prompt says so explicitly.
+- **Streaming.** Send-and-wait. Streaming needs a second transport (SSE) and a
+  partial-message state in storage.
+- **Usage packs.** Overflow credits beyond the plan allowance — the third thing
+  to build here, and explicitly out of scope in #827.
