@@ -3,7 +3,6 @@ import { Bot, Check, ChevronDown, Copy, Plus, X } from "lucide-react";
 import { ENTRYPOINT } from "@/config/entrypoint";
 import { type SpaceAgent, type SpaceAgentCollection } from "@/lib/agentTypes";
 import { type SpaceRole, type SpaceRoleRef } from "@/lib/roleTypes";
-import { cn } from "@/lib/utils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -333,9 +332,7 @@ const SpaceAgents = ({
                 className="flex items-center gap-3 px-3 py-2.5"
               >
                 <span
-                  className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white",
-                  )}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
                   style={{ backgroundColor: agent.personalizedColor }}
                   aria-hidden
                 >

@@ -6,7 +6,6 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Board;
-use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\Organization;
 use App\Entity\Space;
@@ -413,7 +412,8 @@ class AgentTest extends ApiTestCase
         $board = $this->createBoard($author, $space);
         $task = $this->createTask($author, $board);
         $agent = $this->provisionAgent($space, 'Helper');
-        $localPart = substr($agent->getEmail(), 0, (int) strpos($agent->getEmail(), '@'));
+        $localPart = strstr($agent->getEmail(), '@', true);
+        $this->assertIsString($localPart);
 
         $client = static::createClient();
         $client->loginUser($author);
