@@ -33,3 +33,10 @@ updates:
     assignees:
       - roboparker
     open-pull-requests-limit: 10
+    groups:
+      # @blocknote/core, /react and /mantine must move in lockstep — the
+      # editor types are cross-package, so bumping one alone leaves two
+      # copies of @blocknote/core in the tree and fails the PWA typecheck.
+      blocknote:
+        patterns:
+          - "@blocknote/*"
