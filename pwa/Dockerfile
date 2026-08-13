@@ -81,7 +81,9 @@ RUN mkdir .next; \
 COPY --from=builder --link --chown=1001:1001 /srv/app/.next/standalone ./
 COPY --from=builder --link --chown=1001:1001 /srv/app/.next/static ./.next/static
 
-USER nextjs
+# nextjs, by uid — a numeric id is resolvable by the host regardless of the
+# image's /etc/passwd (hadolint DL3066); matches the --chown=1001:1001 above.
+USER 1001:1001
 
 EXPOSE 3000
 
