@@ -9767,16 +9767,16 @@
         },
         {
             "name": "symfony/resend-mailer",
-            "version": "v7.4.6",
+            "version": "v7.4.16",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/resend-mailer.git",
-                "reference": "eb7f4d83128eef12fcceccf33e5b4b89f2e2474f"
+                "reference": "8d2b4bdae823fbc66cb9ff676579b8f7c3ea6be5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/resend-mailer/zipball/eb7f4d83128eef12fcceccf33e5b4b89f2e2474f",
-                "reference": "eb7f4d83128eef12fcceccf33e5b4b89f2e2474f",
+                "url": "https://api.github.com/repos/symfony/resend-mailer/zipball/8d2b4bdae823fbc66cb9ff676579b8f7c3ea6be5",
+                "reference": "8d2b4bdae823fbc66cb9ff676579b8f7c3ea6be5",
                 "shasum": ""
             },
             "require": {
@@ -9789,7 +9789,7 @@
             "require-dev": {
                 "symfony/http-client": "^6.4|^7.0|^8.0",
                 "symfony/http-foundation": "^7.1|^8.0",
-                "symfony/webhook": "^6.4|^7.0|^8.0"
+                "symfony/webhook": "^7.4|^8.0"
             },
             "type": "symfony-mailer-bridge",
             "autoload": {
@@ -9817,7 +9817,7 @@
             "description": "Symfony Resend Mailer Bridge",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/resend-mailer/tree/v7.4.6"
+                "source": "https://github.com/symfony/resend-mailer/tree/v7.4.16"
             },
             "funding": [
                 {
@@ -9837,7 +9837,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-02-09T14:10:20+00:00"
+            "time": "2026-07-31T07:07:04+00:00"
         },
         {
             "name": "symfony/routing",
