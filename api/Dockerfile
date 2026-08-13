@@ -58,7 +58,7 @@ COPY --link frankenphp/maintenance.html /etc/frankenphp/maintenance.html
 
 ENTRYPOINT ["docker-entrypoint"]
 
-HEALTHCHECK --start-period=60s CMD curl -f http://localhost:2019/metrics || exit 1
+HEALTHCHECK --start-period=60s CMD ["curl", "-f", "http://localhost:2019/metrics"]
 CMD [ "frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile" ]
 
 # Dev FrankenPHP image
