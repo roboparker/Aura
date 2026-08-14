@@ -26,6 +26,6 @@ final class SegmentRepository extends ServiceEntityRepository
      */
     public function findAllEnabled(): array
     {
-        return array_values($this->findBy(['enabled' => true]));
+        return $this->findBy(['enabled' => true]);
     }
 }

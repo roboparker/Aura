@@ -100,7 +100,7 @@ final class AgentProvisioner
      */
     public function tokensFor(User $agent): array
     {
-        return array_values($this->tokens->findBy(['user' => $agent]));
+        return $this->tokens->findBy(['user' => $agent]);
     }
 
     private function buildAgent(string $name): User
