@@ -10008,16 +10008,16 @@
         },
         {
             "name": "symfony/scheduler",
-            "version": "v7.4.13",
+            "version": "v7.4.15",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/scheduler.git",
-                "reference": "d8fff93e5d29af0262e5693b76376117259b4532"
+                "reference": "493ca7c4dd832d6d9a42d6d2cb9a12198027c7b5"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/scheduler/zipball/d8fff93e5d29af0262e5693b76376117259b4532",
-                "reference": "d8fff93e5d29af0262e5693b76376117259b4532",
+                "url": "https://api.github.com/repos/symfony/scheduler/zipball/493ca7c4dd832d6d9a42d6d2cb9a12198027c7b5",
+                "reference": "493ca7c4dd832d6d9a42d6d2cb9a12198027c7b5",
                 "shasum": ""
             },
             "require": {
@@ -10069,7 +10069,7 @@
                 "scheduler"
             ],
             "support": {
-                "source": "https://github.com/symfony/scheduler/tree/v7.4.13"
+                "source": "https://github.com/symfony/scheduler/tree/v7.4.15"
             },
             "funding": [
                 {
@@ -10089,7 +10089,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-05-25T06:06:12+00:00"
+            "time": "2026-07-19T19:34:23+00:00"
         },
         {
             "name": "symfony/security-bundle",
