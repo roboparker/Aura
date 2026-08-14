@@ -31,6 +31,6 @@ final class SegmentMembershipRepository extends ServiceEntityRepository
      */
     public function findForUser(User $user): array
     {
-        return array_values($this->findBy(['user' => $user]));
+        return $this->findBy(['user' => $user]);
     }
 }

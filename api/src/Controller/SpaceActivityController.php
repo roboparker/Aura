@@ -62,10 +62,10 @@ class SpaceActivityController extends AbstractController
         $pages = $this->em->getRepository(Page::class)->findBy(['space' => $space]);
 
         /** @var array<class-string, list<string>> $groups */
-        $groups = [Page::class => array_values(array_map(
+        $groups = [Page::class => array_map(
             static fn (Page $p): string => (string) $p->getId(),
             $pages,
-        ))];
+        )];
         foreach ($boards as $board) {
             foreach ($this->scope->groupsForBoard($board) as $class => $ids) {
                 $groups[$class] = array_values(array_unique([
