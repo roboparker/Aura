@@ -124,6 +124,14 @@ class CommentMercurePublisherTest extends TestCase
             {
                 return null;
             }
+            public function getCookieName(): string
+            {
+                return 'mercureAuthorization';
+            }
+            public function getProtocolVersion(): \Symfony\Component\Mercure\ProtocolVersion
+            {
+                return \Symfony\Component\Mercure\ProtocolVersion::Legacy;
+            }
         };
         $normalizer = $this->createMock(NormalizerInterface::class);
         $normalizer->method('normalize')->willReturn(['@id' => '/comments/x']);
@@ -171,6 +179,14 @@ class CommentMercurePublisherTest extends TestCase
             public function getFactory(): ?\Symfony\Component\Mercure\Jwt\TokenFactoryInterface
             {
                 return null;
+            }
+            public function getCookieName(): string
+            {
+                return 'mercureAuthorization';
+            }
+            public function getProtocolVersion(): \Symfony\Component\Mercure\ProtocolVersion
+            {
+                return \Symfony\Component\Mercure\ProtocolVersion::Legacy;
             }
         };
 
