@@ -4,47 +4,48 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Entity\Comment;
-use App\Entity\Feedback;
-use App\Entity\MediaObject;
 use App\Entity\Organization;
-use App\Entity\Page;
-use App\Entity\Board;
 use App\Entity\Space;
 use App\Entity\SpaceMembership;
 use App\Billing\BillingException;
 use App\Billing\StripeGatewayInterface;
 use App\Deletion\SoftDeletionService;
-use App\Entity\Task;
 use App\Entity\User;
 use App\Repository\SubscriptionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 /**
  * Hard-deletes a user account while preserving the content they authored.
  *
  * Every authorship FK on User is `onDelete: CASCADE` and non-null, so a naive
  * `EntityManager::remove($user)` would erase their tasks, boards, pages,
- * comments, feedback tickets and media. Instead we reassign those
- * FKs to a reserved
- * "Former member" sentinel inside a transaction *before* removing the user, so
- * the content stays published under an anonymized author. Memberships, API
- * tokens, sessions, notifications, invites and personal tags clear via their
- * existing CASCADE.
+ * comments, feedback tickets and media. Instead we reassign those FKs to a
+ * reserved placeholder inside a transaction *before* removing the user, so the
+ * content stays published under an anonymized author. Memberships, API tokens,
+ * sessions, notifications, invites and personal tags clear via their existing
+ * CASCADE.
+ *
+ * The reassignment itself — which FKs, and which placeholder — lives in
+ * {@see AuthorshipSentinel}, shared with {@see AgentDeletionService} so the two
+ * deletion paths cannot drift as new authored entities are added.
  */
 final class AccountDeletionService
 {
-    public const SENTINEL_EMAIL = 'former-member@system.invalid';
+    /**
+     * @deprecated Use {@see AuthorshipSentinel::HUMAN_EMAIL}. Kept as an alias
+     *             because this constant is referenced from tests and reads
+     *             naturally at those call sites.
+     */
+    public const SENTINEL_EMAIL = AuthorshipSentinel::HUMAN_EMAIL;
 
     public function __construct(
         private EntityManagerInterface $em,
-        private UserPasswordHasherInterface $hasher,
         private SubscriptionRepository $subscriptions,
         private StripeGatewayInterface $stripe,
         private SoftDeletionService $softDeletion,
         private PersonalOrganizationProvisioner $personalOrganizations,
+        private AuthorshipSentinel $authorship,
         private LoggerInterface $logger,
     ) {
     }
@@ -59,7 +60,10 @@ final class AccountDeletionService
      */
     public function scheduleDeletion(User $user): \DateTimeImmutable
     {
-        if (self::SENTINEL_EMAIL === $user->getEmail()) {
+        // Either placeholder — deleting one would cascade away every orphaned
+        // piece of content that had been reassigned to it, which is exactly
+        // what the reassignment existed to prevent.
+        if ($this->authorship->isSentinel($user)) {
             throw new \RuntimeException('The system sentinel account cannot be deleted.');
         }
 
@@ -138,7 +142,7 @@ final class AccountDeletionService
      */
     public function deleteAccount(User $user): void
     {
-        if (self::SENTINEL_EMAIL === $user->getEmail()) {
+        if ($this->authorship->isSentinel($user)) {
             throw new \RuntimeException('The system sentinel account cannot be deleted.');
         }
 
@@ -152,16 +156,13 @@ final class AccountDeletionService
 
         $this->em->wrapInTransaction(function () use ($user): void {
             $userId = (string) $user->getId();
-            $sentinel = $this->sentinel();
 
-            // Reassign authored content to the sentinel (bulk UPDATE keeps it
-            // cheap and avoids materialising large collections).
-            $this->reassign(Task::class, 'owner', $user, $sentinel);
-            $this->reassign(Board::class, 'owner', $user, $sentinel);
-            $this->reassign(Page::class, 'createdBy', $user, $sentinel);
-            $this->reassign(Comment::class, 'author', $user, $sentinel);
-            $this->reassign(Feedback::class, 'owner', $user, $sentinel);
-            $this->reassign(MediaObject::class, 'owner', $user, $sentinel);
+            // Reassign authored content to the placeholder for this kind of
+            // subject. `sentinelFor()` rather than a fixed account because the
+            // site-admin deletion endpoint can target any user row, including
+            // an agent — and an agent's output must not end up filed under
+            // "Former member", which reads as a colleague.
+            $this->authorship->reassign($user, $this->authorship->sentinelFor($user));
 
             $this->handleSpaces($user, $userId);
             $this->handlePersonalOrganization($user);
@@ -201,18 +202,6 @@ final class AccountDeletionService
                 ]);
             }
         }
-    }
-
-    private function reassign(string $entityClass, string $field, User $from, User $to): void
-    {
-        $this->em->createQueryBuilder()
-            ->update($entityClass, 'e')
-            ->set('e.' . $field, ':to')
-            ->where('e.' . $field . ' = :from')
-            ->setParameter('to', $to)
-            ->setParameter('from', $from)
-            ->getQuery()
-            ->execute();
     }
 
     /**
@@ -320,25 +309,5 @@ final class AccountDeletionService
         }
 
         return $fallback;
-    }
-
-    private function sentinel(): User
-    {
-        $existing = $this->em->getRepository(User::class)->findOneBy(['email' => self::SENTINEL_EMAIL]);
-        if (null !== $existing) {
-            return $existing;
-        }
-
-        $sentinel = new User();
-        $sentinel->setEmail(self::SENTINEL_EMAIL);
-        $sentinel->setGivenName('Former');
-        $sentinel->setFamilyName('member');
-        $sentinel->setPersonalizedColor('#0369a1');
-        // Random, never-known password → the account can't be signed into.
-        $sentinel->setPassword($this->hasher->hashPassword($sentinel, bin2hex(random_bytes(24))));
-        $this->em->persist($sentinel);
-        $this->em->flush();
-
-        return $sentinel;
     }
 }

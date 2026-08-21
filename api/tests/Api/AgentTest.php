@@ -6,6 +6,7 @@ use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\ApiToken;
 use App\Entity\Board;
+use App\Entity\Comment;
 use App\Entity\Notification;
 use App\Entity\Organization;
 use App\Entity\Space;
@@ -17,7 +18,9 @@ use App\Security\AgentSignInDeniedException;
 use App\Security\Permission\SpacePermission;
 use App\Security\Permission\SpacePermissionResolver;
 use App\Security\UserChecker;
+use App\Service\AgentDeletionService;
 use App\Service\AgentProvisioner;
+use App\Service\AuthorshipSentinel;
 use App\Service\PersonalOrganizationProvisioner;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -319,6 +322,69 @@ class AgentTest extends ApiTestCase
         $this->assertCount(0, $this->entityManager->getRepository(ApiToken::class)->findAll());
         // Only the admin's own membership survives.
         $this->assertCount(1, $this->entityManager->getRepository(SpaceMembership::class)->findAll());
+    }
+
+    public function testRemovingAnAgentKeepsWhatItWroteUnderAnAgentPlaceholder(): void
+    {
+        // v1 agents author nothing, so this can't happen yet — which is exactly
+        // why it's worth pinning now. The day autonomy ships, a plain remove()
+        // would silently take other people's task comments with it: nothing
+        // fails, content is just gone.
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSpace($admin);
+        $board = $this->createBoard($admin, $space);
+        $task = $this->createTask($admin, $board);
+        $agent = $this->provisionAgent($space, 'Helper');
+
+        $comment = (new Comment())
+            ->setAuthor($agent)
+            ->setTask($task)
+            ->setBody('I had a look at this.');
+        $this->entityManager->persist($comment);
+        $this->entityManager->flush();
+        $commentId = (string) $comment->getId();
+
+        $client = static::createClient();
+        $client->loginUser($admin);
+        $client->request('DELETE', '/spaces/' . $space->getId() . '/agents/' . $agent->getId());
+        $this->assertResponseStatusCodeSame(204);
+
+        $this->entityManager->clear();
+        $survivor = $this->entityManager->getRepository(Comment::class)->find($commentId);
+        $this->assertInstanceOf(Comment::class, $survivor);
+
+        $author = $survivor->getAuthor();
+        $this->assertInstanceOf(User::class, $author);
+        // The *agent* placeholder, never the human "Former member" one — a
+        // reader must not be led to believe a colleague wrote this.
+        $this->assertSame(AuthorshipSentinel::AGENT_EMAIL, $author->getEmail());
+        $this->assertTrue($author->isAgent());
+    }
+
+    public function testTheAgentPlaceholderCannotItselfBeDeleted(): void
+    {
+        // Deleting it would cascade away every orphaned piece of content that
+        // had been reassigned to it — undoing the whole point of the transfer.
+        $admin = $this->createUser('admin@example.com');
+        $space = $this->createSpace($admin);
+        $agent = $this->provisionAgent($space, 'Helper');
+
+        $sentinels = static::getContainer()->get(AuthorshipSentinel::class);
+        $placeholder = $sentinels->sentinelFor($agent);
+
+        $deletions = static::getContainer()->get(AgentDeletionService::class);
+        $this->expectException(\InvalidArgumentException::class);
+        $deletions->delete($placeholder);
+    }
+
+    public function testAgentDeletionRefusesAPerson(): void
+    {
+        $admin = $this->createUser('admin@example.com');
+        $this->createSpace($admin);
+
+        $deletions = static::getContainer()->get(AgentDeletionService::class);
+        $this->expectException(\InvalidArgumentException::class);
+        $deletions->delete($admin);
     }
 
     public function testAgentRoutesRefuseToActOnAHumanMember(): void
