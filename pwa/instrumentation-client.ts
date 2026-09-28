@@ -4,6 +4,8 @@
 // docs/developer/monitoring.md.
 import * as Sentry from "@sentry/nextjs";
 
+import { sentryDataCollection } from "@/lib/sentryDataCollection";
+
 const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 if (dsn) {
@@ -15,10 +17,11 @@ if (dsn) {
     // Session Replay off (both sampling rates 0) — errors still report fully.
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
-    sendDefaultPii: false,
+    // Restrictive v10-equivalent baseline — see lib/sentryDataCollection.ts.
+    dataCollection: sentryDataCollection,
     // Structured Logs: mirror browser console.* into Sentry Logs. Additive —
-    // messages still print to the console as usual.
-    enableLogs: true,
+    // messages still print to the console as usual. (v11 opts logs in by
+    // using a logging integration; there is no `enableLogs` flag any more.)
     integrations: [
       Sentry.consoleLoggingIntegration({ levels: ["log", "info", "warn", "error"] }),
     ],
