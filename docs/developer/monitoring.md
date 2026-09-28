@@ -25,8 +25,9 @@ the environment (exactly like the VAPID keys and the calendar-webhook URL).
   channels excluded) forward records — Monolog already fans each record out to
   every handler, so it keeps hitting stderr too. Records whose context carries an
   exception are skipped (they surface as issues instead). On the PWA, each
-  `Sentry.init` sets `enableLogs: true` + `consoleLoggingIntegration` so
-  `console.*` (log/info/warn/error) is mirrored while still printing normally.
+  `Sentry.init` adds `consoleLoggingIntegration` so `console.*`
+  (log/info/warn/error) is mirrored while still printing normally (Sentry JS v11
+  opts logs in by using a logging integration — there's no `enableLogs` flag).
   Logs count against a separate free-tier quota from errors/traces.
 - **Metrics** — the PWA's product-event catalog is mirrored into Sentry Metrics:
   `trackEvent()` (`pwa/lib/analytics.ts`) emits one `Sentry.metrics.count(name, 1)`
@@ -71,10 +72,26 @@ into the environment. The vars are wired to the `php` and `worker` services in
 - `sentry.edge.config.ts` — edge runtime.
 - `instrumentation.ts` — the Next.js entrypoint that loads the server/edge init.
 
-`next.config.js` is wrapped with `withSentryConfig`. **Source-map upload is
+`next.config.js` is wrapped with `withSentryConfig` (imported from
+`@sentry/nextjs/config` since v11). **Source-map upload is
 opt-in**: it only runs when `SENTRY_AUTH_TOKEN` (+ `SENTRY_ORG` / `SENTRY_PROJECT`)
 are set at build time, so a normal build without them just skips the upload —
 no build-time Sentry account needed for the dark launch.
+
+**Privacy baseline.** v11 replaced `sendDefaultPii` with `dataCollection`, and
+an *unset* `dataCollection` collects cookies, request/response bodies, user info
+and DB query data by default. All three inits pass the shared restrictive
+baseline from `pwa/lib/sentryDataCollection.ts` (the v10 `sendDefaultPii: false`
+equivalent). Loosen it only as a deliberate privacy decision.
+
+**Standalone tracing.** The prod image runs Next's standalone `server.js`, whose
+file tracer misses files the SDK loads at runtime. `next.config.js`
+`outputFileTracingIncludes` force-includes two: meriyah's ESM dist, and
+`@sentry/server-runtime-injection`'s ESM build (the `Module.register()` loader
+behind v11's channel-based instrumentation — without it the server logs
+"Failed to register diagnostics-channel injection hooks" and silently drops
+server-side spans). If a Sentry bump brings a new such warning, run the
+standalone server with `SENTRY_DEBUG=1` to see which file is missing.
 
 The DSN is **public** (baked into the client bundle at build), so a single
 `NEXT_PUBLIC_SENTRY_DSN` serves client + server. **It is NOT committed** — this
