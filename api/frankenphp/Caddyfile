@@ -37,12 +37,31 @@
 	encode zstd br gzip
 
 	mercure {
+		# This snippet is imported into two site blocks (public host + the
+		# internal http://php host), which creates two hub handlers. Mercure 1.0
+		# allows only one unnamed hub, and pools the transport by (config, name):
+		# the SAME name makes both handlers share one bolt transport, so updates
+		# the API publishes via http://php still reach browsers subscribed on
+		# the public host. Two different names would split them into separate
+		# hubs (and fail to open the same bolt file twice).
+		name madori
 		# Transport to use (default to Bolt). The Mercure Caddy module that
 		# ships with mercure-bundle 0.4 replaced the old
 		# `transport_url bolt:///path/to/db` scalar with a subdirective block.
 		transport bolt {
 			path /data/mercure.db
 		}
+		# FrankenPHP 1.13 bundles the Mercure 1.0 hub, which rejects the bare
+		# publisher_jwt/subscriber_jwt directives below unless compatibility
+		# mode is on — the hub refused to start, so the php container never
+		# went healthy. Our Symfony publisher (symfony/mercure, legacy protocol)
+		# and the PWA subscriber still speak 0.x: legacy `mercure` claim,
+		# mercureAuthorization cookie, no `at+jwt`/aud/exp. Mode 8 keeps that
+		# working exactly as on the pre-1.0 hub. Moving to modern mode means
+		# migrating to an `issuer` block AND switching symfony/mercure to
+		# protocol 1.0 (RFC 9068 claims) together — see the Mercure UPGRADE
+		# guide; until then, don't remove this line.
+		protocol_version_compatibility 8
 		# Publisher JWT key
 		publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY} {env.MERCURE_PUBLISHER_JWT_ALG}
 		# Subscriber JWT key
